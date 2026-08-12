@@ -8,6 +8,7 @@ import {
   CampaignLifecycleStatusSchema,
   CompanionAgentRequestSchema,
   isCompanionCampaignLifecycleStatus,
+  PendingActionTypeSchema,
   SubmitCompanionResultSchema,
 } from "./types.ts";
 
@@ -19,6 +20,18 @@ Deno.test("campaign lifecycle status guard only accepts supported statuses", () 
 
   assertThrows(() => CampaignLifecycleStatusSchema.parse("needs_adjustment"));
   assert(!isCompanionCampaignLifecycleStatus("needs_adjustment"));
+});
+
+Deno.test("pending action schema accepts conversational planner writes", () => {
+  assertEquals(PendingActionTypeSchema.parse("task_create"), "task_create");
+  assertEquals(
+    PendingActionTypeSchema.parse("campaign_create"),
+    "campaign_create",
+  );
+  assertEquals(
+    PendingActionTypeSchema.parse("day_plan_apply"),
+    "day_plan_apply",
+  );
 });
 
 Deno.test("submit companion result accepts agent-led follow-up decisions", () => {

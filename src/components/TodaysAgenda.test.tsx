@@ -3686,7 +3686,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     });
     expect(screen.getByText("Time")).toBeInTheDocument();
     expect(screen.getByText("Priority")).toBeInTheDocument();
-    expect(screen.getByText("XP")).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "XP" })).toBeInTheDocument();
   });
 
   it("shows the row action trigger when move-to-tomorrow is available", () => {
@@ -3928,7 +3928,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(slotMinutes).toHaveLength(48);
     expect(slotMinutes[0]).toBe(0);
     expect(slotMinutes.at(-1)).toBe(23 * 60 + 30);
-    expect(screen.getByTestId("journeys-day-grid")).toHaveStyle({ height: "2496px" });
+    expect(screen.getByTestId("journeys-day-grid")).toHaveStyle({ height: "1728px" });
     expect(screen.getByText("No tasks for this day")).toBeInTheDocument();
   });
 
@@ -3963,9 +3963,9 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
 
     const wrapper = getTimelineRowWrapper("task-scheduled-1");
     expect(Number(wrapper.getAttribute("data-start-minute"))).toBe(minuteFromTime("01:30"));
-    expect(Number(wrapper.getAttribute("data-top-px"))).toBeCloseTo(156);
-    expect(Number(wrapper.getAttribute("data-duration-height-px"))).toBeCloseTo(104);
-    expect(wrapper).toHaveStyle({ top: "156px", height: "104px" });
+    expect(Number(wrapper.getAttribute("data-top-px"))).toBeCloseTo(108);
+    expect(Number(wrapper.getAttribute("data-duration-height-px"))).toBeCloseTo(72);
+    expect(wrapper).toHaveStyle({ top: "108px", height: "72px" });
   });
 
   it("clips 30-minute scheduled quest cards while opening details in a drawer", async () => {
@@ -4101,8 +4101,8 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const row = screen.getByTestId("timeline-row-task-scheduled-60");
     const shell = getQuestCardShell(row);
 
-    expect(Number(wrapper.getAttribute("data-duration-height-px"))).toBeCloseTo(104);
-    expect(wrapper).toHaveStyle({ height: "104px" });
+    expect(Number(wrapper.getAttribute("data-duration-height-px"))).toBeCloseTo(72);
+    expect(wrapper).toHaveStyle({ height: "72px" });
     expect(row.style.overflow).toBe("");
     expect(row).not.toHaveAttribute("data-timeline-compact");
     expect(shell).not.toHaveAttribute("data-compact-timeline-card");
@@ -4400,5 +4400,79 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
 
     expect(elementScrollToSpy).not.toHaveBeenCalled();
     expect(windowScrollToSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("TodaysAgenda external calendar overlay", () => {
+  it("renders connected calendar events as read-only agenda items and refreshes them", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const onRefresh = vi.fn();
+    const onManageCalendars = vi.fn();
+    const onDateSelect = vi.fn();
+
+    render(
+      <TodaysAgenda
+        tasks={[]}
+        externalEvents={[
+          {
+            id: "meeting-1",
+            provider: "google",
+            title: "Project review",
+            taskDate: "2026-02-13",
+            scheduledTime: "10:00",
+            estimatedDuration: 45,
+            isAllDay: false,
+            startDate: "2026-02-13T18:00:00.000Z",
+            endDate: "2026-02-13T18:45:00.000Z",
+            location: null,
+            calendarId: "primary",
+            calendarName: "Work",
+            htmlLink: "https://calendar.google.com/event?eid=1",
+          },
+          {
+            id: "holiday-1",
+            provider: "outlook",
+            title: "Holiday",
+            taskDate: "2026-02-13",
+            scheduledTime: null,
+            estimatedDuration: 1440,
+            isAllDay: true,
+            startDate: "2026-02-13",
+            endDate: "2026-02-14",
+            location: null,
+            calendarId: "work",
+            calendarName: "Company",
+            htmlLink: null,
+          },
+        ]}
+        connectedCalendarCount={2}
+        onRefreshExternalCalendars={onRefresh}
+        onManageCalendars={onManageCalendars}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onDateSelect={onDateSelect}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={0}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByTestId("external-calendar-event-external:google:meeting-1")).toHaveTextContent(
+      "Project review",
+    );
+    expect(screen.getByTestId("external-calendar-all-day-events")).toHaveTextContent("Holiday");
+    expect(screen.queryByTestId("empty-state-pane")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh external calendars" }));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "2 connected" }));
+    expect(onManageCalendars).toHaveBeenCalledTimes(1);
   });
 });

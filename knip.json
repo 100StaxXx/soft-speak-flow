@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "scripts/**/*.{js,mjs,cjs,ts}",
+    "supabase/functions/*/index.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "scripts/**/*.{js,mjs,cjs,ts}",
+    "supabase/functions/**/*.ts",
+    "*.{js,mjs,cjs,ts}"
+  ],
+  "ignore": [
+    "supabase/functions/**/*.test.ts"
+  ],
+  "ignoreDependencies": [
+    "@capacitor/android",
+    "@capgo/capacitor-social-login"
+  ]
+}

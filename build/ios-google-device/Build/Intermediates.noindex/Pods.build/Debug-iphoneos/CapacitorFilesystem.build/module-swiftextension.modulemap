@@ -1,5 +1,0 @@
-
-module CapacitorFilesystem.Swift {
-  header "CapacitorFilesystem-Swift.h"
-  requires objc
-}

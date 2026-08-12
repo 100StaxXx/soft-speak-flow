@@ -227,8 +227,8 @@ export const CompanionErrorBoundary = ({ children }: { children: ReactNode }) =>
 export const QuestsErrorBoundary = ({ children }: { children: ReactNode }) => (
   <SectionErrorBoundary
     section="quests"
-    title="Quests unavailable"
-    description="Unable to load your quests right now"
+    title="Agenda unavailable"
+    description="Unable to load your schedule right now"
   >
     {children}
   </SectionErrorBoundary>

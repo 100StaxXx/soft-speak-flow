@@ -165,7 +165,7 @@ describe("BottomNav", () => {
   it("warms the local-first journeys cache on tab prefetch interactions", () => {
     renderBottomNav("/mentor");
 
-    fireEvent.pointerDown(screen.getByText("Quests"));
+    fireEvent.pointerDown(screen.getByText("Agenda"));
 
     expect(mocks.warmDailyTasksQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1", expect.any(String));
     expect(mocks.warmEpicsQueryFromRemote).not.toHaveBeenCalled();
@@ -181,7 +181,7 @@ describe("BottomNav", () => {
     try {
       renderBottomNav("/journeys");
 
-      fireEvent.click(screen.getByText("Quests"));
+      fireEvent.click(screen.getByText("Agenda"));
 
       expect(mocks.hapticsLight).toHaveBeenCalledTimes(1);
       expect(resetEvents).toHaveLength(1);
@@ -196,7 +196,7 @@ describe("BottomNav", () => {
 
     expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
       "Guide",
-      "Quests",
+      "Agenda",
       "Companion",
     ]);
   });

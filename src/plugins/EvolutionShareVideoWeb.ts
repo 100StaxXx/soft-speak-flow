@@ -4,7 +4,7 @@ import type {
   EvolutionShareVideoPluginInterface,
   RenderEvolutionShareVideoOptions,
   RenderEvolutionShareVideoResult,
-} from "./EvolutionShareVideoPlugin";
+} from "./EvolutionShareVideoTypes";
 
 export class EvolutionShareVideoWeb
   extends WebPlugin

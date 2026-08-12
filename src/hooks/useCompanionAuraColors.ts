@@ -17,7 +17,6 @@ const MOOD_MODIFIERS: Record<CompanionMood, { saturation: number; lightness: num
   neutral: { saturation: 40, lightness: 50, glowIntensity: 0.2 },
   reserved: { saturation: 25, lightness: 45, glowIntensity: 0.15 },
   quiet: { saturation: 15, lightness: 40, glowIntensity: 0.1 },
-  dormant: { saturation: 5, lightness: 30, glowIntensity: 0 },
 };
 
 export const useCompanionAuraColors = (): AuraColors => {

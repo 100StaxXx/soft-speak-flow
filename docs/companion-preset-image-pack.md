@@ -1,65 +1,49 @@
 # Companion Preset Image Pack
 
 ## Scope
+
 - Active roster: `dragon`, `wolf`, `kitsune`, `owl`, `lion`, `phoenix`, `pegasus`, `griffin`, `sphinx`, `leviathan`, `mechanicaldragon`, `tanuki`, `buttercat`
 - Storage slug compatibility: `kitsune` continues using the preset/storage slug `fox`
 - Legacy compatibility: `raven` remains in the preset table for existing companions, but is no longer part of the active selection roster
 - Elements: `fire`, `ice`, `storm`, `nature`, `void`, `light`
-- States: `normal`, `neglected`, `dormant`
-- Stages: `0..14`
-- Shared Stage 0 eggs:
-  - `t0_egg` -> stage `0`
-  - shared across the roster, keyed only by element
-  - bundled locally in `public/companion-eggs`
-- Preset art tiers:
-  - `t1_youth` -> stages `1..3`
-  - `t2_guardian` -> stages `4..6`
-  - `t3_champion` -> stages `7..9`
-  - `t4_mythic` -> stages `10..12`
-  - `t5_apex` -> stages `13..14`
+- Base state: `normal`
+- Expressive moods: `excited`, `happy`, `calm`, `concerned`, `sleepy`
+- Product forms: Egg (`0`), Hatchling (`1..4`), Initiate (`5..12`), Awakened (`13..20`), Guardian (`21..35`), Champion (`36..55`), Mythic (`56..80`), Ascended (`81..100`)
+- Storage tiers remain `t0_egg`, `t1_youth`, `t2_guardian`, `t3_champion`, `t4_mythic`, and `t5_apex` for asset compatibility.
+
+Time away never changes, damages, or replaces companion art. Absence-based variants are not generated.
 
 ## File spec
+
 - Transparent background
 - Square master: `2048x2048`
 - PNG or lossless WebP
-- Same framing for every preset across all tiers, states, and elements
+- Identical identity, framing, silhouette, and anatomy across every form, mood, variant, and element
 - Element changes palette and ambient effects only
-- Neglected changes posture and expression only
-- Dormant changes posture and eyes only
+- Expression changes body language and face without changing the character design
 
-## Filename convention
-Preset examples:
+## Filename and storage conventions
+
+Base portrait:
+
 ```text
-dragon__t3_champion__normal__fire.png
-wolf__t1_youth__neglected__void.png
-buttercat__t5_apex__dormant__light.png
+companion-presets/{preset_slug}/{tier}/normal/{preset_slug}__{tier}__normal__{element}.png
 ```
 
-Shared egg examples:
+Expressive portrait:
+
 ```text
-egg__t0_egg__normal__fire.png
-egg__t0_egg__normal__void.png
+companion-presets/{preset_slug}/{tier}/{expression}/{preset_slug}__{tier}__{expression}__v{1-5}__{element}.png
 ```
 
-## Storage layout
+Shared egg:
+
 ```text
-companion-eggs/
-  egg__t0_egg__normal__{element}.png
-
-companion-presets/
-  {preset_slug}/
-    {tier}/
-      {state}/
-        {preset_slug}__{tier}__{state}__{element}.png
+companion-eggs/egg__t0_egg__normal__{element}.png
 ```
-
-## Asset count
-- Shared egg library: `6 elements = 6`
-- Per preset pack: `5 tiers * 3 states * 6 elements = 90`
-- Active roster preset total: `13 presets * 90 = 1170`
-- Combined shipped total: `1170 + 6 shared eggs = 1176`
 
 ## Preset anchors
+
 - `dragon`: western dragon silhouette, swept horns, luminous chest core, long tail
 - `wolf`: thick neck ruff, alert ears, confident forward stance
 - `kitsune` (`fox` slug): fox spirit silhouette, oversized ears, luminous cheek markings, flowing tail fan
@@ -74,43 +58,15 @@ companion-presets/
 - `tanuki`: dark eye mask, plush striped tail, round canine body, playful trickster posture
 - `buttercat`: cat face, butterfly wings, soft antennae optional, plush tail
 
-## Generation order
-1. Maintain the shared Stage 0 egg sheet as the universal onboarding/reset entry point.
-2. Create one identity reference sheet per preset.
-3. Generate `normal` art for `t1_youth` through `t5_apex`.
-4. Derive the six element variants for each preset tier.
-5. Derive `neglected` and `dormant` from the matching preset tier+element render.
-6. QA for silhouette drift, framing drift, and anatomy violations before upload.
+## Generation and review
 
-## Expressive Portraits v1
-- Runtime moods: `excited`, `happy`, `calm`, `concerned`, `sleepy`
-- Alternates: `v1..v5` for each mood
-- Rollout tiers: `t1_youth` and `t2_guardian` only for the first expressive pass
-- Elements remain unchanged: `fire`, `ice`, `storm`, `nature`, `void`, `light`
-- Expression variants must preserve the same model sheet identity, crop family, and silhouette lock as the matching base portrait
+1. Maintain the six shared elemental eggs as the universal entry point.
+2. Lock one identity reference sheet per preset.
+3. Generate the normal portrait for each storage tier and element.
+4. Derive the five expressive moods from the matching normal portrait.
+5. Produce `v1..v5` per mood while preserving the identity and crop family.
+6. Reject silhouette drift, framing drift, anatomy violations, or unexplained costume changes before upload.
 
-### Expressive filename convention
-```text
-dragon__t1_youth__happy__v3__fire.png
-griffin__t2_guardian__concerned__v5__void.png
-buttercat__t1_youth__sleepy__v1__light.png
-```
-
-### Expressive storage layout
-```text
-companion-presets/
-  {preset_slug}/
-    {tier}/
-      {expression}/
-        {preset_slug}__{tier}__{expression}__v{1-5}__{element}.png
-```
-
-### Expressive asset count
-- Per tier+element pack: `5 moods * 5 variants = 25`
-- v1 shipped tiers per preset: `2 tiers * 6 elements * 25 = 300`
-- Active roster v1 expressive total: `13 presets * 300 = 3900`
-
-### Expressive review tooling
 - Manifest + prompt pack: `npm run companions:expressive:manifest`
 - 5x5 review sheets: `npm run companions:expressive:sheets`
 - Review sheet layout: rows = moods, columns = variants, one sheet per preset+tier+element

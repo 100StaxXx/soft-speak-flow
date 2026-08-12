@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/security-regression.yml"
       - "package.json"
+      - "package-lock.json"
       - "scripts/run-security-function-tests.sh"
       - "supabase/**"
   workflow_dispatch:
@@ -30,6 +31,9 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           version: latest
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=moderate
 
       - name: Start local Supabase stack
         run: supabase start --exclude edge-runtime

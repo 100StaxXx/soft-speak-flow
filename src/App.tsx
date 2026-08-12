@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, Navigate, useNavigate, useParams } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { useCallback, useEffect, Suspense, lazy, memo, useRef, useState, type ReactNode } from "react";
 import { Capacitor } from "@capacitor/core";
@@ -21,7 +21,6 @@ import { useProfile } from "@/hooks/useProfile";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { GlobalEvolutionListener } from "@/components/GlobalEvolutionListener";
 import { RealtimeSyncProvider } from "@/components/RealtimeSyncProvider";
 import { InstallPWA } from "@/components/InstallPWA";
 import { lockToPortrait } from "@/utils/orientationLock";
@@ -37,7 +36,6 @@ import {
 } from "@/utils/nativePushNotifications";
 import { logger } from "@/utils/logger";
 import { AstralEncounterProvider } from "@/components/astral-encounters/AstralEncounterProvider";
-import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
 import { WeeklyRecapProvider } from "@/contexts/WeeklyRecapContext";
 import { useAppResumeRefresh } from "@/hooks/useAppResumeRefresh";
 import { TalkPopupProvider } from "@/contexts/TalkPopupContext";
@@ -89,6 +87,7 @@ const PepTalks = lazy(() => import("./pages/PepTalks"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const PremiumSuccess = lazy(() => import("./pages/PremiumSuccess"));
+const Premium = lazy(() => import("./pages/Premium"));
 const SharedEpics = lazy(() => import("./pages/SharedEpics"));
 const Partners = lazy(() => import("./pages/Partners"));
 const JoinEpic = lazy(() => import("./pages/JoinEpic"));
@@ -97,10 +96,17 @@ const InfluencerDashboard = lazy(() => import("./pages/InfluencerDashboard"));
 const AccountDeletionHelp = lazy(() => import("./pages/AccountDeletionHelp"));
 const Recaps = lazy(() => import("./pages/Recaps"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
-const TestDayPlanner = lazy(() => import("./pages/TestDayPlanner"));
-const TestScroll = lazy(() => import("./pages/TestScroll"));
-const IAPTest = lazy(() => import("./pages/IAPTest"));
 const SupportReport = lazy(() => import("./pages/SupportReport"));
+const GlobalEvolutionListener = lazy(() =>
+  import("@/components/GlobalEvolutionListener").then((module) => ({
+    default: module.GlobalEvolutionListener,
+  })),
+);
+const WeeklyRecapModal = lazy(() =>
+  import("@/components/WeeklyRecapModal").then((module) => ({
+    default: module.WeeklyRecapModal,
+  })),
+);
 
 
 // Create query client outside component for better performance and stability
@@ -164,6 +170,16 @@ const LoadingFallback = memo(() => (
 
 LoadingFallback.displayName = 'LoadingFallback';
 
+const LegacyTaskRedirect = () => {
+  const { taskId } = useParams<{ taskId: string }>();
+  return <Navigate to={taskId ? `/journeys?taskId=${encodeURIComponent(taskId)}` : "/journeys"} replace />;
+};
+
+const LegacyInviteRedirect = () => {
+  const { code } = useParams<{ code: string }>();
+  return <Navigate to={code ? `/join/${encodeURIComponent(code)}` : "/campaigns"} replace />;
+};
+
 const RootRoute = memo(() => {
   const { user, loading, status } = useAuth();
   const authStatus = status ?? (loading ? 'loading' : user ? 'authenticated' : 'unauthenticated');
@@ -202,7 +218,6 @@ const EvolutionAwareContent = memo(() => {
   return (
     <>
       <GlobalEvolutionListener />
-      {/* SubscriptionGate removed - monetization disabled */}
       <WeeklyRecapModal />
     </>
   );
@@ -466,13 +481,17 @@ const AppContent = memo(() => {
                   <Route path="/" element={<RootRoute />} />
                   
                   <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                  <Route path="/premium" element={<Navigate to="/" replace />} />
+                  <Route path="/premium" element={<ProtectedRoute requireAccess={false}><Premium /></ProtectedRoute>} />
                   <Route path="/premium/success" element={<ProtectedRoute requireAccess={false}><PremiumSuccess /></ProtectedRoute>} />
                   <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
                   <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
                   <Route path="/admin" element={<ProtectedRoute requireMentor={false} requireAccess={false}><Admin /></ProtectedRoute>} />
                   <Route path="/tasks" element={<Navigate to="/journeys" replace />} />
+                  <Route path="/task/:taskId" element={<LegacyTaskRedirect />} />
+                  <Route path="/tasks/:taskId" element={<LegacyTaskRedirect />} />
                   <Route path="/epics" element={<Navigate to="/campaigns" replace />} />
+                  <Route path="/epics/join/:code" element={<LegacyInviteRedirect />} />
+                  <Route path="/campaigns/join/:code" element={<LegacyInviteRedirect />} />
                   <Route path="/join/:code" element={<JoinEpic />} />
                   <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
                   <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
@@ -490,13 +509,10 @@ const AppContent = memo(() => {
                   <Route path="/help" element={<ProtectedRoute><HelpCenter /></ProtectedRoute>} />
                   <Route path="/inbox" element={<Navigate to="/journeys?section=inbox" replace />} />
                   <Route path="/contacts" element={<Navigate to="/profile" replace />} />
-                  <Route path="/iap-test" element={<IAPTest />} />
                   <Route path="/support/report" element={<ProtectedRoute requireAccess={false}><SupportReport /></ProtectedRoute>} />
                   <Route path="/guilds" element={<Navigate to="/campaigns" replace />} />
                   <Route path="/terms" element={<TermsOfService />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
-                  <Route path="/test-scroll" element={<TestScroll />} />
-                  <Route path="/test-day-planner" element={<TestDayPlanner />} />
                   <Route path="*" element={<NotFound />} />
                             </Routes>
                             </AnimatePresence>

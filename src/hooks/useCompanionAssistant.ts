@@ -178,12 +178,6 @@ type PendingLegacyFallbackReplay = {
   shouldConsumePendingStarterIntent: boolean;
 };
 
-const hasPlanDaySnapshotBriefing = (
-  launchIntent: CompanionPlannerLaunchIntent | null | undefined,
-) =>
-  launchIntent?.starterIntent === "plan_day" &&
-  Boolean(launchIntent.briefingContext?.dataSnapshot);
-
 const readFollowUpSelectedDate = (
   followUp: CompanionAgentFollowUp | null | undefined,
 ) => {
@@ -205,7 +199,7 @@ const shouldApplyDefaultSelectedDateToStarterIntent = (
 
 const shouldForceChatAfterLauncherStarterIntent = (
   starterIntent: CompanionPlannerLaunchIntent["starterIntent"] | null | undefined,
-) => starterIntent === "plan_day" || starterIntent === "upcoming_start";
+) => starterIntent === "upcoming_start";
 
 const hasChatOnlyLauncherStructuredResponse = (
   response: CompanionAgentResponse["structuredResponse"] | null | undefined,
@@ -782,7 +776,7 @@ export function useCompanionAssistant({
     surface,
     conversationEnabled,
     onOpenCampaignBuilder,
-    plannerFallbackMode: "read_only",
+    plannerFallbackMode: useLegacyFallback ? "interactive" : "read_only",
   });
 
   const [activeSessionId, setActiveSessionId] = useState(() =>
@@ -1454,15 +1448,18 @@ export function useCompanionAssistant({
       setDraftInput("");
       setInterimText("");
 
-      const shouldUseDirectChat = shouldUseDirectCompanionChat({
-        surface,
-        message,
-        starterIntent,
-        turnOrigin: options?.turnOrigin,
-        selectedDate,
-        activeFollowUp: requestActiveFollowUp,
-        pendingAction,
-      }) || forceLauncherContinuationChat;
+      const hasOpenPlannerThread = surface === "journeys" &&
+        Boolean(lastReplayablePlannerMessageRef.current);
+      const shouldUseDirectChat = forceLauncherContinuationChat ||
+        (!hasOpenPlannerThread && shouldUseDirectCompanionChat({
+          surface,
+          message,
+          starterIntent,
+          turnOrigin: options?.turnOrigin,
+          selectedDate,
+          activeFollowUp: requestActiveFollowUp,
+          pendingAction,
+        }));
       const directChatHistory = shouldUseDirectChat
         ? buildDirectChatHistory(messages)
         : [];
@@ -1833,6 +1830,17 @@ export function useCompanionAssistant({
         });
         if (mode === "confirm" && response.receipt?.status === "executed") {
           emitPlanDayActionSavedEvent();
+          for (const queryKey of [
+            "daily-tasks",
+            "tasks",
+            "calendar-tasks",
+            "inbox-tasks",
+            "habit-surfacing",
+            "epics",
+            "epic-progress",
+          ]) {
+            void queryClient.invalidateQueries({ queryKey: [queryKey] });
+          }
         }
         void speakAssistantReply(
           response.reply,
@@ -1857,6 +1865,7 @@ export function useCompanionAssistant({
       isSubmitting,
       legacyAssistant,
       pendingAction,
+      queryClient,
       speakAssistantReply,
       structuredResponse,
       surface,
@@ -2013,8 +2022,6 @@ export function useCompanionAssistant({
     const isCompanionAuthoredConversationStarter =
       launchIntent.target === "conversation" &&
       launchIntent.starterIntent === "free_talk_start";
-    const isSnapshotOnlyPlanDayStarter =
-      hasPlanDaySnapshotBriefing(launchIntent);
     const isLocalUpcomingStarter =
       localScheduleReadEnabled &&
       launchIntent.starterIntent === "upcoming_start";
@@ -2035,29 +2042,6 @@ export function useCompanionAssistant({
               greetingText,
               visibleAssistantOpening: true,
             });
-          }
-          return;
-        }
-
-        if (isSnapshotOnlyPlanDayStarter) {
-          let nextSessionId: string | undefined;
-          if (useLegacyFallback) {
-            nextSessionId = legacyAssistant.startTemplateThread?.();
-          } else {
-            nextSessionId = startTemplateThread({ greetingText: null });
-          }
-          if (nextSessionId) {
-            chatOnlyLauncherSessionRef.current = nextSessionId;
-          } else {
-            chatOnlyLauncherSessionRef.current = activeSessionIdRef.current;
-          }
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(
-              new CustomEvent("companion-plan-my-day-started"),
-            );
-            window.dispatchEvent(
-              new CustomEvent("companion-plan-my-day-snapshot-shown"),
-            );
           }
           return;
         }
@@ -2206,6 +2190,9 @@ export function useCompanionAssistant({
       pendingAction: legacyAssistant.pendingAction,
       pendingActionCount: legacyAssistant.pendingActionCount,
       readyPendingActionCount: legacyAssistant.readyPendingActionCount,
+      editableQuestProposal: legacyAssistant.editableQuestProposal,
+      completeEditableQuestProposal: legacyAssistant.completeEditableQuestProposal,
+      rejectEditableQuestProposal: legacyAssistant.rejectEditableQuestProposal,
       draftInput,
       setDraftInput,
       interimText,
@@ -2267,6 +2254,9 @@ export function useCompanionAssistant({
     pendingAction,
     pendingActionCount: pendingAction ? 1 : 0,
     readyPendingActionCount: pendingAction ? 1 : 0,
+    editableQuestProposal: null,
+    completeEditableQuestProposal: async () => undefined,
+    rejectEditableQuestProposal: async () => undefined,
     draftInput,
     setDraftInput,
     interimText,

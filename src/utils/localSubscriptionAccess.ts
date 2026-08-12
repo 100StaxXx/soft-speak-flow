@@ -1,4 +1,4 @@
-import type { AccessState } from "@/hooks/useAccessState";
+import type { AccessState } from "@/types/access";
 import type { StoreKitTransaction } from "@/types/subscription";
 import { resolvePlanFromProductId, type IAPPlan } from "@/utils/appleIAP";
 

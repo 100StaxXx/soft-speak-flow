@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
-import { PawPrint, User, Compass } from "lucide-react";
+import { PawPrint, User, CalendarDays } from "lucide-react";
 
 import { NavLink } from "@/components/NavLink";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -213,9 +213,9 @@ export const BottomNav = memo(() => {
           >
             {({ isActive }) => (
               <>
-                <Compass className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground'}`} />
+                <CalendarDays className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground'}`} />
                 <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground/85'}`}>
-                  Quests
+                  Agenda
                 </span>
               </>
             )}

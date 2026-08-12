@@ -151,9 +151,6 @@ verify_jwt = true
 [functions.process-daily-decay]
 verify_jwt = false
 
-[functions.generate-neglected-companion-image]
-verify_jwt = false
-
 [functions.generate-smart-notifications]
 verify_jwt = false
 
@@ -180,9 +177,6 @@ verify_jwt = false
 
 [functions.schedule-daily-quote-pushes]
 verify_jwt = false
-
-[functions.generate-activity-comment]
-verify_jwt = true
 
 [functions.generate-check-in-response]
 verify_jwt = true
@@ -384,15 +378,6 @@ verify_jwt = true
 
 [functions.verify-admin-access]
 verify_jwt = true
-
-[functions.generate-dormant-companion-image]
-verify_jwt = false
-
-[functions.generate-memorial-image]
-verify_jwt = false
-
-[functions.generate-companion-scar]
-verify_jwt = false
 
 [functions.transcribe-audio]
 verify_jwt = false

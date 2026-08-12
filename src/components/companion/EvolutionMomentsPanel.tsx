@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
 import {
   PROGRESSION_VISUAL_BOUNDARY_LEVELS,
+  getVisualStageDisplay,
   isTierBoundaryLevel,
 } from "@/config/progression";
 import { supabase } from "@/integrations/supabase/client";
@@ -388,7 +389,7 @@ const EvolutionMomentsGrid = ({
 
       const result = await shareRenderedMedia({
         uriOrFile: renderedVideo,
-        title: `Stage ${moment.stage} Evolution`,
+        title: `${getVisualStageDisplay(moment.stage)} Evolution`,
         text: DEFAULT_EVOLUTION_SHARE_TEXT,
         dialogTitle: "Share evolution video",
       });
@@ -434,7 +435,7 @@ const EvolutionMomentsGrid = ({
       >
         <DialogContent className="max-w-xl rounded-xl p-4">
           <DialogHeader>
-            <DialogTitle>Stage {selectedMoment?.stage} Evolution</DialogTitle>
+            <DialogTitle>{selectedMoment ? getVisualStageDisplay(selectedMoment.stage) : "Form"} Evolution</DialogTitle>
             <DialogDescription>
               {selectedMoment?.animation_completed_at
                 ? formatMomentDate(selectedMoment.animation_completed_at)
@@ -528,8 +529,8 @@ const EvolutionMomentCard = ({
         className="block w-full text-left"
         aria-label={
           canPlay
-            ? `Stage ${moment.stage} evolution`
-            : `Stage ${moment.stage} evolution generating`
+            ? `${getVisualStageDisplay(moment.stage)} evolution`
+            : `${getVisualStageDisplay(moment.stage)} evolution generating`
         }
       >
         <div
@@ -557,7 +558,7 @@ const EvolutionMomentCard = ({
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/76 via-black/10 to-transparent" />
           <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-semibold text-white">
-            Stage {moment.stage}
+            {getVisualStageDisplay(moment.stage)}
           </span>
         </div>
       </button>
@@ -567,7 +568,7 @@ const EvolutionMomentCard = ({
           type="button"
           variant="secondary"
           size="icon"
-          aria-label={`Share evolution for stage ${moment.stage}`}
+          aria-label={`Share evolution for ${getVisualStageDisplay(moment.stage)}`}
           className="absolute right-2 top-2 h-8 w-8 border border-white/20 bg-background/70 text-foreground shadow-sm backdrop-blur hover:bg-background/85"
           onClick={(event) => {
             event.stopPropagation();

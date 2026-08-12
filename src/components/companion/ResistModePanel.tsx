@@ -72,7 +72,7 @@ export const ResistModePanel = memo(() => {
                 Astral Encounters are only available on iPhone and iPad.
               </p>
               <p className="text-xs text-muted-foreground">
-                Open Soft Speak Flow on your iPhone or iPad to play Astral Encounters.
+                Open Cosmiq on your iPhone or iPad to play Astral Encounters.
               </p>
             </div>
           </div>

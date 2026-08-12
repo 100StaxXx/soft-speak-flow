@@ -123,13 +123,13 @@ vi.mock("@/utils/globalAudio", () => ({
 import { CompanionEvolution } from "./CompanionEvolution";
 
 const FULL_SEQUENCE_MS = {
-  hold: 800,
-  charge: 3200,
-  conceal: 850,
-  strobe: 2920,
-  apex: 340,
-  reveal: 2400,
-  dismissBuffer: 3000,
+  hold: 700,
+  charge: 2400,
+  conceal: 650,
+  strobe: 1800,
+  apex: 300,
+  reveal: 1900,
+  dismissBuffer: 1000,
 } as const;
 
 const REDUCED_SEQUENCE_MS = {
@@ -143,17 +143,17 @@ const REDUCED_SEQUENCE_MS = {
 
 const STROBE_BEAT_OFFSETS_MS = [
   0,
-  350,
-  685,
-  1005,
-  1305,
-  1585,
-  1845,
-  2085,
-  2305,
-  2495,
-  2660,
-  2800,
+  250,
+  480,
+  690,
+  880,
+  1050,
+  1200,
+  1335,
+  1455,
+  1555,
+  1640,
+  1710,
 ] as const;
 const FULL_DISMISSABLE_SEQUENCE_MS =
   FULL_SEQUENCE_MS.hold
@@ -271,6 +271,9 @@ describe("CompanionEvolution", () => {
 
     const dialog = screen.getByRole("alertdialog");
     expect(dialog).toHaveAttribute("data-phase", "hold");
+    expect(screen.getByTestId("evolution-atmosphere")).toBeInTheDocument();
+    expect(screen.getByTestId("evolution-phase-beacon")).toHaveTextContent("Ascension 4 → 5");
+    expect(screen.getByTestId("evolution-orbit-system")).toBeInTheDocument();
 
     fireEvent.click(dialog);
     expect(props.onComplete).not.toHaveBeenCalled();
@@ -298,6 +301,10 @@ describe("CompanionEvolution", () => {
     await flushTimers(FULL_SEQUENCE_MS.apex);
     expect(dialog).toHaveAttribute("data-phase", "reveal");
     expect(screen.getByText("Evolved!")).toBeInTheDocument();
+    expect(screen.getByTestId("evolution-reveal-rings")).toBeInTheDocument();
+    expect(screen.getByTestId("evolution-stage-transition")).toHaveTextContent("Form 1 • Hatchling");
+    expect(screen.getByTestId("evolution-stage-transition")).toHaveTextContent("Form 2 • Initiate");
+    expect(screen.getByTestId("evolution-stage-transition")).toHaveTextContent("Fire essence");
 
     await flushTimers(FULL_SEQUENCE_MS.reveal);
     expect(dialog).toHaveAttribute("data-phase", "settle");
@@ -392,6 +399,7 @@ describe("CompanionEvolution", () => {
     expect(artStage).toHaveAttribute("data-strobe-beat", "-1");
     expect(artStage).toHaveAttribute("data-strobe-target", "none");
     expect(screen.queryByTestId("evolution-convergence-particles")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("evolution-orbit-system")).not.toBeInTheDocument();
 
     await flushTimers(REDUCED_SEQUENCE_MS.hold);
     expect(dialog).toHaveAttribute("data-phase", "charge");
@@ -821,13 +829,17 @@ describe("CompanionEvolution", () => {
     expect(mocks.hapticsMediumMock).toHaveBeenCalledTimes(4);
   });
 
-  it("still allows emergency exit during the longer cinematic sequence", async () => {
-    const props = buildProps();
+  it("offers an emergency exit when a generated animation never finishes", async () => {
+    const props = {
+      ...buildProps(),
+      animationVideoUrl: "https://example.com/never-ending-evolution.mp4",
+    };
     render(<CompanionEvolution {...props} />);
     await prepareEvolution();
 
     await flushTimers(15_000);
 
+    expect(screen.queryByRole("button", { name: "Tap anywhere to continue" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Close evolution modal" }));
     expect(props.onComplete).toHaveBeenCalledTimes(1);
   });

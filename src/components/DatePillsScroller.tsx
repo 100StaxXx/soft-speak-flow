@@ -499,7 +499,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       onPointerDownCapture={handleUserDateInteraction}
       onTouchStartCapture={handleUserDateInteraction}
       onWheelCapture={handleUserDateInteraction}
-      className={cn("flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1")}
+      className={cn("flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1")}
       style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
     >
       <div
@@ -527,7 +527,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
             }}
             className={cn(
               "flex-shrink-0 flex flex-col items-center justify-center",
-              "min-w-[52px] h-16 rounded-xl transition-all duration-200",
+              "min-w-[44px] h-[52px] rounded-xl transition-all duration-200",
               "border border-border/50",
               isSelected
                 ? "bg-gradient-to-br from-primary to-purple-500 text-white border-primary shadow-lg shadow-primary/25"
@@ -540,7 +540,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
           >
             <span
               className={cn(
-                "text-[10px] font-medium uppercase tracking-wide",
+                "text-[9px] font-medium uppercase tracking-wide",
                 isSelected ? "text-white/90" : isDayToday ? "text-celestial-blue" : "text-muted-foreground",
               )}
             >
@@ -548,25 +548,25 @@ export const DatePillsScroller = memo(function DatePillsScroller({
             </span>
             <span
               className={cn(
-                "text-lg font-bold leading-tight",
+                "text-base font-bold leading-tight",
                 isSelected ? "text-white" : isDayToday ? "text-celestial-blue" : "text-foreground",
               )}
             >
               {format(date, "d")}
             </span>
-            <div className="flex gap-0.5 mt-0.5 h-1.5">
+            <div className="mt-0.5 flex h-1 gap-0.5">
               {taskCount > 0 && (
                 <>
                   <div
                     className={cn(
-                      "h-1.5 w-1.5 rounded-full",
+                      "h-1 w-1 rounded-full",
                       isSelected ? "bg-white/70" : isDayToday ? "bg-celestial-blue/60" : "bg-stardust-gold/60",
                     )}
                   />
                   {taskCount > 1 && (
                     <div
                       className={cn(
-                        "h-1.5 w-1.5 rounded-full",
+                        "h-1 w-1 rounded-full",
                         isSelected ? "bg-white/50" : isDayToday ? "bg-celestial-blue/40" : "bg-stardust-gold/40",
                       )}
                     />
@@ -574,7 +574,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
                   {taskCount > 2 && (
                     <div
                       className={cn(
-                        "h-1.5 w-1.5 rounded-full",
+                        "h-1 w-1 rounded-full",
                         isSelected ? "bg-white/30" : isDayToday ? "bg-celestial-blue/20" : "bg-stardust-gold/20",
                       )}
                     />

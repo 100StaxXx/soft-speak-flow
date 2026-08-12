@@ -13,6 +13,7 @@ export type CompanionAttributeSourceEvent =
   | "habit_complete_learning"
   | "morning_check_in"
   | "evening_reflection"
+  | "daily_chapter_reflection"
   | "health_task_complete"
   | "recovery_block_kept"
   | "hard_task_complete"
@@ -178,6 +179,12 @@ export const COMPANION_ATTRIBUTE_EVENT_CONFIG: Record<
     attribute: "alignment",
     sourceEvent: "evening_reflection",
     amount: 4,
+    applyEchoGains: false,
+  },
+  daily_chapter_reflection: {
+    attribute: "wisdom",
+    sourceEvent: "daily_chapter_reflection",
+    amount: 6,
     applyEchoGains: false,
   },
   health_task_complete: {

@@ -58,7 +58,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>We use the camera only if you choose to take photos for your profile, progress tracking, or to attach images to your quests.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>We use the microphone for voice input to create tasks and chat with your mentor using your voice.</string>
+	<string>We use the microphone for voice input to create tasks and chat with your companion using your voice.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>We use speech recognition to convert your voice into text for creating tasks and sending messages.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
@@ -115,5 +115,7 @@
 	<true/>
 	<key>GooglePlacesAPIKey</key>
 	<string>$(GOOGLE_PLACES_IOS_API_KEY)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

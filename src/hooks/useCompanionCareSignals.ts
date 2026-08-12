@@ -54,8 +54,6 @@ interface CompanionCareData {
   dialogueTone: 'joyful' | 'content' | 'neutral' | 'reserved' | 'quiet' | 'silent';
 }
 
-const DORMANCY_RECOVERY_DAYS_REQUIRED = 5;
-
 /**
  * Hook to fetch hidden care signals from the backend.
  * These are calculated daily by process-daily-decay and stored in user_companion.
@@ -147,26 +145,16 @@ export const useCompanionCareSignals = (
     };
 
     // Dormancy state
-    const dormantSince = careData?.dormant_since;
-    const isDormant = !!dormantSince;
-    const recoveryDays = careData?.dormancy_recovery_days ?? 0;
     const inactiveDays = careData?.inactive_days ?? 0;
-    
-    // Calculate days until dormancy (warning shows at 5-6 inactive days, dormancy at 7)
-    const DORMANCY_THRESHOLD = 7;
-    const WARNING_THRESHOLD = 5;
-    const daysUntilDormancy = !isDormant && inactiveDays >= WARNING_THRESHOLD 
-      ? Math.max(1, DORMANCY_THRESHOLD - inactiveDays) 
-      : null;
-    
+
     const dormancy: DormancyState = {
-      isDormant,
-      dormantSince: dormantSince ?? null,
+      isDormant: false,
+      dormantSince: null,
       dormancyCount: careData?.dormancy_count ?? 0,
-      recoveryDays,
-      daysUntilWake: isDormant ? Math.max(0, DORMANCY_RECOVERY_DAYS_REQUIRED - recoveryDays) : 0,
+      recoveryDays: 0,
+      daysUntilWake: 0,
       inactiveDays,
-      daysUntilDormancy,
+      daysUntilDormancy: null,
     };
 
     // Bond state
@@ -176,24 +164,18 @@ export const useCompanionCareSignals = (
       lastInteractionAt: careData?.last_interaction_at ?? null,
     };
 
-    // Check for dormancy warning in care_pattern
-    const carePattern = careData?.care_pattern as Record<string, any> | null;
-    const hasDormancyWarning = carePattern?.dormancy_warning === true;
+    const hasDormancyWarning = false;
 
     // Determine dialogue tone based on overall care
     let dialogueTone: CompanionCareData['dialogueTone'] = 'content';
-    if (isDormant) {
-      dialogueTone = 'silent';
-    } else if (overallCare > 0.8) {
+    if (overallCare > 0.8) {
       dialogueTone = 'joyful';
     } else if (overallCare > 0.6) {
       dialogueTone = 'content';
     } else if (overallCare > 0.4) {
       dialogueTone = 'neutral';
-    } else if (overallCare > 0.2) {
-      dialogueTone = 'reserved';
     } else {
-      dialogueTone = 'quiet';
+      dialogueTone = 'neutral';
     }
 
     return {
@@ -227,8 +209,8 @@ export const getEvolutionPathInfo = (path: EvolutionPath['path']) => {
       };
     case 'volatile_ascendant':
       return {
-        name: 'Volatile Ascendant',
-        description: 'Your intense but erratic energy has forged a powerful, passionate companion.',
+        name: 'Dynamic Ascendant',
+        description: 'Your bursts of energy have shaped a powerful, adaptable companion.',
         icon: '⚡',
         color: 'text-purple-400',
         bgColor: 'bg-purple-500/10',
@@ -236,8 +218,8 @@ export const getEvolutionPathInfo = (path: EvolutionPath['path']) => {
       };
     case 'neglected_wanderer':
       return {
-        name: 'Neglected Wanderer',
-        description: 'Time apart has made your companion independent but distant.',
+        name: 'Open-Sky Wanderer',
+        description: 'Time and return have shaped an independent companion that always welcomes a new beginning.',
         icon: '🌙',
         color: 'text-slate-400',
         bgColor: 'bg-slate-500/10',

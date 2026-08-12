@@ -120,7 +120,7 @@ describe("ProtectedRoute", () => {
     expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
   });
 
-  it("does not reuse a previous user's access decision during account switches", () => {
+  it("blocks content instead of reusing a previous user's access decision during account switches", () => {
     authState.status = "authenticated";
     authState.loading = false;
     authState.user = { id: "user-a" };
@@ -133,11 +133,11 @@ describe("ProtectedRoute", () => {
     accessState.loading = true;
     view.rerender(ProtectedRouteTree());
 
-    expect(screen.getByText("Protected Content")).toBeInTheDocument();
-    expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
+    expect(screen.getByText("Checking access...")).toBeInTheDocument();
+    expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
   });
 
-  it("renders protected content while the initial access check is still loading", () => {
+  it("does not render protected content while the initial access check is still loading", () => {
     authState.status = "authenticated";
     authState.loading = false;
     authState.user = { id: "user-stalled" };
@@ -147,11 +147,11 @@ describe("ProtectedRoute", () => {
 
     renderProtectedRoute();
 
-    expect(screen.getByText("Protected Content")).toBeInTheDocument();
-    expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
+    expect(screen.getByText("Checking access...")).toBeInTheDocument();
+    expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
   });
 
-  it("shows the paywall if access resolves denied after the optimistic initial render", () => {
+  it("shows the paywall if the initial access check resolves denied", () => {
     authState.status = "authenticated";
     authState.loading = false;
     authState.user = { id: "user-denied-after-stall" };
@@ -161,7 +161,8 @@ describe("ProtectedRoute", () => {
 
     const view = renderProtectedRoute();
 
-    expect(screen.getByText("Protected Content")).toBeInTheDocument();
+    expect(screen.getByText("Checking access...")).toBeInTheDocument();
+    expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
 
     accessState.loading = false;
     accessState.hasAccess = false;

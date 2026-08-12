@@ -199,9 +199,14 @@ export const getEvolutionTheme = (element?: string, isFirstEvolution?: boolean):
   }
   
   const normalizedElement = element?.trim().toLowerCase();
+  const themeElement = normalizedElement === "storm"
+    ? "lightning"
+    : normalizedElement === "void"
+      ? "shadow"
+      : normalizedElement;
 
-  if (normalizedElement && ELEMENT_THEMES[normalizedElement]) {
-    return ELEMENT_THEMES[normalizedElement];
+  if (themeElement && ELEMENT_THEMES[themeElement]) {
+    return ELEMENT_THEMES[themeElement];
   }
   
   return DEFAULT_THEME;

@@ -2,6 +2,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
+import {
+  parseFunctionInvokeError,
+  toUserFacingFunctionError,
+} from "@/utils/supabaseFunctionErrors";
 
 export interface CompanionStory {
   id: string;
@@ -37,7 +41,7 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: story, isLoading } = useQuery<CompanionStory | null>({
+  const { data: story, isLoading, error, refetch } = useQuery<CompanionStory | null>({
     queryKey: ["companion-story", companionId, stage],
     queryFn: async () => {
       if (!companionId || stage === undefined) return null;
@@ -94,18 +98,26 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
 
       if (error) {
         console.error("Story generation error:", error);
-        throw new Error("Unable to write your story right now. Please try again.");
+        throw error;
       }
-      return data as CompanionStory;
+      if (data?.error) throw new Error(data.error);
+      return data as CompanionStory & { cached?: boolean };
     },
-    onSuccess: () => {
-      toast.success("📖 New chapter unlocked!");
+    onSuccess: (data) => {
+      if (!(data as CompanionStory & { cached?: boolean })?.cached) {
+        toast.success("📖 New chapter unlocked!");
+      }
       queryClient.invalidateQueries({ queryKey: ["companion-story"] });
       queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
     },
-    onError: (error) => {
+    onError: async (error) => {
       console.error("Story generation failed:", error);
-      toast.error(error instanceof Error ? error.message : "Something went wrong. Please try again.");
+      const parsed = await parseFunctionInvokeError(error);
+      toast.error("Chapter could not be written", {
+        description: toUserFacingFunctionError(parsed, {
+          action: "write this chapter",
+        }),
+      });
     },
     onSettled: (_data, _error, _variables, context) => {
       if (context?.loadingToastId) {
@@ -118,6 +130,8 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
     story,
     allStories,
     isLoading,
+    error,
+    refetch,
     generateStory,
   };
 };

@@ -197,7 +197,7 @@ describe("companion asset resolver", () => {
     expect(getPublicUrlMock).not.toHaveBeenCalled();
   });
 
-  it("preserves higher-tier remote coverage for existing remote presets", () => {
+  it("does not advertise higher-tier remote coverage that is absent from storage", () => {
     expect(
       getPresetCompanionAssetUrl({
         presetId: "dragon",
@@ -205,12 +205,22 @@ describe("companion asset resolver", () => {
         element: "storm",
         state: "dormant",
       }),
-    ).toBe(
-      "https://example.supabase.co/storage/v1/object/public/companion-presets/dragon/t3_champion/dormant/dragon__t3_champion__dormant__storm.png",
-    );
+    ).toBeNull();
   });
 
-  it("resolves bundled hatchling expressive art from the public companion preset pack", () => {
+  it("keeps generated evolution art ahead of bundled youth fallbacks", () => {
+    expect(
+      resolveCompanionVisualAssetUrl({
+        preset_id: "dragon",
+        current_stage: 21,
+        core_element: "storm",
+        current_image_url: "https://example.com/generated-guardian.png",
+        initial_image_url: "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__storm.png",
+      }),
+    ).toBe("https://example.com/generated-guardian.png");
+  });
+
+  it("does not advertise missing bundled hatchling expressive art", () => {
     expect(
       getPresetCompanionExpressiveAssetUrl({
         presetId: "griffin",
@@ -219,13 +229,11 @@ describe("companion asset resolver", () => {
         mood: "happy",
         variant: 3,
       }),
-    ).toBe(
-      "/companion-presets/griffin/t1_youth/happy/griffin__t1_youth__happy__v3__fire.png",
-    );
+    ).toBeNull();
     expect(getPublicUrlMock).not.toHaveBeenCalled();
   });
 
-  it("resolves remote initiate expressive art for active preset tiers", () => {
+  it("does not advertise missing remote initiate expressive art", () => {
     expect(
       getPresetCompanionExpressiveAssetUrl({
         presetId: "griffin",
@@ -234,9 +242,7 @@ describe("companion asset resolver", () => {
         mood: "excited",
         variant: 2,
       }),
-    ).toBe(
-      "https://example.supabase.co/storage/v1/object/public/companion-presets/griffin/t2_guardian/excited/griffin__t2_guardian__excited__v2__fire.png",
-    );
+    ).toBeNull();
   });
 
   it("falls back to normal portraits when expressive tiers are not covered yet", () => {
@@ -251,7 +257,7 @@ describe("companion asset resolver", () => {
     ).toBeNull();
   });
 
-  it("resolves expressive URLs from companion records only for post-hatch preset companions", () => {
+  it("keeps expressive URLs disabled until authored bitmap packs ship", () => {
     expect(
       resolveCompanionExpressiveAssetUrl(
         {
@@ -264,9 +270,7 @@ describe("companion asset resolver", () => {
           variant: 5,
         },
       ),
-    ).toBe(
-      "https://example.supabase.co/storage/v1/object/public/companion-presets/griffin/t2_guardian/sleepy/griffin__t2_guardian__sleepy__v5__fire.png",
-    );
+    ).toBeNull();
 
     expect(
       resolveCompanionExpressiveAssetUrl(

@@ -6,7 +6,10 @@ function assert(condition: boolean, message: string): void {
 
 Deno.test("ledger migration provisions the asset table, trigger, bucket, and backfill", async () => {
   const source = await Deno.readTextFile(
-    new URL("../migrations/20260412153000_add_user_storage_asset_ledger.sql", import.meta.url),
+    new URL(
+      "../migrations/20260412153000_add_user_storage_asset_ledger.sql",
+      import.meta.url,
+    ),
   );
 
   assert(
@@ -34,15 +37,13 @@ Deno.test("user-owned media writers register uploaded assets in the ledger", asy
     "./generate-companion-evolution/index.ts",
     "./generate-cosmic-postcard/index.ts",
     "./generate-journey-path/index.ts",
-    "./generate-dormant-companion-image/index.ts",
-    "./generate-memorial-image/index.ts",
     "./process-companion-animation-job/index.ts",
   ];
 
   for (const file of files) {
     const source = await Deno.readTextFile(new URL(file, import.meta.url));
     assert(
-      source.includes('registerUserStorageAsset'),
+      source.includes("registerUserStorageAsset"),
       `Expected ${file} to register uploaded storage assets`,
     );
   }
@@ -53,10 +54,16 @@ Deno.test("companion image bootstrap cleans up hidden stage-one assets and recor
     new URL("./generate-companion-image/index.ts", import.meta.url),
   );
   const migration = await Deno.readTextFile(
-    new URL("../migrations/20260425150000_add_companion_image_generation_idempotency.sql", import.meta.url),
+    new URL(
+      "../migrations/20260425150000_add_companion_image_generation_idempotency.sql",
+      import.meta.url,
+    ),
   );
   const idempotencyTuningMigration = await Deno.readTextFile(
-    new URL("../migrations/20260425170000_tune_companion_image_generation_idempotency.sql", import.meta.url),
+    new URL(
+      "../migrations/20260425170000_tune_companion_image_generation_idempotency.sql",
+      import.meta.url,
+    ),
   );
 
   assert(
@@ -75,7 +82,9 @@ Deno.test("companion image bootstrap cleans up hidden stage-one assets and recor
     "Expected bootstrap responses to surface quality and judge warnings",
   );
   assert(
-    migration.includes("CREATE TABLE IF NOT EXISTS public.companion_image_generation_requests") &&
+    migration.includes(
+      "CREATE TABLE IF NOT EXISTS public.companion_image_generation_requests",
+    ) &&
       migration.includes("begin_companion_image_generation_request") &&
       migration.includes("complete_companion_image_generation_request"),
     "Expected migration to provision companion image generation idempotency helpers",
@@ -83,8 +92,12 @@ Deno.test("companion image bootstrap cleans up hidden stage-one assets and recor
   assert(
     idempotencyTuningMigration.includes("interval '3 minutes'") &&
       idempotencyTuningMigration.includes("interval '30 minutes'") &&
-      idempotencyTuningMigration.includes("expires_at = LEAST(expires_at, now() + interval '30 minutes')") &&
-      idempotencyTuningMigration.includes("DELETE FROM public.companion_image_generation_requests"),
+      idempotencyTuningMigration.includes(
+        "expires_at = LEAST(expires_at, now() + interval '30 minutes')",
+      ) &&
+      idempotencyTuningMigration.includes(
+        "DELETE FROM public.companion_image_generation_requests",
+      ),
     "Expected idempotency tuning migration to shorten stale/replay windows, cap legacy rows, and clean expired rows",
   );
   assert(
@@ -108,28 +121,9 @@ Deno.test("legacy nonconforming storage writers now prefix uploads with the user
   );
   assert(
     compactCompanionEvolutionSource.includes(
-      'constfileName=`${userId}/evolutions/${companionId}_stage_${nextStage}_${Date.now()}.png`;',
+      "constfileName=`${userId}/evolutions/${companionId}_stage_${nextStage}_${Date.now()}.png`;",
     ),
     "Expected companion evolution uploads to be user-prefixed",
   );
 
-  const dormantSource = await Deno.readTextFile(
-    new URL("./generate-dormant-companion-image/index.ts", import.meta.url),
-  );
-  assert(
-    dormantSource.includes(
-      'const fileName = `${companion.user_id}/dormant/${companionId}-${Date.now()}.png`;',
-    ),
-    "Expected dormant image uploads to be user-prefixed",
-  );
-
-  const memorialSource = await Deno.readTextFile(
-    new URL("./generate-memorial-image/index.ts", import.meta.url),
-  );
-  assert(
-    memorialSource.includes(
-      'const fileName = `${ownerUserId}/memorials/${memorialId}-${Date.now()}.png`;',
-    ),
-    "Expected memorial image uploads to be user-prefixed",
-  );
 });

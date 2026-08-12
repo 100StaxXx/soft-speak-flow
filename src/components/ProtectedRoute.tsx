@@ -50,6 +50,10 @@ export const ProtectedRoute = ({
     requireAccess && accessLoading && hasResolvedAccessForCurrentRoute && resolvedAccessDecision
         ? resolvedAccessDecision
         : { hasAccess, gateReason };
+  const shouldShowAccessLoading = Boolean(
+    requireAccess && accessLoading && !hasResolvedAccessForCurrentRoute,
+  );
+  const shouldShowGateLoading = shouldShowAuthLoading || shouldShowAccessLoading;
 
   useEffect(() => {
     setAuthGateTimedOut(false);
@@ -104,7 +108,7 @@ export const ProtectedRoute = ({
   useEffect(() => {
     let timer: NodeJS.Timeout;
     
-    if (shouldShowAuthLoading) {
+    if (shouldShowGateLoading) {
       timer = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 90) return prev;
@@ -120,7 +124,7 @@ export const ProtectedRoute = ({
         clearInterval(timer);
       }
     };
-  }, [shouldShowAuthLoading]);
+  }, [shouldShowGateLoading]);
 
   useEffect(() => {
     if (!userId || !hasCachedUser || shouldShowAuthLoading) return;
@@ -149,15 +153,18 @@ export const ProtectedRoute = ({
     userId,
   ]);
 
-  // Only auth can block route rendering. Access/profile/subscription checks resolve
-  // behind the current screen so a slow entitlement path cannot strand the app.
-  if (shouldShowAuthLoading) {
+  // Never render protected content before the first entitlement decision for
+  // this user. A resolved same-user decision may remain visible during a
+  // background refresh, but it is never reused for a different account.
+  if (shouldShowGateLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-full max-w-md px-8 space-y-4">
           <div className="text-center space-y-2">
             <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
-            <p className="text-foreground">Loading...</p>
+            <p className="text-foreground">
+              {shouldShowAuthLoading ? "Loading..." : "Checking access..."}
+            </p>
           </div>
           <Progress value={progress} className="w-full" />
         </div>

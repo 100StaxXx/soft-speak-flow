@@ -68,16 +68,21 @@ const JUDGE_MINIMUMS = {
   overall: 7,
   continuity: 6,
   anatomy: 6,
+  styleConsistency: 7,
+  compositionConsistency: 7,
   backgroundCutout: 7,
 };
 const EVOLUTION_QUALITY_GATE_CODE = "evolution_quality_gate_failed";
 const EVOLUTION_CONTINUITY_UNVERIFIED_CODE = "evolution_continuity_unverified";
-const EVOLUTION_VALIDATION_UNAVAILABLE_CODE = "evolution_validation_unavailable";
+const EVOLUTION_VALIDATION_UNAVAILABLE_CODE =
+  "evolution_validation_unavailable";
 
 const getJudgeBackgroundCutoutScore = (
   scores: Awaited<ReturnType<typeof judgeCompanionImage>>,
 ): number =>
-  scores && typeof scores.backgroundCutout === "number" ? scores.backgroundCutout : 0;
+  scores && typeof scores.backgroundCutout === "number"
+    ? scores.backgroundCutout
+    : 0;
 
 class EvolutionQualityGateError extends Error {
   code: string;
@@ -232,6 +237,8 @@ const judgeScoresPass = ({
     scores.overall < JUDGE_MINIMUMS.overall ||
     scores.continuity < JUDGE_MINIMUMS.continuity ||
     scores.anatomy < JUDGE_MINIMUMS.anatomy ||
+    scores.styleConsistency < JUDGE_MINIMUMS.styleConsistency ||
+    scores.compositionConsistency < JUDGE_MINIMUMS.compositionConsistency ||
     getJudgeBackgroundCutoutScore(scores) < JUDGE_MINIMUMS.backgroundCutout
   ) {
     return false;
@@ -257,6 +264,8 @@ const rankJudgeScores = (
     scores.overall * 4 +
     scores.continuity * 3 +
     scores.anatomy * 2 +
+    scores.styleConsistency * 3 +
+    scores.compositionConsistency * 2 +
     getJudgeBackgroundCutoutScore(scores) * 2 +
     scores.centering +
     scores.difference

@@ -44,11 +44,14 @@ export const COMPANION_CAMPAIGN_LIFECYCLE_STATUSES = [
 ] as const;
 
 export const COMPANION_PENDING_ACTION_TYPES = [
+  "task_create",
   "task_update",
   "ritual_create",
   "reminder_create",
+  "campaign_create",
   "campaign_update",
   "campaign_adjust",
+  "day_plan_apply",
   "journal_entry",
 ] as const;
 
@@ -407,6 +410,7 @@ export interface LoadedCompanionAgentContext {
   rituals: Array<Record<string, unknown>>;
   campaigns: Array<Record<string, unknown>>;
   calendarEvents: Array<Record<string, unknown>>;
+  calendarConnections?: Array<Record<string, unknown>>;
   reminders: Array<Record<string, unknown>>;
   goals: string[];
   recentMemory: Record<string, unknown>;

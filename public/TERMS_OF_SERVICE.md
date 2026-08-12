@@ -4,11 +4,11 @@
 
 ## 1. Agreement to Terms
 
-By accessing or using Soft Speak Flow ("the App"), you agree to be bound by these Terms of Service ("Terms"). If you disagree with any part of these terms, you may not access the App.
+By accessing or using Cosmiq ("the App"), you agree to be bound by these Terms of Service ("Terms"). If you disagree with any part of these terms, you may not access the App.
 
 ## 2. Description of Service
 
-Soft Speak Flow is a personal wellness and self-improvement application that provides:
+Cosmiq is a personal wellness and self-improvement application that provides:
 - Daily mood tracking and check-ins
 - Personal goal setting through quests and habits
 - Virtual companion that evolves with your progress
@@ -147,12 +147,13 @@ If you provide us with feedback or suggestions about the App, we may use and sha
 - Subscription fees are charged in advance on a recurring basis (monthly or annually)
 - In-app purchases provide one-time access to premium features or content
 - All fees are in US Dollars unless otherwise stated
-- Fees are non-refundable except as required by law or platform policy (Apple App Store, Google Play Store)
+- Fees are non-refundable except as required by law or Apple App Store policy
 
 ### 9.2 Payment Processing
-- Payments are processed securely through Stripe
-- You authorize us to charge your payment method for all fees incurred
-- You must provide accurate and complete billing information
+- Supported iOS subscription purchases are presented and processed by Apple through the App Store
+- The localized price, trial eligibility, subscription period, and renewal terms shown by Apple at confirmation control your purchase
+- RevenueCat verifies App Store receipts and reports entitlement status to Cosmiq; Cosmiq does not receive or store your full payment credentials
+- You authorize Apple to charge your Apple ID account for confirmed purchases and renewals
 - You are responsible for any taxes applicable to your subscription
 
 ### 9.3 Cancellation
@@ -237,9 +238,10 @@ The App may contain links to third-party websites or services that are not owned
 
 Third-party services include:
 - Supabase (data storage and authentication)
-- Stripe (payment processing)
+- Apple App Store (subscription purchase and management)
+- RevenueCat (receipt validation and subscription entitlement status)
 - Artificial Intelligence services (for mentor chat, personalized content generation, daily planning, and behavioral learning as described in Section 2.1)
-- Mobile app platforms (Apple App Store, Google Play Store)
+- Mobile app platform (Apple App Store)
 - Other integrated services
 
 ## 17. Privacy
@@ -266,4 +268,4 @@ If you have any questions about these Terms, please contact us:
 
 ---
 
-By using Soft Speak Flow, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
+By using Cosmiq, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.

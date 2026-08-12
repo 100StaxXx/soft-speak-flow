@@ -39,6 +39,10 @@ vi.mock("@/hooks/useTaskMutations", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useCompanion", () => ({
+  useCompanion: () => ({ companion: null }),
+}));
+
 vi.mock("@/components/EditRitualSheet", () => ({
   EditRitualSheet: () => null,
 }));

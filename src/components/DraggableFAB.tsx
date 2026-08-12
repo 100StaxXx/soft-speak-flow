@@ -27,7 +27,7 @@ interface DraggableFABProps {
   onTap?: () => void;
 }
 
-const FLOATING_LAUNCHER_SIZE_PX = 144;
+const FLOATING_LAUNCHER_SIZE_PX = 96;
 const POPUP_VIEWPORT_GUTTER_PX = 16;
 const POPUP_TAIL_SIZE_PX = 24;
 const POPUP_TAIL_EDGE_INSET_PX = 28;

@@ -399,8 +399,7 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
     };
   };
 
-  const sendTaskToCalendar = useMutation({
-    mutationFn: async ({ taskId, options }: { taskId: string; options?: SendOptions }) => {
+  const sendTask = async ({ taskId, options }: { taskId: string; options?: SendOptions }) => {
       if (!user?.id) throw new Error('User not authenticated');
 
       const provider = resolveProvider(options?.provider);
@@ -511,6 +510,96 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
           || (provider === 'google' ? 'Primary calendar' : 'Calendar'),
         externalId: readString(link.externalEventId),
       } satisfies SendTaskToCalendarResult;
+  };
+
+  const sendTaskToCalendar = useMutation({
+    mutationFn: sendTask,
+    onSuccess: invalidateSyncQueries,
+  });
+
+  const removeProviderCalendarLinks = async (taskId: string, provider: CalendarProvider) => {
+    if (!user?.id) throw new Error('User not authenticated');
+
+    if (provider === 'google' || provider === 'outlook') {
+      await invokeCalendarFunction(
+        `${provider}-calendar-events`,
+        { action: 'deleteLinkedEvent', taskId },
+        `Failed to remove linked ${calendarProviderDisplayName(provider)} calendar event`,
+      );
+      return;
+    }
+
+    const appleLinks = (linksByTask.get(taskId) || []).filter((link) => link.provider === 'apple');
+    for (const link of appleLinks) {
+      await NativeCalendar.deleteEvent({ eventId: link.external_event_id });
+    }
+    if (appleLinks.length === 0) return;
+
+    const { error } = await supabase
+      .from('quest_calendar_links')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('task_id', taskId)
+      .eq('provider', 'apple');
+    if (error) throw error;
+  };
+
+  const syncLinkedTask = useMutation({
+    mutationFn: async ({ taskId }: { taskId: string }) => {
+      const providers = Array.from(new Set<CalendarProvider>([
+        ...(linksByTask.get(taskId) || []).map((link) => link.provider),
+        ...(outlookTaskLinksByTask.get(taskId) || []).map(() => 'outlook' as const),
+      ]));
+
+      const results: SendTaskToCalendarResult[] = [];
+      for (const provider of providers) {
+        try {
+          results.push(await sendTask({ taskId, options: { provider } }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const isNoLongerCalendarReady = provider !== 'outlook'
+            && (
+              message.includes('TASK_DATE_REQUIRED')
+              || message.includes('SCHEDULED_TIME_REQUIRED')
+              || message.includes('SCHEDULED_TIME_INVALID')
+            );
+
+          if (!isNoLongerCalendarReady) throw error;
+          await removeProviderCalendarLinks(taskId, provider);
+        }
+      }
+      return results;
+    },
+    onSuccess: invalidateSyncQueries,
+  });
+
+  const removeTaskFromCalendars = useMutation({
+    mutationFn: async ({ taskId }: { taskId: string }) => {
+      if (!user?.id) throw new Error('User not authenticated');
+
+      const taskCalendarLinks = linksByTask.get(taskId) || [];
+      const taskOutlookLinks = outlookTaskLinksByTask.get(taskId) || [];
+      const providers = new Set(taskCalendarLinks.map((link) => link.provider));
+
+      if (providers.has('google')) {
+        await removeProviderCalendarLinks(taskId, 'google');
+      }
+
+      if (providers.has('outlook')) {
+        await removeProviderCalendarLinks(taskId, 'outlook');
+      }
+
+      if (providers.has('apple')) {
+        await removeProviderCalendarLinks(taskId, 'apple');
+      }
+
+      if (taskOutlookLinks.length > 0) {
+        await invokeCalendarFunction(
+          'outlook-todo-tasks',
+          { action: 'deleteLinkedTask', taskId },
+          'Failed to remove linked Microsoft To Do task',
+        );
+      }
     },
     onSuccess: invalidateSyncQueries,
   });
@@ -525,5 +614,7 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
     outlookTaskLinksByTask,
     hasLinkedEvent,
     sendTaskToCalendar,
+    syncLinkedTask,
+    removeTaskFromCalendars,
   };
 }

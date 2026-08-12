@@ -12,6 +12,7 @@ import {
   type CalendarProvider,
 } from '@/hooks/useCalendarIntegrations';
 import { getCalendarOAuthRedirectUri, getCalendarOAuthSource } from '@/utils/calendarOAuthRedirect';
+import { parseCalendarOAuthUrl } from '@/utils/calendarOAuthUrl';
 
 const PROVIDERS: Array<{ key: CalendarProvider; label: string; web: boolean; ios: boolean }> = [
   { key: 'google', label: 'Google Calendar', web: true, ios: true },
@@ -225,12 +226,13 @@ export function CalendarIntegrationsSettings() {
 
       const source = getCalendarOAuthSource();
       const callbackBase = getCalendarOAuthRedirectUri({ provider, source });
-      const url = await beginOAuthConnection.mutateAsync({
+      const responseUrl = await beginOAuthConnection.mutateAsync({
         provider,
         redirectUri: callbackBase,
         syncMode: 'send_only',
         source,
       });
+      const url = parseCalendarOAuthUrl(responseUrl);
       if (source === 'native') {
         await Browser.open({ url });
         return;
@@ -345,7 +347,7 @@ export function CalendarIntegrationsSettings() {
           Calendar Integrations
         </CardTitle>
         <CardDescription className="text-xs">
-          Connect destinations for sending quests to external calendars.
+          Show selected calendars in Agenda and send quests outward when you choose. Imported events stay read-only.
         </CardDescription>
       </CardHeader>
 
@@ -396,6 +398,11 @@ export function CalendarIntegrationsSettings() {
                           ? appleNativeUnavailableReason || 'Apple Calendar is unavailable in this app build.'
                         : 'Not connected'}
                   </p>
+                  {connection?.last_synced_at ? (
+                    <p className="mt-1 text-[11px] text-muted-foreground/80">
+                      Agenda synced {new Date(connection.last_synced_at).toLocaleString()}
+                    </p>
+                  ) : null}
                 </div>
 
                 {connection ? (

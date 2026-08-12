@@ -1,4 +1,0 @@
-
-module CapacitorSplashScreen.__Swift {
-  exclude header "CapacitorSplashScreen-Swift.h"
-}

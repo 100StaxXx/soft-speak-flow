@@ -14,18 +14,9 @@ import {
   storeKitTransactionMatchesUser,
 } from "@/utils/localSubscriptionAccess";
 import { parseFunctionInvokeError, type ParsedFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
+import type { AccessState } from "@/types/access";
 
-export type AccessSource = "subscription" | "promo_code" | "trial" | "manual" | "none";
-
-export interface AccessState {
-  has_access: boolean;
-  access_source: AccessSource;
-  trial_ends_at: string | null;
-  subscribed: boolean;
-  status?: string;
-  plan?: string;
-  subscription_end?: string;
-}
+export type { AccessSource, AccessState } from "@/types/access";
 
 const DEFAULT_ACCESS_STATE: AccessState = {
   has_access: false,

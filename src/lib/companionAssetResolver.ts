@@ -166,7 +166,10 @@ export const getPresetCompanionAssetUrl = ({
       .data.publicUrl;
   }
 
-  return state === "normal" ? bundledYouthUrl : null;
+  // Bundled youth art is only a Hatchling asset. Reusing it for later forms
+  // hides the companion's generated evolution portrait and makes progression
+  // appear to move backwards.
+  return null;
 };
 
 export const getPresetCompanionExpressiveAssetUrl = ({

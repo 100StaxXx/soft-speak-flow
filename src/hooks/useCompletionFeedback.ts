@@ -1,7 +1,8 @@
 import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useTalkPopupContextSafe, type CompanionTalkPopupAction } from "@/contexts/TalkPopupContext";
+import { useTalkPopupContextSafe } from "@/contexts/TalkPopupContext";
+import type { CompanionTalkPopupAction } from "@/types/companionTalkPopup";
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
 import { logger } from "@/utils/logger";
 import {

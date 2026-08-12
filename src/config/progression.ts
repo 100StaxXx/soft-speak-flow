@@ -203,7 +203,7 @@ export const getProgressionThreshold = (level: number): number | null =>
   PROGRESSION_XP_THRESHOLDS[getThresholdKey(level)] ?? null;
 
 export const getProgressionLevelDisplay = (level: number): string =>
-  `Stage ${clampProgressionLevel(level)} • ${getProgressionTierLabelForLevel(level)}`;
+  `Level ${clampProgressionLevel(level)} • ${getProgressionTierLabelForLevel(level)}`;
 
 export const getVisualStage = (level: number): number => {
   const safeLevel = clampProgressionLevel(level);
@@ -218,7 +218,7 @@ export const getVisualStageLabelForLevel = (level: number): string =>
   getProgressionTierLabelForLevel(level);
 
 export const getVisualStageDisplay = (level: number): string =>
-  `Stage ${getVisualStage(level)} • ${getVisualStageLabelForLevel(level)}`;
+  `Form ${getVisualStage(level)} • ${getVisualStageLabelForLevel(level)}`;
 
 export const getNextProgressionLevel = (level: number): number | null => {
   const safeLevel = clampProgressionLevel(level);

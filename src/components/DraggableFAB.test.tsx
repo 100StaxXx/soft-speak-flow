@@ -238,8 +238,8 @@ describe("DraggableFAB", () => {
     const image = screen.getByRole("img", { name: "Nova" });
 
     expect(launcher).toHaveClass(
-      "h-36",
-      "w-36",
+      "h-24",
+      "w-24",
       "overflow-visible",
       "rounded-full",
       "border-0",
@@ -247,7 +247,7 @@ describe("DraggableFAB", () => {
       "shadow-none",
     );
     expect(launcher.querySelectorAll('[aria-hidden="true"]')).toHaveLength(0);
-    expect(image.parentElement).toHaveClass("h-[7.75rem]", "w-[7.75rem]");
+    expect(image.parentElement).toHaveClass("h-[5.25rem]", "w-[5.25rem]");
     expect(launcher.style.boxShadow).toBe("");
     expect(launcher).toHaveAttribute("data-face-direction", "away");
 
@@ -426,7 +426,7 @@ describe("DraggableFAB", () => {
     });
   });
 
-  it("routes the goal option straight to the campaign builder target and emits the tutorial event", () => {
+  it("routes the goal option into the conversational planner and emits the tutorial event", () => {
     const newGoalStarted = vi.fn();
     window.addEventListener("companion-new-goal-started", newGoalStarted);
     render(<DraggableFAB onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
@@ -435,7 +435,7 @@ describe("DraggableFAB", () => {
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-option-goal"));
 
     expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({
-      target: "campaign_builder",
+      target: "planner",
       starterIntent: "goal_breakdown_start",
       message: "Let's lock in a new goal",
     }));

@@ -70,13 +70,26 @@ import {
 } from "@/utils/companionLatencyMetrics";
 import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
 import type { CompanionChatThreadSummary } from "@/types/companionConversation";
-import type { CompanionAgentFollowUp } from "@/types/companionAgent";
+import type {
+  CompanionAgentFollowUp,
+  PendingActionView,
+} from "@/types/companionAgent";
 import type {
   CompanionPlannerLaunchIntent,
+  CompanionPlannerProposal,
   PlannerBriefingContext,
 } from "@/types/companionPlanner";
 
 type JourneysCompanionPlannerModalPresentation = "dialog" | "drawer";
+
+export interface JourneysQuestProposalEditResult {
+  saved: boolean;
+  savedTitle?: string | null;
+}
+
+export type JourneysQuestProposalEditHandoff = (
+  proposal: CompanionPlannerProposal,
+) => Promise<JourneysQuestProposalEditResult>;
 
 interface JourneysCompanionPlannerModalProps {
   open: boolean;
@@ -86,6 +99,7 @@ interface JourneysCompanionPlannerModalProps {
   launchIntent?: CompanionPlannerLaunchIntent | null;
   onLaunchIntentConsumed?: (intentId: string) => void;
   onOpenCampaignBuilder?: (message: string) => void;
+  onQuestProposalEditHandoff?: JourneysQuestProposalEditHandoff;
 }
 
 type JourneysCompanionDrawerLayout = {
@@ -102,6 +116,82 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+
+const PendingActionPreview = memo(function PendingActionPreview({
+  action,
+}: {
+  action: PendingActionView;
+}) {
+  const payload = asRecord(action.normalizedPayload);
+  if (!payload) return null;
+  const calendarNote = payload.send_to_calendar === true
+    ? `Also send to ${
+      typeof payload.calendar_provider === "string"
+        ? payload.calendar_provider
+        : "connected calendar"
+    }`
+    : null;
+
+  if (action.actionType === "day_plan_apply") {
+    const blocks = Array.isArray(payload.blocks)
+      ? payload.blocks.map(asRecord).filter(Boolean)
+      : [];
+    return (
+      <div className="mt-3 space-y-2 rounded-2xl border border-white/[0.08] bg-black/10 p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {String(payload.plan_date ?? "Day plan")}
+        </p>
+        {blocks.map((block, index) => (
+          <div key={`${String(block?.start_time)}-${index}`} className="flex items-start gap-3 text-sm">
+            <span className="w-12 shrink-0 font-medium text-foreground">
+              {String(block?.start_time ?? "")}
+            </span>
+            <span className="min-w-0 flex-1 text-foreground">
+              {String(block?.title ?? "Focus block")}
+            </span>
+            <span className="shrink-0 text-muted-foreground">
+              {String(block?.duration_minutes ?? 30)}m
+            </span>
+          </div>
+        ))}
+        {calendarNote ? <p className="text-xs text-muted-foreground">{calendarNote}</p> : null}
+      </div>
+    );
+  }
+
+  if (action.actionType === "campaign_create") {
+    const rituals = Array.isArray(payload.rituals)
+      ? payload.rituals.map(asRecord).filter(Boolean)
+      : [];
+    return (
+      <div className="mt-3 rounded-2xl border border-white/[0.08] bg-black/10 p-3 text-sm">
+        <p className="font-medium text-foreground">
+          {String(payload.target_days ?? 30)} days
+        </p>
+        <ul className="mt-2 space-y-1 text-muted-foreground">
+          {rituals.map((ritual, index) => (
+            <li key={`${String(ritual?.title)}-${index}`}>
+              {String(ritual?.title ?? "Daily ritual")} · {String(ritual?.frequency ?? "daily")}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  if (action.actionType === "task_create") {
+    return (
+      <div className="mt-3 rounded-2xl border border-white/[0.08] bg-black/10 p-3 text-sm text-muted-foreground">
+        <span className="font-medium text-foreground">{String(payload.title ?? "New task")}</span>
+        {payload.task_date ? ` · ${String(payload.task_date)}` : " · Inbox"}
+        {payload.scheduled_time ? ` at ${String(payload.scheduled_time)}` : ""}
+        {calendarNote ? <p className="mt-1 text-xs">{calendarNote}</p> : null}
+      </div>
+    );
+  }
+
+  return null;
+});
 
 const readSnapshotValue = (
   snapshot: Record<string, unknown> | null,
@@ -442,6 +532,7 @@ const JourneysCompanionOverlayBody = memo(
     launchIntent,
     onLaunchIntentConsumed,
     onOpenCampaignBuilder,
+    onQuestProposalEditHandoff,
     drawerLayout,
   }: {
     presentation: JourneysCompanionPlannerModalPresentation;
@@ -450,6 +541,7 @@ const JourneysCompanionOverlayBody = memo(
     launchIntent?: CompanionPlannerLaunchIntent | null;
     onLaunchIntentConsumed?: (intentId: string) => void;
     onOpenCampaignBuilder?: (message: string) => void;
+    onQuestProposalEditHandoff?: JourneysQuestProposalEditHandoff;
     drawerLayout?: JourneysCompanionDrawerLayout;
   }) => {
     const {
@@ -485,6 +577,7 @@ const JourneysCompanionOverlayBody = memo(
     const [pendingFollowUpOption, setPendingFollowUpOption] = useState<
       string | null
     >(null);
+    const [isEditingQuestProposal, setIsEditingQuestProposal] = useState(false);
     const [handledLocalFollowUpKey, setHandledLocalFollowUpKey] = useState<
       string | null
     >(null);
@@ -745,6 +838,23 @@ const JourneysCompanionOverlayBody = memo(
       await assistant.startNewChat();
     }, [assistant]);
 
+    const handleEditQuestProposal = useCallback(async () => {
+      const proposal = assistant.editableQuestProposal;
+      if (!proposal || !onQuestProposalEditHandoff || isEditingQuestProposal) return;
+
+      setIsEditingQuestProposal(true);
+      try {
+        const result = await onQuestProposalEditHandoff(proposal);
+        if (result.saved) {
+          await assistant.completeEditableQuestProposal(proposal.id, {
+            savedTitle: result.savedTitle,
+          });
+        }
+      } finally {
+        setIsEditingQuestProposal(false);
+      }
+    }, [assistant, isEditingQuestProposal, onQuestProposalEditHandoff]);
+
     const localActionPending = Boolean(pendingFollowUpOption);
 
     const handleFollowUpOption = useCallback(
@@ -1001,6 +1111,55 @@ const JourneysCompanionOverlayBody = memo(
                   />
                 ) : null}
 
+                {assistant.editableQuestProposal && onQuestProposalEditHandoff ? (
+                  <div
+                    className="flex w-full justify-start"
+                    data-testid="journeys-companion-editable-quest-proposal"
+                    data-tutorial-avoid="true"
+                  >
+                    <div className={cn(plannerPathfinderTheme.raisedPanel, "max-w-[88%] p-4")}>
+                      <Badge variant="outline" className={plannerPathfinderTheme.chip}>
+                        Quest draft
+                      </Badge>
+                      <p className="mt-3 text-sm font-semibold text-foreground">
+                        {assistant.editableQuestProposal.title}
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {assistant.editableQuestProposal.summary}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          className={plannerPathfinderTheme.primaryButton}
+                          onClick={() => { void handleEditQuestProposal(); }}
+                          disabled={assistantActionDisabled || isEditingQuestProposal}
+                        >
+                          {isEditingQuestProposal ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : null}
+                          Review and save
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className={plannerPathfinderTheme.outlineButton}
+                          onClick={() => {
+                            void assistant.rejectEditableQuestProposal(
+                              assistant.editableQuestProposal!.id,
+                            );
+                          }}
+                          disabled={assistantActionDisabled || isEditingQuestProposal}
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 {hasFollowUpPanel && assistant.activeFollowUp ? (
                   <div
                     className="flex w-full justify-start"
@@ -1096,6 +1255,7 @@ const JourneysCompanionOverlayBody = memo(
                       <p className="mt-3 text-sm font-semibold text-foreground">
                         {assistant.pendingAction.summary}
                       </p>
+                      <PendingActionPreview action={assistant.pendingAction} />
                       {assistant.pendingAction.confirmationMessage ? (
                         <p className="mt-1 text-sm text-muted-foreground">
                           {assistant.pendingAction.confirmationMessage}
@@ -1335,6 +1495,7 @@ export const JourneysCompanionPlannerModal = memo(
     launchIntent,
     onLaunchIntentConsumed,
     onOpenCampaignBuilder,
+    onQuestProposalEditHandoff,
   }: JourneysCompanionPlannerModalProps) {
     const [drawerLayout, setDrawerLayout] =
       useState<JourneysCompanionDrawerLayout>(() => getDrawerLayout());
@@ -1366,6 +1527,7 @@ export const JourneysCompanionPlannerModal = memo(
         launchIntent={launchIntent}
         onLaunchIntentConsumed={onLaunchIntentConsumed}
         onOpenCampaignBuilder={onOpenCampaignBuilder}
+        onQuestProposalEditHandoff={onQuestProposalEditHandoff}
         drawerLayout={presentation === "drawer" ? drawerLayout : undefined}
       />
     );

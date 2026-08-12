@@ -23,6 +23,8 @@ export async function generateWithValidation(
     stage: number;
     eyeColor?: string;
     furColor?: string;
+    companionId?: string;
+    previousStageImageUrl?: string;
     storyTone?: string;
     flowType?: CompanionImageFlowType;
     debug?: boolean;

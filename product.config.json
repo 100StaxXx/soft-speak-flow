@@ -1,0 +1,12 @@
+{
+  "product": "cosmiq",
+  "displayName": "Cosmiq",
+  "legalEntity": "Cosmiq LLC",
+  "bundleId": "com.darrylgraham.revolution",
+  "urlScheme": "cosmiq",
+  "hostedApp": "https://app.cosmiq.quest",
+  "storeKitProducts": [
+    "cosmiq_premium_monthly",
+    "cosmiq_premium_yearly"
+  ]
+}

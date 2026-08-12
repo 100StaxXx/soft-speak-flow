@@ -22,6 +22,7 @@ export const useCompanionRegenerate = () => {
       core_element: string;
       favorite_color: string;
       current_stage: number;
+      current_image_url?: string | null;
       eye_color?: string;
       fur_color?: string;
     }) => {
@@ -66,6 +67,8 @@ export const useCompanionRegenerate = () => {
           stage: companion.current_stage,
           eyeColor: companion.eye_color,
           furColor: companion.fur_color,
+          companionId: companion.id,
+          previousStageImageUrl: companion.current_image_url ?? undefined,
           flowType: "regenerate",
         },
         {

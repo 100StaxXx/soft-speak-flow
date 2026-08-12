@@ -369,6 +369,7 @@ vi.mock("@/hooks/useDailyTasks", () => ({
     deleteTask: mocks.deleteTask,
     restoreTask: mocks.restoreTask,
     moveTaskToDate: mocks.moveTaskToDate,
+    moveTaskToDateAsync: mocks.moveTaskToDate,
     completedCount: 0,
     totalCount: mocks.dailyTasks.length,
     isAdding: false,
@@ -474,7 +475,21 @@ vi.mock("@/hooks/useQuestCalendarSync", () => ({
       mutateAsync: mocks.sendTaskToCalendarMutateAsync,
       isPending: false,
     },
+    syncLinkedTask: { mutateAsync: vi.fn() },
+    removeTaskFromCalendars: { mutateAsync: vi.fn() },
     hasLinkedEvent: mocks.hasLinkedEvent,
+    links: [],
+    outlookTaskLinks: [],
+  }),
+}));
+
+vi.mock("@/hooks/useExternalCalendarEvents", () => ({
+  useExternalCalendarEvents: () => ({
+    events: [],
+    errors: [],
+    connectedProviderCount: 0,
+    isFetching: false,
+    refresh: vi.fn(),
   }),
 }));
 
@@ -582,7 +597,7 @@ describe("Journeys inbox integration", () => {
     );
   });
 
-  it("renders the inbox section above the agenda when unscheduled quests exist", async () => {
+  it("keeps the agenda above the secondary inbox when unscheduled quests exist", async () => {
     mocks.inboxTasks = [
       {
         id: "inbox-1",
@@ -604,7 +619,7 @@ describe("Journeys inbox integration", () => {
       document.querySelectorAll('[data-testid="journeys-inbox-section"], [data-testid="todays-agenda"]'),
     ).map((node) => node.getAttribute("data-testid"));
 
-    expect(orderedSections).toEqual(["journeys-inbox-section", "todays-agenda"]);
+    expect(orderedSections).toEqual(["todays-agenda", "journeys-inbox-section"]);
 
     fireEvent.click(screen.getByRole("button", { name: /expand inbox section/i }));
 

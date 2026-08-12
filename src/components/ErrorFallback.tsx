@@ -61,15 +61,6 @@ export const ErrorFallback = ({
   );
 };
 
-export const MissionErrorFallback = ({ error, resetError }: ErrorFallbackProps) => (
-  <ErrorFallback
-    error={error}
-    resetError={resetError}
-    title="Missions Unavailable"
-    description="We couldn't load your daily missions. Don't worry, your progress is safe."
-  />
-);
-
 export const EvolutionErrorFallback = ({ 
   error, 
   onClose 

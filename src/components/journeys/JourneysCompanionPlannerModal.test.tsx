@@ -518,6 +518,37 @@ describe("JourneysCompanionPlannerModal", () => {
     ).toHaveAttribute("data-tour", "companion-plan-day-chat-send");
   });
 
+  it("previews the exact day blocks before confirmation", () => {
+    mocks.state.pendingAction = {
+      ...createBasePendingAction(),
+      intent: "plan_day",
+      actionType: "day_plan_apply",
+      summary: "Plan 2026-04-18 with 2 focused blocks.",
+      normalizedPayload: {
+        plan_date: "2026-04-18",
+        send_to_calendar: true,
+        calendar_provider: "google",
+        blocks: [
+          { title: "Launch notes", start_time: "09:30", duration_minutes: 45 },
+          { title: "Walk", start_time: "14:00", duration_minutes: 20 },
+        ],
+      },
+    } as any;
+
+    render(
+      <JourneysCompanionPlannerModal
+        open
+        onOpenChange={vi.fn()}
+        presentation="dialog"
+      />,
+    );
+
+    expect(screen.getByText("09:30")).toBeInTheDocument();
+    expect(screen.getByText("Launch notes")).toBeInTheDocument();
+    expect(screen.getByText("45m")).toBeInTheDocument();
+    expect(screen.getByText("Also send to google")).toBeInTheDocument();
+  });
+
   it("fills generated scene avatars in the circular header frame", () => {
     mocks.visual.imageUrl = "https://assets.example.com/generated-companion-scene.png";
     mocks.visual.focalX = 0.42;

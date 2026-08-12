@@ -21,7 +21,7 @@ import {
   APP_STORE_SUBSCRIPTION_ALREADY_LINKED_MESSAGE,
   useAppleSubscription,
 } from "@/hooks/useAppleSubscription";
-import { getProductForPlan, getPurchaseProductIdForPlan } from "@/utils/appleIAP";
+import { getFreeTrialLabel, getProductForPlan, getPurchaseProductIdForPlan } from "@/utils/appleIAP";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -126,7 +126,7 @@ const paywallStorySections: PaywallStorySection[] = [
     id: "paywall-companion",
     eyebrow: "Built for growth",
     title: "Your companion grows when you follow through.",
-    body: "XP, daily missions, evolutions, stories, collection, and memories turn ordinary consistency into a world worth returning to.",
+    body: "XP, Daily Chapters, evolutions, stories, collection, and memories turn ordinary consistency into a world worth returning to.",
     background: paywallBackdrops.companion,
     icon: Sparkles,
     imagePosition: "50% 48%",
@@ -254,6 +254,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const pendingAppleRedemptionRecoveryRef = useRef(false);
+  const initialProductLoadAttemptedRef = useRef(false);
 
   const {
     handlePurchase,
@@ -288,6 +289,23 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     () => getPurchaseProductIdForPlan(selectedPlan, products),
     [selectedPlan, products],
   );
+  const selectedProduct = selectedPlan === "yearly" ? yearlyProduct : monthlyProduct;
+  const freeTrialLabel = getFreeTrialLabel(selectedProduct);
+
+  useEffect(() => {
+    if (
+      !isAvailable ||
+      productsLoading ||
+      products.length > 0 ||
+      productError ||
+      initialProductLoadAttemptedRef.current
+    ) {
+      return;
+    }
+
+    initialProductLoadAttemptedRef.current = true;
+    void reloadProducts();
+  }, [isAvailable, productError, products.length, productsLoading, reloadProducts]);
 
   useEffect(() => {
     trackPaywallEvent("paywall_viewed", {
@@ -298,6 +316,11 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   }, [hasOfferCode, variant]);
 
   const handleSubscribe = async () => {
+    if (!selectedProduct) {
+      await reloadProducts();
+      return;
+    }
+
     trackPaywallEvent("package_selected", {
       surface: "paywall",
       plan: selectedPlan,
@@ -716,20 +739,20 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     monthly: {
       title: "Cosmiq Pro Monthly",
       duration: "1 month",
-      fallbackPrice: "$9.99",
+      fallbackPrice: "Price unavailable",
       period: "/month",
       savings: null,
-      fallbackUnitPrice: "$9.99/month",
+      fallbackUnitPrice: "Connect to the App Store to see your localized price",
     },
     yearly: {
       title: "Cosmiq Pro Yearly",
       duration: "1 year",
-      fallbackPrice: hasOfferCode ? activeYearlyOfferPrice : "$99.99",
+      fallbackPrice: hasOfferCode ? activeYearlyOfferPrice : "Price unavailable",
       period: "/year",
       savings: hasOfferCode ? "Code applied" : "Best value",
       fallbackUnitPrice: hasOfferCode
         ? activeYearlyOfferUnitPrice
-        : "$8.33/month when billed yearly",
+        : "Connect to the App Store to see your localized price",
     },
   };
   const hasSelectedCreatorYearlyOffer = hasOfferCode && selectedPlan === "yearly";
@@ -746,9 +769,11 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
       return `${product.pricePerMonthString}/month when billed yearly`;
     }
 
-    return plan === "monthly"
-      ? `${getPlanDisplayPrice("monthly")}/month`
-      : plans.yearly.fallbackUnitPrice;
+    if (plan === "monthly" && monthlyProduct) {
+      return `${monthlyProduct.displayPrice}/month`;
+    }
+
+    return plans[plan].fallbackUnitPrice;
   };
   const selectedPlanPrice = getPlanDisplayPrice(selectedPlan);
   const selectedPlanUnitPrice = getPlanUnitPrice(selectedPlan);
@@ -757,6 +782,8 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     : `${selectedPlanPrice}/year (${selectedPlanUnitPrice})`;
   const selectedPlanRenewalText = hasSelectedCreatorYearlyOffer
     ? `${selectedPlanPrice} for the first year (${selectedPlanUnitPrice}), then renews yearly at the standard yearly price unless canceled.`
+    : !selectedProduct
+      ? "Localized price and renewal terms will appear after the App Store product loads."
     : `${selectedPlanPriceText}; renews every ${plans[selectedPlan].duration} until canceled.`;
   const isSubscriptionAlreadyLinkedError = productError === APP_STORE_SUBSCRIPTION_ALREADY_LINKED_MESSAGE;
 
@@ -776,17 +803,23 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
         checkoutEyebrow: "Start Cosmiq",
         title: "Start the trial. Keep the story moving.",
         subtitle: "Unlock the full experience: plan with your companion, follow your quests, and watch the world grow from real progress.",
-        cta: hasSelectedCreatorYearlyOffer ? "Redeem Discount with Apple" : "Start 3-Day Free Trial",
+        cta: hasSelectedCreatorYearlyOffer
+          ? "Redeem Discount with Apple"
+          : freeTrialLabel
+            ? `Start ${freeTrialLabel}`
+            : `Subscribe ${selectedPlan === "yearly" ? "Yearly" : "Monthly"}`,
         legalIntro: hasSelectedCreatorYearlyOffer
           ? `Your creator code unlocks ${activeYearlyOfferPrice} for the first year. After the first year, this plan renews at the standard yearly price unless canceled.`
-          : "No charge today. Your Apple ID account will be charged when the free trial ends unless canceled at least 24 hours before the end of the trial.",
-        heroBadge: "3-day free trial",
+          : freeTrialLabel
+            ? `Eligible new subscribers receive a ${freeTrialLabel}. Your Apple ID account will be charged when the trial ends unless canceled at least 24 hours before the end of the trial.`
+            : "Payment will be charged to your Apple ID account at confirmation of purchase.",
+        heroBadge: freeTrialLabel ?? "Cosmiq Pro",
         shortcutLabel: "Start trial",
       };
   const ctaLabel = hasSelectedCreatorYearlyOffer
     ? (offerCodePurchaseReady ? "Subscribe Yearly" : "Redeem Discount with Apple")
     : copy.cta;
-  const purchaseActionDisabled = !isAvailable || loading || productsLoading || recoveringExistingSubscription || isRedeemingAppleCode;
+  const purchaseActionDisabled = !isAvailable || !selectedProduct || loading || productsLoading || recoveringExistingSubscription || isRedeemingAppleCode;
 
   if (!accessStatusLoading && hasAccess) {
     return null;
@@ -922,7 +955,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                   </div>
                 </div>
 
-                {variant === "pre_trial_signup" ? (
+                {variant === "pre_trial_signup" && freeTrialLabel ? (
                   <div
                     data-testid="paywall-trial-callout"
                     className="border border-cyan-100/36 bg-cyan-100/12 p-4 shadow-[0_0_34px_rgba(165,243,252,0.12)]"
@@ -933,13 +966,13 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                       </div>
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-100">
-                          3-day free trial
+                          {freeTrialLabel}
                         </p>
                         <p className="mt-1 text-base font-semibold text-white">
                           No charge today.
                         </p>
                         <p className="mt-1 text-sm leading-6 text-white/72">
-                          Try the full Cosmiq experience before your Apple ID account is charged.
+                          Eligible new subscribers can try the full Cosmiq experience before their Apple ID account is charged.
                         </p>
                       </div>
                     </div>

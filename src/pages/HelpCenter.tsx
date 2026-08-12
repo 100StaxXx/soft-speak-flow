@@ -4,7 +4,6 @@ import {
   ArrowLeft, 
   Sparkles, 
   Swords, 
-  Users, 
   Target, 
   MessageCircle, 
   Zap, 
@@ -56,7 +55,7 @@ const HelpCenter = () => {
         },
         {
           title: "How does my Companion work?",
-          content: "Your companion begins as a mystical egg and grows alongside you. As you complete quests, habits, and engage with the app, it earns XP across a unified Stage 0 to Stage 100 progression ladder. During onboarding, you choose the creature form, then lock the egg's story tone and element before the shell ever cracks. The first hatch is the reveal of that already-chosen companion."
+          content: "Your companion begins as a mystical egg and grows alongside you. Quests, habits, focus, and reflection earn XP across a Level 0 to Level 100 progression ladder. Eight visual Forms mark the major transformations from Egg through Ascended. During onboarding, you choose the creature form, then lock the egg's story tone and element before the shell ever cracks."
         },
         {
           title: "Understanding XP & Evolution",
@@ -75,8 +74,8 @@ const HelpCenter = () => {
       color: "text-primary",
       items: [
         {
-          title: "Stages & Tiers",
-          content: "Your companion now grows through a unified Stage 0 to Stage 100 progression system. Stage 0 is Egg, then the major tiers unfold as Hatchling, Initiate, Awakened, Guardian, Champion, Mythic, and Ascended. The egg uses shared elemental art, while the species you chose during onboarding stays locked in until hatch and carries forward through later tiers."
+          title: "Levels, Forms & Tiers",
+          content: "Your companion grows from Level 0 to Level 100. Major milestones unlock eight visual Forms: Egg, Hatchling, Initiate, Awakened, Guardian, Champion, Mythic, and Ascended. Story Chapters follow those Form milestones, while the species you chose stays consistent throughout."
         },
         {
           title: "Earning XP",
@@ -84,7 +83,7 @@ const HelpCenter = () => {
         },
         {
           title: "Companion Skins",
-          content: "Unlock exclusive cosmetic skins for your companion through the referral program. When friends you refer reach Stage 5 • Initiate, you earn rare skin variants. Skins are purely cosmetic and change your companion's visual effects, including frames, glows, and particle effects. Check your collection in Command Center."
+          content: "Unlock exclusive cosmetic skins for your companion through the referral program. When friends you refer reach Level 5 • Initiate, you earn rare skin variants. Skins are purely cosmetic and change your companion's visual effects, including frames, glows, and particle effects. Check your collection in Command Center."
         },
         {
           title: "Postcards & Stories",
@@ -201,30 +200,6 @@ const HelpCenter = () => {
       ]
     },
     {
-      id: "guilds",
-      title: "Guilds & Community",
-      icon: Users,
-      color: "text-cyan-400",
-      items: [
-        {
-          title: "Joining Guilds",
-          content: "Guilds are communities of Cosmiq users working toward common goals. Join public guilds or create private ones for friends. Guild members can see each other's progress and encourage one another."
-        },
-        {
-          title: "Guild Features",
-          content: "In guilds, you can: view member activity and streaks, send 'shouts' to encourage others, set friendly rivalries for motivation, and collaborate on Shared Epics. Guilds add a social layer to your personal growth journey."
-        },
-        {
-          title: "Creating a Guild",
-          content: "Start your own guild with a custom name, description, and theme. Invite friends via invite code or make it public for anyone to join. As the owner, you can customize the guild's appearance and manage members."
-        },
-        {
-          title: "Guild Stories",
-          content: "Active guilds unlock collective story chapters as members reach milestones together. These narratives feature all guild members' companions and celebrate shared achievements."
-        }
-      ]
-    },
-    {
       id: "referrals",
       title: "Referrals & Rewards",
       icon: Gift,
@@ -236,11 +211,11 @@ const HelpCenter = () => {
         },
         {
           title: "Earning Rewards",
-          content: "When a friend you referred reaches Stage 5 • Initiate with their companion, you automatically unlock an exclusive companion skin. Refer more friends to unlock rarer skins. Rewards are purely cosmetic with no gameplay advantages."
+          content: "When a friend you referred reaches Level 5 • Initiate with their companion, you automatically unlock an exclusive companion skin. Refer more friends to unlock rarer skins. Rewards are purely cosmetic with no gameplay advantages."
         },
         {
           title: "Redeeming Codes",
-          content: "New users can enter a friend's referral code in Command Center. This tags you as their referral but doesn't unlock anything for you. The referrer earns the reward when you reach Stage 5 • Initiate. It's a way to credit the friend who introduced you."
+          content: "New users can enter a friend's referral code in Command Center. This tags you as their referral but doesn't unlock anything for you. The referrer earns the reward when you reach Level 5 • Initiate. It's a way to credit the friend who introduced you."
         },
         {
           title: "Available Skins",

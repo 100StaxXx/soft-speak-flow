@@ -20,6 +20,7 @@ import {
   type CompanionAgentFailureStage,
   getCompanionAgentFailureReason,
 } from "./failureDiagnostics.ts";
+import { createCallerSupabaseClient } from "../_shared/callerSupabase.ts";
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -83,6 +84,7 @@ serve(async (req) => {
     const result = await runCompanionAgent({
       guardedFetch,
       supabase: protectedRequest.supabase,
+      actorSupabase: createCallerSupabaseClient(req),
       userId: protectedRequest.auth.userId,
       request: parsed.data,
       requestId,

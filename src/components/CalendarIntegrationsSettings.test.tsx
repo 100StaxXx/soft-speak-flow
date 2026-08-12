@@ -143,7 +143,7 @@ describe("CalendarIntegrationsSettings", () => {
   it("shows calendar integrations by default when nothing is connected", () => {
     render(<CalendarIntegrationsSettings />);
 
-    expect(screen.getByText("Connect destinations for sending quests to external calendars.")).toBeInTheDocument();
+    expect(screen.getByText(/show selected calendars in agenda and send quests outward/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /connect outlook calendar/i })).toBeInTheDocument();
   });
 
@@ -285,6 +285,24 @@ describe("CalendarIntegrationsSettings", () => {
         url: "https://accounts.google.com/o/oauth2/v2/auth",
       });
     });
+  });
+
+  it("does not hand an invalid OAuth response to the native browser", async () => {
+    mocks.state.nativePlatform = true;
+    mocks.beginOAuthConnectionMutateAsync.mockResolvedValue(undefined);
+
+    render(<CalendarIntegrationsSettings />);
+
+    fireEvent.click(screen.getByRole("button", { name: /connect google calendar/i }));
+
+    await waitFor(() => {
+      expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
+        title: "Failed to start connection",
+        description: expect.stringMatching(/did not return a sign-in link/i),
+        variant: "destructive",
+      }));
+    });
+    expect(mocks.browserOpenMock).not.toHaveBeenCalled();
   });
 
   it("does not auto-load Outlook destinations for a connected account", async () => {

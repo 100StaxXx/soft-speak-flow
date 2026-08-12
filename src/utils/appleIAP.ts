@@ -81,3 +81,17 @@ export const getPurchaseProductIdForPlan = (
   if (product) return product.identifier;
   return plan === "yearly" ? PREMIUM_YEARLY_PRODUCT_ID : PREMIUM_MONTHLY_PRODUCT_ID;
 };
+
+export const getFreeTrialLabel = (product: StoreKitProduct | null | undefined): string | null => {
+  const intro = product?.introductoryPrice;
+  if (!intro || intro.price !== 0 || intro.cycles < 1) return null;
+
+  const unitCount = intro.periodNumberOfUnits * intro.cycles;
+  if (!Number.isFinite(unitCount) || unitCount < 1) return null;
+
+  const normalizedUnit = intro.periodUnit.trim().toLowerCase();
+  const unit = normalizedUnit.endsWith("s") ? normalizedUnit.slice(0, -1) : normalizedUnit;
+  if (!["day", "week", "month", "year"].includes(unit)) return null;
+
+  return `${unitCount}-${unit} free trial`;
+};
