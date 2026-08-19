@@ -38,6 +38,7 @@ function getProductBuildIdentity(env: Record<string, string>): ProductBuildIdent
           "icon-192.png",
           "icon-192.svg",
           "icon-512.svg",
+          "graceward-motion",
         ],
       }
     : {
@@ -54,6 +55,12 @@ function getProductBuildIdentity(env: Record<string, string>): ProductBuildIdent
           "COSMIQ_PRIVACY_POLICY.md",
           "COSMIQ_TERMS_OF_SERVICE.md",
           "cosmiq-icon.svg",
+          "companion-eggs",
+          "companion-hatch-videos",
+          "companion-launcher-away",
+          "companion-presets",
+          "landing-backdrops",
+          "onboarding",
         ],
       };
 }
@@ -71,7 +78,7 @@ function productArtifactIsolationPlugin(env: Record<string, string>): Plugin {
       );
 
       for (const relativePath of identity.excludedPublicArtifacts) {
-        fs.rmSync(path.join(outputDirectory, relativePath), { force: true });
+        fs.rmSync(path.join(outputDirectory, relativePath), { force: true, recursive: true });
       }
     },
   };
@@ -608,9 +615,18 @@ export default defineConfig(({ mode }) => {
       })
     ].filter(Boolean),
     resolve: {
-      alias: {
-        "@": path.resolve(__dirname, "./src"),
-      },
+      alias: [
+        {
+          find: "@/assets/backgrounds/productAssets",
+          replacement: path.resolve(
+            __dirname,
+            identity.productName === "Cosmiq"
+              ? "./src/assets/backgrounds/productAssets.cosmiq.ts"
+              : "./src/assets/backgrounds/productAssets.graceward.ts",
+          ),
+        },
+        { find: "@", replacement: path.resolve(__dirname, "./src") },
+      ],
     },
     build: {
       target: 'esnext',

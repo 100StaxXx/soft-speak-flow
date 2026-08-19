@@ -536,7 +536,10 @@ function resolveCapabilityFromOpenAIRequest(
 ): CostCapability | null {
   if (pathname.includes("/audio/transcriptions")) return "transcription";
   if (pathname.includes("/audio/speech")) return "tts";
-  if (pathname.includes("/images/generations")) return "image";
+  if (
+    pathname.includes("/images/generations") ||
+    pathname.includes("/images/edits")
+  ) return "image";
   if (pathname.includes("/videos")) return "video";
   if (
     !pathname.includes("/chat/completions") && !pathname.includes("/responses")

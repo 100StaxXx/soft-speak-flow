@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getBundledDailyFormationAssetUrls,
   getCompanionReactionAnimationUrl,
   getDailyFormationAssetDescriptor,
 } from "./gracewardMotion";
@@ -64,6 +65,35 @@ describe("Graceward motion asset resolution", () => {
       element: "fire",
       stage: 5,
       category: "Soul",
+      dateKey: "2026-08-11",
+    })).toBeNull();
+  });
+
+  it.each([
+    ["Body", /\/graceward-motion\/v1\/lion\/light\/body-[123]\.mp4$/],
+    ["Soul", /\/graceward-motion\/v1\/lion\/light\/soul-[123]\.mp4$/],
+  ] as const)("resolves the bundled lion %s clip when it is absent from the remote pack", (
+    category,
+    expectedPath,
+  ) => {
+    const asset = getBundledDailyFormationAssetUrls({
+      species: "lion",
+      element: "light",
+      stage: 1,
+      category,
+      dateKey: "2026-08-11",
+    });
+
+    expect(asset?.videoUrl).toMatch(expectedPath);
+    expect(asset?.stillUrl).toBe(asset?.videoUrl.replace(/\.mp4$/, ".jpg"));
+  });
+
+  it("does not reuse the bundled Young clips for later visual stages", () => {
+    expect(getBundledDailyFormationAssetUrls({
+      species: "lion",
+      element: "light",
+      stage: 5,
+      category: "Body",
       dateKey: "2026-08-11",
     })).toBeNull();
   });

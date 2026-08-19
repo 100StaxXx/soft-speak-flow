@@ -1,4 +1,4 @@
-import { PRODUCT } from "../config/product";
+import { PRODUCT } from "../config/product.ts";
 
 export const LOCKED_COMPANION_TONE_PACK = "witty_sassy" as const;
 export const LOCKED_COMPANION_VOICE_LABEL = "Joyful Companion";

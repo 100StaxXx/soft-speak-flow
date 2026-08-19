@@ -127,6 +127,8 @@ describe("GracewardDailyFormationBoard", () => {
     expect(onFormationMediaChange).toHaveBeenLastCalledWith(expect.objectContaining({
       category: "Body",
       playVideo: true,
+      videoUrl: expect.stringMatching(/\/graceward-motion\/v1\/lion\/light\/body-[123]\.mp4$/),
+      stillUrl: expect.stringMatching(/\/graceward-motion\/v1\/lion\/light\/body-[123]\.jpg$/),
     }));
 
     fireEvent.click(bodyButton);
@@ -136,9 +138,50 @@ describe("GracewardDailyFormationBoard", () => {
     }));
   });
 
+  it("plays the bundled lion Soul animation when the remote pack has no Soul clip", () => {
+    const onFormationMediaChange = vi.fn();
+    render(
+      <GracewardDailyFormationBoard
+        companion={makeCompanion()}
+        onFormationMediaChange={onFormationMediaChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Soul" }));
+
+    expect(onFormationMediaChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      category: "Soul",
+      playVideo: true,
+      videoUrl: expect.stringMatching(/\/graceward-motion\/v1\/lion\/light\/soul-[123]\.mp4$/),
+      stillUrl: expect.stringMatching(/\/graceward-motion\/v1\/lion\/light\/soul-[123]\.jpg$/),
+    }));
+  });
+
+  it("replays restored media for a pillar revealed before the bundled fallback fix", () => {
+    localStorage.setItem(
+      "graceward:formation-reveals:v1:user-1:2026-08-11",
+      "[\"Body\"]",
+    );
+    const onFormationMediaChange = vi.fn();
+    render(
+      <GracewardDailyFormationBoard
+        companion={makeCompanion()}
+        onFormationMediaChange={onFormationMediaChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Body" }));
+
+    expect(onFormationMediaChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      category: "Body",
+      playVideo: true,
+      videoUrl: expect.stringMatching(/\/graceward-motion\/v1\/lion\/light\/body-[123]\.mp4$/),
+    }));
+  });
+
   it("restores the selected finish frame without replaying when the screen remounts", async () => {
     localStorage.setItem("graceward:formation-active:v1:user-1:2026-08-11", "Soul");
-    localStorage.setItem("graceward:formation-reveals:v1:user-1:2026-08-11", "[\"Soul\"]");
+    localStorage.setItem("graceward:formation-reveals:v2:user-1:2026-08-11", "[\"Soul\"]");
     const onFormationMediaChange = vi.fn();
 
     render(

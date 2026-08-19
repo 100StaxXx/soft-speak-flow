@@ -20,8 +20,22 @@ const PRODUCTS = {
       "COSMIQ_PRIVACY_POLICY.md",
       "COSMIQ_TERMS_OF_SERVICE.md",
       "cosmiq-icon.svg",
+      "companion-eggs",
+      "companion-hatch-videos",
+      "companion-launcher-away",
+      "companion-presets",
+      "landing-backdrops",
+      "onboarding",
     ],
     oppositeCacheName: "cosmiq-image-cache",
+    forbiddenAssetFragments: [
+      "cosmic-galaxy-portal",
+      "cosmic-path-",
+      "cosmic-signin",
+      "cosmic-welcome",
+      "wallpaper-campaigns-seed",
+      "wallpaper-quests-seed",
+    ],
   },
   cosmiq: {
     name: "Cosmiq",
@@ -37,8 +51,10 @@ const PRODUCTS = {
       "icon-192.png",
       "icon-192.svg",
       "icon-512.svg",
+      "graceward-motion",
     ],
     oppositeCacheName: "graceward-image-cache",
+    forbiddenAssetFragments: ["graceward-"],
   },
 };
 
@@ -120,8 +136,20 @@ const run = async () => {
     if (await pathExists(relativePath)) {
       fail(`dist/${relativePath} is an opposite-product artifact and must not be shipped.`);
     }
-    if (serviceWorker.includes(relativePath)) {
+    const serviceWorkerNeedle = relativePath.includes(".")
+      ? relativePath
+      : `\"url\":\"${relativePath}/`;
+    if (serviceWorker.includes(serviceWorkerNeedle)) {
       fail(`Service worker precaches opposite-product artifact ${relativePath}.`);
+    }
+  }
+
+  const emittedFiles = await fs.readdir(distRoot, { recursive: true });
+  for (const relativePath of emittedFiles) {
+    for (const fragment of product.forbiddenAssetFragments) {
+      if (relativePath.includes(fragment)) {
+        fail(`dist/${relativePath} contains opposite-product background asset ${fragment}.`);
+      }
     }
   }
 

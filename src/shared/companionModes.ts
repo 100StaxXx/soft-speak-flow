@@ -1,5 +1,5 @@
-import type { CompanionDialogueTonePack } from "../config/companionDialoguePacks";
-import { PRODUCT } from "../config/product";
+import type { CompanionDialogueTonePack } from "../config/companionDialoguePacks.ts";
+import { PRODUCT } from "../config/product.ts";
 import {
   LOCKED_COMPANION_BOND_LEVEL_DIALOGUE,
   LOCKED_COMPANION_ENCOURAGEMENT_TEMPLATES,

@@ -173,7 +173,7 @@ const hashFile = async (filePath) => {
   return createHash("sha256").update(fileBuffer).digest("hex");
 };
 
-const verifyGracewardNativeProductIdentity = async () => {
+const verifyGracewardNativeProductIdentity = async (compareDist = true) => {
   for (const relativePath of PRODUCT_IDENTITY_FILES) {
     const distPath = path.join(distRoot, relativePath);
     const iosPath = path.join(iosPublicRoot, relativePath);
@@ -181,10 +181,10 @@ const verifyGracewardNativeProductIdentity = async () => {
     let distContents;
     let iosContents;
     try {
-      [distContents, iosContents] = await Promise.all([
-        fs.readFile(distPath, "utf8"),
-        fs.readFile(iosPath, "utf8"),
-      ]);
+      iosContents = await fs.readFile(iosPath, "utf8");
+      distContents = compareDist
+        ? await fs.readFile(distPath, "utf8")
+        : iosContents;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       fail(`Missing required ${EXPECTED_NATIVE_PRODUCT} identity artifact ${relativePath}: ${message}`);
@@ -204,7 +204,10 @@ const verifyGracewardNativeProductIdentity = async () => {
     }
   }
 
-  const manifest = JSON.parse(await fs.readFile(path.join(distRoot, "manifest.webmanifest"), "utf8"));
+  const identityRoot = compareDist ? distRoot : iosPublicRoot;
+  const manifest = JSON.parse(
+    await fs.readFile(path.join(identityRoot, "manifest.webmanifest"), "utf8"),
+  );
   if (manifest.short_name !== EXPECTED_NATIVE_PRODUCT) {
     fail(
       `Expected ${EXPECTED_NATIVE_PRODUCT} manifest, got ${String(manifest.short_name ?? "missing short_name")}.`,
@@ -212,7 +215,7 @@ const verifyGracewardNativeProductIdentity = async () => {
   }
 
   const association = JSON.parse(
-    await fs.readFile(path.join(distRoot, "apple-app-site-association"), "utf8"),
+    await fs.readFile(path.join(identityRoot, "apple-app-site-association"), "utf8"),
   );
   const associatedAppIds = association?.applinks?.details?.map((detail) => detail.appID) ?? [];
   const expectedAssociatedAppId = `B6VW78ABTR.${EXPECTED_NATIVE_BUNDLE_ID}`;
@@ -258,7 +261,13 @@ const verifyNoLegacyJourneyPathContract = async (directory, bundles) => {
   }
 };
 
-const verifyDirectoryMatchesDist = async (directory, distBundles, distJavaScriptBundles, label) => {
+const verifyDirectoryMatchesDist = async (
+  directory,
+  distBundles,
+  distJavaScriptBundles,
+  label,
+  referenceAssetsDir = distAssetsDir,
+) => {
   const directoryBundles = await listIndexBundles(directory);
   const directoryJavaScriptBundles = await listJavaScriptBundles(directory);
 
@@ -276,7 +285,7 @@ const verifyDirectoryMatchesDist = async (directory, distBundles, distJavaScript
 
   const hashMismatches = [];
   for (const bundle of distBundles) {
-    const distHash = await hashFile(path.join(distAssetsDir, bundle));
+    const distHash = await hashFile(path.join(referenceAssetsDir, bundle));
     const directoryHash = await hashFile(path.join(directory, bundle));
     if (distHash !== directoryHash) {
       hashMismatches.push(bundle);
@@ -287,7 +296,7 @@ const verifyDirectoryMatchesDist = async (directory, distBundles, distJavaScript
     fail(`${label} at ${directory} has bundle content mismatch for: ${hashMismatches.join(", ")}`);
   }
 
-  await verifyNoLegacyJourneyPathContract(distAssetsDir, distJavaScriptBundles);
+  await verifyNoLegacyJourneyPathContract(referenceAssetsDir, distJavaScriptBundles);
   await verifyNoLegacyJourneyPathContract(directory, directoryJavaScriptBundles);
 };
 
@@ -297,6 +306,26 @@ const verifyAssets = async () => {
     skipGeneratedBuildScan,
     scanGeneratedBuilds,
   } = parseArgs(process.argv.slice(2));
+
+  // During an Xcode build the copied Capacitor bundle is the immutable source
+  // of truth. The root dist directory may legitimately be replaced by a
+  // separate Cosmiq web build while the archive is compiling.
+  if (targetBuiltAssetsDir) {
+    const iosBundles = await listIndexBundles(iosAssetsDir);
+    const iosJavaScriptBundles = await listJavaScriptBundles(iosAssetsDir);
+    await verifyNoLegacyJourneyPathContract(iosAssetsDir, iosJavaScriptBundles);
+    await verifyGracewardNativeProductIdentity(false);
+    await verifyDirectoryMatchesDist(
+      targetBuiltAssetsDir,
+      iosBundles,
+      iosJavaScriptBundles,
+      "Xcode target bundled assets",
+      iosAssetsDir,
+    );
+    info(`Verified ${iosBundles.length} staged index bundle(s) in the Xcode target.`);
+    return;
+  }
+
   const distBundles = await listIndexBundles(distAssetsDir);
   const distJavaScriptBundles = await listJavaScriptBundles(distAssetsDir);
 

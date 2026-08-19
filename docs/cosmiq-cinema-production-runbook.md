@@ -13,19 +13,28 @@ on paid generation. Production rollout is a separate, observable decision.
 - All six cinema-aware functions are active. The per-minute worker cron and
   nightly private-asset cleanup cron are active, and the private cinema bucket
   is non-public.
-- Paid generation remains fail-closed with `COSMIQ_CINEMA_ENABLED=false`, a 0%
-  rollout, and a non-user canary sentinel. A live internal-worker smoke request
-  returned the expected `cosmiq_cinema_disabled` response.
+- Paid generation remains fail-closed with `COSMIQ_CINEMA_ENABLED=false` and a
+  0% rollout. A dedicated non-customer Cosmiq canary account is configured and
+  its Level 5 Standard evolution event is queued. The first paid-canary attempt
+  reached OpenAI but returned `429 insufficient_quota` before producing or
+  charging for media. The event was reset to a clean queued state after the
+  engine was disabled. Add OpenAI API credits before resuming the canary.
 - The repository contains older migrations that production intentionally or
   accidentally skipped. Do not run `supabase db push --include-all` from the full
   repository migration directory.
-- The three base provider/internal secrets and the reviewed Standard
-  rollout/model/retention values exist. A real reviewed Cosmiq canary UUID and an
-  operator-owned alert webhook still need to replace the fail-closed placeholders
-  before paid canary generation.
-- `app.cosmiq.quest` is served by the `cosmiq-web` Cloudflare Pages project. The
-  current workstation has no authenticated Cloudflare deployment session, so the
-  reviewed frontend bundle has not been promoted from this workspace.
+- The three base provider/internal secrets, reviewed Standard
+  rollout/model/retention values, dedicated canary UUID, and authenticated cost
+  alert webhook exist. The webhook durably stores sanitized alerts in Cloudflare
+  KV for 30 days. The optional push relay is currently rate-limited, so operators
+  must use the private Cloudflare inbox until another push destination is added.
+- A live `429` canary retry verified multipart Image API telemetry as
+  `openai / gpt-image-1-mini / image / error / $0.00` after the edit-route
+  classification fix was deployed.
+- `app.cosmiq.quest` is served by the `cosmiq-web` Cloudflare Pages project and
+  Cloudflare deployment access is authenticated. The reviewed branch also
+  contains a large Graceward release and diverges from current `main`; do not
+  promote that branch wholesale. Integrate the Cosmiq cinema frontend onto
+  current `main`, verify its preview, and only then promote it.
 
 Run `npm run cosmiq:cinema:production-check` before and after every release step.
 It reports names and status only; it never prints secret values.
@@ -60,6 +69,7 @@ Set these values explicitly:
 - `COSMIQ_CINEMA_VIDEO_MODEL=fal-ai/kling-video/v3/standard/image-to-video`
 - `COSMIQ_CINEMA_PRIVATE_RETENTION_HOURS=24`
 - `COST_ALERT_WEBHOOK_URL=<operator-owned alert endpoint>`
+- `COST_ALERT_WEBHOOK_BEARER_TOKEN=<high-entropy receiver credential>`
 
 Keep existing `OPENAI_API_KEY`, `FAL_KEY`, and `INTERNAL_FUNCTION_SECRET` values.
 Deploy the following functions as one release:
@@ -76,6 +86,32 @@ must not be enabled until schema preflight passes.
 
 After the post-deploy preflight passes, set `COSMIQ_CINEMA_ENABLED=true` to admit
 only the reviewed canary UUID. Do not increase the rollout percentage yet.
+
+## Cost alert receiver
+
+The production receiver is
+`https://cosmiq-cost-alerts.codyjohnson32123.workers.dev/v1/cost-alert`.
+Its source and tests live in `cloudflare/cosmiq-cost-alerts`.
+
+- `POST /v1/cost-alert` requires `Authorization: Bearer ...`.
+- Accepted alerts are sanitized before storage; user UUIDs, email addresses,
+  URLs, and arbitrary metadata are not retained.
+- Cloudflare KV is the delivery source of truth and expires alerts after 30 days.
+- The private HTML and JSON inbox routes use a separate view credential. Do not
+  commit or log their URLs.
+- ntfy delivery is best-effort. A failure updates `notification_delivery` but
+  never changes a successful durable webhook acknowledgement.
+
+Run the Worker unit tests with:
+
+```sh
+node --test cloudflare/cosmiq-cost-alerts/src/index.test.mjs
+```
+
+Deploy with Wrangler, then rotate both Worker credentials and update the
+Supabase bearer secret in the same release window. Prove health `200`, rejected
+unauthenticated POST `401`, authenticated POST `204`, and a sanitized record in
+the private inbox before enabling paid work.
 
 ## Canary and rollout
 

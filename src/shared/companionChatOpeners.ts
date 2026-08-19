@@ -1,4 +1,4 @@
-import { PRODUCT, type ProductMode } from "../config/product";
+import { PRODUCT, type ProductMode } from "../config/product.ts";
 
 const GRACEWARD_COMPANION_CHAT_OPENING_LINES = [
   "I'm here. What's on your heart today?",

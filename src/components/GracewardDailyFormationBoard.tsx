@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
 import {
+  getBundledDailyFormationAssetUrls,
   getCompanionReactionAnimationUrl,
   getDailyFormationAssetDescriptor,
   type CompanionReactionAnimation,
@@ -70,12 +71,21 @@ const resolveFormationMedia = ({
     category,
     dateKey,
   });
-  const videoUrl = asset
-    ? supabase.storage.from(asset.videoBucket).getPublicUrl(asset.videoStoragePath).data.publicUrl
-    : null;
-  const stillUrl = asset
-    ? supabase.storage.from(asset.stillBucket).getPublicUrl(asset.stillStoragePath).data.publicUrl
-    : null;
+  if (!asset) {
+    return getBundledDailyFormationAssetUrls({
+      species,
+      element,
+      stage,
+      category,
+      dateKey,
+    }) ?? { videoUrl: null, stillUrl: null };
+  }
+  const videoUrl = supabase.storage
+    .from(asset.videoBucket)
+    .getPublicUrl(asset.videoStoragePath).data.publicUrl;
+  const stillUrl = supabase.storage
+    .from(asset.stillBucket)
+    .getPublicUrl(asset.stillStoragePath).data.publicUrl;
   return { videoUrl, stillUrl };
 };
 
@@ -99,7 +109,9 @@ export const GracewardDailyFormationBoard = ({
   const soul = useAdaptiveDailyFormation({ category: "Soul", enabled: formationSupported });
   const storageScope = `${user?.id ?? "preview"}:${dateKey}`;
   const activeStorageKey = `graceward:formation-active:v1:${storageScope}`;
-  const revealStorageKey = `graceward:formation-reveals:v1:${storageScope}`;
+  // v2 replays the newly restored bundled Body/Soul media once for users who
+  // previously revealed those pillars while only the fallback was available.
+  const revealStorageKey = `graceward:formation-reveals:v2:${storageScope}`;
   const [activeCategory, setActiveCategory] = useState<DailyFormationCategory | null>(() => (
     parseCategory(safeLocalStorage.getItem(activeStorageKey))
   ));

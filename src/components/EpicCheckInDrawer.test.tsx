@@ -210,4 +210,24 @@ describe("EpicCheckInDrawer", () => {
 
     expect(mocks.surfaceHabitMock).not.toHaveBeenCalled();
   });
+
+  it("cancels the delayed completion reset when the drawer unmounts", () => {
+    vi.useFakeTimers();
+    mocks.surfacedHabits = [
+      { habit_id: "habit-1", task_id: "task-1", is_completed: false },
+    ];
+
+    try {
+      const { unmount } = renderSubject();
+      const initialTimerCount = vi.getTimerCount();
+
+      fireEvent.click(screen.getByRole("checkbox", { name: "Mark rhythm as complete" }));
+      expect(vi.getTimerCount()).toBe(initialTimerCount + 1);
+
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

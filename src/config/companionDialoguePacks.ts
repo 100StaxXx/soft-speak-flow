@@ -460,4 +460,4 @@ export const getLinesForToneAndBucket = (
 
 export const getAllLinesForBucket = (bucketKey: CompanionDialogueBucketKey): CompanionDialogueLine[] =>
   COMPANION_DIALOGUE_TONE_PACKS.flatMap((tonePack) => COMPANION_DIALOGUE_PACKS[tonePack][bucketKey]);
-import { PRODUCT } from "@/config/product";
+import { PRODUCT } from "./product.ts";
