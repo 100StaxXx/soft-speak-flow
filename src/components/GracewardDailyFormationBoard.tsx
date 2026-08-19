@@ -5,8 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
   getCompanionReactionAnimationUrl,
-  getDailyFormationAnimationUrl,
-  getDailyFormationStillUrl,
+  getDailyFormationAssetDescriptor,
   type CompanionReactionAnimation,
 } from "@/config/gracewardMotion";
 import { PRODUCT } from "@/config/product";
@@ -15,6 +14,7 @@ import { useAdaptiveDailyFormation } from "@/hooks/useAdaptiveDailyFormation";
 import { useAuth } from "@/hooks/useAuth";
 import type { Companion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { safeLocalStorage } from "@/utils/storage";
 import { getEffectiveDailyDate } from "@/utils/timezone";
@@ -53,16 +53,29 @@ const readRevealedCategories = (key: string): DailyFormationCategory[] => {
 const resolveFormationMedia = ({
   species,
   element,
+  stage,
   category,
   dateKey,
 }: {
   species: string | null | undefined;
   element: string | null | undefined;
+  stage: number | null | undefined;
   category: DailyFormationCategory;
   dateKey: string;
 }) => {
-  const videoUrl = getDailyFormationAnimationUrl({ species, element, category, dateKey });
-  const stillUrl = getDailyFormationStillUrl({ species, element, category, dateKey });
+  const asset = getDailyFormationAssetDescriptor({
+    species,
+    element,
+    stage,
+    category,
+    dateKey,
+  });
+  const videoUrl = asset
+    ? supabase.storage.from(asset.videoBucket).getPublicUrl(asset.videoStoragePath).data.publicUrl
+    : null;
+  const stillUrl = asset
+    ? supabase.storage.from(asset.stillBucket).getPublicUrl(asset.stillStoragePath).data.publicUrl
+    : null;
   return { videoUrl, stillUrl };
 };
 
@@ -78,6 +91,7 @@ export const GracewardDailyFormationBoard = ({
   const dateKey = getEffectiveDailyDate(profile?.timezone ?? undefined);
   const species = companion?.spirit_animal ?? companion?.preset_id;
   const element = companion?.core_element;
+  const stage = companion?.current_stage;
   const formationSupported = PRODUCT.mode === "christian"
     && Boolean(companion && companion.current_stage > 0);
   const mind = useAdaptiveDailyFormation({ category: "Mind", enabled: formationSupported });
@@ -123,7 +137,7 @@ export const GracewardDailyFormationBoard = ({
       return;
     }
 
-    const media = resolveFormationMedia({ species, element, category: activeCategory, dateKey });
+    const media = resolveFormationMedia({ species, element, stage, category: activeCategory, dateKey });
     onFormationMediaChange?.({
       category: activeCategory,
       ...media,
@@ -141,13 +155,14 @@ export const GracewardDailyFormationBoard = ({
     formationSupported,
     onFormationMediaChange,
     species,
+    stage,
   ]);
 
   if (!formationSupported) return null;
 
   const selectCategory = (category: DailyFormationCategory) => {
     const entry = entries.find((candidate) => candidate.category === category);
-    const media = resolveFormationMedia({ species, element, category, dateKey });
+    const media = resolveFormationMedia({ species, element, stage, category, dateKey });
 
     const firstReveal = !revealed.includes(category);
     const shouldStageReveal = firstReveal && !entry?.state.assignment?.completedAt;

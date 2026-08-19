@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { Skeleton } from "./ui/skeleton";
 import { formatDisplayLabel } from "@/lib/utils";
 import { buildPostgrestIlikeOr } from "@/utils/postgrestSearchFilters";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 
 interface GlobalSearchProps {
   initialQuery?: string;
@@ -65,12 +66,13 @@ export const GlobalSearch = ({
   };
 
   const { data: quotes, isLoading: quotesLoading } = useQuery({
-    queryKey: ["search-quotes", currentQuery],
+    queryKey: ["search-quotes", PRODUCT_RUNTIME.authProductMode, currentQuery],
     enabled: currentQuery.length >= 2,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotes")
         .select("*")
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
         .or(quoteSearchFilter)
         .limit(10);
 
@@ -80,12 +82,13 @@ export const GlobalSearch = ({
   });
 
   const { data: pepTalks, isLoading: pepTalksLoading } = useQuery({
-    queryKey: ["search-pep-talks", currentQuery],
+    queryKey: ["search-pep-talks", PRODUCT_RUNTIME.authProductMode, currentQuery],
     enabled: currentQuery.length >= 2,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("pep_talks")
         .select("*")
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
         .or(pepTalkSearchFilter)
         .limit(10);
 

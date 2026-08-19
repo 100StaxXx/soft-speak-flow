@@ -34,13 +34,13 @@ const DIRECTION_OPTIONS = [
   {
     id: "responsibility",
     label: "One responsibility",
-    category: "Stewardship",
+    category: "Mind",
     companionResponse: "One responsibility is enough to begin. I’ll notice the follow-through with you.",
   },
   {
     id: "pace",
     label: "A gentler pace",
-    category: "Rest",
+    category: "Body",
     companionResponse: "A gentler pace belongs in the plan. I’ll help you leave room for it.",
   },
 ] as const satisfies readonly DailyGuideQuestionOption[];
@@ -49,19 +49,19 @@ const COURAGE_OPTIONS = [
   {
     id: "courage",
     label: "Courage",
-    category: "Faith",
+    category: "Soul",
     companionResponse: "Courage can be quiet. I’ll stay close while you practice it today.",
   },
   {
     id: "self-respect",
     label: "Self-respect",
-    category: "Relationships",
+    category: "Soul",
     companionResponse: "We’ll protect what is honest and dignified today, without hardening.",
   },
   {
     id: "gentleness",
     label: "Gentleness",
-    category: "Rest",
+    category: "Body",
     companionResponse: "Gentleness it is. Nothing meaningful has to be powered by shame.",
   },
 ] as const satisfies readonly DailyGuideQuestionOption[];
@@ -76,13 +76,13 @@ const CARE_OPTIONS = [
   {
     id: "quiet",
     label: "More quiet",
-    category: "Rest",
+    category: "Body",
     companionResponse: "We’ll leave some quiet in the day. You do not have to fill every space.",
   },
   {
     id: "support",
     label: "Connection",
-    category: "Relationships",
+    category: "Soul",
     companionResponse: "Connection matters today. I’ll remind you that asking for support can be a faithful step.",
   },
 ] as const satisfies readonly DailyGuideQuestionOption[];
@@ -91,7 +91,7 @@ const REFLECTION_OPTIONS = [
   {
     id: "prayer",
     label: "Prayer",
-    category: "Faith",
+    category: "Soul",
     companionResponse: "We’ll make room to return to prayer without turning it into pressure.",
   },
   {
@@ -103,7 +103,7 @@ const REFLECTION_OPTIONS = [
   {
     id: "repair",
     label: "Repair",
-    category: "Relationships",
+    category: "Soul",
     companionResponse: "Repair can begin small. I’ll remember that this matters to you today.",
   },
 ] as const satisfies readonly DailyGuideQuestionOption[];

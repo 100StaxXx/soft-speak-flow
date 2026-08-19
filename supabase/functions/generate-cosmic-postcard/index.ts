@@ -11,6 +11,7 @@ import {
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
 import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -191,6 +192,13 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    if (await resolveUserProductMode(supabase, userId) !== "cosmiq") {
+      return new Response(
+        JSON.stringify({ error: "Cosmic postcards belong to Cosmiq accounts only" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const costGuardrails = createCostGuardrailSession({
       supabase,
       endpointKey: "generate-cosmic-postcard",
@@ -306,7 +314,7 @@ serve(async (req) => {
 
     if (profile?.selected_mentor_id) {
       const { data: mentor } = await supabase
-        .from('graceward_guides')
+        .from('mentors')
         .select('slug, name')
         .eq('id', profile.selected_mentor_id)
         .maybeSingle();

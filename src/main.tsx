@@ -5,7 +5,10 @@ import "./index.css";
 import { initializeCapacitor } from "./utils/capacitor";
 import { logger } from "./utils/logger";
 import { isMacDesignedForIPadIOSApp } from "./utils/platformTargets";
+import { applyProductDocumentIdentity } from "./config/productDocumentIdentity";
 import App from "./App";
+
+applyProductDocumentIdentity();
 
 // Initialize Sentry error tracking (only in production with valid DSN)
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN;

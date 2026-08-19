@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchProductMentorById } from "@/services/productMentorCatalog";
 import {
   getOnboardingMentorId,
   getResolvedMentorId,
@@ -81,16 +82,7 @@ export function useMentorConnectionHealth(): {
   );
 
   const validateOnboardingMentor = useCallback(async (mentorId: string) => {
-    const { data: mentorLookup, error: mentorLookupError } = await supabase
-      .from("graceward_guides")
-      .select("id")
-      .eq("id", mentorId)
-      .maybeSingle();
-
-    if (mentorLookupError) {
-      throw mentorLookupError;
-    }
-
+    const mentorLookup = await fetchProductMentorById(mentorId);
     return mentorLookup?.id ?? null;
   }, []);
 

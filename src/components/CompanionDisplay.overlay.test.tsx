@@ -344,7 +344,7 @@ vi.mock("@/components/GracewardDailyFormationBoard", () => ({
     onFormationMediaChange,
   }: {
     onFormationMediaChange?: (media: {
-      category: "Mind";
+      category: "Mind" | "Body";
       videoUrl: string | null;
       stillUrl: string | null;
       playVideo: boolean;
@@ -421,7 +421,7 @@ describe("CompanionDisplay overlay stack", () => {
     mocks.currentEvolutionReplay = null;
     mocks.refetchCurrentEvolutionReplay.mockReset();
     mocks.refetchCurrentEvolutionReplay.mockResolvedValue({ data: null });
-    mocks.triggerManualEvolution.mockClear();
+    mocks.triggerManualEvolution.mockReset();
     mocks.hatchCompanion.mutateAsync.mockClear();
     mocks.canEvolve = false;
     mocks.requiresHatchSelection = false;
@@ -898,7 +898,9 @@ describe("CompanionDisplay overlay stack", () => {
 
     render(<CompanionDisplay />);
 
-    fireEvent.click(screen.getByRole("button", { name: "HATCH" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "HATCH" }));
+    });
 
     expect(mocks.triggerManualEvolution).toHaveBeenCalledTimes(1);
     expect(mocks.triggerManualEvolution).toHaveBeenCalledWith(
@@ -910,6 +912,38 @@ describe("CompanionDisplay overlay stack", () => {
       }),
     );
     expect(screen.queryByText("Hatch chooser")).not.toBeInTheDocument();
+  });
+
+  it("shows immediate hatch feedback while the latest companion state is syncing", async () => {
+    mocks.canEvolve = true;
+    mocks.companion = {
+      ...mocks.companion,
+      current_stage: 0,
+      current_xp: 14,
+      preset_id: "dragon",
+      spirit_animal: "Dragon",
+      cached_creature_name: null,
+    };
+
+    let finishSync: (() => void) | null = null;
+    mocks.triggerManualEvolution.mockImplementation(
+      () => new Promise<void>((resolve) => {
+        finishSync = resolve;
+      }),
+    );
+
+    render(<CompanionDisplay />);
+
+    fireEvent.click(screen.getByRole("button", { name: "HATCH" }));
+
+    const processingButton = screen.getByRole("button", { name: "HATCHING..." });
+    expect(processingButton).toBeDisabled();
+
+    await act(async () => {
+      finishSync?.();
+    });
+
+    expect(screen.getByRole("button", { name: "HATCH" })).toBeEnabled();
   });
 
   it("keeps the hatch chooser for legacy presetless eggs", async () => {
@@ -928,7 +962,9 @@ describe("CompanionDisplay overlay stack", () => {
 
     render(<CompanionDisplay />);
 
-    fireEvent.click(screen.getByRole("button", { name: "HATCH" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "HATCH" }));
+    });
 
     expect(mocks.triggerManualEvolution).not.toHaveBeenCalled();
     expect(screen.getByText("Hatch chooser")).toBeInTheDocument();

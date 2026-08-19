@@ -8,11 +8,25 @@ import {
 export const COMPANION_FUTURE_STATE_LABEL = "Coming Soon" as const;
 export const COMPANION_LEGACY_STATE_LABEL = "Legacy" as const;
 
-// Graceward's early-access motion library intentionally launches small. Locked
-// entries stay visible so testers can see the world that is still coming.
-export const PILOT_CHRISTIAN_COMPANION_FORM_IDS = ["lion", "dove"] as const satisfies readonly ChristianCompanionForm["id"][];
+// Graceward's complete Level 1-5 premade motion library covers every symbolic
+// species and elemental treatment shown by its companion picker.
+export const PILOT_CHRISTIAN_COMPANION_FORM_IDS = [
+  "lamb",
+  "lion",
+  "stag",
+  "dove",
+  "eagle",
+  "wolf",
+] as const satisfies readonly ChristianCompanionForm["id"][];
 
-export const PILOT_CHRISTIAN_COMPANION_ELEMENT_IDS = ["light", "nature"] as const satisfies readonly CompanionElementId[];
+export const PILOT_CHRISTIAN_COMPANION_ELEMENT_IDS = [
+  "fire",
+  "ice",
+  "storm",
+  "nature",
+  "void",
+  "light",
+] as const satisfies readonly CompanionElementId[];
 
 // Cosmiq's wider catalog remains installed for existing accounts, but only the
 // fully built 3x3 matrix may be chosen on a Cosmiq selection surface.

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PRODUCT } from "@/config/product";
 
-const topics = [
+const gracewardTopics = [
   {
     id: "scripture",
     icon: BookOpen,
@@ -57,6 +57,47 @@ const topics = [
   },
 ] as const;
 
+const cosmiqTopics = [
+  {
+    id: "guidance",
+    icon: Brain,
+    title: "How does AI guidance work?",
+    answer: "Cosmiq may use AI to help turn your goals, preferences, and recent activity into plans, reflections, and Guide responses. AI can be incomplete or wrong, so use it as a planning and reflection aid—not professional medical, mental-health, legal, or financial advice.",
+  },
+  {
+    id: "companion",
+    icon: BookOpen,
+    title: "How does my companion evolve?",
+    answer: "Your Cosmiq companion grows through product-specific XP, milestones, choices, and companion history. Graceward practices, companion forms, and progress do not count toward the Cosmiq account.",
+  },
+  {
+    id: "reminders",
+    icon: Bell,
+    title: "How do reminders work?",
+    answer: "Cosmiq can remind you about plans, actions, habits, check-ins, and reflections you enable. You can change notification preferences at any time in settings or in your device notification controls.",
+  },
+  {
+    id: "companion-memory",
+    icon: Brain,
+    title: "What does Companion memory remember?",
+    answer: "When Companion memory is on, Cosmiq may use durable details you choose to share and recent activity patterns to make later replies feel connected. You can turn memory off or clear learned personal details without deleting conversations or earned progress.",
+  },
+  {
+    id: "privacy",
+    icon: ShieldCheck,
+    title: "Is my account data private?",
+    answer: "Account, planning, reflection, and companion data are stored to provide the service. Do not enter information you would not want processed by our hosting and AI service providers. We do not sell personal data. See the Privacy Policy for details.",
+  },
+  {
+    id: "delete",
+    icon: Trash2,
+    title: "How do I delete my account?",
+    answer: "Open your Cosmiq profile, choose Delete account and data, then follow the confirmation steps. This permanently removes the account and saved app data and cannot be undone.",
+  },
+] as const;
+
+const topics = PRODUCT.mode === "christian" ? gracewardTopics : cosmiqTopics;
+
 export default function HelpCenter() {
   const navigate = useNavigate();
 
@@ -69,7 +110,11 @@ export default function HelpCenter() {
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">{PRODUCT.name}</p>
               <h1 className="mt-1 text-3xl font-semibold tracking-tight">Help center</h1>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Clear answers about Scripture, AI guidance, reminders, and your data.</p>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+                {PRODUCT.mode === "christian"
+                  ? "Clear answers about Scripture, AI guidance, reminders, and your data."
+                  : "Clear answers about AI guidance, companion progress, reminders, and your data."}
+              </p>
             </div>
           </header>
 

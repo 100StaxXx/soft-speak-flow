@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
 import { getOnboardingGateState } from "@/utils/profileOnboarding";
+import { PRODUCT } from "@/config/product";
 
 const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -81,7 +82,7 @@ export default function Onboarding() {
     }
 
     if (!companionOnly && onboardingGate.isEstablished) {
-      navigate("/mentor", { replace: true });
+      navigate(PRODUCT.mode === "cosmiq" ? "/journeys" : "/mentor", { replace: true });
     }
   }, [
     companion,
@@ -99,7 +100,7 @@ export default function Onboarding() {
     || profileLoading
     || companionLoading
   ) {
-    return <PageLoader message="Preparing your Graceward journey…" />;
+    return <PageLoader message={`Preparing your ${PRODUCT.name} journey…`} />;
   }
 
   if (!user) return null;

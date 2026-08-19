@@ -109,6 +109,7 @@ Deno.serve(async (req) => {
     }
 
     const rows = quotes.map(q => ({
+      product_mode: 'cosmiq',
       text: q.text,
       author: q.author || 'Anonymous',
       category: type === 'category' ? value : null,

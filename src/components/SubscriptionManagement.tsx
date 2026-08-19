@@ -11,8 +11,10 @@ import {
   PREMIUM_BENEFITS,
   PREMIUM_BENEFITS_SUMMARY,
   PREMIUM_PLAN_NOTE,
+  PREMIUM_PRODUCT_NAME,
   PREMIUM_SUBSCRIPTION_LEGAL_LINKS,
 } from "@/config/premiumBenefits";
+import { PRODUCT } from "@/config/product";
 
 type PlanOption = {
   id: IAPPlan;
@@ -31,24 +33,26 @@ const PLAN_OPTIONS: PlanOption[] = [
   {
     id: "monthly",
     label: "Monthly",
-    productTitle: "Graceward Plus Monthly",
+    productTitle: `${PREMIUM_PRODUCT_NAME} Monthly`,
     description: PREMIUM_BENEFITS_SUMMARY,
-    hint: "Full Graceward Plus access billed monthly.",
-    fallbackPrice: "$8.99",
+    hint: `Full ${PREMIUM_PRODUCT_NAME} access billed monthly.`,
+    fallbackPrice: PRODUCT.mode === "cosmiq" ? "$9.99" : "$8.99",
     billingPeriodLabel: "/month",
     subscriptionLength: "1 month",
-    fallbackUnitPrice: "$8.99/month",
+    fallbackUnitPrice: PRODUCT.mode === "cosmiq" ? "$9.99/month" : "$8.99/month",
   },
   {
     id: "yearly",
     label: "Yearly",
-    productTitle: "Graceward Plus Yearly",
+    productTitle: `${PREMIUM_PRODUCT_NAME} Yearly`,
     description: PREMIUM_BENEFITS_SUMMARY,
-    hint: "Full Graceward Plus access billed yearly with the best recurring value.",
-    fallbackPrice: "$49.99",
+    hint: `Full ${PREMIUM_PRODUCT_NAME} access billed yearly with the best recurring value.`,
+    fallbackPrice: PRODUCT.mode === "cosmiq" ? "$99.99" : "$49.99",
     billingPeriodLabel: "/year",
     subscriptionLength: "1 year",
-    fallbackUnitPrice: "$4.17/month when billed yearly",
+    fallbackUnitPrice: PRODUCT.mode === "cosmiq"
+      ? "$8.33/month when billed yearly"
+      : "$4.17/month when billed yearly",
     badge: "Most popular",
   },
 ];
@@ -76,7 +80,7 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
   const activeYearlyOfferUnitPrice = activeYearlyOffer?.unitPrice ?? "$2.50/month, locked while active";
 
   const subscriptionStatusText = subscription
-    ? `You have Graceward Plus (${plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : "Active"})`
+    ? `You have ${PREMIUM_PRODUCT_NAME} (${plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : "Active"})`
     : "You're on the free plan";
 
   const statusLabel = subscription

@@ -29,7 +29,7 @@ serve(async (req) => {
 
     // Get mentor info
     const { data: mentor } = await supabase
-      .from('graceward_guides')
+      .from('mentors')
       .select('*')
       .eq('id', mentor_id)
       .single();

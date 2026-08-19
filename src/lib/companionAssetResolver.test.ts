@@ -150,6 +150,19 @@ describe("companion asset resolver", () => {
     ).toBe(getUniversalEggAssetUrl("nature"));
   });
 
+  it("keeps Graceward on its last approved portrait beyond the Level 5 launch pack", () => {
+    expect(
+      resolveCompanionVisualAssetUrl({
+        product_mode: "graceward",
+        preset_id: null,
+        spirit_animal: "Lion",
+        current_stage: 18,
+        core_element: "light",
+        current_image_url: "https://example.com/legacy-generated-lion.png",
+      }),
+    ).toBe("https://example.com/legacy-generated-lion.png");
+  });
+
   it("keeps stage 0 companions on bundled elemental egg art for every visual state", () => {
     const stageZeroCompanion = {
       preset_id: null,

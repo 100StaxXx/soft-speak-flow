@@ -4,6 +4,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { PRODUCT, PRODUCT_COPY } from "@/config/product";
 
 export const QuestSectionTooltip = () => {
   return (
@@ -25,7 +26,7 @@ export const QuestSectionTooltip = () => {
         <div className="space-y-3">
           <h4 className="font-heading font-bold text-base text-primary">Today’s Actions</h4>
           <p className="text-sm leading-relaxed text-foreground/90">
-            Graceward gives you a small set of meaningful daily actions. Complete them to grow in consistency, earn XP, and help your symbolic companion flourish.
+            {PRODUCT.name} gives you a small set of meaningful daily actions. Complete them to grow in consistency, earn {PRODUCT_COPY.growthLabel}, and help your symbolic companion flourish.
           </p>
           <div className="space-y-2 pt-2 border-t border-primary/20">
             <div className="flex items-start gap-2">

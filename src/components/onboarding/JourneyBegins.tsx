@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Sunrise, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PRODUCT } from "@/config/product";
 
 interface JourneyBeginsProps {
   userName: string;
@@ -9,13 +10,21 @@ interface JourneyBeginsProps {
   onComplete: () => void;
 }
 
-const narrativeLines = [
-  "Your daily path is ready...",
-  "Your Guide helps you listen and choose a direction.",
-  "Today turns that direction into one faithful step.",
-  "Your companion notices, responds, and carries the thread forward.",
-  "In the evening, your Guide helps you return to the same day with grace.",
-];
+const narrativeLines = PRODUCT.mode === "christian"
+  ? [
+      "Your daily path is ready...",
+      "Your Guide helps you listen and choose a direction.",
+      "Today turns that direction into one faithful step.",
+      "Your companion notices, responds, and carries the thread forward.",
+      "In the evening, your Guide helps you return to the same day with grace.",
+    ]
+  : [
+      "Your path is ready...",
+      "Your Guide helps you turn intention into direction.",
+      "Your plan turns that direction into meaningful action.",
+      "Your companion notices, responds, and carries the story forward.",
+      "Reflection helps you learn from the day and build momentum.",
+    ];
 
 const LINE_DISPLAY_MS = 3000;
 const FINAL_LINE_HOLD_MS = 3200;
@@ -141,7 +150,9 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
                   transition={{ delay: 0.8 }}
                   className="text-white/60 text-base"
                 >
-                  Your {companionAnimal} is a visual companion for the practices you complete. It reflects consistency—not God&apos;s love, favor, or approval, which cannot be earned.
+                  {PRODUCT.mode === "christian"
+                    ? `Your ${companionAnimal} is a visual companion for the practices you complete. It reflects consistency—not God's love, favor, or approval, which cannot be earned.`
+                    : `Your ${companionAnimal} is a living record of the actions, choices, and momentum you build.`}
                 </motion.p>
                 
                 <motion.div
@@ -151,10 +162,12 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
                   className="pt-2"
                 >
                   <p className="text-white/70 text-lg">
-                    Guide, practice, companion, and reflection now move together.
+                    {PRODUCT.mode === "christian"
+                      ? "Guide, practice, companion, and reflection now move together."
+                      : "Guide, plan, companion, and reflection now move together."}
                   </p>
                   <p className="text-white/50 text-sm mt-1">
-                    Begin with what Graceward prepared for today. No perfect streak required.
+                    Begin with what {PRODUCT.name} prepared for today. No perfect streak required.
                   </p>
                 </motion.div>
               </motion.div>

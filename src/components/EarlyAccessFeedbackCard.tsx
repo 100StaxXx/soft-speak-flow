@@ -9,8 +9,10 @@ import { useDailyGuideThread } from "@/hooks/useDailyGuideThread";
 import type { DailyGuideThreadRow } from "@/services/dailyGuideThread";
 import { trackProductExperience } from "@/lib/productAnalytics";
 import { safeLocalStorage } from "@/utils/storage";
+import { PRODUCT } from "@/config/product";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
-const FEEDBACK_STATE_PREFIX = "graceward:early-feedback:v1";
+const FEEDBACK_STATE_PREFIX = productScopedStorageKey("early-feedback:v1");
 const FEEDBACK_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
 
 type FeedbackState = { actedAt?: string };
@@ -82,7 +84,7 @@ export const EarlyAccessFeedbackCard = () => {
   if (!shouldShow) return null;
 
   return (
-    <Card className="border-primary/25 bg-card/90 p-5 shadow-sm backdrop-blur-xl" aria-label="Graceward feedback invitation">
+    <Card className="border-primary/25 bg-card/90 p-5 shadow-sm backdrop-blur-xl" aria-label={`${PRODUCT.name} feedback invitation`}>
       <div className="flex items-start gap-3">
         <span className="rounded-2xl bg-primary/10 p-3 text-primary">
           <MessageSquareHeart className="h-5 w-5" aria-hidden="true" />
@@ -90,7 +92,7 @@ export const EarlyAccessFeedbackCard = () => {
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Help shape Graceward</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Help shape {PRODUCT.name}</p>
               <h2 className="mt-1 text-lg font-semibold">Did the daily relationship feel connected?</h2>
             </div>
             <button

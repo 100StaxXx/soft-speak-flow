@@ -1,9 +1,18 @@
 import type { AccessState } from "@/hooks/useAccessState";
 import type { StoreKitTransaction } from "@/types/subscription";
 import { resolvePlanFromProductId, type IAPPlan } from "@/utils/appleIAP";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
-const STORAGE_PREFIX = "cosmiq.localSubscriptionAccess.v1";
-const REJECTED_TRANSACTIONS_STORAGE_PREFIX = "cosmiq.rejectedLocalSubscriptionTransactions.v1";
+const STORAGE_PREFIX = productScopedStorageKey("local-subscription-access:v1");
+const REJECTED_TRANSACTIONS_STORAGE_PREFIX = productScopedStorageKey(
+  "rejected-local-subscription-transactions:v1",
+);
+// Graceward's first native builds inherited these Cosmiq-prefixed keys before
+// local storage was product scoped. Migrate them per-user on first access so an
+// app update cannot discard a fresh StoreKit activation grace window.
+const LEGACY_STORAGE_PREFIX = "cosmiq.localSubscriptionAccess.v1";
+const LEGACY_REJECTED_TRANSACTIONS_STORAGE_PREFIX =
+  "cosmiq.rejectedLocalSubscriptionTransactions.v1";
 const LOCAL_ACCESS_RECORD_VERSION = 2;
 export const LOCAL_SUBSCRIPTION_ACTIVATION_GRACE_MS = 15 * 60 * 1000;
 
@@ -37,6 +46,35 @@ function storageKey(userId: string): string {
 
 function rejectedTransactionsStorageKey(userId: string): string {
   return `${REJECTED_TRANSACTIONS_STORAGE_PREFIX}.${userId}`;
+}
+
+function legacyStorageKey(userId: string): string {
+  return `${LEGACY_STORAGE_PREFIX}.${userId}`;
+}
+
+function legacyRejectedTransactionsStorageKey(userId: string): string {
+  return `${LEGACY_REJECTED_TRANSACTIONS_STORAGE_PREFIX}.${userId}`;
+}
+
+function readAndMigrateLegacyStorageValue(
+  storage: Storage,
+  currentKey: string,
+  legacyKey: string,
+): string | null {
+  const currentValue = storage.getItem(currentKey);
+  if (currentValue) return currentValue;
+
+  const legacyValue = storage.getItem(legacyKey);
+  if (!legacyValue) return null;
+
+  try {
+    storage.setItem(currentKey, legacyValue);
+    storage.removeItem(legacyKey);
+  } catch {
+    // Keep using the readable legacy value if storage is temporarily unwritable.
+  }
+
+  return legacyValue;
 }
 
 function normalizeTransactionKey(value: string | null | undefined): string | null {
@@ -209,7 +247,12 @@ function readLocalSubscriptionAccessRecord(
   if (!storage) return null;
 
   try {
-    const raw = storage.getItem(storageKey(userId));
+    const currentKey = storageKey(userId);
+    const raw = readAndMigrateLegacyStorageValue(
+      storage,
+      currentKey,
+      legacyStorageKey(userId),
+    );
     if (!raw) return null;
 
     const parsed = parseLocalSubscriptionAccessRecord(JSON.parse(raw));
@@ -217,7 +260,7 @@ function readLocalSubscriptionAccessRecord(
       return parsed;
     }
 
-    storage.removeItem(storageKey(userId));
+    storage.removeItem(currentKey);
     return null;
   } catch {
     try {
@@ -263,6 +306,7 @@ export function rememberLocalSubscriptionAccess(
       transactionKeys: transactionKeys(transaction ?? null),
     };
     storage.setItem(storageKey(userId), JSON.stringify(record));
+    storage.removeItem(legacyStorageKey(userId));
   } catch {
     // Local persistence is a best-effort backup. StoreKit and the backend remain the sources of truth.
   }
@@ -276,6 +320,7 @@ export function clearLocalSubscriptionAccess(userId: string | null | undefined):
 
   try {
     storage.removeItem(storageKey(userId));
+    storage.removeItem(legacyStorageKey(userId));
   } catch {
     // Ignore local storage cleanup failures.
   }
@@ -289,7 +334,12 @@ function readRejectedTransactionKeys(userId: string | null | undefined): Set<str
   if (!storage) return rejectedKeys;
 
   try {
-    const raw = storage.getItem(rejectedTransactionsStorageKey(userId));
+    const currentKey = rejectedTransactionsStorageKey(userId);
+    const raw = readAndMigrateLegacyStorageValue(
+      storage,
+      currentKey,
+      legacyRejectedTransactionsStorageKey(userId),
+    );
     if (!raw) return rejectedKeys;
 
     const parsed = JSON.parse(raw) as unknown;
@@ -336,6 +386,7 @@ export function rememberRejectedLocalSubscriptionTransaction(
         updatedAt: new Date().toISOString(),
       }),
     );
+    storage.removeItem(legacyRejectedTransactionsStorageKey(userId));
   } catch {
     // This cache is defensive only; backend binding remains authoritative.
   }

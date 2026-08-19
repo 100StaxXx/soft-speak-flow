@@ -114,7 +114,7 @@ describe("OnboardingEggSelection", () => {
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
 
-  it("keeps the two pilot elements active and greys the rest as coming soon", () => {
+  it("keeps every Graceward element active", () => {
     const onComplete = vi.fn();
 
     render(
@@ -127,12 +127,12 @@ describe("OnboardingEggSelection", () => {
     );
 
     const stormSlot = screen.getByTestId("egg-slot-storm");
-    expect(stormSlot).toBeDisabled();
-    expect(stormSlot).toHaveAttribute("data-supported", "false");
-    expect(screen.getByTestId("egg-slot-void")).toBeDisabled();
+    expect(stormSlot).toBeEnabled();
+    expect(stormSlot).toHaveAttribute("data-supported", "true");
+    expect(screen.getByTestId("egg-slot-void")).toBeEnabled();
     expect(screen.getByTestId("egg-slot-light")).toBeEnabled();
     expect(screen.getByTestId("egg-slot-nature")).toBeEnabled();
-    expect(screen.getAllByText("Coming Soon").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Coming Soon")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Select Dawn Gold element" }));
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));

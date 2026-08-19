@@ -3,36 +3,82 @@ import { ArrowDown, BookOpen, CheckCircle2, Leaf, LogIn, ShieldCheck, UserPlus }
 import { motion, useReducedMotion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 
-import { PRODUCT } from "@/config/product";
+import { PRODUCT, type ProductMode } from "@/config/product";
 import { useAuth } from "@/hooks/useAuth";
 import { getAuthRedirectPath } from "@/utils/authRedirect";
+import { getAuthUserAccountEmail } from "@/utils/authUser";
 
-const featureGroups = [
-  {
-    icon: BookOpen,
-    title: "Scripture & prayer",
-    text: "Begin with reviewed Scripture, a grounded reflection, and a short prayer for the day in front of you.",
-  },
-  {
-    icon: CheckCircle2,
-    title: "Daily practice",
-    text: "Receive one small, ready-made practice for faith, mind, body, relationships, service, stewardship, or rest.",
-  },
-  {
-    icon: Leaf,
-    title: "Faithful growth",
-    text: "Build consistency without confusing a streak, score, or completed task with spiritual worth.",
-  },
-] as const;
+export const getWelcomeProductContent = (mode: ProductMode) =>
+  mode === "cosmiq"
+    ? {
+        eyebrow: "A living companion for meaningful momentum",
+        heroCopy:
+          "Turn intention into meaningful momentum with a companion that plans, focuses, and evolves through the story you create.",
+        sectionEyebrow: "A story shaped by what you do",
+        sectionTitle:
+          "Set the intention. Take the action. Watch your companion become more.",
+        finalTitle: "Every evolution should feel earned and unmistakably yours.",
+        finalCopy:
+          "Cosmiq remembers your choices, milestones, and companion history. Future forms are generated privately in the background and revealed as full cinematic moments when you earn them.",
+        sectionLink: "See how it evolves",
+        primaryAction: "Begin your story",
+        featureGroups: [
+          {
+            icon: BookOpen,
+            title: "A living history",
+            text: "Your companion carries forward the traits, relics, memories, and visual identity shaped by your journey.",
+          },
+          {
+            icon: CheckCircle2,
+            title: "Cinematic evolution",
+            text: "Every earned form arrives as a personalized portrait and full transition film with sound.",
+          },
+          {
+            icon: Leaf,
+            title: "Action with consequence",
+            text: "Focus, Hunt, and Forge moments turn meaningful action into scenes, rewards, and lasting mythology.",
+          },
+        ],
+      }
+    : {
+        eyebrow: "A Christian daily companion",
+        heroCopy:
+          "Grow in faith, one day at a time. Scripture, prayer, reflection, and faithful action for the day you actually have.",
+        sectionEyebrow: "A practice for ordinary life",
+        sectionTitle: "Receive the day. Practice what matters. Return with grace.",
+        finalTitle: "Guidance without pretending to speak for God.",
+        finalCopy:
+          "Graceward supports daily reflection and practice. It does not replace Scripture, prayer, church, pastoral care, therapy, or medical help. AI-generated reflections are clearly identified and never presented as divine revelation.",
+        sectionLink: "See the daily practice",
+        primaryAction: "Begin today",
+        featureGroups: [
+          {
+            icon: BookOpen,
+            title: "Scripture & prayer",
+            text: "Begin with reviewed Scripture, a grounded reflection, and a short prayer for the day in front of you.",
+          },
+          {
+            icon: CheckCircle2,
+            title: "Daily practice",
+            text: "Receive one small, ready-made practice for faith, mind, body, relationships, service, stewardship, or rest.",
+          },
+          {
+            icon: Leaf,
+            title: "Faithful growth",
+            text: "Build consistency without confusing a streak, score, or completed task with spiritual worth.",
+          },
+        ],
+      };
 
 export default function Welcome() {
   const prefersReducedMotion = useReducedMotion();
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const content = getWelcomeProductContent(PRODUCT.mode);
 
   useEffect(() => {
     if (!loading && user) {
-      getAuthRedirectPath(user.id, { email: user.email ?? null }).then((path) => {
+      getAuthRedirectPath(user.id, { email: getAuthUserAccountEmail(user) }).then((path) => {
         navigate(path, { replace: true });
       });
     }
@@ -52,12 +98,12 @@ export default function Welcome() {
             transition={{ duration: prefersReducedMotion ? 0 : 0.5, ease: "easeOut" }}
             className="mx-auto w-full max-w-6xl"
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#496f4c]">A Christian daily companion</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#496f4c]">{content.eyebrow}</p>
             <h1 className="mt-5 max-w-4xl font-serif text-6xl leading-[0.92] tracking-[-0.035em] sm:text-7xl lg:text-8xl">
               {PRODUCT.name}
             </h1>
             <p className="mt-6 max-w-2xl text-xl leading-8 text-[#3f4d41] sm:text-2xl sm:leading-9">
-              {PRODUCT.tagline} Scripture, prayer, reflection, and faithful action for the day you actually have.
+              {content.heroCopy}
             </p>
 
             <div className="mt-9 flex w-full max-w-xl flex-col gap-3 sm:flex-row">
@@ -78,7 +124,7 @@ export default function Welcome() {
             </div>
 
             <a href="#daily-practice" className="mt-12 inline-flex items-center gap-2 text-sm font-medium text-[#496f4c]">
-              See the daily practice <ArrowDown className="h-4 w-4" />
+              {content.sectionLink} <ArrowDown className="h-4 w-4" />
             </a>
           </motion.div>
         </section>
@@ -92,12 +138,12 @@ export default function Welcome() {
             transition={{ duration: prefersReducedMotion ? 0 : 0.4 }}
             className="relative mx-auto w-full max-w-6xl"
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#d7bd7b]">A practice for ordinary life</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#d7bd7b]">{content.sectionEyebrow}</p>
             <h2 className="mt-4 max-w-4xl font-serif text-4xl leading-tight sm:text-6xl">
-              Receive the day. Practice what matters. Return with grace.
+              {content.sectionTitle}
             </h2>
             <div className="mt-9 grid gap-4 sm:grid-cols-3">
-              {featureGroups.map((feature) => {
+              {content.featureGroups.map((feature) => {
                 const Icon = feature.icon;
                 return (
                   <div key={feature.title} className="rounded-[24px] border border-white/[0.12] bg-white/[0.06] p-5 backdrop-blur-sm">
@@ -114,14 +160,14 @@ export default function Welcome() {
         <section className="relative flex h-screen min-h-[100svh] snap-start snap-always items-end overflow-hidden bg-[#e9e4d7] px-5 pb-10 pt-24 text-[#203124] sm:pb-14">
           <div className="mx-auto w-full max-w-6xl">
             <ShieldCheck className="h-8 w-8 text-[#496f4c]" />
-            <h2 className="mt-5 max-w-4xl font-serif text-4xl leading-tight sm:text-6xl">Guidance without pretending to speak for God.</h2>
+            <h2 className="mt-5 max-w-4xl font-serif text-4xl leading-tight sm:text-6xl">{content.finalTitle}</h2>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-[#4d584f]">
-              Graceward supports daily reflection and practice. It does not replace Scripture, prayer, church, pastoral care, therapy, or medical help. AI-generated reflections are clearly identified and never presented as divine revelation.
+              {content.finalCopy}
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:w-fit sm:flex-row">
               <a href="/auth?mode=signup" className="inline-flex h-13 items-center justify-center rounded-full bg-[#2f5938] px-7 py-4 text-sm font-semibold text-white">
-                Begin today
+                {content.primaryAction}
               </a>
               <a href="/auth" className="inline-flex h-13 items-center justify-center rounded-full border border-[#2f5938]/25 px-7 py-4 text-sm font-semibold text-[#294b31]">
                 Sign in

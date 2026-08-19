@@ -11,7 +11,12 @@ import {
 } from "./localSubscriptionAccess";
 
 const userId = "11111111-1111-4111-8111-111111111111";
-const storageKey = `cosmiq.localSubscriptionAccess.v1.${userId}`;
+const storageKey = `graceward:local-subscription-access:v1.${userId}`;
+const legacyStorageKey = `cosmiq.localSubscriptionAccess.v1.${userId}`;
+const rejectedStorageKey =
+  `graceward:rejected-local-subscription-transactions:v1.${userId}`;
+const legacyRejectedStorageKey =
+  `cosmiq.rejectedLocalSubscriptionTransactions.v1.${userId}`;
 
 const activeAccessState: AccessState = {
   has_access: true,
@@ -26,7 +31,7 @@ const activeAccessState: AccessState = {
 const transaction = (overrides: Partial<StoreKitTransaction> = {}): StoreKitTransaction => ({
   transactionId: "tx-1",
   originalTransactionId: "original-tx-1",
-  productId: "cosmiq_premium_yearly",
+  productId: "graceward_plus_yearly",
   purchaseDate: "2026-05-18T12:00:00.000Z",
   expirationDate: "2099-01-01T00:00:00.000Z",
   appAccountToken: userId,
@@ -152,6 +157,17 @@ describe("localSubscriptionAccess", () => {
     expect(readFreshLocalSubscriptionAccess(userId)).toBeNull();
   });
 
+  it("migrates the shipped unscoped access key without losing access", () => {
+    localStorage.setItem(legacyStorageKey, JSON.stringify(activeAccessState));
+
+    expect(readLocalSubscriptionAccess(userId)).toMatchObject({
+      has_access: true,
+      subscribed: true,
+    });
+    expect(localStorage.getItem(storageKey)).toBe(JSON.stringify(activeAccessState));
+    expect(localStorage.getItem(legacyStorageKey)).toBeNull();
+  });
+
   it("expires fresh activation access after the grace window", () => {
     rememberLocalSubscriptionAccess(userId, activeAccessState, transaction());
 
@@ -169,6 +185,17 @@ describe("localSubscriptionAccess", () => {
 
     expect(readLocalSubscriptionAccess(userId)).toBeNull();
     expect(localStorage.getItem(storageKey)).toBeNull();
+  });
+
+  it("migrates shipped rejected transactions before evaluating cached access", () => {
+    rememberLocalSubscriptionAccess(userId, activeAccessState, transaction());
+    localStorage.setItem(legacyRejectedStorageKey, JSON.stringify({
+      transactionKeys: ["original-tx-1"],
+    }));
+
+    expect(readLocalSubscriptionAccess(userId)).toBeNull();
+    expect(localStorage.getItem(rejectedStorageKey)).toContain("original-tx-1");
+    expect(localStorage.getItem(legacyRejectedStorageKey)).toBeNull();
   });
 
   it("does not let a cached rejection block an active sandbox transaction", () => {

@@ -41,6 +41,14 @@ describe("push notification inbox mapping", () => {
     expect(getPushNotificationSourceLabel("unknown")).toBe("Graceward");
   });
 
+  it("does not label Cosmiq encouragement as Daily Grace", () => {
+    expect(
+      getPushNotificationSourceLabel("daily_pep", undefined, {
+        productMode: "cosmiq",
+      }),
+    ).toBe("Daily encouragement");
+  });
+
   it("labels legacy daily task notification rows as rituals when source context says so", () => {
     const item = mapPushNotificationRowToInboxItem({
       id: "queue-ritual",

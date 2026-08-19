@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import type { RewardCssEffect } from "@/types/epicRewards";
 import { FrameCornerDecorations } from "./companion/FrameCornerDecorations";
 import { ATTRIBUTE_DESCRIPTIONS, type AttributeType } from "@/config/attributeDescriptions";
+import { PRODUCT } from "@/config/product";
 
 interface EvolutionCard {
   id: string;
@@ -144,10 +145,10 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
     
     await downloadCardElement(
       cardRef.current,
-      `graceward-${card.creature_name.toLowerCase().replace(/\s+/g, '-')}-stage-${card.evolution_stage}.png`,
+      `${PRODUCT.name.toLowerCase()}-${card.creature_name.toLowerCase().replace(/\s+/g, '-')}-stage-${card.evolution_stage}.png`,
       {
-        title: `${card.creature_name} - Graceward`,
-        text: `Meet my companion, ${card.creature_name}! ✨ #Graceward`,
+        title: `${card.creature_name} - ${PRODUCT.name}`,
+        text: `Meet my companion, ${card.creature_name}! ✨ #${PRODUCT.name}`,
         dialogTitle: 'Share Companion Card'
       }
     );
@@ -428,7 +429,7 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
                       </div>
                     </div>
                     
-                    {/* Graceward branding - centered at bottom with ornate frame */}
+                    {/* Product branding - centered at bottom with ornate frame */}
                     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-30 flex items-center justify-center backface-hidden">
                       <div className="relative px-6 py-2">
                         {/* Decorative side elements */}
@@ -436,7 +437,7 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
                         <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-[2px] bg-gradient-to-l from-transparent to-white/60" />
                         
                         <span className="text-[11px] font-bold tracking-[0.3em] text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] relative z-10">
-                          ✦ GRACEWARD ✦
+                          ✦ {PRODUCT.name.toUpperCase()} ✦
                         </span>
                       </div>
                     </div>

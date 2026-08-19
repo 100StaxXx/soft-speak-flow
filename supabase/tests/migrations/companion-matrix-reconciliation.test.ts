@@ -22,4 +22,9 @@ Deno.test("companion matrix migration keeps only verified asset rows and locks s
   );
   assertEquals(sql.includes("legacy_evolution_endpoints_unverified"), true);
   assertEquals(sql.includes("start_image_url = COALESCE"), true);
+  assertEquals(sql.includes("FROM boundary_map,"), true);
+  assertEquals(
+    sql.includes("JOIN public.user_companion AS companion\n  ON companion.id = job.companion_id"),
+    false,
+  );
 });

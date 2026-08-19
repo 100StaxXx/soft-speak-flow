@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { useAuth } from "@/hooks/useAuth";
 import { resolvePushNotificationDestination } from "@/utils/pushNotificationNavigation";
+import { PRODUCT, type ProductMode } from "@/config/product";
 
 export const PUSH_NOTIFICATIONS_INBOX_QUERY_KEY = "push-notifications-inbox";
 export const PUSH_NOTIFICATIONS_UNREAD_COUNT_QUERY_KEY = "push-notifications-unread-count";
@@ -95,13 +96,14 @@ function isRitualTaskNotificationRow(
 export function getPushNotificationSourceLabel(
   type: string,
   payloadInput?: unknown,
-  options: { isRitualTask?: boolean } = {},
+  options: { isRitualTask?: boolean; productMode?: ProductMode } = {},
 ): string {
   const isRitualTask = options.isRitualTask === true || hasRitualPayloadHint(payloadInput);
+  const productMode = options.productMode ?? PRODUCT.mode;
 
   switch (type) {
     case "daily_pep":
-      return "Daily Grace";
+      return productMode === "christian" ? "Daily Grace" : "Daily encouragement";
     case "daily_quote":
       return "Daily quote";
     case "task_start":
@@ -121,7 +123,7 @@ export function getPushNotificationSourceLabel(
     case "plan_day_overdue":
       return "Planner alert";
     default:
-      return "Graceward";
+      return PRODUCT.name;
   }
 }
 

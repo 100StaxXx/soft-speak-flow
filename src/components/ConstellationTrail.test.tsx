@@ -252,6 +252,8 @@ describe("ConstellationTrail", () => {
     expect(starPathPlaceholderBackgrounds.map((background) => background.src)).toContain(
       fallbackImage.getAttribute("src"),
     );
+    expect(fallbackImage.getAttribute("src")).toMatch(/graceward-/);
+    expect(fallbackImage.getAttribute("src")).not.toMatch(/cosmic-|wallpaper-(?:quests|campaigns)-seed/);
     expect(screen.getByTestId("journey-path-overlay")).toHaveAttribute("data-overlay-mode", "fallback");
     expect(screen.getByText("Updating")).toBeInTheDocument();
     expect(screen.queryByText(/mapping your path/i)).not.toBeInTheDocument();

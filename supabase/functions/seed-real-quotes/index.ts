@@ -72,7 +72,7 @@ serve(async (req) => {
 
     // Fetch all mentors to assign quotes
     const { data: mentors } = await supabase
-      .from("graceward_guides")
+      .from("mentors")
       .select("id, slug, tags");
 
     if (!mentors || mentors.length === 0) {
@@ -94,6 +94,7 @@ serve(async (req) => {
         : null;
 
       return {
+        product_mode: "cosmiq",
         text: quote.text,
         author: quote.author,
         category: quote.category,

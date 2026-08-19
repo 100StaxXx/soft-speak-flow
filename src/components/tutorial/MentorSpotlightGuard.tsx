@@ -400,10 +400,17 @@ export const MentorSpotlightGuard = ({
     if (!active || !targetElement) return;
 
     targetElement.classList.add("mentor-spotlight-target-elevated");
+    if (mode === "outline") {
+      // Attach non-blocking tutorial outlines to the target itself. A fixed SVG
+      // can be displaced by the iOS visual viewport/safe-area offset after the
+      // page scrolls, which makes the outline appear over the wrong control.
+      targetElement.classList.add("mentor-spotlight-target-outlined");
+    }
     return () => {
       targetElement.classList.remove("mentor-spotlight-target-elevated");
+      targetElement.classList.remove("mentor-spotlight-target-outlined");
     };
-  }, [active, targetElement]);
+  }, [active, mode, targetElement]);
 
   useEffect(() => {
     if (!active || mode !== "spotlight") return;
@@ -518,16 +525,21 @@ export const MentorSpotlightGuard = ({
     return null;
   }
 
+  // Outline mode deliberately avoids viewport-coordinate drawing. The class
+  // above follows the real element through iOS safe-area changes, scrolling,
+  // transforms, and layout animation without creating an interaction layer.
+  if (mode === "outline") {
+    return null;
+  }
+
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
 
   return (
     <>
-      {mode === "spotlight" ? (
-        <span className="sr-only" role="status" aria-live="polite">
-          Tutorial highlight active. Use Tab to move between the highlighted action and the mentor guidance.
-        </span>
-      ) : null}
+      <span className="sr-only" role="status" aria-live="polite">
+        Tutorial highlight active. Use Tab to move between the highlighted action and the mentor guidance.
+      </span>
       <div
         className={`mentor-spotlight-root mentor-spotlight-root--${mode}`}
         aria-hidden="true"
@@ -535,45 +547,41 @@ export const MentorSpotlightGuard = ({
         data-tutorial-layer="true"
         data-testid="mentor-spotlight-guard"
       >
-        {mode === "spotlight" ? (
-          <>
-            <div
-              className="mentor-spotlight-blocker"
-              style={{ top: 0, left: 0, width: "100%", height: `${spotlightGeometry.top}px` }}
-              {...blockedClickProps}
-            />
-            <div
-              className="mentor-spotlight-blocker"
-              style={{
-                top: `${spotlightGeometry.top}px`,
-                left: 0,
-                width: `${spotlightGeometry.left}px`,
-                height: `${spotlightGeometry.height}px`,
-              }}
-              {...blockedClickProps}
-            />
-            <div
-              className="mentor-spotlight-blocker"
-              style={{
-                top: `${spotlightGeometry.top}px`,
-                left: `${spotlightGeometry.left + spotlightGeometry.width}px`,
-                width: `${Math.max(0, viewportWidth - (spotlightGeometry.left + spotlightGeometry.width))}px`,
-                height: `${spotlightGeometry.height}px`,
-              }}
-              {...blockedClickProps}
-            />
-            <div
-              className="mentor-spotlight-blocker"
-              style={{
-                top: `${spotlightGeometry.top + spotlightGeometry.height}px`,
-                left: 0,
-                width: "100%",
-                height: `${Math.max(0, viewportHeight - (spotlightGeometry.top + spotlightGeometry.height))}px`,
-              }}
-              {...blockedClickProps}
-            />
-          </>
-        ) : null}
+        <div
+          className="mentor-spotlight-blocker"
+          style={{ top: 0, left: 0, width: "100%", height: `${spotlightGeometry.top}px` }}
+          {...blockedClickProps}
+        />
+        <div
+          className="mentor-spotlight-blocker"
+          style={{
+            top: `${spotlightGeometry.top}px`,
+            left: 0,
+            width: `${spotlightGeometry.left}px`,
+            height: `${spotlightGeometry.height}px`,
+          }}
+          {...blockedClickProps}
+        />
+        <div
+          className="mentor-spotlight-blocker"
+          style={{
+            top: `${spotlightGeometry.top}px`,
+            left: `${spotlightGeometry.left + spotlightGeometry.width}px`,
+            width: `${Math.max(0, viewportWidth - (spotlightGeometry.left + spotlightGeometry.width))}px`,
+            height: `${spotlightGeometry.height}px`,
+          }}
+          {...blockedClickProps}
+        />
+        <div
+          className="mentor-spotlight-blocker"
+          style={{
+            top: `${spotlightGeometry.top + spotlightGeometry.height}px`,
+            left: 0,
+            width: "100%",
+            height: `${Math.max(0, viewportHeight - (spotlightGeometry.top + spotlightGeometry.height))}px`,
+          }}
+          {...blockedClickProps}
+        />
 
         <svg
           aria-hidden="true"
@@ -582,24 +590,20 @@ export const MentorSpotlightGuard = ({
           height={viewportHeight}
           viewBox={`0 0 ${viewportWidth} ${viewportHeight}`}
         >
-          {mode === "spotlight" ? (
-            <>
-              <defs>
-                <mask id={maskId}>
-                  <rect width="100%" height="100%" fill="white" />
-                  <path d={spotlightGeometry.pathD} fill="black" />
-                </mask>
-              </defs>
-              <rect
-                className="mentor-spotlight-mask"
-                width="100%"
-                height="100%"
-                mask={`url(#${maskId})`}
-              />
-            </>
-          ) : null}
+          <defs>
+            <mask id={maskId}>
+              <rect width="100%" height="100%" fill="white" />
+              <path d={spotlightGeometry.pathD} fill="black" />
+            </mask>
+          </defs>
+          <rect
+            className="mentor-spotlight-mask"
+            width="100%"
+            height="100%"
+            mask={`url(#${maskId})`}
+          />
           <path
-            className={`mentor-spotlight-ring mentor-spotlight-ring--${mode}`}
+            className="mentor-spotlight-ring mentor-spotlight-ring--spotlight"
             d={spotlightGeometry.pathD}
             data-testid="mentor-spotlight-path"
           />

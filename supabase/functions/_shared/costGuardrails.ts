@@ -808,8 +808,25 @@ function estimateElevenLabsCost(
   return 0;
 }
 
+export function getFalVideoRatePerSecond(
+  model: string | null,
+  generateAudio: boolean,
+): number {
+  const normalizedModel = (model ?? "").toLowerCase();
+  if (normalizedModel.includes("kling-video/v3/pro")) {
+    return generateAudio ? 0.168 : 0.112;
+  }
+  if (normalizedModel.includes("kling-video/v3/standard")) {
+    return generateAudio ? 0.126 : 0.084;
+  }
+  // Unknown fal video models remain conservatively priced above the legacy
+  // estimate so a new model cannot silently weaken a monthly budget.
+  return generateAudio ? 0.15 : 0.1;
+}
+
 function estimateFalCost(
   capability: CostCapability,
+  model: string | null,
   requestBody: JsonObject | null,
 ): number {
   if (capability !== "video") return 0;
@@ -817,7 +834,12 @@ function estimateFalCost(
     requestBody?.duration_seconds ?? requestBody?.duration,
     5,
   );
-  return roundUsd(Math.max(1, durationSeconds) * 0.1);
+  return roundUsd(
+    Math.max(1, durationSeconds) * getFalVideoRatePerSecond(
+      model,
+      requestBody?.generate_audio === true,
+    ),
+  );
 }
 
 function estimatePhotoRoomCost(capability: CostCapability): number {
@@ -851,6 +873,7 @@ function estimateProviderRequestCost(
   if (providerContext.provider === "fal") {
     return estimateFalCost(
       providerContext.capability,
+      providerContext.model,
       providerContext.requestBody,
     );
   }

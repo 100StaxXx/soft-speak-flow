@@ -1,5 +1,5 @@
 import { forwardRef, type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import {
   BarChart3,
   Brain,
@@ -145,7 +145,7 @@ const rankClassName = (rank: string) =>
     C: "border-muted-foreground/30 bg-muted/30 text-muted-foreground",
   })[rank] ?? "border-border bg-background text-foreground";
 
-const revealContainerVariants = {
+const revealContainerVariants: Variants = {
   hidden: { opacity: 0, y: 12 },
   visible: {
     opacity: 1,
@@ -158,7 +158,7 @@ const revealContainerVariants = {
   },
 };
 
-const revealItemVariants = {
+const revealItemVariants: Variants = {
   hidden: { opacity: 0, y: 10 },
   visible: {
     opacity: 1,
@@ -199,7 +199,7 @@ const formatSnakeLabel = (value: string) =>
 const getScorePercent = (score: number) =>
   Math.max(0, Math.min(100, Math.round(((score - STAT_MIN) / (STAT_MAX - STAT_MIN)) * 100)));
 
-const buildCosmiqTitleShareFilename = (title: string) => {
+const buildCompanionTitleShareFilename = (title: string) => {
   const slug =
     title
       .trim()
@@ -207,7 +207,8 @@ const buildCosmiqTitleShareFilename = (title: string) => {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "") || "title-card";
 
-  return `graceward-${slug}-stats-card.png`;
+  const productSlug = PRODUCT.mode === "cosmiq" ? "cosmiq" : "graceward";
+  return `${productSlug}-${slug}-stats-card.png`;
 };
 
 const waitForShareCardRender = () =>
@@ -1378,7 +1379,7 @@ function CompanionStatAnalysisView({
 
       const renderedCard = await renderShareCardImage({
         element: shareCardRef.current,
-        filename: buildCosmiqTitleShareFilename(analysis.cosmiqTitle.title),
+        filename: buildCompanionTitleShareFilename(analysis.cosmiqTitle.title),
         format: "story",
       });
 

@@ -20,6 +20,7 @@ import { AdminCompanionImageTester } from "@/components/AdminCompanionImageTeste
 import { AdminWallpaperCatalog } from "@/components/AdminWallpaperCatalog";
 import { globalAudio } from "@/utils/globalAudio";
 import { downloadImage } from "@/utils/imageDownload";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 
 interface PepTalk {
   id?: string;
@@ -153,6 +154,7 @@ const Admin = () => {
     const { data, error } = await supabase
       .from("pep_talks")
       .select("*")
+      .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -224,6 +226,7 @@ const Admin = () => {
 
     const pepTalkData = {
       ...formData,
+      product_mode: PRODUCT_RUNTIME.authProductMode,
       audio_url: audioUrl || formData.audio_url,
     };
 
@@ -231,7 +234,8 @@ const Admin = () => {
       const { error } = await supabase
         .from("pep_talks")
         .update(pepTalkData)
-        .eq("id", editingId);
+        .eq("id", editingId)
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode);
 
       if (error) {
         toast.error("Failed to update pep talk");
@@ -284,7 +288,11 @@ const Admin = () => {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this pep talk?")) return;
 
-    const { error } = await supabase.from("pep_talks").delete().eq("id", id);
+    const { error } = await supabase
+      .from("pep_talks")
+      .delete()
+      .eq("id", id)
+      .eq("product_mode", PRODUCT_RUNTIME.authProductMode);
 
     if (error) {
       toast.error("Failed to delete pep talk");

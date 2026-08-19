@@ -61,6 +61,7 @@ import {
   type NormalizedRitualSchedule,
 } from "@/hooks/habitTaskReconciliation";
 import { isHabitScheduledForDate } from "@/utils/habitSchedule";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
 const normalizeDifficulty = (value: string): "easy" | "medium" | "hard" => {
   const lower = value?.toLowerCase()?.trim() || "medium";
@@ -336,7 +337,9 @@ type FingerprintPhase = {
 
 const RECENT_EPIC_CREATE_WINDOW_MS = 5 * 60 * 1000;
 const RECENT_EPIC_CREATE_ATTEMPT_WINDOW_MS = 24 * 60 * 60 * 1000;
-const EPIC_CREATE_ATTEMPT_STORAGE_KEY = "cosmiq:recent-epic-create-attempts:v1";
+const EPIC_CREATE_ATTEMPT_STORAGE_KEY = productScopedStorageKey(
+  "recent-epic-create-attempts:v1",
+);
 const inFlightEpicCreateRequests = new Map<string, Promise<CreateEpicMutationResult>>();
 const recentEpicCreateAttempts = new Map<string, { createdAt: number; payload: LocalEpicPayload }>();
 

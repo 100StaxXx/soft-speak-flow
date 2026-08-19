@@ -19,6 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchActiveProductMentors } from "@/services/productMentorCatalog";
 import {
   getMentorDisplaySortIndex,
   normalizeMentorSlug,
@@ -245,16 +246,7 @@ export const MentorSwitcher = ({
     queryKey: ["mentors", "active"],
     staleTime: 10 * 60 * 1000,
     queryFn: async (): Promise<ActiveMentorRecord[]> => {
-      const { data, error } = await supabase
-        .from("graceward_guides")
-        .select(
-          "id, name, slug, avatar_url, primary_color, short_title, tone_description, tags, themes, style_description, target_user, intensity_level",
-        )
-        .eq("is_active", true)
-        .order("name");
-
-      if (error) throw error;
-      return data || [];
+      return fetchActiveProductMentors();
     },
   });
 

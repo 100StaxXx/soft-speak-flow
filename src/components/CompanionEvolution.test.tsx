@@ -11,6 +11,10 @@ const mocks = vi.hoisted(() => ({
   hapticsMediumMock: vi.fn(),
   hapticsHeavyMock: vi.fn(),
   globalAudioMuted: false,
+  setGlobalAudioMutedMock: vi.fn((muted: boolean) => {
+    mocks.globalAudioMuted = muted;
+    mocks.globalAudioListeners.forEach((listener) => listener(muted));
+  }),
   ensureReadyMock: vi.fn(() => Promise.resolve()),
   globalAudioListeners: new Set<(muted: boolean) => void>(),
 }));
@@ -110,6 +114,7 @@ vi.mock("@/utils/logger", () => ({
 vi.mock("@/utils/globalAudio", () => ({
   globalAudio: {
     getMuted: () => mocks.globalAudioMuted,
+    setMuted: (muted: boolean) => mocks.setGlobalAudioMutedMock(muted),
     ensureReady: () => mocks.ensureReadyMock(),
     subscribe: (listener: (muted: boolean) => void) => {
       mocks.globalAudioListeners.add(listener);
@@ -222,6 +227,7 @@ describe("CompanionEvolution", () => {
     mocks.profile = "balanced";
     mocks.prefersReducedMotion = false;
     mocks.globalAudioMuted = false;
+    mocks.setGlobalAudioMutedMock.mockClear();
     mocks.ensureReadyMock.mockResolvedValue(undefined);
     mocks.globalAudioListeners.clear();
 
@@ -431,12 +437,15 @@ describe("CompanionEvolution", () => {
     expect(dialog).toHaveAttribute("data-phase", "reveal");
     const video = screen.getByTestId("evolution-animation-video") as HTMLVideoElement;
     expect(video).toHaveAttribute("src", props.animationVideoUrl);
-    expect(video.muted).toBe(true);
+    expect(video.muted).toBe(false);
     expect(video.playsInline).toBe(true);
     expect(video).toHaveAttribute("data-animation-ready", "true");
     expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
     expect(video).toHaveStyle({ opacity: "1" });
     expect(screen.getByTestId("evolution-reveal-art")).toHaveAttribute("data-hold-for-animation", "true");
+    expect(screen.getByTestId("evolution-animation-audio-toggle")).toHaveAccessibleName(
+      "Mute evolution cinematic",
+    );
 
     await flushTimers(FULL_SEQUENCE_MS.reveal + FULL_SEQUENCE_MS.dismissBuffer);
     expect(screen.queryByText("Tap anywhere to continue")).not.toBeInTheDocument();
@@ -506,6 +515,7 @@ describe("CompanionEvolution", () => {
 
     expect(props.onAnimationError).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(2);
   });
 
   it("still renders the Kling evolution animation video at the reduced-motion reveal", async () => {

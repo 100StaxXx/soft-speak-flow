@@ -46,8 +46,8 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
 
   const handleShare = async () => {
     const shareText = postcard.chapter_title 
-      ? `📖 Chapter ${postcard.chapter_number}: "${postcard.chapter_title}" - ${postcard.location_name} ✨ #Graceward`
-      : `📸 My companion visited ${postcard.location_name}! ✨ #Graceward`;
+      ? `📖 Chapter ${postcard.chapter_number}: "${postcard.chapter_title}" - ${postcard.location_name} ✨ #Cosmiq`
+      : `📸 My companion visited ${postcard.location_name}! ✨ #Cosmiq`;
     
     if (Capacitor.isNativePlatform()) {
       try {

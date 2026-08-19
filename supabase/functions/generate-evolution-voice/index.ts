@@ -13,6 +13,7 @@ import {
   ELEVENLABS_MENTOR_TTS_MODEL,
   resolveMentorVoiceConfig,
 } from "../_shared/mentorVoiceConfig.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -104,9 +105,11 @@ serve(async (req) => {
       providers: ["openai", "elevenlabs"],
     });
 
-    // Get mentor personality details
+    const productMode = await resolveUserProductMode(supabaseClient, effectiveUserId);
+
+    // Get the product-specific mentor/Guide presentation without crossing copy.
     const { data: mentor, error: mentorError } = await supabaseClient
-      .from('graceward_guides')
+      .from(productMode === "graceward" ? "graceward_guides" : "mentors")
       .select('name, tone_description, style_description')
       .eq('slug', mentorSlug)
       .single();

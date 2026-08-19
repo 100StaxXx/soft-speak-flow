@@ -32,8 +32,8 @@ import {
   buildStage1BootstrapPrompt,
   coerceCompanionVisualAnchors,
   coerceImageLineageMetadata,
-  getEvolutionDifferenceFloor,
   getApprovedHiddenBoundaryAnchor,
+  getEvolutionDifferenceFloor,
   shouldGeneratePortraitForStage,
   synthesizeVisualIdentityProfile,
   updateLineageMetadataAfterBoundaryEvolution,
@@ -65,9 +65,21 @@ import {
   resolveProgressionLevelFromXp,
 } from "../../../src/config/progression.ts";
 import { isPresetBackedCompanion } from "../../../src/lib/companionPredicates.ts";
+import {
+  buildPremadeCompanionPublicStorageUrl,
+  getPremadeCompanionEvolutionAssetDescriptor,
+  isPremadeCompanionBoundaryLevelForProduct,
+} from "../../../src/config/premadeCompanionAssets.ts";
 import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
+import {
+  getCompanionCinemaRolloutConfig,
+  isCompanionCinemaUserEligible,
+} from "../_shared/companionCinemaRollout.ts";
 
 export { maybeEnqueueCompanionAnimationJob } from "../_shared/companionAnimationJobs.ts";
+
+export const isPromotableCinemaEventStatus = (status: unknown): boolean =>
+  status === "ready" || status === "revealed";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -76,6 +88,8 @@ const corsHeaders = {
 };
 
 const IMAGE_BUCKET = "evolution-cards";
+const CINEMA_PRIVATE_BUCKET = "companion-cinema-private";
+const ANIMATION_BUCKET = "companion-animation-videos";
 const COMPANION_IMAGE_BACKGROUND = "transparent" as const;
 const COMPANION_IMAGE_OUTPUT_FORMAT = "png" as const;
 const JUDGE_MINIMUMS = {
@@ -89,6 +103,7 @@ const EVOLUTION_QUALITY_GATE_CODE = "evolution_quality_gate_failed";
 const EVOLUTION_CONTINUITY_UNVERIFIED_CODE = "evolution_continuity_unverified";
 const EVOLUTION_VALIDATION_UNAVAILABLE_CODE =
   "evolution_validation_unavailable";
+const PREMADE_ASSET_UNAVAILABLE_CODE = "premade_asset_unavailable";
 const CANONICAL_CHRISTIAN_COMPANION_BUCKET = "mentors-avatars";
 const CANONICAL_CHRISTIAN_COMPANION_PATH = "canonical/christian/v2";
 const CANONICAL_CHRISTIAN_COMPANION_IDS = new Map<string, string>([
@@ -144,6 +159,16 @@ class EvolutionQualityGateError extends Error {
   }
 }
 
+class PremadeCompanionAssetError extends Error {
+  code = PREMADE_ASSET_UNAVAILABLE_CODE;
+  status = 409;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "PremadeCompanionAssetError";
+  }
+}
+
 const normalizeErrorCode = (value: string) =>
   value
     .toLowerCase()
@@ -180,7 +205,41 @@ const resolveServerErrorCode = (message: string) => {
     return EVOLUTION_CONTINUITY_UNVERIFIED_CODE;
   }
   if (normalized.includes("openai_api_key")) return "openai_api_key_missing";
+  if (normalized.includes("premade companion asset")) {
+    return PREMADE_ASSET_UNAVAILABLE_CODE;
+  }
   return normalizeErrorCode(message);
+};
+
+const verifyPremadeCompanionAsset = async ({
+  supabase,
+  bucket,
+  storagePath,
+}: {
+  supabase: any;
+  bucket: string;
+  storagePath: string;
+}): Promise<boolean> => {
+  const separatorIndex = storagePath.lastIndexOf("/");
+  const directory = separatorIndex >= 0
+    ? storagePath.slice(0, separatorIndex)
+    : "";
+  const filename = separatorIndex >= 0
+    ? storagePath.slice(separatorIndex + 1)
+    : storagePath;
+  const { data, error } = await supabase.storage.from(bucket).list(directory, {
+    limit: 2,
+    search: filename,
+  });
+
+  if (error) {
+    throw new PremadeCompanionAssetError(
+      `Premade companion asset inventory could not be checked: ${error.message}`,
+    );
+  }
+
+  return Array.isArray(data) &&
+    data.some((entry: { name?: unknown }) => entry?.name === filename);
 };
 
 const parseDataUrl = (dataUrl: string): Uint8Array => {
@@ -233,6 +292,8 @@ const upsertEvolutionRecord = async ({
   imageUrl,
   xpAtEvolution,
   generationMetadata,
+  premadeAnimation,
+  cinemaEventId,
 }: {
   supabase: any;
   companionId: string;
@@ -240,7 +301,16 @@ const upsertEvolutionRecord = async ({
   imageUrl: string;
   xpAtEvolution: number;
   generationMetadata?: unknown;
+  premadeAnimation?: {
+    videoUrl: string;
+    storagePath: string;
+    provider?: string;
+    providerModel?: string;
+    prompt?: string | null;
+  };
+  cinemaEventId?: string | null;
 }) => {
+  const nowIso = new Date().toISOString();
   const { data, error } = await supabase
     .from("companion_evolutions")
     .upsert(
@@ -249,8 +319,24 @@ const upsertEvolutionRecord = async ({
         stage,
         image_url: imageUrl,
         xp_at_evolution: xpAtEvolution,
-        evolved_at: new Date().toISOString(),
+        evolved_at: nowIso,
         generation_metadata: generationMetadata ?? null,
+        ...(cinemaEventId ? { cinema_event_id: cinemaEventId } : {}),
+        ...(premadeAnimation
+          ? {
+            animation_video_url: premadeAnimation.videoUrl,
+            animation_storage_path: premadeAnimation.storagePath,
+            animation_provider: premadeAnimation.provider ?? "higgsfield",
+            animation_provider_model: premadeAnimation.providerModel ??
+              "premade",
+            animation_status: "succeeded",
+            animation_prompt: premadeAnimation.prompt ?? null,
+            animation_error_code: null,
+            animation_error_message: null,
+            animation_requested_at: nowIso,
+            animation_completed_at: nowIso,
+          }
+          : {}),
       },
       { onConflict: "companion_id,stage" },
     )
@@ -262,6 +348,155 @@ const upsertEvolutionRecord = async ({
   }
 
   return (data ?? {}) as Record<string, unknown>;
+};
+
+interface ReadyCinemaEvent {
+  id: string;
+  boundary_level: number;
+  previous_boundary_level: number;
+  context_snapshot: Record<string, unknown> | null;
+  scene_plan: Record<string, unknown> | null;
+  canonical_image_bucket: string;
+  canonical_image_path: string;
+  canonical_image_focal_x: number | null;
+  canonical_image_focal_y: number | null;
+  video_bucket: string;
+  video_path: string;
+  provider: string;
+  provider_model: string;
+  selected_render_id: string | null;
+}
+
+const downloadStorageBytes = async ({
+  supabase,
+  bucket,
+  storagePath,
+  kind,
+}: {
+  supabase: any;
+  bucket: string;
+  storagePath: string;
+  kind: "portrait" | "video";
+}): Promise<Uint8Array> => {
+  const { data, error } = await supabase.storage.from(bucket).download(
+    storagePath,
+  );
+  if (error || !data) {
+    throw new Error(
+      `Cinematic evolution ${kind} could not be downloaded: ${
+        error?.message ?? "missing_asset"
+      }`,
+    );
+  }
+  return new Uint8Array(await data.arrayBuffer());
+};
+
+const uploadPromotedCinemaAsset = async ({
+  supabase,
+  bucket,
+  storagePath,
+  bytes,
+  contentType,
+}: {
+  supabase: any;
+  bucket: string;
+  storagePath: string;
+  bytes: Uint8Array;
+  contentType: string;
+}): Promise<string> => {
+  const { error } = await supabase.storage.from(bucket).upload(
+    storagePath,
+    bytes,
+    { contentType, upsert: true },
+  );
+  if (error) {
+    throw new Error(`Cinematic evolution promotion failed: ${error.message}`);
+  }
+  return supabase.storage.from(bucket).getPublicUrl(storagePath).data.publicUrl;
+};
+
+const getCosmiqCinemaEventForBoundary = async ({
+  supabase,
+  companion,
+  boundaryLevel,
+}: {
+  supabase: any;
+  companion: Record<string, any>;
+  boundaryLevel: number;
+}): Promise<{ event: ReadyCinemaEvent | null; status: string | null }> => {
+  const { data, error } = await supabase
+    .from("companion_cinema_events")
+    .select(
+      "id, boundary_level, previous_boundary_level, context_snapshot, scene_plan, canonical_image_bucket, canonical_image_path, canonical_image_focal_x, canonical_image_focal_y, video_bucket, video_path, provider, provider_model, selected_render_id, status",
+    )
+    .eq("companion_id", companion.id)
+    .eq("user_id", companion.user_id)
+    .eq("event_type", "evolution")
+    .eq("boundary_level", boundaryLevel)
+    .eq(
+      "lineage_revision",
+      typeof companion.cinema_lineage_revision === "number"
+        ? companion.cinema_lineage_revision
+        : 1,
+    )
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return { event: null, status: null };
+
+  const status = typeof data.status === "string" ? data.status : null;
+  const hasReadyAssets = isPromotableCinemaEventStatus(status) &&
+    typeof data.canonical_image_bucket === "string" &&
+    typeof data.canonical_image_path === "string" &&
+    typeof data.video_bucket === "string" &&
+    typeof data.video_path === "string";
+  return {
+    event: hasReadyAssets ? data as ReadyCinemaEvent : null,
+    status,
+  };
+};
+
+const removePromotedPrivateCinemaAssets = async ({
+  supabase,
+  userId,
+  eventId,
+  portraitPath,
+}: {
+  supabase: any;
+  userId: string;
+  eventId: string;
+  portraitPath: string;
+}) => {
+  const { data: renderRows } = await supabase
+    .from("companion_cinema_renders")
+    .select("video_path")
+    .eq("event_id", eventId);
+  const paths = Array.from(
+    new Set([
+      portraitPath,
+      ...(renderRows ?? []).map((row: { video_path?: unknown }) =>
+        typeof row.video_path === "string" ? row.video_path : null
+      ),
+    ].filter((value): value is string => Boolean(value))),
+  );
+  if (paths.length === 0) return;
+
+  const { error: removeError } = await supabase.storage
+    .from(CINEMA_PRIVATE_BUCKET)
+    .remove(paths);
+  if (removeError) {
+    console.warn("Failed to remove promoted private cinema assets", {
+      eventId,
+      error: removeError.message,
+    });
+    return;
+  }
+
+  await supabase.from("user_storage_assets").delete()
+    .eq("user_id", userId)
+    .eq("bucket_id", CINEMA_PRIVATE_BUCKET)
+    .in("storage_path", paths);
 };
 
 const judgeScoresPass = ({
@@ -281,7 +516,8 @@ const judgeScoresPass = ({
     scores.overall < JUDGE_MINIMUMS.overall ||
     scores.continuity < JUDGE_MINIMUMS.continuity ||
     scores.anatomy < JUDGE_MINIMUMS.anatomy ||
-    (mode === "bootstrap" && scores.stageMaturity < JUDGE_MINIMUMS.stageMaturity) ||
+    (mode === "bootstrap" &&
+      scores.stageMaturity < JUDGE_MINIMUMS.stageMaturity) ||
     getJudgeBackgroundCutoutScore(scores) < JUDGE_MINIMUMS.backgroundCutout
   ) {
     return false;
@@ -340,6 +576,7 @@ export interface GenerateCompanionEvolutionDeps {
   registerUserStorageAsset: typeof registerUserStorageAsset;
   uploadGeneratedImage: typeof uploadGeneratedImage;
   upsertEvolutionRecord: typeof upsertEvolutionRecord;
+  verifyPremadeCompanionAsset: typeof verifyPremadeCompanionAsset;
   enqueueCompanionAnimationJob?: typeof maybeEnqueueCompanionAnimationJob;
   info: typeof console.info;
   error: typeof console.error;
@@ -358,6 +595,7 @@ const defaultGenerateCompanionEvolutionDeps: GenerateCompanionEvolutionDeps = {
   registerUserStorageAsset,
   uploadGeneratedImage,
   upsertEvolutionRecord,
+  verifyPremadeCompanionAsset,
   enqueueCompanionAnimationJob: maybeEnqueueCompanionAnimationJob,
   info: console.info,
   error: console.error,
@@ -385,6 +623,7 @@ export const handleGenerateCompanionEvolution = async (
     registerUserStorageAsset: registerUserStorageAssetFn,
     uploadGeneratedImage: uploadGeneratedImageFn,
     upsertEvolutionRecord: upsertEvolutionRecordFn,
+    verifyPremadeCompanionAsset: verifyPremadeCompanionAssetFn,
     enqueueCompanionAnimationJob: enqueueCompanionAnimationJobFn =
       maybeEnqueueCompanionAnimationJob,
     info: infoLog,
@@ -562,6 +801,29 @@ export const handleGenerateCompanionEvolution = async (
       );
     }
 
+    if (
+      !isPremadeCompanionBoundaryLevelForProduct({
+        productMode: companion.product_mode,
+        boundaryLevel: nextStage,
+      })
+    ) {
+      return new Response(
+        JSON.stringify({
+          evolved: false,
+          message: companion.product_mode === "graceward"
+            ? "Graceward visual progression currently supports Levels 1–5. More forms are coming soon."
+            : "This companion's next premade form is not available yet.",
+          current_stage: currentStage,
+          earned_level: earnedLevel,
+          xp: currentXP,
+          release_max_stage: companion.product_mode === "graceward"
+            ? 5
+            : currentStage,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const nextThresholdData = thresholds.find((threshold) =>
       threshold.stage === nextStage
     );
@@ -579,6 +841,321 @@ export const handleGenerateCompanionEvolution = async (
           next_threshold: nextThresholdData.xp_required,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Explicit Cosmiq companions never fall through to preset evolution art.
+    // The kill switch pauses the claim until personalized cinema is available;
+    // Graceward continues on its independent premade path below.
+    if (companion.product_mode === "cosmiq") {
+      const cinemaRollout = getCompanionCinemaRolloutConfig();
+      if (!cinemaRollout.enabled) {
+        return new Response(
+          JSON.stringify({
+            evolved: false,
+            message:
+              "Cosmiq cinematic evolutions are temporarily paused. Your earned form remains waiting for its personalized cinematic.",
+            code: "cosmiq_cinema_disabled",
+            current_stage: currentStage,
+            requested_stage: nextStage,
+          }),
+          {
+            status: 503,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      if (!isCompanionCinemaUserEligible(resolvedUserId)) {
+        return new Response(
+          JSON.stringify({
+            evolved: false,
+            message:
+              "Cosmiq cinematic evolutions are not available for this account yet.",
+            code: "cosmiq_cinema_rollout_ineligible",
+            current_stage: currentStage,
+            requested_stage: nextStage,
+          }),
+          {
+            status: 503,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      const cinemaLookup = await getCosmiqCinemaEventForBoundary({
+        supabase,
+        companion,
+        boundaryLevel: nextStage,
+      });
+
+      if (cinemaLookup.event) {
+        const cinemaEvent = cinemaLookup.event;
+        const [portraitBytes, videoBytes, selectedRenderResult] = await Promise
+          .all([
+            downloadStorageBytes({
+              supabase,
+              bucket: cinemaEvent.canonical_image_bucket,
+              storagePath: cinemaEvent.canonical_image_path,
+              kind: "portrait",
+            }),
+            downloadStorageBytes({
+              supabase,
+              bucket: cinemaEvent.video_bucket,
+              storagePath: cinemaEvent.video_path,
+              kind: "video",
+            }),
+            cinemaEvent.selected_render_id
+              ? supabase.from("companion_cinema_renders")
+                .select("prompt, qa_score, qa_payload, duration_seconds")
+                .eq("id", cinemaEvent.selected_render_id)
+                .maybeSingle()
+              : Promise.resolve({ data: null, error: null }),
+          ]);
+        if (selectedRenderResult.error) throw selectedRenderResult.error;
+
+        const promotedImagePath =
+          `${resolvedUserId}/evolutions/${companion.id}_stage_${nextStage}_cinema_${cinemaEvent.id}.png`;
+        const promotedVideoPath =
+          `${resolvedUserId}/evolutions/${companion.id}_stage_${nextStage}_cinema_${cinemaEvent.id}.mp4`;
+        const [newImageUrl, animationVideoUrl] = await Promise.all([
+          uploadPromotedCinemaAsset({
+            supabase,
+            bucket: IMAGE_BUCKET,
+            storagePath: promotedImagePath,
+            bytes: portraitBytes,
+            contentType: "image/png",
+          }),
+          uploadPromotedCinemaAsset({
+            supabase,
+            bucket: ANIMATION_BUCKET,
+            storagePath: promotedVideoPath,
+            bytes: videoBytes,
+            contentType: "video/mp4",
+          }),
+        ]);
+
+        const generationMetadata = {
+          sourceType: "cinema_prebuild",
+          portraitRegenerated: true,
+          boundaryLevel: nextStage,
+          previousBoundaryLevel: cinemaEvent.previous_boundary_level,
+          cinemaEventId: cinemaEvent.id,
+          provider: cinemaEvent.provider,
+          providerModel: cinemaEvent.provider_model,
+          selectedRenderId: cinemaEvent.selected_render_id,
+          qaScore: selectedRenderResult.data?.qa_score ?? null,
+          qaPayload: selectedRenderResult.data?.qa_payload ?? null,
+          promptVersion: "cosmiq-cinema-v1",
+        };
+        const evolutionRecord = await upsertEvolutionRecordFn({
+          supabase,
+          companionId: companion.id,
+          stage: nextStage,
+          imageUrl: newImageUrl,
+          xpAtEvolution: currentXP,
+          generationMetadata,
+          cinemaEventId: cinemaEvent.id,
+          premadeAnimation: {
+            videoUrl: animationVideoUrl,
+            storagePath: promotedVideoPath,
+            provider: cinemaEvent.provider,
+            providerModel: cinemaEvent.provider_model,
+            prompt: selectedRenderResult.data?.prompt ?? null,
+          },
+        });
+
+        const focalX = typeof cinemaEvent.canonical_image_focal_x === "number"
+          ? cinemaEvent.canonical_image_focal_x
+          : 0.5;
+        const focalY = typeof cinemaEvent.canonical_image_focal_y === "number"
+          ? cinemaEvent.canonical_image_focal_y
+          : 0.5;
+        const visualIdentityProfile = synthesizeVisualIdentityProfile(
+          companion.visual_identity_profile,
+          {
+            spiritAnimal: companion.spirit_animal,
+            coreElement: companion.core_element,
+            favoriteColor: companion.favorite_color,
+            storyTone: companion.story_tone,
+          },
+        );
+        const lineageAfterPromotion =
+          updateLineageMetadataAfterBoundaryEvolution({
+            existing: companion.image_lineage_metadata,
+            boundaryLevel: nextStage,
+            imageUrl: newImageUrl,
+            focalX,
+            focalY,
+          });
+        const { data: promotedCompanion, error: updateError } = await supabase
+          .from("user_companion")
+          .update({
+            current_stage: nextStage,
+            current_image_url: newImageUrl,
+            current_image_focal_x: focalX,
+            current_image_focal_y: focalY,
+            dormant_image_url: null,
+            dormant_image_focal_x: null,
+            dormant_image_focal_y: null,
+            neglected_image_url: null,
+            neglected_image_focal_x: null,
+            neglected_image_focal_y: null,
+            visual_identity_profile: visualIdentityProfile,
+            image_lineage_metadata: lineageAfterPromotion,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", companion.id)
+          .eq("current_stage", currentStage)
+          .select("id")
+          .maybeSingle();
+        if (updateError || !promotedCompanion) {
+          throw new Error("Failed to promote cinematic companion state");
+        }
+
+        await Promise.all([
+          registerUserStorageAssetFn({
+            supabase,
+            userId: resolvedUserId,
+            bucketId: IMAGE_BUCKET,
+            storagePath: promotedImagePath,
+            sourceKind: "companion_evolution",
+            sourceRecordTable: "companion_evolutions",
+            sourceRecordId: typeof evolutionRecord?.id === "string"
+              ? evolutionRecord.id
+              : undefined,
+          }),
+          registerUserStorageAssetFn({
+            supabase,
+            userId: resolvedUserId,
+            bucketId: ANIMATION_BUCKET,
+            storagePath: promotedVideoPath,
+            sourceKind: "companion_animation_video",
+            sourceRecordTable: "companion_evolutions",
+            sourceRecordId: typeof evolutionRecord?.id === "string"
+              ? evolutionRecord.id
+              : undefined,
+          }),
+        ]);
+
+        const { error: eventUpdateError } = await supabase
+          .from("companion_cinema_events")
+          .update({
+            status: "revealed",
+            canonical_image_bucket: IMAGE_BUCKET,
+            canonical_image_path: promotedImagePath,
+            video_bucket: ANIMATION_BUCKET,
+            video_path: promotedVideoPath,
+            revealed_at: new Date().toISOString(),
+            error_code: null,
+            error_message: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", cinemaEvent.id)
+          .in("status", ["ready", "revealed"]);
+        if (eventUpdateError) throw eventUpdateError;
+
+        // Remove every private candidate while their original storage paths are
+        // still present. Updating the selected row first used to hide its
+        // private path from cleanup and leak one paid render per reveal.
+        await removePromotedPrivateCinemaAssets({
+          supabase,
+          userId: resolvedUserId,
+          eventId: cinemaEvent.id,
+          portraitPath: cinemaEvent.canonical_image_path,
+        });
+
+        if (cinemaEvent.selected_render_id) {
+          const { error: selectedRenderUpdateError } = await supabase
+            .from("companion_cinema_renders")
+            .update({
+              video_bucket: ANIMATION_BUCKET,
+              video_path: promotedVideoPath,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", cinemaEvent.selected_render_id);
+          if (selectedRenderUpdateError) throw selectedRenderUpdateError;
+        }
+
+        try {
+          const { error: nextCinemaError } = await supabase.rpc(
+            "enqueue_cosmiq_cinema_event_internal",
+            {
+              p_user_id: resolvedUserId,
+              p_companion_id: companion.id,
+            },
+          );
+          if (nextCinemaError) throw nextCinemaError;
+        } catch (enqueueError) {
+          infoLog("[CompanionCinema] Next cinematic enqueue failed", {
+            companionId: companion.id,
+            error: enqueueError instanceof Error
+              ? enqueueError.message
+              : String(enqueueError),
+          });
+        }
+
+        return new Response(
+          JSON.stringify({
+            evolved: true,
+            previous_stage: currentStage,
+            new_stage: nextStage,
+            image_url: newImageUrl,
+            animation_video_url: animationVideoUrl,
+            xp_at_evolution: currentXP,
+            evolution_id: evolutionRecord.id,
+            portrait_regenerated: true,
+            asset_source: "personalized_cinema",
+            cinema_event_id: cinemaEvent.id,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      if (
+        cinemaLookup.status &&
+        !["failed", "cancelled", "superseded"].includes(cinemaLookup.status)
+      ) {
+        return new Response(
+          JSON.stringify({
+            evolved: false,
+            message:
+              "Your companion's cinematic evolution is still being finished.",
+            code: "cinema_event_preparing",
+            current_stage: currentStage,
+            requested_stage: nextStage,
+            cinema_status: cinemaLookup.status,
+          }),
+          {
+            status: 503,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      const { data: queuedCinemaEventId, error: queueCinemaError } =
+        await supabase
+          .rpc("enqueue_cosmiq_cinema_event_internal", {
+            p_user_id: resolvedUserId,
+            p_companion_id: companion.id,
+          });
+      if (queueCinemaError) throw queueCinemaError;
+
+      return new Response(
+        JSON.stringify({
+          evolved: false,
+          message:
+            "Your personalized evolution has been queued and is being finished.",
+          code: "cinema_event_preparing",
+          current_stage: currentStage,
+          requested_stage: nextStage,
+          cinema_status: "queued",
+          cinema_event_id: queuedCinemaEventId ?? null,
+          retried: Boolean(cinemaLookup.status),
+        }),
+        {
+          status: 503,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
 
@@ -622,6 +1199,115 @@ export const handleGenerateCompanionEvolution = async (
         error: errorLog,
       });
     };
+
+    const premadeAsset = getPremadeCompanionEvolutionAssetDescriptor({
+      productMode: companion.product_mode,
+      species: companion.preset_id ?? companion.spirit_animal,
+      element: companion.core_element,
+      boundaryLevel: nextStage,
+    });
+
+    if (companion.product_mode === "graceward") {
+      if (!premadeAsset) {
+        throw new PremadeCompanionAssetError(
+          "Premade companion asset mapping is unavailable for this combination.",
+        );
+      }
+
+      const [hasPortrait, hasVideo] = await Promise.all([
+        verifyPremadeCompanionAssetFn({
+          supabase,
+          bucket: premadeAsset.portraitBucket,
+          storagePath: premadeAsset.portraitStoragePath,
+        }),
+        verifyPremadeCompanionAssetFn({
+          supabase,
+          bucket: premadeAsset.videoBucket,
+          storagePath: premadeAsset.videoStoragePath,
+        }),
+      ]);
+
+      const missingAssetKinds = [
+        hasPortrait ? null : "portrait",
+        hasVideo ? null : "video",
+      ].filter(Boolean).join(" and ");
+      if (missingAssetKinds) {
+        throw new PremadeCompanionAssetError(
+          `Premade companion ${missingAssetKinds} is not published for ${premadeAsset.productMode}/${premadeAsset.species}/${premadeAsset.element}/level-${nextStage}.`,
+        );
+      }
+
+      const newImageUrl = buildPremadeCompanionPublicStorageUrl({
+        supabaseUrl,
+        bucket: premadeAsset.portraitBucket,
+        storagePath: premadeAsset.portraitStoragePath,
+      });
+      const animationVideoUrl = buildPremadeCompanionPublicStorageUrl({
+        supabaseUrl,
+        bucket: premadeAsset.videoBucket,
+        storagePath: premadeAsset.videoStoragePath,
+      });
+      const generationMetadata = {
+        sourceType: "premade",
+        provider: "higgsfield",
+        assetVersion: premadeAsset.version,
+        productMode: premadeAsset.productMode,
+        species: premadeAsset.species,
+        element: premadeAsset.element,
+        boundaryLevel: nextStage,
+        portraitRegenerated: false,
+        portraitStoragePath: premadeAsset.portraitStoragePath,
+        videoStoragePath: premadeAsset.videoStoragePath,
+      };
+      const evolutionRecord = await upsertEvolutionRecordFn({
+        supabase,
+        companionId: companion.id,
+        stage: nextStage,
+        imageUrl: newImageUrl,
+        xpAtEvolution: currentXP,
+        generationMetadata,
+        premadeAnimation: {
+          videoUrl: animationVideoUrl,
+          storagePath: premadeAsset.videoStoragePath,
+        },
+      });
+
+      const { error: updateError } = await supabase
+        .from("user_companion")
+        .update({
+          current_stage: nextStage,
+          current_image_url: newImageUrl,
+          current_image_focal_x: 0.5,
+          current_image_focal_y: 0.5,
+          dormant_image_url: null,
+          dormant_image_focal_x: null,
+          dormant_image_focal_y: null,
+          neglected_image_url: null,
+          neglected_image_focal_x: null,
+          neglected_image_focal_y: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", companion.id);
+
+      if (updateError) {
+        throw new Error("Failed to update companion");
+      }
+
+      return new Response(
+        JSON.stringify({
+          evolved: true,
+          previous_stage: currentStage,
+          new_stage: nextStage,
+          image_url: newImageUrl,
+          animation_video_url: animationVideoUrl,
+          xp_at_evolution: currentXP,
+          evolution_id: evolutionRecord.id,
+          portrait_regenerated: false,
+          asset_source: "premade_higgsfield",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     if (isPresetBackedCompanion(companion)) {
       const normalizedPresetId = coerceCompanionPresetId(companion.preset_id);
@@ -1031,10 +1717,11 @@ export const handleGenerateCompanionEvolution = async (
           : "",
       ].filter(Boolean).join("\n\n");
 
-      const canonicalStageOneReferenceUrl = resolveCanonicalChristianCompanionImageUrl({
-        supabaseUrl,
-        spiritAnimal: companion.spirit_animal,
-      });
+      const canonicalStageOneReferenceUrl =
+        resolveCanonicalChristianCompanionImageUrl({
+          supabaseUrl,
+          spiritAnimal: companion.spirit_animal,
+        });
       let stageOneReferenceEditFailure: string | null = null;
       const stageOneAttempt = await runJudgedRender({
         mode: "bootstrap",
@@ -1126,9 +1813,7 @@ export const handleGenerateCompanionEvolution = async (
         imageUrl: newImageUrl,
         focalX: stageOneFocalX,
         focalY: stageOneFocalY,
-        sourceType: isLegacyStageOneBackfill
-          ? "legacy_backfill"
-          : "generation",
+        sourceType: isLegacyStageOneBackfill ? "legacy_backfill" : "generation",
       });
       const generationMetadata = buildCompanionGenerationMetadata({
         sourceType: isLegacyStageOneBackfill ? "legacy_backfill" : "generation",
@@ -1480,10 +2165,12 @@ export const handleGenerateCompanionEvolution = async (
     const errorMessage = error instanceof Error
       ? error.message
       : "Unknown error";
-    const errorCode = error instanceof EvolutionQualityGateError
+    const errorCode = error instanceof EvolutionQualityGateError ||
+        error instanceof PremadeCompanionAssetError
       ? error.code
       : resolveServerErrorCode(errorMessage);
-    const status = error instanceof EvolutionQualityGateError
+    const status = error instanceof EvolutionQualityGateError ||
+        error instanceof PremadeCompanionAssetError
       ? error.status
       : 500;
     return new Response(

@@ -23,6 +23,7 @@ import {
   resolveSingleDailyPepTalkDateContext,
   type ProfileTimezoneSupabaseClient,
 } from "./workflow.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -97,8 +98,8 @@ function parseUpstreamError(rawBody: string): string | null {
   }
 }
 
-function buildPepTalkRequestKey(mentorSlug: string, forDate: string): string {
-  return `daily:${mentorSlug}:${forDate}`;
+function buildPepTalkRequestKey(productMode: string, mentorSlug: string, forDate: string): string {
+  return `daily:${productMode}:${mentorSlug}:${forDate}`;
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -306,6 +307,7 @@ serve(async (req) => {
     }
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     idempotencySupabase = supabase as unknown as PepTalkGenerationRpcClient;
+    const productMode = await resolveUserProductMode(supabase, auth.userId);
 
     const { effectiveDate: todayDate, themeAnchorDate, timezone } = await resolveSingleDailyPepTalkDateContext({
       supabase: supabase as unknown as ProfileTimezoneSupabaseClient,
@@ -318,6 +320,7 @@ serve(async (req) => {
     const { data: existing, error: checkError } = await supabase
       .from('daily_pep_talks')
       .select('*')
+      .eq('product_mode', productMode)
       .eq('mentor_slug', resolvedMentorSlug)
       .eq('for_date', todayDate)
       .maybeSingle();
@@ -356,7 +359,7 @@ serve(async (req) => {
 
     // Fetch mentor details
     const { data: mentor, error: mentorError } = await supabase
-      .from('graceward_guides')
+      .from(productMode === "graceward" ? "graceward_guides" : "mentors")
       .select('*')
       .eq('slug', resolvedMentorSlug)
       .maybeSingle();
@@ -391,8 +394,8 @@ serve(async (req) => {
       );
 
     const requestKey = forceRegenerate
-      ? `${buildPepTalkRequestKey(resolvedMentorSlug, todayDate)}:force:${crypto.randomUUID()}`
-      : buildPepTalkRequestKey(resolvedMentorSlug, todayDate);
+      ? `${buildPepTalkRequestKey(productMode, resolvedMentorSlug, todayDate)}:force:${crypto.randomUUID()}`
+      : buildPepTalkRequestKey(productMode, resolvedMentorSlug, todayDate);
     let idempotencyState = await beginPepTalkGenerationRequest({
       supabase,
       requestKey,
@@ -456,6 +459,7 @@ serve(async (req) => {
     
     const audioResponse = await invokeInternalFunction("generate-full-mentor-audio", {
       mentorSlug: resolvedMentorSlug,
+      productMode,
       topic_category: theme.topic_category,
       intensity: theme.intensity,
       emotionalTriggers: theme.triggers,
@@ -517,13 +521,14 @@ serve(async (req) => {
     }
 
     // Generate title and summary
-    const title = getDailyEncouragementTitle(theme.topic_category);
-    const summary = getDailyEncouragementSummary(theme.topic_category);
+    const title = getDailyEncouragementTitle(theme.topic_category, productMode);
+    const summary = getDailyEncouragementSummary(theme.topic_category, productMode);
 
     console.log(`Generated content for ${resolvedMentorSlug}: ${title}`);
 
     const dailyPepTalkPayload = {
       mentor_slug: resolvedMentorSlug,
+      product_mode: productMode,
       topic_category: theme.topic_category,
       emotional_triggers: theme.triggers,
       intensity: theme.intensity,
@@ -563,6 +568,7 @@ serve(async (req) => {
         const { data: existingAfterConflict, error: conflictFetchError } = await supabase
           .from('daily_pep_talks')
           .select('*')
+          .eq('product_mode', productMode)
           .eq('mentor_slug', resolvedMentorSlug)
           .eq('for_date', todayDate)
           .maybeSingle();
@@ -612,6 +618,7 @@ serve(async (req) => {
         emotional_triggers: theme.triggers,
         intensity: theme.intensity,
         mentor_slug: resolvedMentorSlug,
+        product_mode: productMode,
         mentor_id: mentor.id,
         source: 'user_generated',
         for_date: todayDate,

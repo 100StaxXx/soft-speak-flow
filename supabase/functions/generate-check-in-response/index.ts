@@ -16,6 +16,7 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const CheckInSchema = z.object({
   checkInId: z.string().uuid()
@@ -62,6 +63,7 @@ export async function handleGenerateCheckInResponse(req: Request) {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
     const userId = protectedRequest.auth.userId;
+    const productMode = await resolveUserProductMode(supabase, userId);
 
     const costGuardrails = createCostGuardrailSession({
       supabase,
@@ -120,7 +122,7 @@ export async function handleGenerateCheckInResponse(req: Request) {
 
     // Fetch mentor and pep talk in parallel (pep talk needs mentor slug, so we get mentor first)
     const { data: mentor, error: mentorError } = await supabase
-      .from('graceward_guides')
+      .from(productMode === "graceward" ? "graceward_guides" : "mentors")
       .select('name, tone_description, slug')
       .eq('id', profile.selected_mentor_id)
       .maybeSingle()
@@ -135,6 +137,7 @@ export async function handleGenerateCheckInResponse(req: Request) {
     const { data: pepTalk } = await supabase
       .from('daily_pep_talks')
       .select('title, topic_category')
+      .eq('product_mode', productMode)
       .eq('for_date', today)
       .eq('mentor_slug', mentor.slug)
       .maybeSingle()
@@ -149,7 +152,7 @@ export async function handleGenerateCheckInResponse(req: Request) {
     // Build personalized prompt using template system
     const promptBuilder = new PromptBuilder(supabaseUrl, supabaseKey);
 
-    const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
+    const builtPrompt = await promptBuilder.build({
       templateKey: 'check_in_response',
       userId,
       variables: {
@@ -163,6 +166,13 @@ export async function handleGenerateCheckInResponse(req: Request) {
         responseLength: 'brief'
       }
     });
+    const systemPrompt = productMode === "graceward"
+      ? builtPrompt.systemPrompt
+      : `You are ${mentor.name}, a clearly identified AI guide in Cosmiq. Your tone is ${mentor.tone_description}. Briefly acknowledge the user's stated mood, support their intention, and offer one practical next step. Do not use religious framing, claim hidden knowledge, or present professional advice.`;
+    const userPrompt = productMode === "graceward"
+      ? builtPrompt.userPrompt
+      : `Mood: ${checkIn.mood}\nIntention: ${checkIn.intention}\n${dailyContext}\nRespond in 2-3 concise, grounded sentences.`;
+    const { validationRules, outputConstraints } = builtPrompt;
 
     const response = await guardedFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',

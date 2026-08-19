@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 import {
   MENTOR_DISPLAY_NAMES,
   resolveActiveMentorSlug,
@@ -43,6 +44,7 @@ const loadEncouragementHistory = async (userId: string): Promise<EncouragementHi
   const { data: pepTalks, error: pepTalkError } = await supabase
     .from("daily_pep_talks")
     .select("id, for_date, title, summary, topic_category, mentor_slug")
+    .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
     .in("id", pepTalkIds);
 
   if (pepTalkError) throw pepTalkError;

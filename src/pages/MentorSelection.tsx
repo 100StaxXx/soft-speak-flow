@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchActiveProductMentors } from "@/services/productMentorCatalog";
 import { useAuth } from "@/hooks/useAuth";
 import { MentorGrid } from "@/components/MentorGrid";
 import { useToast } from "@/hooks/use-toast";
@@ -20,14 +21,8 @@ const MentorSelection = () => {
   const fetchData = async () => {
     try {
       // Fetch mentors
-      const { data: mentorsData, error: mentorsError } = await supabase
-        .from("graceward_guides")
-        .select("*")
-        .eq("is_active", true)
-        .order("created_at");
-
-      if (mentorsError) throw mentorsError;
-      setMentors(mentorsData || []);
+      const mentorsData = await fetchActiveProductMentors();
+      setMentors(mentorsData);
 
       // Fetch current mentor if user is logged in
       if (user) {

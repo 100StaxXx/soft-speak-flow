@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { PRODUCT } from "@/config/product";
 import { Shield, Trash2, Info, ArrowLeft, Mail } from "lucide-react";
 
 const deletionSteps = [
@@ -62,9 +63,9 @@ export default function AccountDeletionHelp() {
         </div>
 
         <div className="space-y-4">
-          <h1 className="text-4xl font-bold">Delete your Graceward account</h1>
+          <h1 className="text-4xl font-bold">Delete your {PRODUCT.name} account</h1>
           <p className="text-muted-foreground text-lg max-w-2xl">
-            Graceward lets you permanently delete your account at any time inside the app. Follow the steps below or open the deletion flow directly.
+            {PRODUCT.name} lets you permanently delete your account at any time inside the app. Follow the steps below or open the deletion flow directly.
           </p>
           <div className="flex flex-wrap gap-3">
             <Button size="lg" onClick={primaryCta.action}>
@@ -131,12 +132,12 @@ export default function AccountDeletionHelp() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Email our team from the address tied to your account and include “Graceward account deletion” in the subject. We will verify ownership and run the same deletion routine on your behalf.
+              Email our team from the address tied to your account and include “{PRODUCT.name} account deletion” in the subject. We will verify ownership and run the same deletion routine on your behalf.
             </p>
             <Button asChild variant="outline">
-              <a href="mailto:hello@graceward.app">
+              <a href={`mailto:${PRODUCT.supportEmail}?subject=${encodeURIComponent(`${PRODUCT.name} account deletion`)}`}>
                 <Mail className="h-4 w-4 mr-2" />
-                hello@graceward.app
+                {PRODUCT.supportEmail}
               </a>
             </Button>
           </CardContent>

@@ -23,12 +23,14 @@ import {
   getCosmiqCanonicalCompanionAssetUrl,
   isBundledCosmiqCanonicalCompanionAssetUrl,
 } from "@/config/cosmiqCanonicalCompanionAssets";
+import { getPremadeCompanionPortraitDescriptorForStage } from "@/config/premadeCompanionAssets";
 
 const UNIVERSAL_EGG_ASSET_DIR = "companion-eggs/v2";
 const UNIVERSAL_EGG_CUTOUT_ASSET_DIR = "companion-eggs";
 const COMPANION_PRESET_PUBLIC_PATH_SEGMENT = `/storage/v1/object/public/${COMPANION_PRESET_BUCKET}/`;
 
 interface CompanionAssetSource {
+  product_mode?: "graceward" | "cosmiq" | string | null;
   preset_id?: string | null;
   spirit_animal?: string | null;
   current_stage?: number | null;
@@ -276,6 +278,21 @@ export const resolveCompanionVisualAssetUrl = (
 
   if (state === "normal" && isPresetEggCompanion(companion)) {
     return getUniversalEggAssetUrl(normalizedElement);
+  }
+
+  const premadePortrait = state === "normal"
+    ? getPremadeCompanionPortraitDescriptorForStage({
+      productMode: companion.product_mode,
+      species: companion.preset_id ?? companion.spirit_animal,
+      element: normalizedElement,
+      stage: companion.current_stage,
+    })
+    : null;
+
+  if (premadePortrait) {
+    return supabase.storage
+      .from(premadePortrait.portraitBucket)
+      .getPublicUrl(premadePortrait.portraitStoragePath).data.publicUrl;
   }
 
   const normalizedCurrentImageUrl = normalizeCompanionStoredImageUrl(companion.current_image_url);

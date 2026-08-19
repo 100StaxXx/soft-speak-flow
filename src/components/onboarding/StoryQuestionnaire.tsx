@@ -15,6 +15,7 @@ import {
   ONBOARDING_VISUAL_PERSONA_OPTIONS,
   ONBOARDING_VISUAL_PERSONA_QUESTION_ID,
 } from "@/shared/onboardingVisualPersona";
+import { PRODUCT } from "@/config/product";
 
 interface QuestionOption {
   optionId: string;
@@ -43,9 +44,21 @@ const GRACEWARD_QUESTION_NARRATIVES = [
   "A daily rhythm must fit the shape of your actual days...",
 ] as const;
 
-const getGracewardNarrative = (questionIndex: number): string =>
-  GRACEWARD_QUESTION_NARRATIVES[questionIndex]
-  ?? GRACEWARD_QUESTION_NARRATIVES[0];
+const COSMIQ_QUESTION_NARRATIVES = [
+  "A meaningful path begins by understanding who is walking it...",
+  "The right guide can turn noise into a clearer next move...",
+  "Honest attention reveals where momentum matters most...",
+  "Guidance works best when its tone matches how you move...",
+  "Progress becomes practical when support fits how you learn...",
+  "A useful daily rhythm must fit the shape of your actual days...",
+] as const;
+
+const getProductNarrative = (questionIndex: number): string => {
+  const narratives = PRODUCT.mode === "christian"
+    ? GRACEWARD_QUESTION_NARRATIVES
+    : COSMIQ_QUESTION_NARRATIVES;
+  return narratives[questionIndex] ?? narratives[0];
+};
 
 const questions: StoryQuestion[] = [
   {
@@ -72,10 +85,10 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "Where would you most like to grow right now?",
     options: [
-      { optionId: "clarity_mindset", text: "Prayer & spiritual attention", tags: ["calm", "discipline"] },
-      { optionId: "emotions_healing", text: "Peace & emotional healing", tags: ["healing", "supportive"] },
-      { optionId: "discipline_performance", text: "Discipline & faithful action", tags: ["discipline", "momentum"] },
-      { optionId: "confidence_self_belief", text: "Relationships & serving others", tags: ["confidence", "supportive"] },
+      { optionId: "clarity_mindset", text: PRODUCT.mode === "christian" ? "Prayer & spiritual attention" : "Clarity & mindset", tags: ["calm", "discipline"] },
+      { optionId: "emotions_healing", text: PRODUCT.mode === "christian" ? "Peace & emotional healing" : "Peace & wellbeing", tags: ["healing", "supportive"] },
+      { optionId: "discipline_performance", text: PRODUCT.mode === "christian" ? "Discipline & faithful action" : "Discipline & performance", tags: ["discipline", "momentum"] },
+      { optionId: "confidence_self_belief", text: PRODUCT.mode === "christian" ? "Relationships & serving others" : "Relationships & connection", tags: ["confidence", "supportive"] },
     ],
   },
   {
@@ -176,7 +189,7 @@ export const StoryQuestionnaire = ({
   const nativeIOSHandheld = useMemo(() => isNativeIOSHandheld(), []);
   activeQuestionIdRef.current = currentQuestion.id;
 
-  const gracewardAccentColor = "#D6B85F";
+  const productAccentColor = PRODUCT.mode === "christian" ? "#D6B85F" : "#8B5CF6";
 
   const controlsLocked = isSubmitting || isTransitioning;
   const canGoBack = currentQuestionIndex > 0 && !controlsLocked;
@@ -387,7 +400,7 @@ export const StoryQuestionnaire = ({
               transition={{ delay: 0.2 }}
               className="text-white/60 text-sm italic mb-5 text-center leading-relaxed px-2"
             >
-              {getGracewardNarrative(currentQuestionIndex)}
+              {getProductNarrative(currentQuestionIndex)}
             </motion.p>
 
             {/* Question */}
@@ -425,15 +438,15 @@ export const StoryQuestionnaire = ({
                           : "border-white/15 bg-black/30 hover:border-white/40 hover:bg-black/40",
                       )}
                       style={{
-                        ["--hover-bg" as string]: `${gracewardAccentColor}20`,
+                        ["--hover-bg" as string]: `${productAccentColor}20`,
                         touchAction: "manipulation",
                         WebkitTapHighlightColor: "transparent",
                         boxShadow: isSelected
-                          ? `0 0 0 1px ${gracewardAccentColor}55, 0 16px 36px rgba(0, 0, 0, 0.34)`
+                          ? `0 0 0 1px ${productAccentColor}55, 0 16px 36px rgba(0, 0, 0, 0.34)`
                           : "0 10px 40px rgba(0, 0, 0, 0.35)",
-                        borderColor: isSelected ? `${gracewardAccentColor}99` : undefined,
+                        borderColor: isSelected ? `${productAccentColor}99` : undefined,
                         background: isSelected
-                          ? `linear-gradient(135deg, ${gracewardAccentColor}26, rgba(255,255,255,0.08))`
+                          ? `linear-gradient(135deg, ${productAccentColor}26, rgba(255,255,255,0.08))`
                           : undefined,
                       }}
                       onContextMenu={(event) => event.preventDefault()}
@@ -449,9 +462,9 @@ export const StoryQuestionnaire = ({
                           isSelected ? "border-white/45 text-white" : "border-white/20 text-white",
                         )}
                         style={{
-                          boxShadow: isSelected ? `0 0 18px ${gracewardAccentColor}55` : `0 0 15px ${gracewardAccentColor}33`,
-                          color: isSelected ? "#FFFFFF" : gracewardAccentColor,
-                          background: isSelected ? `${gracewardAccentColor}55` : undefined,
+                          boxShadow: isSelected ? `0 0 18px ${productAccentColor}55` : `0 0 15px ${productAccentColor}33`,
+                          color: isSelected ? "#FFFFFF" : productAccentColor,
+                          background: isSelected ? `${productAccentColor}55` : undefined,
                         }}
                       >
                         {String.fromCharCode(65 + index)}

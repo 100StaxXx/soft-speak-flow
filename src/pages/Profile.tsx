@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, memo, useRef, type ChangeEvent, type FormEvent, type PointerEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  fetchActiveProductMentors,
+  fetchProductMentorById,
+} from "@/services/productMentorCatalog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -44,6 +48,7 @@ import {
   isAccountDeletionAuthError,
 } from "@/services/accountDeletion";
 import { logger } from "@/utils/logger";
+import { getAuthUserAccountEmail } from "@/utils/authUser";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -176,14 +181,8 @@ const Profile = () => {
     queryKey: ["mentors", "active"],
     staleTime: 10 * 60 * 1000, // 10 minutes - mentors rarely change
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("graceward_guides")
-        .select("id, name, slug, avatar_url, is_active")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
       const map = new Map<string, any>();
-      for (const m of data || []) {
+      for (const m of await fetchActiveProductMentors()) {
         const key = (m.slug || m.name || "").trim().toLowerCase();
         if (!map.has(key)) map.set(key, m);
       }
@@ -203,14 +202,7 @@ const Profile = () => {
       if (!resolvedMentorId) {
         throw new Error('No guide selected');
       }
-      
-      const { data, error } = await supabase
-        .from("graceward_guides")
-        .select("*")
-        .eq("id", resolvedMentorId)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
+      return fetchProductMentorById(resolvedMentorId);
     },
   });
 
@@ -451,7 +443,7 @@ const Profile = () => {
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Email</span>
-                    <span className="font-medium truncate ml-4">{user.email}</span>
+                    <span className="font-medium truncate ml-4">{getAuthUserAccountEmail(user)}</span>
                   </div>
                 </CardContent>
               </Card>

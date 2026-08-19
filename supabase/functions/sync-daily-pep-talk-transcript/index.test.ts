@@ -51,7 +51,7 @@ Deno.test("sync-daily-pep-talk-transcript allows internal requests to reach vali
   assert(response.status === 400, `Expected 400 validation response, got ${response.status}`);
   const payload = await response.json();
   assert(
-    payload.error === "Provide either id or {mentor_slug, for_date}",
+    payload.error === "Provide either id or {product_mode, mentor_slug, for_date}",
     `Expected request validation error, got ${payload.error}`,
   );
 });

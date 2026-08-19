@@ -253,10 +253,10 @@ SET start_image_url = COALESCE(
       companion.initial_image_url
     ),
     updated_at = now()
-FROM boundary_map
-JOIN public.user_companion AS companion
-  ON companion.id = job.companion_id
+FROM boundary_map,
+     public.user_companion AS companion
 WHERE job.stage = boundary_map.stage
+  AND companion.id = job.companion_id
   AND NULLIF(BTRIM(job.start_image_url), '') IS NULL;
 
 COMMENT ON COLUMN public.companion_animation_jobs.start_image_url IS

@@ -25,6 +25,7 @@ import {
   normalizeCompanionCustomName,
 } from "@/lib/companionName";
 import { cn } from "@/lib/utils";
+import { PRODUCT } from "@/config/product";
 
 export interface AICompanionCreationData {
   favoriteColor: string;
@@ -362,7 +363,7 @@ export const AICompanionCreator = ({
                       Companion Name
                     </Label>
                     <p className="text-sm text-white/60">
-                      Optional. If you leave this blank, Graceward will suggest a name.
+                      Optional. If you leave this blank, {PRODUCT.name} will suggest a name.
                     </p>
                   </div>
                   <Input

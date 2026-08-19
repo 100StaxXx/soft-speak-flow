@@ -32,6 +32,7 @@ import {
   type OnboardingVisualPersona,
 } from "../../../src/shared/onboardingVisualPersona.ts";
 import { getTaskCompletionDisciplineAward } from "../../../src/shared/taskCompletionTiming.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 type AttributeType = CompanionStatAttribute;
 
@@ -133,6 +134,7 @@ interface GenerateMentorCopyResult {
 interface GenerateCompanionStatAnalysisDeps {
   authenticate: (req: Request, corsHeaders: HeadersInit) => Promise<RequestAuth | Response>;
   createSupabaseClient: () => any;
+  resolveProductMode?: (supabase: any, userId: string) => Promise<"graceward" | "cosmiq">;
   fetchImpl: typeof fetch;
   now: () => Date;
   getCosmiqTitleCardCacheState?: (params: {
@@ -830,6 +832,7 @@ ${JSON.stringify({
     });
 
     if (!response.ok) {
+      await response.body?.cancel();
       return fallback;
     }
 
@@ -888,6 +891,10 @@ export async function handleGenerateCompanionStatAnalysis(
     const { forceRefresh } = validation.data;
     const userId = requestAuth.userId;
     const supabase = deps.createSupabaseClient();
+    const productMode = await (deps.resolveProductMode ?? resolveUserProductMode)(supabase, userId);
+    if (productMode !== "cosmiq") {
+      return errorResponse(403, "Companion stat analysis belongs to Cosmiq accounts only", corsHeaders);
+    }
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -984,7 +991,7 @@ export async function handleGenerateCompanionStatAnalysis(
     const selectedMentorId = (profile as ProfileRow | null)?.selected_mentor_id ?? null;
     if (selectedMentorId) {
       const { data: selectedMentor, error: mentorError } = await supabase
-        .from("graceward_guides")
+        .from("mentors")
         .select("id, name, tone_description, avatar_url, primary_color")
         .eq("id", selectedMentorId)
         .maybeSingle();
@@ -995,7 +1002,7 @@ export async function handleGenerateCompanionStatAnalysis(
 
     if (!mentor) {
       const { data: fallbackMentor, error: fallbackMentorError } = await supabase
-        .from("graceward_guides")
+        .from("mentors")
         .select("id, name, tone_description, avatar_url, primary_color")
         .limit(1)
         .maybeSingle();

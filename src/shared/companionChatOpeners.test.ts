@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   COMPANION_CHAT_OPENING_LINES,
+  getCompanionChatOpeningLines,
   getRandomCompanionChatOpeningLine,
 } from "./companionChatOpeners";
 
@@ -31,5 +32,11 @@ describe("companion chat openers", () => {
     expect(getRandomCompanionChatOpeningLine(() => 0.999999999999)).toBe(
       COMPANION_CHAT_OPENING_LINES[COMPANION_CHAT_OPENING_LINES.length - 1],
     );
+  });
+
+  it("keeps Graceward prayer language out of Cosmiq openers", () => {
+    const cosmiqLines = getCompanionChatOpeningLines("cosmiq");
+    expect(cosmiqLines).toHaveLength(30);
+    expect(cosmiqLines.join(" ")).not.toMatch(/\b(?:pray|prayer|faithful|grace)\b/i);
   });
 });

@@ -4,11 +4,33 @@ import {
   createCostGuardrailSession,
   detectCostAnomalies,
   getCurrentCostPeriodStart,
+  getFalVideoRatePerSecond,
   getOpenAIImageFallbackCostUsd,
   getOpenAIImageTokenRatesPerThousand,
   getOpenAITextTokenRatesPerThousand,
   normalizeThresholds,
 } from "./costGuardrails.ts";
+
+Deno.test("Fal Kling Standard and Pro native-audio estimates use current per-second rates", () => {
+  assertEquals(
+    getFalVideoRatePerSecond(
+      "fal-ai/kling-video/v3/standard/image-to-video",
+      true,
+    ),
+    0.126,
+  );
+  assertEquals(
+    getFalVideoRatePerSecond(
+      "fal-ai/kling-video/v3/standard/image-to-video",
+      false,
+    ),
+    0.084,
+  );
+  assertEquals(
+    getFalVideoRatePerSecond("fal-ai/kling-video/v3/pro/image-to-video", true),
+    0.168,
+  );
+});
 
 function createCostGuardrailSupabaseMock() {
   const inserts: Array<{ table: string; payload: Record<string, unknown> }> =

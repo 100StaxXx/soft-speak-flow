@@ -1,4 +1,0 @@
-
-module CapacitorCommunityAppleSignIn.__Swift {
-  exclude header "CapacitorCommunityAppleSignIn-Swift.h"
-}

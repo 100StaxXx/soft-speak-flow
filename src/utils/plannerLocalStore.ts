@@ -1,10 +1,11 @@
 import { createClientUuid, normalizeUuidFields } from "@/utils/offlineId";
+import { getProductIndexedDbName } from "@/config/productRuntime";
 import {
   bindIndexedDbLifecycle,
   withReopenedIndexedDb,
 } from "@/utils/indexedDbReconnect";
 
-const DB_NAME = "cosmiq-planner-db";
+const DB_NAME = getProductIndexedDbName("planner-db");
 const DB_VERSION = 2;
 
 type PlannerStoreName =

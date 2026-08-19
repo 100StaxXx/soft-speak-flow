@@ -9,6 +9,8 @@ import { TrendingUp, BookOpen, Package, Sparkles, Timer, Settings } from "lucide
 import { CollectionTab } from "@/components/companion/CollectionTab";
 import { FocusTab } from "@/components/companion/FocusTab";
 import { MemoryWhisper } from "@/components/companion/MemoryWhisper";
+import { CompanionCinemaStatus } from "@/components/companion/CompanionCinemaStatus";
+import { CompanionCinemaActions } from "@/components/companion/CompanionCinemaActions";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useAuth } from "@/hooks/useAuth";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
@@ -101,6 +103,13 @@ const OverviewTab = memo(({
           <MemoryWhisper chance={0.2} className="px-0" />
         </div>
 
+        {companion?.product_mode === "cosmiq" && companion.current_stage >= 1 ? (
+          <>
+            <CompanionCinemaStatus companionId={companion.id} />
+            <CompanionCinemaActions />
+          </>
+        ) : null}
+
         {companion?.current_stage === 0 ? <div data-tour="companion-progress-area">
           <NextEvolutionPreview
             currentXP={companion.current_xp || 0}
@@ -123,6 +132,13 @@ const OverviewTab = memo(({
   return (
     <div className="space-y-6 mt-6">
       <MemoryWhisper chance={0.2} className="px-2" />
+
+      {companion?.product_mode === "cosmiq" && companion.current_stage >= 1 ? (
+        <>
+          <CompanionCinemaStatus companionId={companion.id} />
+          <CompanionCinemaActions />
+        </>
+      ) : null}
 
       <ParallaxCard offset={30}>
         <CompanionDisplay isVisible={isActive} experienceMode={isGraceward ? "formation" : "full"} />
@@ -453,7 +469,12 @@ const Companion = () => {
             forceMount
             className={cn("data-[state=inactive]:hidden", contentClassName)}
           >
-            {mountedTabs.focus && <FocusTab layoutMode={layoutMode} />}
+            {mountedTabs.focus && (
+              <FocusTab
+                layoutMode={layoutMode}
+                enableCosmiqCinema={displayCompanion?.product_mode === "cosmiq"}
+              />
+            )}
           </TabsContent>
 
           <TabsContent

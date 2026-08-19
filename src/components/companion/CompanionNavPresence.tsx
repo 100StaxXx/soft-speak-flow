@@ -34,7 +34,12 @@ export const CompanionNavPresence = memo(({ isActive = false }: CompanionNavPres
   const showBreathing = !prefersReducedMotion && (presence.mood === 'joyful' || presence.mood === 'content');
   const showAttentionDot = presence.needsAttention && !isActive;
   const showRewardPulse = !prefersReducedMotion && Boolean(
-    activeEvent && (activeEvent.type === "xp_gain" || activeEvent.type === "quest_complete" || activeEvent.type === "streak"),
+    activeEvent && (
+      activeEvent.type === "task_start"
+      || activeEvent.type === "xp_gain"
+      || activeEvent.type === "quest_complete"
+      || activeEvent.type === "streak"
+    ),
   );
 
   return (

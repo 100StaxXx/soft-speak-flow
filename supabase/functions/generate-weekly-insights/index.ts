@@ -14,6 +14,7 @@ import {
   logRateLimitedInvocation,
   RATE_LIMITS,
 } from "../_shared/rateLimiter.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const WeeklyInsightsSchema = z.object({
   weeklyData: z.object({
@@ -97,6 +98,8 @@ export async function handleGenerateWeeklyInsights(
       return createRateLimitResponse(rateLimit, corsHeaders);
     }
 
+    const productMode = await resolveUserProductMode(supabase, userId);
+
     const { data: profile } = await supabase
       .from("profiles")
       .select("selected_mentor_id")
@@ -108,7 +111,7 @@ export async function handleGenerateWeeklyInsights(
     }
 
     const { data: mentor } = await supabase
-      .from("graceward_guides")
+      .from(productMode === "graceward" ? "graceward_guides" : "mentors")
       .select("name, tone_description")
       .eq("id", profile.selected_mentor_id)
       .maybeSingle();

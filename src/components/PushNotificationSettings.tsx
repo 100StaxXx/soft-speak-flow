@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NotificationPreview } from "@/components/NotificationPreview";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { 
+import {
   isNativePushSupported, 
   initializeNativePush, 
   unregisterNativePush,
@@ -23,6 +23,7 @@ import {
   getNativePushTokenDebugSnapshot,
   waitForNativePushToken,
 } from "@/utils/nativePushNotifications";
+import { PRODUCT } from "@/config/product";
 
 const timeOptions = [
   { value: "06:00", label: "6:00 AM" },
@@ -286,7 +287,7 @@ export const PushNotificationSettings = memo(() => {
       toast({
         title: enabled ? "Evening Reflection Enabled" : "Evening Reflection Disabled",
         description: enabled
-          ? "Graceward will invite you to reflect and release the day around 8 PM."
+          ? `${PRODUCT.name} will invite you to reflect on the day around 8 PM.`
           : "Evening Reflection reminders are now off.",
       });
     } catch (error) {
@@ -315,7 +316,9 @@ export const PushNotificationSettings = memo(() => {
         <h2 className="font-display text-2xl text-foreground">Daily Delivery</h2>
       </div>
       <p className="text-muted-foreground text-sm mb-6">
-        Let Graceward bring the day to you: one morning package and, if you want it, one evening invitation.
+        {PRODUCT.mode === "christian"
+          ? "Let Graceward bring the day to you: one morning package and, if you want it, one evening invitation."
+          : "Let Cosmiq bring the day to you with the planning and reflection reminders you choose."}
       </p>
 
       {!isSupported && (
@@ -349,9 +352,13 @@ export const PushNotificationSettings = memo(() => {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <Label className="text-foreground font-medium">Morning Daily Grace</Label>
+              <Label className="text-foreground font-medium">
+                {PRODUCT.mode === "christian" ? "Morning Daily Grace" : "Morning Plan"}
+              </Label>
               <p className="text-xs text-muted-foreground mt-1">
-                Scripture, prayer, your Guide’s audio encouragement, and one ready-made daily practice
+                {PRODUCT.mode === "christian"
+                  ? "Scripture, prayer, your Guide’s audio encouragement, and one ready-made daily practice"
+                  : "Your plan, Guide context, and the actions you chose for the day"}
               </p>
             </div>
             <Switch

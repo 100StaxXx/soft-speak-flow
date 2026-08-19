@@ -11,6 +11,7 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const DEFAULT_MODEL = Deno.env.get("OPENAI_TEXT_MODEL") ?? "gpt-4o-mini";
@@ -65,6 +66,7 @@ interface GenerateCompletionFeedbackDeps {
   protectRequest: typeof requireProtectedRequest;
   fetchImpl: typeof fetch;
   now: () => Date;
+  resolveProductMode?: (supabase: any, userId: string) => Promise<"graceward" | "cosmiq">;
 }
 
 const defaultDeps: GenerateCompletionFeedbackDeps = {
@@ -109,6 +111,7 @@ interface ProfileRow {
 
 interface CompletionContext {
   userId: string;
+  productMode: "graceward" | "cosmiq";
   taskId: string;
   completionSource: "quest" | "ritual" | "inbox";
   title: string;
@@ -399,6 +402,7 @@ async function buildCompletionContext(
   userId: string,
   input: CompletionFeedbackRequest,
   now: Date,
+  resolveProductMode: (supabase: any, userId: string) => Promise<"graceward" | "cosmiq">,
 ): Promise<CompletionContext | Response> {
   const completedAtDate = input.completedAt ? new Date(input.completedAt) : now;
   const completedAt = Number.isNaN(completedAtDate.getTime()) ? now : completedAtDate;
@@ -421,6 +425,7 @@ async function buildCompletionContext(
       headers: { "Content-Type": "application/json" },
     });
   }
+  const productMode = await resolveProductMode(supabase, userId);
 
   const typedTask = task as TaskRow;
   const profile = await maybeSingle<ProfileRow>(
@@ -497,6 +502,7 @@ async function buildCompletionContext(
 
   const context: CompletionContext = {
     userId,
+    productMode,
     taskId: typedTask.id,
     completionSource: input.completionSource,
     title: cleanText(typedTask.task_text ?? input.clientContext.taskTitle, "this quest"),
@@ -537,7 +543,7 @@ async function buildCompletionContext(
   if (profile?.selected_mentor_id) {
     context.mentor = await maybeSingle<MentorRow>(
       supabase
-        .from("graceward_guides")
+        .from(productMode === "graceward" ? "graceward_guides" : "mentors")
         .select("id, name, slug, tone_description, style")
         .eq("id", profile.selected_mentor_id)
         .maybeSingle(),
@@ -552,7 +558,14 @@ function buildPrompt(context: CompletionContext, signal: SignalScore, mentorDeci
   const mentorTone = cleanText(context.mentor?.tone_description, "distinct, concise, motivational");
   const mentorStyle = cleanText(context.mentor?.style, cleanText(context.mentor?.slug, "selected mentor"));
 
-  const systemPrompt = `You write Cosmiq completion feedback.
+  const productPolicy = context.productMode === "graceward"
+    ? `You write Graceward completion feedback for a Christian daily-practice app.
+Companion voice: warm, grounded, hopeful, and concise. Never claim divine authority, revelation, or certainty about God's will.
+Do not turn practice completion into a measure of faith, holiness, favor, or spiritual worth.`
+    : `You write Cosmiq completion feedback.
+Companion voice: confident, warm, aspirational, slightly cool, never corny.`;
+
+  const systemPrompt = `${productPolicy}
 
 Return only JSON with this shape:
 {
@@ -561,7 +574,6 @@ Return only JSON with this shape:
   "followUp"?: { "label": string, "action": string }
 }
 
-Companion voice: confident, warm, aspirational, slightly cool, never corny.
 Keep every message to 1-2 short lines, under 150 characters.
 No therapy claims, no medical advice, no guilt, no exclamation spam.
 Use the actual context. Do not say "task" if a better title is available.
@@ -694,6 +706,7 @@ export async function handleGenerateCompletionFeedback(
       auth.userId,
       parsed.data,
       deps.now(),
+      deps.resolveProductMode ?? resolveUserProductMode,
     );
 
     if (context instanceof Response) {

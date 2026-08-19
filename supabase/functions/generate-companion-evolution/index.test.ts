@@ -20,6 +20,8 @@ Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
 Deno.env.set("SUPABASE_ANON_KEY", "anon-key");
 Deno.env.set("INTERNAL_FUNCTION_SECRET", "internal-secret");
 Deno.env.set("OPENAI_API_KEY", "openai-key");
+Deno.env.set("COSMIQ_CINEMA_ENABLED", "true");
+Deno.env.set("COSMIQ_CINEMA_ROLLOUT_PERCENT", "100");
 
 const module = await import("./index.ts");
 const costGuardrailsModule = await import("../_shared/costGuardrails.ts");
@@ -54,6 +56,7 @@ type CompanionRecord = {
   current_stage: number;
   current_xp: number;
   preset_id: string | null;
+  product_mode?: "graceward" | "cosmiq";
   current_image_url: string | null;
   initial_image_url: string | null;
   current_image_focal_x?: number | null;
@@ -145,12 +148,15 @@ const createSupabaseHarness = ({
   companion,
   thresholds,
   previousGenerationMetadata = null,
+  cinemaEvent = null,
 }: {
   companion: CompanionRecord;
   thresholds: EvolutionThreshold[];
   previousGenerationMetadata?: unknown;
+  cinemaEvent?: Record<string, unknown> | null;
 }) => {
   const updatedCompanions: Array<Record<string, unknown>> = [];
+  const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
 
   const supabase = {
     storage: {
@@ -206,13 +212,29 @@ const createSupabaseHarness = ({
         };
       }
 
+      if (table === "companion_cinema_events") {
+        const query = {
+          select: () => query,
+          eq: () => query,
+          order: () => query,
+          limit: () => query,
+          maybeSingle: async () => ({ data: cinemaEvent, error: null }),
+        };
+        return query;
+      }
+
       throw new Error(`Unexpected table: ${table}`);
+    },
+    rpc: async (name: string, args: Record<string, unknown>) => {
+      rpcCalls.push({ name, args });
+      return { data: "cinema-event-queued", error: null };
     },
   };
 
   return {
     supabase,
     updatedCompanions,
+    rpcCalls,
   };
 };
 
@@ -223,6 +245,7 @@ const createDeps = ({
     CompanionImageJudgeScoreFixture | null
   >,
   previousGenerationMetadata = null,
+  cinemaEvent = null,
   visualAnchors = [{
     schemaVersion: 1,
     level: companion.current_stage,
@@ -246,12 +269,14 @@ const createDeps = ({
   thresholds: EvolutionThreshold[];
   judgeScores?: Array<CompanionImageJudgeScoreFixture | null>;
   previousGenerationMetadata?: unknown;
+  cinemaEvent?: Record<string, unknown> | null;
   visualAnchors?: Array<Record<string, unknown> | null>;
 }) => {
-  const { supabase, updatedCompanions } = createSupabaseHarness({
+  const { supabase, updatedCompanions, rpcCalls } = createSupabaseHarness({
     companion,
     thresholds,
     previousGenerationMetadata,
+    cinemaEvent,
   });
   const generateCalls: Array<Record<string, unknown>> = [];
   const judgeCalls: Array<Record<string, unknown>> = [];
@@ -259,6 +284,7 @@ const createDeps = ({
   const upsertCalls: Array<Record<string, unknown>> = [];
   const uploadCalls: Array<Record<string, unknown>> = [];
   const animationEnqueueCalls: Array<Record<string, unknown>> = [];
+  const premadeAssetVerificationCalls: Array<Record<string, unknown>> = [];
   const infoLogs: Array<unknown[]> = [];
   let judgeIndex = 0;
   let visualAnchorIndex = 0;
@@ -313,6 +339,10 @@ const createDeps = ({
       upsertCalls.push(args as unknown as Record<string, unknown>);
       return { id: `evo-${upsertCalls.length}` } as never;
     },
+    verifyPremadeCompanionAsset: async (args: Record<string, unknown>) => {
+      premadeAssetVerificationCalls.push(args);
+      return true;
+    },
     enqueueCompanionAnimationJob: async (args: Record<string, unknown>) => {
       animationEnqueueCalls.push(args as unknown as Record<string, unknown>);
       return { status: "queued", jobId: "animation-job-1" } as never;
@@ -326,17 +356,307 @@ const createDeps = ({
   return {
     deps,
     updatedCompanions,
+    rpcCalls,
     generateCalls,
     judgeCalls,
     extractAnchorCalls,
     upsertCalls,
     uploadCalls,
     animationEnqueueCalls,
+    premadeAssetVerificationCalls,
     infoLogs,
   };
 };
 
-Deno.test("supported Cosmiq companions use exact canonical art at late boundaries", async () => {
+Deno.test("explicit Graceward companions claim premade portraits and videos without generation", async () => {
+  const companion = createCompanion({
+    product_mode: "graceward",
+    spirit_animal: "Lion",
+    core_element: "light",
+    image_lineage_metadata: null,
+  });
+  const harness = createDeps({
+    companion,
+    thresholds: [
+      { stage: 1, xp_required: 10 },
+      { stage: 2, xp_required: 30 },
+    ],
+  });
+
+  const response = await module.handleGenerateCompanionEvolution(
+    createInternalRequest(),
+    harness.deps,
+  );
+  const payload = await response.json();
+
+  assertEquals(response.status, 200, "Expected premade hatch to succeed");
+  assertEquals(
+    payload.image_url,
+    "https://example.supabase.co/storage/v1/object/public/companion-presets/premade/v1/graceward/lion/light/portraits/level-1.webp",
+    "Expected the exact premade portrait URL",
+  );
+  assertEquals(
+    payload.animation_video_url,
+    "https://example.supabase.co/storage/v1/object/public/companion-animation-videos/premade/v1/graceward/lion/light/videos/level-0-to-1.mp4",
+    "Expected the exact premade transition video URL",
+  );
+  assertEquals(harness.generateCalls.length, 0, "Expected no image generation");
+  assertEquals(harness.judgeCalls.length, 0, "Expected no runtime judging");
+  assertEquals(
+    harness.animationEnqueueCalls.length,
+    0,
+    "Expected no runtime animation job",
+  );
+  assertEquals(
+    harness.premadeAssetVerificationCalls.length,
+    2,
+    "Expected both published assets to be verified before claiming",
+  );
+  assertEquals(
+    (harness.upsertCalls[0]?.generationMetadata as Record<string, unknown>)
+      .sourceType,
+    "premade",
+    "Expected premade provenance",
+  );
+  assertEquals(
+    (harness.upsertCalls[0]?.premadeAnimation as Record<string, unknown>)
+      .storagePath,
+    "premade/v1/graceward/lion/light/videos/level-0-to-1.mp4",
+    "Expected the premade video to be persisted with the evolution",
+  );
+});
+
+Deno.test("explicit Graceward companions fail clearly when a premade asset is missing", async () => {
+  const companion = createCompanion({
+    product_mode: "graceward",
+    spirit_animal: "Lion",
+    core_element: "light",
+  });
+  const harness = createDeps({
+    companion,
+    thresholds: [
+      { stage: 1, xp_required: 10 },
+      { stage: 2, xp_required: 30 },
+    ],
+  });
+  let verificationCount = 0;
+  harness.deps.verifyPremadeCompanionAsset = async () => {
+    verificationCount += 1;
+    return verificationCount === 1;
+  };
+
+  const response = await module.handleGenerateCompanionEvolution(
+    createInternalRequest(),
+    harness.deps,
+  );
+  const payload = await response.json();
+
+  assertEquals(response.status, 409, "Expected missing asset conflict status");
+  assertEquals(
+    payload.code,
+    "premade_asset_unavailable",
+    "Expected a terminal asset error code",
+  );
+  assertEquals(harness.upsertCalls.length, 0, "Expected no evolution claim");
+  assertEquals(
+    harness.generateCalls.length,
+    0,
+    "Expected no generation fallback",
+  );
+});
+
+Deno.test("Graceward defers visual boundaries above the Level 5 launch scope", async () => {
+  const companion = createCompanion({
+    product_mode: "graceward",
+    current_stage: 5,
+    current_xp: 1_300,
+    spirit_animal: "Lion",
+    core_element: "light",
+  });
+  const harness = createDeps({
+    companion,
+    thresholds: [
+      { stage: 13, xp_required: 1_200 },
+      { stage: 14, xp_required: 1_550 },
+    ],
+  });
+
+  const response = await module.handleGenerateCompanionEvolution(
+    createInternalRequest(),
+    harness.deps,
+  );
+  const payload = await response.json();
+
+  assertEquals(response.status, 200, "Expected a clean deferred response");
+  assertEquals(
+    payload.evolved,
+    false,
+    "Expected no unsupported evolution claim",
+  );
+  assertEquals(
+    payload.release_max_stage,
+    5,
+    "Expected the Graceward release ceiling",
+  );
+  assertEquals(harness.upsertCalls.length, 0, "Expected no evolution record");
+  assertEquals(
+    harness.premadeAssetVerificationCalls.length,
+    0,
+    "Expected no storage checks beyond the release scope",
+  );
+});
+
+Deno.test("explicit Cosmiq companions requeue personalized cinema instead of falling back to premade art", async () => {
+  const companion = createCompanion({
+    product_mode: "cosmiq",
+    current_stage: 5,
+    current_xp: 1_300,
+    preset_id: "phoenix",
+    spirit_animal: "Phoenix",
+    core_element: "nature",
+    current_image_url: "https://example.com/phoenix-stage-5.png",
+  });
+  const harness = createDeps({
+    companion,
+    thresholds: [
+      { stage: 13, xp_required: 1_200 },
+      { stage: 14, xp_required: 1_550 },
+    ],
+  });
+
+  const response = await module.handleGenerateCompanionEvolution(
+    createInternalRequest(),
+    harness.deps,
+  );
+  const payload = await response.json();
+
+  assertEquals(
+    response.status,
+    503,
+    "Expected Cosmiq to wait for generated cinema",
+  );
+  assertEquals(payload.evolved, false, "Expected no premade evolution claim");
+  assertEquals(
+    payload.code,
+    "cinema_event_preparing",
+    "Expected a retryable cinema response",
+  );
+  assertEquals(
+    payload.cinema_event_id,
+    "cinema-event-queued",
+    "Expected the queued event id",
+  );
+  assertEquals(
+    harness.rpcCalls.length,
+    1,
+    "Expected one idempotent cinema enqueue",
+  );
+  assertEquals(
+    harness.rpcCalls[0]?.name,
+    "enqueue_cosmiq_cinema_event_internal",
+    "Expected the Cosmiq-only enqueue RPC",
+  );
+  assertEquals(
+    harness.premadeAssetVerificationCalls.length,
+    0,
+    "Expected no premade storage reads",
+  );
+  assertEquals(
+    harness.generateCalls.length,
+    0,
+    "Expected no synchronous image generation",
+  );
+  assertEquals(
+    harness.upsertCalls.length,
+    0,
+    "Expected no evolution record before cinema is ready",
+  );
+});
+
+Deno.test("Cosmiq can promote cinema both before and after the user reveals it", () => {
+  assertEquals(
+    module.isPromotableCinemaEventStatus("ready"),
+    true,
+    "Expected a newly ready film to promote",
+  );
+  assertEquals(
+    module.isPromotableCinemaEventStatus("revealed"),
+    true,
+    "Expected a film the user already watched to remain promotable",
+  );
+  assertEquals(
+    module.isPromotableCinemaEventStatus("rendering_video"),
+    false,
+    "Expected an incomplete film to remain blocked",
+  );
+  assertEquals(
+    module.isPromotableCinemaEventStatus("failed"),
+    false,
+    "Expected a failed film to remain blocked",
+  );
+});
+
+Deno.test("explicit Cosmiq companions wait instead of falling back when cinema is disabled", async () => {
+  const companion = createCompanion({
+    product_mode: "cosmiq",
+    current_stage: 5,
+    current_xp: 1_300,
+    preset_id: "phoenix",
+    spirit_animal: "Phoenix",
+    core_element: "nature",
+  });
+  const harness = createDeps({
+    companion,
+    thresholds: [
+      { stage: 13, xp_required: 1_200 },
+      { stage: 14, xp_required: 1_550 },
+    ],
+  });
+
+  const response = await withEnvValue(
+    "COSMIQ_CINEMA_ENABLED",
+    "false",
+    () =>
+      module.handleGenerateCompanionEvolution(
+        createInternalRequest(),
+        harness.deps,
+      ),
+  );
+  const payload = await response.json();
+
+  assertEquals(
+    response.status,
+    503,
+    "Expected the personalized claim to pause",
+  );
+  assertEquals(
+    payload.evolved,
+    false,
+    "Expected the companion to stay on its approved form",
+  );
+  assertEquals(
+    payload.code,
+    "cosmiq_cinema_disabled",
+    "Expected an explicit paused-generation error",
+  );
+  assertEquals(
+    harness.rpcCalls.length,
+    0,
+    "Expected no cinema enqueue while the global switch is disabled",
+  );
+  assertEquals(
+    harness.premadeAssetVerificationCalls.length,
+    0,
+    "Expected no Graceward premade verification",
+  );
+  assertEquals(
+    harness.upsertCalls.length,
+    0,
+    "Expected no fallback evolution mutation",
+  );
+});
+
+Deno.test("legacy companions without an explicit product mode keep their canonical compatibility path", async () => {
   const companion = createCompanion({
     current_stage: 5,
     current_xp: 1_300,
@@ -400,7 +720,7 @@ Deno.test("supported Cosmiq companions use exact canonical art at late boundarie
   );
 });
 
-Deno.test("unsupported legacy Cosmiq companions retain their last approved later-stage portrait", async () => {
+Deno.test("unsupported legacy companions retain their last approved later-stage portrait", async () => {
   const companion = createCompanion({
     current_stage: 5,
     current_xp: 1_300,

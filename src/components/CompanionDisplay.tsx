@@ -56,6 +56,9 @@ import {
 } from "@/lib/companionAssetResolver";
 import { getCompanionEggLabel } from "@/config/companionCatalog";
 import { PRODUCT } from "@/config/product";
+import { isPremadeCompanionBoundaryLevelForProduct } from "@/config/premadeCompanionAssets";
+import { buildPremadeCompanionPublicStorageUrl } from "@/config/premadeCompanionAssets";
+import { getCosmiqAgendaMotionAssetDescriptor } from "@/config/cosmiqAgendaMotion";
 import {
   getCompanionEggImageAssetKey,
   isCompanionEggImageSource,
@@ -74,6 +77,12 @@ import {
 import { useMotionProfile } from "@/hooks/useMotionProfile";
 import { useLivingCompanionPresence } from "@/hooks/useLivingCompanionPresence";
 import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
+import {
+  clearPendingCompanionAgendaEvent,
+  getPendingCompanionAgendaEvent,
+  listenForCompanionAgendaEvents,
+  type CompanionAgendaEventDetail,
+} from "@/lib/companionAgendaEvents";
 import {
   useState,
   useEffect,
@@ -120,6 +129,12 @@ interface InlineEvolutionReplayState {
   videoUrl: string;
   posterUrl: string;
   stage: number;
+}
+
+interface CosmiqAgendaPlaybackState {
+  eventId: string;
+  videoUrl: string;
+  label: string;
 }
 
 const FORMATION_FALLBACK_PROPS = {
@@ -240,7 +255,9 @@ export const CompanionDisplay = memo(({
   const [showStatsAnalysis, setShowStatsAnalysis] = useState(false);
   const [creatureName, setCreatureName] = useState<string | null>(null);
   const [hatchDialogOpen, setHatchDialogOpen] = useState(false);
+  const [isManualEvolutionStarting, setIsManualEvolutionStarting] = useState(false);
   const [inlineEvolutionReplay, setInlineEvolutionReplay] = useState<InlineEvolutionReplayState | null>(null);
+  const [cosmiqAgendaPlayback, setCosmiqAgendaPlayback] = useState<CosmiqAgendaPlaybackState | null>(null);
   const [formationMedia, setFormationMedia] = useState<GracewardFormationMedia | null>(null);
   const [formationVideoPlaying, setFormationVideoPlaying] = useState(false);
   const isDesktop = layoutMode === "desktop";
@@ -253,6 +270,7 @@ export const CompanionDisplay = memo(({
   const touchStartPoint = useRef<{ x: number; y: number } | null>(null);
   const latestTouchPoint = useRef<{ x: number; y: number } | null>(null);
   const previousImageUrl = useRef<string | null>(null);
+  const manualEvolutionStartingRef = useRef(false);
   const inlineReplayPosterUrlRef = useRef(COMPANION_PLACEHOLDER);
   const wasVisible = useRef(isVisible);
   const matchingPendingEvolutionReveal = useMemo(
@@ -309,6 +327,60 @@ export const CompanionDisplay = memo(({
   const finishInlineEvolutionReplay = useCallback(() => {
     setInlineEvolutionReplay(null);
   }, []);
+
+  const finishCosmiqAgendaPlayback = useCallback(() => {
+    setCosmiqAgendaPlayback((current) => {
+      if (current) clearPendingCompanionAgendaEvent(current.eventId);
+      return null;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (
+      PRODUCT.mode !== "cosmiq"
+      || !displayCompanion
+      || displayCompanion.current_stage < 1
+      || prefersReducedMotion
+    ) {
+      return;
+    }
+
+    const preparePlayback = (detail: CompanionAgendaEventDetail) => {
+      const descriptor = getCosmiqAgendaMotionAssetDescriptor({
+        species: displayCompanion.preset_id ?? displayCompanion.spirit_animal,
+        element: displayCompanion.core_element,
+        stage: displayCompanion.current_stage,
+        eventType: detail.eventType,
+        category: detail.category,
+        seed: detail.seed,
+      });
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
+      if (!descriptor || !supabaseUrl) return;
+
+      setInlineEvolutionReplay(null);
+      setFormationVideoPlaying(false);
+      setCosmiqAgendaPlayback({
+        eventId: detail.id,
+        videoUrl: buildPremadeCompanionPublicStorageUrl({
+          supabaseUrl,
+          bucket: descriptor.videoBucket,
+          storagePath: descriptor.videoStoragePath,
+        }),
+        label: `${detail.category ? `${detail.category} ` : ""}${detail.eventType.replace("-", " ")}`,
+      });
+    };
+
+    const pending = getPendingCompanionAgendaEvent();
+    if (pending) preparePlayback(pending);
+    return listenForCompanionAgendaEvents(preparePlayback);
+  }, [
+    displayCompanion,
+    displayCompanion?.core_element,
+    displayCompanion?.current_stage,
+    displayCompanion?.preset_id,
+    displayCompanion?.spirit_animal,
+    prefersReducedMotion,
+  ]);
 
   const handleEvolutionReplay = useCallback(async () => {
     if (!displayCompanion || inlineEvolutionReplay) return;
@@ -697,6 +769,7 @@ export const CompanionDisplay = memo(({
     currentStage: displayCompanion?.current_stage ?? 1,
     presetId: displayCompanion?.preset_id,
     spiritAnimal: displayCompanion?.spirit_animal,
+    enableDailyQuestion: PRODUCT.mode === "cosmiq",
   });
 
   const getRelativeInteractionPoint = useCallback((
@@ -845,12 +918,22 @@ export const CompanionDisplay = memo(({
   const displayedProgressValue = displayCanEvolve ? 100 : levelProgressToNext;
   const isMaxStage = earnedLevel >= MAX_COMPANION_STAGE;
   const isStageZeroEgg = displayCompanion.current_stage === 0;
-  const hasEmbeddedCompanionControl = imageError || Boolean(inlineEvolutionReplay) || formationVideoPlaying;
+  const hasEmbeddedCompanionControl = imageError
+    || Boolean(inlineEvolutionReplay)
+    || Boolean(cosmiqAgendaPlayback)
+    || formationVideoPlaying;
   const companionPortraitIsInteractive = !hasEmbeddedCompanionControl;
-  const readyVisualBoundaryLevel = getNextUnclaimedVisualStageBoundaryLevel(
+  const unscopedReadyVisualBoundaryLevel = getNextUnclaimedVisualStageBoundaryLevel(
     displayCompanion.current_stage,
     evolutionReadinessLevel,
   );
+  const readyVisualBoundaryLevel = unscopedReadyVisualBoundaryLevel !== null &&
+      isPremadeCompanionBoundaryLevelForProduct({
+        productMode: displayCompanion.product_mode,
+        boundaryLevel: unscopedReadyVisualBoundaryLevel,
+      })
+    ? unscopedReadyVisualBoundaryLevel
+    : null;
   const readyVisualStageDisplay = readyVisualBoundaryLevel === null
     ? null
     : getVisualStageDisplay(readyVisualBoundaryLevel);
@@ -859,7 +942,18 @@ export const CompanionDisplay = memo(({
     : readyVisualBoundaryLevel === 1
       ? "Ready to hatch"
       : `New form ready: ${readyVisualStageDisplay}`;
-  const nextVisualStageBoundaryLevel = getNextVisualStageBoundaryLevel(displayCompanion.current_stage);
+  const unscopedNextVisualStageBoundaryLevel = getNextVisualStageBoundaryLevel(
+    displayCompanion.current_stage,
+  );
+  const nextVisualStageBoundaryLevel = unscopedNextVisualStageBoundaryLevel !== null &&
+      isPremadeCompanionBoundaryLevelForProduct({
+        productMode: displayCompanion.product_mode,
+        boundaryLevel: unscopedNextVisualStageBoundaryLevel,
+      })
+    ? unscopedNextVisualStageBoundaryLevel
+    : null;
+  const isGracewardVisualReleaseCeiling = displayCompanion.product_mode === "graceward" &&
+    displayCompanion.current_stage >= 5;
   const nextVisualStageLabel = nextVisualStageBoundaryLevel === null
     ? null
     : getVisualStageLabelForLevel(nextVisualStageBoundaryLevel);
@@ -886,6 +980,7 @@ export const CompanionDisplay = memo(({
     && imageLoaded
     && !imageError
     && !inlineEvolutionReplay
+    && !cosmiqAgendaPlayback
     && !formationVideoPlaying
     && !isDormant
     && !health.isNeglected
@@ -897,7 +992,7 @@ export const CompanionDisplay = memo(({
   const isPendingRevealReady = matchingPendingEvolutionReveal?.status === "ready";
   const isPendingRevealPreparing = isPendingRevealDisplay && !isPendingRevealReady;
 
-  const handleEvolvePress = () => {
+  const handleEvolvePress = async () => {
     if (matchingPendingEvolutionReveal?.status === "ready") {
       window.dispatchEvent(
         new CustomEvent<CompanionEvolutionRevealRequestedDetail>(
@@ -922,16 +1017,25 @@ export const CompanionDisplay = memo(({
       return;
     }
 
-    triggerManualEvolution(
-      isStageZeroEgg
-        ? {
-          hatchAnimationSnapshot: {
-            previousImageUrl: effectiveImageUrl,
-            element: displayCompanion.core_element ?? null,
-          },
-        }
-        : undefined,
-    );
+    if (manualEvolutionStartingRef.current) return;
+
+    manualEvolutionStartingRef.current = true;
+    setIsManualEvolutionStarting(true);
+    try {
+      await triggerManualEvolution(
+        isStageZeroEgg
+          ? {
+            hatchAnimationSnapshot: {
+              previousImageUrl: effectiveImageUrl,
+              element: displayCompanion.core_element ?? null,
+            },
+          }
+          : undefined,
+      );
+    } finally {
+      manualEvolutionStartingRef.current = false;
+      setIsManualEvolutionStarting(false);
+    }
   };
 
   const handleHatchSelection = async (data: {
@@ -1010,6 +1114,8 @@ export const CompanionDisplay = memo(({
                   ? "Maximum level reached"
                   : displayCanEvolve && readyEvolutionCopy
                     ? readyEvolutionCopy
+                    : isGracewardVisualReleaseCeiling
+                      ? "More companion forms coming soon"
                     : nextVisualStageBoundaryLevel === null || !nextVisualStageLabel
                       ? `Final stage • ${visualStageLabel}`
                       : `Next stage at Level ${nextVisualStageBoundaryLevel} • ${nextVisualStageLabel}`}
@@ -1201,7 +1307,7 @@ export const CompanionDisplay = memo(({
                     </div>
                   </>
                 </CompanionMotionSurface>
-                {!inlineEvolutionReplay ? (
+                {!inlineEvolutionReplay && !cosmiqAgendaPlayback ? (
                   <LivingCompanionInteractionAura
                     bodyLanguage={livingPresence.bodyLanguage}
                     interactionNonce={livingPresence.interactionNonce}
@@ -1241,6 +1347,35 @@ export const CompanionDisplay = memo(({
                         event.stopPropagation();
                         finishInlineEvolutionReplay();
                       }}
+                    >
+                      Skip
+                    </Button>
+                  </div>
+                ) : null}
+                {cosmiqAgendaPlayback && isVisible ? (
+                  <div
+                    className="absolute inset-0 z-30 overflow-hidden rounded-2xl bg-black/90 shadow-2xl ring-4 ring-primary/25"
+                    data-testid="cosmiq-agenda-animation"
+                  >
+                    <video
+                      key={cosmiqAgendaPlayback.videoUrl}
+                      src={cosmiqAgendaPlayback.videoUrl}
+                      poster={effectiveImageUrl}
+                      className="h-full w-full rounded-2xl bg-black object-contain"
+                      autoPlay
+                      muted
+                      playsInline
+                      aria-label={`${cosmiqAgendaPlayback.label} companion animation`}
+                      onEnded={finishCosmiqAgendaPlayback}
+                      onError={finishCosmiqAgendaPlayback}
+                    />
+                    <Button
+                      data-companion-subcontrol="true"
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="absolute right-3 top-3 h-8 rounded-full border-white/20 bg-black/45 px-3 text-xs text-white backdrop-blur-md hover:bg-black/60"
+                      onClick={finishCosmiqAgendaPlayback}
                     >
                       Skip
                     </Button>
@@ -1313,7 +1448,7 @@ export const CompanionDisplay = memo(({
                 daysUntilWake={care.dormancy.daysUntilWake}
               />
             </div>
-            {!inlineEvolutionReplay ? (
+            {!inlineEvolutionReplay && !cosmiqAgendaPlayback ? (
               <LivingCompanionPresenceBubble
                 prompt={livingPresence.prompt}
                 companionName={displayedCreatureName}
@@ -1463,7 +1598,7 @@ export const CompanionDisplay = memo(({
               {displayCanEvolve && (
                 <EvolveButton
                   onEvolve={handleEvolvePress}
-                  isEvolving={isEvolutionBusy || isPendingRevealPreparing}
+                  isEvolving={isManualEvolutionStarting || isEvolutionBusy || isPendingRevealPreparing}
                   actionLabel={isPendingRevealReady ? "REVEAL" : isStageZeroEgg ? "HATCH" : "EVOLVE"}
                   loadingLabel={isPendingRevealDisplay ? "PREPARING..." : isStageZeroEgg ? "HATCHING..." : "EVOLVING..."}
                   durationLabel={isPendingRevealDisplay ? "Rendering the reveal video. This can take a few minutes." : undefined}

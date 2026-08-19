@@ -3,8 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { PlannerPathfinderThemeMode } from "@/components/companion/plannerPathfinderTheme";
 import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
 import { safeLocalStorage } from "@/utils/storage";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
-export const PLANNER_PATHFINDER_APPEARANCE_STORAGE_KEY = "planner-pathfinder-appearance-v1";
+export const PLANNER_PATHFINDER_APPEARANCE_STORAGE_KEY = productScopedStorageKey("planner-pathfinder-appearance-v1");
 const SETTINGS_CHANGE_EVENT = "planner-pathfinder-appearance-change";
 
 type StoredPlannerPathfinderAppearance = {

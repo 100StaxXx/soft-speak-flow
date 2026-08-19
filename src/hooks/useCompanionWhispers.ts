@@ -5,6 +5,7 @@ import { useCompanion } from "./useCompanion";
 import { useCompanionCareSignals } from "./useCompanionCareSignals";
 import { safeSessionStorage } from "@/utils/storage";
 import { resolveCompanionName } from "@/lib/companionName";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
 export type WhisperTrigger = 
   | 'navigation'      // User navigated to a new page
@@ -164,8 +165,8 @@ const getTimeContext = (): WhisperContext => {
 
 // Storage keys
 const STORAGE_KEYS = {
-  lastWhisperTime: 'companion_last_whisper_time',
-  sessionWhisperCount: 'companion_session_whisper_count',
+  lastWhisperTime: productScopedStorageKey('companion_last_whisper_time'),
+  sessionWhisperCount: productScopedStorageKey('companion_session_whisper_count'),
 };
 
 export function useCompanionWhispers() {

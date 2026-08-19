@@ -35,6 +35,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { DAILY_GUIDE_FOCUS_SELECTED_EVENT } from "@/lib/dailyGuideThread";
 import { trackProductExperience } from "@/lib/productAnalytics";
 import { getEffectiveDailyDate } from "@/utils/timezone";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
 const EXTERNAL_SPEECH_GAP_MS = 45_000;
 const COMMENT_AUTO_DISMISS_MS = 5_800;
@@ -42,10 +43,10 @@ const TAP_COOLDOWN_MS = 900;
 const PROACTIVE_COMMENT_COOLDOWN_MS = 8 * 60 * 1000;
 const MAX_PROACTIVE_COMMENTS_PER_SESSION = 3;
 
-const PRESENCE_BUDGET_STORAGE_PREFIX = "graceward:living-companion:budget";
-const TAP_COUNT_STORAGE_PREFIX = "graceward:living-companion:taps";
-const MEMORY_STORAGE_PREFIX = "graceward:living-companion:daily-memory";
-const DAILY_QUESTION_STORAGE_PREFIX = "graceward:living-companion:question";
+const PRESENCE_BUDGET_STORAGE_PREFIX = productScopedStorageKey("living-companion:budget");
+const TAP_COUNT_STORAGE_PREFIX = productScopedStorageKey("living-companion:taps");
+const MEMORY_STORAGE_PREFIX = productScopedStorageKey("living-companion:daily-memory");
+const DAILY_QUESTION_STORAGE_PREFIX = productScopedStorageKey("living-companion:question");
 
 const LIFE_ACTION_DURATIONS: Record<CompanionLifeAction, number> = {
   breathe: 3_800,
@@ -99,6 +100,7 @@ interface UseLivingCompanionPresenceOptions {
   currentStage?: number;
   presetId?: string | null;
   spiritAnimal?: string | null;
+  enableDailyQuestion?: boolean;
 }
 
 const parsePresenceBudget = (value: string | null): PresenceBudget => {
@@ -144,6 +146,7 @@ export const useLivingCompanionPresence = ({
   currentStage = 1,
   presetId,
   spiritAnimal,
+  enableDailyQuestion = true,
 }: UseLivingCompanionPresenceOptions) => {
   const { triggerEvent } = useCompanionMotionSafe();
   const { profile } = useProfile();
@@ -477,7 +480,7 @@ export const useLivingCompanionPresence = ({
   }, [animateBodyLanguage, canInteract, currentStage, isDormant, isVisible, lifeStage.unlockedBehaviors, resolvedCompanionId, runLifeAction, speciesMotion.speciesId, tapCountStorageKey, triggerEvent]);
 
   const answerQuestion = useCallback((optionId: string) => {
-    if (!isVisible || !canInteract || !canSpeak || isDormant) return null;
+    if (!enableDailyQuestion || !isVisible || !canInteract || !canSpeak || isDormant) return null;
     const decision = dailyAdventure.decision;
     const option = dailyAdventure.choose(optionId);
     if (!option) return null;
@@ -558,6 +561,7 @@ export const useLivingCompanionPresence = ({
     companionName,
     dailyAdventure,
     dailyQuestionStorageKey,
+    enableDailyQuestion,
     isDormant,
     isVisible,
     resolvedCompanionId,
@@ -711,7 +715,8 @@ export const useLivingCompanionPresence = ({
 
   useEffect(() => {
     if (
-      !isVisible
+      !enableDailyQuestion
+      || !isVisible
       || !canInteract
       || !canSpeak
       || isDormant
@@ -754,6 +759,7 @@ export const useLivingCompanionPresence = ({
     dailyGuideThread?.companion_acknowledged_at,
     dailyGuideThread?.companion_response,
     dailyQuestionStorageKey,
+    enableDailyQuestion,
     isDormant,
     isVisible,
     lastExternalSpeechAt,

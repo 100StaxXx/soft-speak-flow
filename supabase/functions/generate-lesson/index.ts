@@ -60,7 +60,7 @@ serve(async (req) => {
 
     // Get a random active mentor
     const { data: mentors } = await supabase
-      .from('graceward_guides')
+      .from('mentors')
       .select('*')
       .eq('is_active', true);
 

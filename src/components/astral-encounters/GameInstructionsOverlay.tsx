@@ -60,7 +60,7 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
   },
   astral_frequency: {
     icon: Rocket,
-    title: "Graceward Dash",
+    title: "Cosmiq Dash",
     goal: "Survive the endless cosmic tunnel!",
     howToPlay: [
       "Swipe or tap ◀ ▶ to switch lanes",
@@ -137,7 +137,7 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
   },
   cosmiq_grid: {
     icon: LayoutGrid,
-    title: "Graceward Grid",
+    title: "Cosmiq Grid",
     goal: "Fill the grid with numbers 1-4!",
     howToPlay: [
       "Each row must have 1, 2, 3, 4",

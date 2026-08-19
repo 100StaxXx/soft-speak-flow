@@ -25,7 +25,7 @@ export const ProtectedRoute = ({
   const location = useLocation();
   const [progress, setProgress] = useState(0);
   const [authGateTimedOut, setAuthGateTimedOut] = useState(false);
-  const authGateTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const authGateTimerRef = useRef<number | null>(null);
   const [resolvedAccessDecision, setResolvedAccessDecision] = useState<{
     userId: string;
     requireAccess: boolean;

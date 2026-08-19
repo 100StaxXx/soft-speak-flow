@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PRODUCT } from "@/config/product";
 
 interface DestinyRevealProps {
   userName: string;
@@ -12,7 +13,7 @@ const narrativeLines = [
   "Growth rarely arrives all at once.",
   "It is formed through prayer, attention, and small faithful choices.",
   "Your days already contain places where grace can take root.",
-  "Graceward will help you notice them and take the next step.",
+  `${PRODUCT.name} will help you notice them and take the next step.`,
 ];
 
 export const DestinyReveal = ({ userName, onComplete }: DestinyRevealProps) => {

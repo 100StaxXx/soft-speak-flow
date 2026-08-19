@@ -1,7 +1,9 @@
+import { PRODUCT } from "@/config/product";
+
 export const ACTIVE_CAMPAIGN_LIMIT = 1;
 
 export const ACTIVE_CAMPAIGN_LIMIT_MESSAGE =
-  "Graceward keeps one Journey active at a time. Complete or release it before beginning another.";
+  `${PRODUCT.name} keeps one Journey active at a time. Complete or release it before beginning another.`;
 
 export const ACTIVE_CAMPAIGN_LIMIT_WARNING =
   "You already have an active Journey. Complete or release it before beginning another.";

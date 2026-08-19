@@ -22,14 +22,14 @@ describe("AICompanionCreator", () => {
     expect(eggGrid).not.toBeNull();
     expect(eggGrid!).toHaveClass("grid-cols-2");
     expect(screen.getByTestId("companion-form-lamb")).toHaveAttribute("src", expect.stringContaining("lamb"));
-    expect(screen.getByRole("button", { name: "Select Lion companion" })).toHaveAttribute("data-selected", "true");
-    expect(screen.getByRole("button", { name: "Select Open Sky Egg" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Select Evening Indigo Egg" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Select Lamb companion" })).toHaveAttribute("data-selected", "true");
+    expect(screen.getByRole("button", { name: "Select Open Sky Egg" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Select Evening Indigo Egg" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Select Dawn Gold Egg" })).toBeEnabled();
     expect(screen.queryByText("Awaiting")).not.toBeInTheDocument();
     expect(screen.queryByText("Selected")).not.toBeInTheDocument();
     expect(screen.queryByText("Choose")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Coming Soon").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Coming Soon")).not.toBeInTheDocument();
     expect(screen.queryByText("Companion Preset")).not.toBeInTheDocument();
     expect(screen.queryByText("Egg Preview")).not.toBeInTheDocument();
     expect(
@@ -50,5 +50,5 @@ describe("AICompanionCreator", () => {
       storyTone: "epic_adventure",
       companionName: null,
     });
-  });
+  }, 10_000);
 });

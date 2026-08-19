@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useCallback, useRef, useState, type CSSProperties } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
+import { fetchProductMentorById } from "@/services/productMentorCatalog";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -32,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 import { getEffectiveDailyDate } from "@/utils/timezone";
 import { safeSessionStorage } from "@/utils/storage";
+import { INITIAL_ROUTE_REDIRECTED_STORAGE_KEY } from "@/services/authScopedClientState";
 import { resolveMentorSlugAlias } from "@/lib/mentorRoster";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { CinematicPageBackground } from "@/components/CinematicPageBackground";
@@ -221,13 +224,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     queryFn: async () => {
       if (!effectiveMentorId) return null;
 
-      const { data: mentorData, error: mentorError } = await supabase
-        .from("graceward_guides")
-        .select("avatar_url, name, slug")
-        .eq("id", effectiveMentorId)
-        .maybeSingle();
-
-      if (mentorError) throw mentorError;
+      const mentorData = await fetchProductMentorById(effectiveMentorId);
       if (!mentorData) return null;
       const mentorSlug = resolveMentorSlugAlias(mentorData.slug) ?? mentorData.slug ?? "sage";
 
@@ -238,6 +235,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       const { data: dailyPepTalk, error: pepTalkError } = await supabase
         .from("daily_pep_talks")
         .select("topic_category")
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
         .eq("for_date", pepTalkDate)
         .eq("mentor_slug", mentorSlug)
         .maybeSingle();
@@ -250,6 +248,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
         const { data: categoryQuotes, error: categoryQuotesError } = await supabase
           .from("quotes")
           .select("text, author")
+          .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
           .eq("category", dailyPepTalk.topic_category)
           .limit(10);
 
@@ -260,6 +259,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
           const { data: allQuotes, error: allQuotesError } = await supabase
             .from("quotes")
             .select("text, author")
+            .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
             .limit(20);
           if (allQuotesError) throw allQuotesError;
           quotes = allQuotes;
@@ -420,9 +420,9 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     if (!onboardingGateReady) return;
     if (!routingOnboardingGate.isEstablished) return;
 
-    const hasRedirected = safeSessionStorage.getItem("initialRouteRedirected");
+    const hasRedirected = safeSessionStorage.getItem(INITIAL_ROUTE_REDIRECTED_STORAGE_KEY);
     if (!hasRedirected) {
-      safeSessionStorage.setItem("initialRouteRedirected", "true");
+      safeSessionStorage.setItem(INITIAL_ROUTE_REDIRECTED_STORAGE_KEY, "true");
       navigate("/journeys", { replace: true });
     }
   }, [location.pathname, navigate, routingOnboardingGate.isEstablished, onboardingGateReady]);

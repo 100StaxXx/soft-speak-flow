@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getMorningCheckInDraftStorageKey } from "@/utils/accountLocalState";
+import { getEffectiveDailyDate } from "@/utils/timezone";
 
 const mocks = vi.hoisted(() => ({
   user: { id: "user-1" } as { id: string } | null,
@@ -642,7 +643,9 @@ describe("MorningCheckIn completion portrait", () => {
 
   it("clears a stale morning check-in draft from a previous day", async () => {
     mocks.existingCheckIn = null;
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString("en-CA");
+    const previousEffectiveDay = new Date(`${getEffectiveDailyDate()}T12:00:00`);
+    previousEffectiveDay.setDate(previousEffectiveDay.getDate() - 1);
+    const yesterday = previousEffectiveDay.toLocaleDateString("en-CA");
     mocks.safeLocalStorage.setItem(
       getMorningCheckInDraftStorageKey("user-1"),
       JSON.stringify({

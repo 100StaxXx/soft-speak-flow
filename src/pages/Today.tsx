@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import {
+  ArrowDown,
   ArrowRight,
   BookOpen,
   CheckCircle2,
@@ -28,6 +29,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 import { getEffectiveDailyDate } from "@/utils/timezone";
 import {
   clearEveningReflectionOpenRequest,
@@ -80,6 +82,13 @@ export default function Today() {
   const [isDevotionalOpen, setIsDevotionalOpen] = useState(false);
   const [prayerCompleted, setPrayerCompleted] = useState(false);
   const [isExamenOpen, setIsExamenOpen] = useState(false);
+  const isTutorialReflectionPrompt =
+    currentStep === "morning_checkin" &&
+    !isIntroDialogueActive &&
+    !isDevotionalOpen &&
+    !prayerCompleted &&
+    !prayerAlreadyCompleted &&
+    !isPrayerStatusLoading;
 
   useEffect(() => {
     if (prayerAlreadyCompleted) setPrayerCompleted(true);
@@ -215,17 +224,36 @@ export default function Today() {
                   {dailyContent.translationLabel}
                 </a>
               </div>
-              <Button
-                data-tour="morning-prayer-open"
-                variant="outline"
-                size="sm"
-                className="mt-3 h-11 rounded-xl"
-                onClick={handlePrayerOpen}
-                aria-expanded={isDevotionalOpen}
-              >
-                <Sunrise className="mr-2 h-4 w-4" />
-                {isDevotionalOpen ? "Close reflection" : "Reflect and pray"}
-              </Button>
+              <div className="mt-3 inline-flex flex-col items-start gap-2">
+                {isTutorialReflectionPrompt ? (
+                  <span
+                    aria-hidden="true"
+                    className="tutorial-reflection-nudge inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-bold text-primary-foreground shadow-md"
+                  >
+                    <ArrowDown className="h-3.5 w-3.5" />
+                    Tap here to open
+                  </span>
+                ) : null}
+                <Button
+                  data-tour="morning-prayer-open"
+                  data-tutorial-highlight={isTutorialReflectionPrompt ? "true" : undefined}
+                  variant={isTutorialReflectionPrompt ? "default" : "outline"}
+                  size="sm"
+                  className={cn(
+                    "h-11 rounded-xl",
+                    isTutorialReflectionPrompt && "tutorial-reflection-cta",
+                  )}
+                  onClick={handlePrayerOpen}
+                  aria-expanded={isDevotionalOpen}
+                >
+                  <Sunrise className="mr-2 h-4 w-4" />
+                  {isDevotionalOpen
+                    ? "Close reflection"
+                    : isTutorialReflectionPrompt
+                      ? "Open today’s reflection"
+                      : "Reflect and pray"}
+                </Button>
+              </div>
               {isDevotionalOpen ? (
                 <div className="mt-3 space-y-3 rounded-2xl border border-primary/20 bg-primary/[0.06] p-4">
                   <p className="text-sm leading-7 text-muted-foreground">{dailyContent.reflection}</p>

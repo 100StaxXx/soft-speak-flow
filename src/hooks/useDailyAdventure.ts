@@ -14,6 +14,7 @@ import {
   type DailyAdventureState,
 } from "@/lib/dailyAdventure";
 import { safeLocalStorage } from "@/utils/storage";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 
 interface UseDailyAdventureOptions {
   ownerId?: string | null;
@@ -50,7 +51,7 @@ export function useDailyAdventure({
   companionName,
   now,
 }: UseDailyAdventureOptions) {
-  const effectiveOwnerId = ownerId ?? companionId ?? "graceward-preview";
+  const effectiveOwnerId = ownerId ?? companionId ?? `${PRODUCT_RUNTIME.authProductMode}-preview`;
   const effectiveCompanionId = companionId ?? "companion";
   const effectiveCompanionName = companionName?.trim() || "your Companion";
   const effectiveNow = now ?? new Date();

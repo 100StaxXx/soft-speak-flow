@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
 import { formatTime12 } from "@/components/quest-shared";
 import { formatDurationLabel } from "@/components/scheduling/shared";
+import { PRODUCT } from "@/config/product";
 import { cn } from "@/lib/utils";
 import type {
   CompanionDayPlan,
@@ -184,7 +185,7 @@ export function DayPlanCard({
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className={plannerPathfinderTheme.sectionEyebrow}>
-            {isCommitted ? "Plan ready" : "Graceward’s suggested plan"}
+            {isCommitted ? "Plan ready" : `${PRODUCT.name}’s suggested plan`}
           </p>
           <h3 className="mt-1 truncate text-base font-semibold text-foreground sm:text-lg">
             {dateLabel}

@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireRequestAuth } from "../_shared/auth.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -61,6 +62,10 @@ serve(async (req) => {
 
     for (const profile of profiles) {
       try {
+        if (await resolveUserProductMode(supabase, profile.id) !== "graceward") {
+          continue;
+        }
+
         // Get mentor slug from mentor_id
         const { data: mentor, error: mentorError } = await supabase
           .from('graceward_guides')
@@ -78,6 +83,7 @@ serve(async (req) => {
         const { data: dailyPepTalk, error: pepTalkError } = await supabase
           .from('daily_pep_talks')
           .select('id')
+          .eq('product_mode', 'graceward')
           .eq('mentor_slug', mentor.slug)
           .eq('for_date', todayDate)
           .maybeSingle();

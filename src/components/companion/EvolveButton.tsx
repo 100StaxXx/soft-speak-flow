@@ -54,6 +54,7 @@ export const EvolveButton = memo(({
       className="pt-4"
     >
       <button
+        type="button"
         onClick={handleClick}
         disabled={isProcessing}
         data-tour="evolve-companion-button"
@@ -64,6 +65,7 @@ export const EvolveButton = memo(({
           uppercase overflow-hidden
           transition-all duration-300
           hover:scale-[1.02] active:scale-[0.98]
+          touch-manipulation
           disabled:cursor-not-allowed disabled:opacity-70
           border border-white/20
         "

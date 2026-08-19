@@ -2,6 +2,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/utils/logger";
 import { safeLocalStorage } from "@/utils/storage";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
 export type DailyGuideThreadRow = Database["public"]["Tables"]["daily_guide_threads"]["Row"];
 export type DailyGuideThreadPatch = Omit<
@@ -11,7 +12,7 @@ export type DailyGuideThreadPatch = Omit<
 
 const log = logger.scope("DailyGuideThread");
 const STORAGE_VERSION = 1;
-const STORAGE_PREFIX = `graceward:daily-guide-thread:v${STORAGE_VERSION}`;
+const STORAGE_PREFIX = productScopedStorageKey(`daily-guide-thread:v${STORAGE_VERSION}`);
 const INDEX_PREFIX = `${STORAGE_PREFIX}:index`;
 
 const storageKey = (userId: string, date: string) => `${STORAGE_PREFIX}:${userId}:${date}`;

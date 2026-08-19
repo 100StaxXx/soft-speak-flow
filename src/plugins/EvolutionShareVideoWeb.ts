@@ -1,4 +1,5 @@
 import { WebPlugin } from "@capacitor/core";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 
 import type {
   EvolutionShareVideoPluginInterface,
@@ -19,7 +20,7 @@ export class EvolutionShareVideoWeb
 
     return {
       uri: options.sourceVideoUrl,
-      filename: `graceward-evolution-stage-${options.stage}.mp4`,
+      filename: `${PRODUCT_RUNTIME.authProductMode}-evolution-stage-${options.stage}.mp4`,
       mimeType: "video/mp4",
       width: 1080,
       height: 1920,

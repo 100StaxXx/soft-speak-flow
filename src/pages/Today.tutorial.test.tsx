@@ -76,13 +76,29 @@ describe("Today guided tutorial handoff", () => {
 
     render(<MemoryRouter initialEntries={["/mentor"]}><Today /></MemoryRouter>);
 
-    fireEvent.click(screen.getByRole("button", { name: "Reflect and pray" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open today’s reflection" }));
     fireEvent.click(screen.getByRole("button", { name: "Mark prayer complete" }));
 
     await waitFor(() => expect(completed).toHaveBeenCalledOnce());
     expect(mocks.awardCheckInComplete).toHaveBeenCalledOnce();
 
     window.removeEventListener("morning-checkin-completed", completed);
+  });
+
+  it("makes the reflection opener unmistakable until it is opened", () => {
+    render(<MemoryRouter initialEntries={["/mentor"]}><Today /></MemoryRouter>);
+
+    const openButton = screen.getByRole("button", { name: "Open today’s reflection" });
+    expect(openButton).toHaveAttribute("data-tutorial-highlight", "true");
+    expect(openButton).toHaveClass("tutorial-reflection-cta");
+    expect(screen.getByText("Tap here to open")).toBeInTheDocument();
+
+    fireEvent.click(openButton);
+
+    expect(screen.getByRole("button", { name: "Close reflection" })).not.toHaveAttribute(
+      "data-tutorial-highlight",
+    );
+    expect(screen.queryByText("Tap here to open")).not.toBeInTheDocument();
   });
 
   it("recovers the tutorial when today's prayer was already complete", async () => {

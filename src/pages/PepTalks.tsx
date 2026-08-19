@@ -15,6 +15,7 @@ import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 
 export default function PepTalks() {
   const prefersReducedMotion = useReducedMotion();
@@ -25,11 +26,12 @@ export default function PepTalks() {
 
   // Fetch pep talks with filters
   const { data: pepTalks, isLoading } = useQuery({
-    queryKey: ["pep-talks", selectedCategory, selectedTrigger],
+    queryKey: ["pep-talks", PRODUCT_RUNTIME.authProductMode, selectedCategory, selectedTrigger],
     queryFn: async () => {
       let query = supabase
         .from("pep_talks")
         .select("*")
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
         .order("created_at", { ascending: false });
 
       // Apply category filter

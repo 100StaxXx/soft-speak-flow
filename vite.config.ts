@@ -1,18 +1,112 @@
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
+import fs from "node:fs";
 import path from "path";
 import { VitePWA } from 'vite-plugin-pwa';
+
+interface ProductBuildIdentity {
+  productName: "Graceward" | "Cosmiq";
+  nativeScheme: "graceward" | "cosmiq";
+  iosBundleId: "com.darrylgraham.graceward" | "com.darrylgraham.revolution";
+  title: string;
+  description: string;
+  themeColor: string;
+  backgroundColor: string;
+  iconPath: string;
+  excludedPublicArtifacts: string[];
+}
+
+function getProductBuildIdentity(env: Record<string, string>): ProductBuildIdentity {
+  const isCosmiq = env.VITE_PRODUCT_MODE?.trim().toLowerCase() === "cosmiq";
+
+  return isCosmiq
+    ? {
+        productName: "Cosmiq",
+        nativeScheme: "cosmiq",
+        iosBundleId: "com.darrylgraham.revolution",
+        title: "Cosmiq — Turn intention into meaningful momentum",
+        description:
+          "A living companion for planning, focus, reflection, and personalized cinematic evolution.",
+        themeColor: "#155e75",
+        backgroundColor: "#071a2d",
+        iconPath: "/cosmiq-icon.svg",
+        excludedPublicArtifacts: [
+          "PRIVACY_POLICY.md",
+          "TERMS_OF_SERVICE.md",
+          "favicon.ico",
+          "favicon.png",
+          "icon-192.png",
+          "icon-192.svg",
+          "icon-512.svg",
+        ],
+      }
+    : {
+        productName: "Graceward",
+        nativeScheme: "graceward",
+        iosBundleId: "com.darrylgraham.graceward",
+        title: "Graceward — Grow in faith, one day at a time",
+        description:
+          "A Christian companion for Scripture, prayer, reflection, and faithful action.",
+        themeColor: "#2f5938",
+        backgroundColor: "#f4efe3",
+        iconPath: "/icon-192.svg",
+        excludedPublicArtifacts: [
+          "COSMIQ_PRIVACY_POLICY.md",
+          "COSMIQ_TERMS_OF_SERVICE.md",
+          "cosmiq-icon.svg",
+        ],
+      };
+}
+
+function productArtifactIsolationPlugin(env: Record<string, string>): Plugin {
+  const identity = getProductBuildIdentity(env);
+
+  return {
+    name: "product-artifact-isolation",
+    apply: "build",
+    writeBundle(options) {
+      const outputDirectory = path.resolve(
+        process.cwd(),
+        typeof options.dir === "string" ? options.dir : "dist",
+      );
+
+      for (const relativePath of identity.excludedPublicArtifacts) {
+        fs.rmSync(path.join(outputDirectory, relativePath), { force: true });
+      }
+    },
+  };
+}
+
+function buildAppleAppSiteAssociation(identity: ProductBuildIdentity): string {
+  return `${JSON.stringify({
+    applinks: {
+      apps: [],
+      details: [
+        {
+          appID: `B6VW78ABTR.${identity.iosBundleId}`,
+          paths: [
+            "/auth",
+            "/auth/*",
+            "/calendar/oauth/callback",
+            "/calendar/oauth/callback/*",
+          ],
+        },
+      ],
+    },
+  }, null, 2)}\n`;
+}
 
 function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
   const supabaseUrl = env.VITE_SUPABASE_URL ?? "";
   const supabaseKey = env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "";
+  const identity = getProductBuildIdentity(env);
 
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Returning to Graceward</title>
+    <title>Returning to ${identity.productName}</title>
     <style>
       :root {
         color-scheme: dark;
@@ -67,9 +161,9 @@ function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
   </head>
   <body>
     <main>
-      <h1>Returning to Graceward</h1>
+      <h1>Returning to ${identity.productName}</h1>
       <p id="status">Finishing your calendar connection...</p>
-      <a id="return-link" class="button" href="graceward://calendar/oauth/callback?provider=google&status=error">Return to Graceward</a>
+      <a id="return-link" class="button" href="${identity.nativeScheme}://calendar/oauth/callback?provider=google&status=error">Return to ${identity.productName}</a>
     </main>
     <script>
       (function () {
@@ -135,7 +229,7 @@ function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
             status: status
           });
           if (message) redirectParams.set("message", message);
-          return "graceward://calendar/oauth/callback?" + redirectParams.toString();
+          return "${identity.nativeScheme}://calendar/oauth/callback?" + redirectParams.toString();
         }
 
         function redirectToApp(provider, status, source, message) {
@@ -145,7 +239,7 @@ function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
           if (source === "native") {
             window.location.replace(appUrl);
             window.setTimeout(function () {
-              setStatus("Tap the button below if Graceward did not reopen automatically.");
+              setStatus("Tap the button below if ${identity.productName} did not reopen automatically.");
             }, 1200);
             return;
           }
@@ -329,11 +423,14 @@ function buildCalendarOAuthCallbackBridge(env: Record<string, string>): string {
 }
 
 function calendarOAuthCallbackBridgePlugin(env: Record<string, string>): Plugin {
+  const identity = getProductBuildIdentity(env);
+
   return {
     name: "calendar-oauth-callback-bridge",
     apply: "build",
     generateBundle() {
       const source = buildCalendarOAuthCallbackBridge(env);
+      const association = buildAppleAppSiteAssociation(identity);
 
       this.emitFile({
         type: "asset",
@@ -345,6 +442,18 @@ function calendarOAuthCallbackBridgePlugin(env: Record<string, string>): Plugin 
         type: "asset",
         fileName: "calendar/oauth/callback.html",
         source,
+      });
+
+      this.emitFile({
+        type: "asset",
+        fileName: "apple-app-site-association",
+        source: association,
+      });
+
+      this.emitFile({
+        type: "asset",
+        fileName: ".well-known/apple-app-site-association",
+        source: association,
       });
 
       this.emitFile({
@@ -374,9 +483,47 @@ function calendarOAuthCallbackBridgePlugin(env: Record<string, string>): Plugin 
   };
 }
 
+function productDocumentIdentityPlugin(env: Record<string, string>): Plugin {
+  const identity = getProductBuildIdentity(env);
+
+  const replaceMeta = (
+    html: string,
+    attribute: "name" | "property",
+    key: string,
+    content: string,
+  ) => html.replace(
+    new RegExp(`(<meta\\s+[^>]*${attribute}=["']${key}["'][^>]*content=)["'][^"']*["']([^>]*>)`, "i"),
+    `$1${JSON.stringify(content)}$2`,
+  );
+
+  return {
+    name: "product-document-identity",
+    transformIndexHtml(html) {
+      let transformed = html
+        .replace(/<title>[^<]*<\/title>/i, `<title>${identity.title}</title>`)
+        .replace(/Loading (?:Graceward|Cosmiq)…/g, `Loading ${identity.productName}…`)
+        .replace(/(<link\s+rel=["']icon["'][^>]*href=)["'][^"']*["']([^>]*>)/i, `$1"${identity.iconPath}"$2`)
+        .replace(/(<link\s+rel=["']apple-touch-icon["'][^>]*href=)["'][^"']*["']([^>]*>)/i, `$1"${identity.iconPath}"$2`);
+
+      transformed = replaceMeta(transformed, "name", "theme-color", identity.themeColor);
+      transformed = replaceMeta(transformed, "name", "description", identity.description);
+      transformed = replaceMeta(transformed, "name", "author", identity.productName);
+      transformed = replaceMeta(transformed, "property", "og:title", identity.title);
+      transformed = replaceMeta(transformed, "property", "og:description", identity.description);
+      transformed = replaceMeta(transformed, "property", "og:image", identity.iconPath);
+      transformed = replaceMeta(transformed, "name", "twitter:title", identity.title);
+      transformed = replaceMeta(transformed, "name", "twitter:description", identity.description);
+      transformed = replaceMeta(transformed, "name", "twitter:image", identity.iconPath);
+
+      return transformed;
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
+  const identity = getProductBuildIdentity(env);
 
   return {
     server: {
@@ -385,30 +532,28 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
+      productDocumentIdentityPlugin(env),
       calendarOAuthCallbackBridgePlugin(env),
+      productArtifactIsolationPlugin(env),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'icon-192.svg', 'icon-512.svg'],
+        includeAssets: identity.productName === "Cosmiq"
+          ? ['cosmiq-icon.svg']
+          : ['favicon.ico', 'icon-192.svg', 'icon-512.svg'],
         manifest: {
-          name: 'Graceward — Faith for Every Day',
-          short_name: 'Graceward',
-          description: 'Reviewed Scripture, prayer, reflection, and faithful planning for ordinary Christian life.',
-          theme_color: '#2f5938',
-          background_color: '#f4efe3',
+          name: identity.title,
+          short_name: identity.productName,
+          description: identity.description,
+          theme_color: identity.themeColor,
+          background_color: identity.backgroundColor,
           display: 'standalone',
           orientation: 'portrait',
           scope: '/',
           start_url: '/',
           icons: [
             {
-              src: '/icon-192.svg',
-              sizes: '192x192',
-              type: 'image/svg+xml',
-              purpose: 'any maskable'
-            },
-            {
-              src: '/icon-512.svg',
-              sizes: '512x512',
+              src: identity.iconPath,
+              sizes: 'any',
               type: 'image/svg+xml',
               purpose: 'any maskable'
             }
@@ -418,6 +563,9 @@ export default defineConfig(({ mode }) => {
           sourcemap: false,
           maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // Keep the install-time precache focused on the app shell.
           globPatterns: ['**/*.{js,css,html,ico,svg,woff,woff2}'],
+          // Public contains the source assets for both products. Exclude the
+          // opposite product before Workbox builds the release precache.
+          globIgnores: identity.excludedPublicArtifacts,
           runtimeCaching: [
             {
               urlPattern: ({ request, sameOrigin }) => (
@@ -425,7 +573,7 @@ export default defineConfig(({ mode }) => {
               ),
               handler: 'CacheFirst',
               options: {
-                cacheName: 'graceward-image-cache',
+                cacheName: `${identity.nativeScheme}-image-cache`,
                 expiration: {
                   maxEntries: 80,
                   maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days

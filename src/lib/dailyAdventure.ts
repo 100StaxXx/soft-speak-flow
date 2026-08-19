@@ -1,10 +1,11 @@
 import type { LivingCompanionBodyLanguage } from "@/config/livingCompanion";
 import type { CompanionLifeAction } from "@/config/companionLife";
 import type { DailyFormationCategory } from "@/data/dailyFormationPractices";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
-export const DAILY_ADVENTURE_UPDATED_EVENT = "graceward:daily-adventure-updated";
-export const DAILY_ADVENTURE_PATH_CHOSEN_EVENT = "graceward:daily-adventure-path-chosen";
-export const DAILY_ADVENTURE_STORAGE_PREFIX = "graceward:daily-adventure:v1";
+export const DAILY_ADVENTURE_UPDATED_EVENT = productScopedStorageKey("daily-adventure-updated");
+export const DAILY_ADVENTURE_PATH_CHOSEN_EVENT = productScopedStorageKey("daily-adventure-path-chosen");
+export const DAILY_ADVENTURE_STORAGE_PREFIX = productScopedStorageKey("daily-adventure:v1");
 
 export type DailyAdventureDecisionKind = "path" | "midday" | "evening" | "bridge";
 export type DailyAdventureOptionIntent =

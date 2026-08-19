@@ -17,7 +17,7 @@ const { passthroughProvider, isMainTabPathMock, authMock, profileMock, storageMo
     loading: false,
   },
   storageMock: {
-    getItem: vi.fn(() => null as string | null),
+    getItem: vi.fn((_key: string) => null as string | null),
     setItem: vi.fn(),
     removeItem: vi.fn(),
     clear: vi.fn(),
@@ -93,6 +93,10 @@ vi.mock("@/contexts/WallpaperManifestContext", () => ({
 
 vi.mock("@/components/GlobalWidgetSyncBridge", () => ({
   GlobalWidgetSyncBridge: () => null,
+}));
+
+vi.mock("@/components/GlobalCalendarSyncBridge", () => ({
+  GlobalCalendarSyncBridge: () => null,
 }));
 
 vi.mock("@/providers/StoreKitProvider", () => ({
@@ -238,10 +242,10 @@ vi.mock("@/utils/profileOnboarding", () => ({
 
 vi.mock("@/utils/storage", () => ({
   safeLocalStorage: {
-    getItem: (...args: unknown[]) => storageMock.getItem(...args),
-    setItem: (...args: unknown[]) => storageMock.setItem(...args),
-    removeItem: (...args: unknown[]) => storageMock.removeItem(...args),
-    clear: (...args: unknown[]) => storageMock.clear(...args),
+    getItem: (key: string) => storageMock.getItem(key),
+    setItem: (key: string, value: string) => storageMock.setItem(key, value),
+    removeItem: (key: string) => storageMock.removeItem(key),
+    clear: () => storageMock.clear(),
   },
   safeSessionStorage: {
     getItem: vi.fn(() => null),
@@ -261,6 +265,10 @@ vi.mock("./pages/NotFound", () => ({
 
 vi.mock("./pages/PremiumSuccess", () => ({
   default: () => <div>Premium Success Page</div>,
+}));
+
+vi.mock("./pages/CalendarOAuthCallback", () => ({
+  default: () => <div>Calendar OAuth Callback Page</div>,
 }));
 
 import App from "./App";
@@ -304,6 +312,16 @@ describe("App preview route", () => {
 
     expect(await screen.findByText("Premium Success Page")).toBeInTheDocument();
     expect(screen.getByTestId("protected-route")).toHaveAttribute("data-require-access", "false");
+  });
+
+  it("renders the calendar OAuth callback instead of discarding the provider response", async () => {
+    window.history.pushState({}, "", "/calendar/oauth/callback?code=oauth-code&state=signed-state");
+
+    render(<App />);
+
+    expect(await screen.findByText("Calendar OAuth Callback Page")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/calendar/oauth/callback");
+    expect(window.location.search).toBe("?code=oauth-code&state=signed-state");
   });
 
   it("redirects legacy reflection routes to the canonical mentor reflection URL", async () => {

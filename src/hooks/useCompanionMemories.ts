@@ -4,6 +4,7 @@ import { useAuth } from "./useAuth";
 import { useCompanion } from "./useCompanion";
 import { useMemo, useCallback } from "react";
 import { useProfile } from "./useProfile";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 
 export type MemoryType = 
   | 'first_meeting'       // When companion was created
@@ -118,6 +119,7 @@ export function useCompanionMemories() {
         .from('user_companion')
         .select('bond_level, total_interactions, last_interaction_at')
         .eq('user_id', user.id)
+        .eq('product_mode', PRODUCT_RUNTIME.authProductMode)
         .maybeSingle();
 
       if (error) {

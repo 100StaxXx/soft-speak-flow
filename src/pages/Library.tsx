@@ -12,6 +12,7 @@ import { QuoteCard } from "@/components/QuoteCard";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { formatDisplayLabel } from "@/lib/utils";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 
 type LibraryTab = "favorites" | "downloads" | "history";
 
@@ -83,6 +84,7 @@ export default function Library() {
       const { data, error } = await supabase
         .from("quotes")
         .select("*")
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
         .in("id", quoteIds);
 
       if (error) throw error;
@@ -102,6 +104,7 @@ export default function Library() {
       const { data, error } = await supabase
         .from("pep_talks")
         .select("*")
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
         .in("id", pepTalkIds);
 
       if (error) throw error;

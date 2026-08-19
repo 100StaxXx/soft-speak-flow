@@ -80,8 +80,10 @@ serve(async (req) => {
       intensity, 
       emotionalTriggers,
       time_of_day,
-      habit_context 
+      habit_context,
+      productMode: requestedProductMode,
     } = await req.json();
+    const productMode = requestedProductMode === "cosmiq" ? "cosmiq" : "graceward";
     
     // topic_category can now be a string or an array
     const categories = Array.isArray(topic_category) ? topic_category : (topic_category ? [topic_category] : []);
@@ -115,7 +117,7 @@ serve(async (req) => {
     });
 
     const { data: mentor, error: mentorError } = await supabase
-      .from("graceward_guides")
+      .from(productMode === "graceward" ? "graceward_guides" : "mentors")
       .select("*")
       .eq("slug", mentorSlug)
       .single();
@@ -126,15 +128,17 @@ serve(async (req) => {
 
     console.log(`Generating script for mentor ${mentor.name}`);
 
-    const buildAuthoredFallback = () => enforceChristianGuidanceOutput(
-      buildLocalDailyEncouragementScript({
-        mentorSlug,
-        category: categories[0],
-        intensity,
-        emotionalTriggers: Array.isArray(emotionalTriggers) ? emotionalTriggers : [],
-      }),
-      { fallback: DAILY_ENCOURAGEMENT_FALLBACK },
-    );
+    const buildAuthoredFallback = () => productMode === "graceward"
+      ? enforceChristianGuidanceOutput(
+        buildLocalDailyEncouragementScript({
+          mentorSlug,
+          category: categories[0],
+          intensity,
+          emotionalTriggers: Array.isArray(emotionalTriggers) ? emotionalTriggers : [],
+        }),
+        { fallback: DAILY_ENCOURAGEMENT_FALLBACK },
+      )
+      : "Take a breath and narrow the field. Choose one useful next step, make it small enough to begin now, and let steady action rebuild momentum without turning today into a verdict on your worth.";
 
     // WEIGHTING MODEL: Categories 60%, Emotional Triggers 25-30%, Intensity 10-15%
 
@@ -242,7 +246,7 @@ HABIT CONTEXT: ${habitMap[habit_context] || habit_context}`;
     }
 
     const variationSeed = crypto.randomUUID();
-    const systemPrompt = `You are writing a short spoken Christian encouragement for "Graceward" using the communication style of the fictional Guide ${mentor.name}. You are not ${mentor.name}, a pastor, or a spiritual authority, and the script must not claim otherwise.
+    const gracewardSystemPrompt = `You are writing a short spoken Christian encouragement for "Graceward" using the communication style of the fictional Guide ${mentor.name}. You are not ${mentor.name}, a pastor, or a spiritual authority, and the script must not claim otherwise.
 
 MENTOR PROFILE:
 - Name: ${mentor.name}
@@ -320,6 +324,21 @@ NEVER USE:
 GOAL: Two scripts on the same topic should feel like different conversations while both remaining recognizably Christian, grace-centered, emotionally safe, and practical.
 
 Write ONLY the script text, nothing else.`;
+    const systemPrompt = productMode === "graceward"
+      ? gracewardSystemPrompt
+      : `You are writing a short spoken encouragement for Cosmiq using the communication style of the fictional guide ${mentor.name}. You are software, not ${mentor.name}, a human mentor, or a professional adviser.
+
+MENTOR PROFILE:
+- Tone: ${mentor.tone_description}
+- Voice Style: ${mentor.voice_style}
+- Description: ${mentor.description}
+
+${categoryGuidance}
+${triggerGuidance}
+${intensityGuidance}
+${contextGuidance}
+
+Write 8-12 conversational sentences for a 45-90 second spoken message. Be practical, specific, and grounded. Offer one small optional next step. Never use Scripture, prayer, theology, religious claims, or Graceward framing. Never diagnose, shame, promise an outcome, infer private feelings, mention the guide's name, or claim professional authority. Return only the script text.`;
 
     const response = await guardedFetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -333,7 +352,7 @@ Write ONLY the script text, nothing else.`;
           { role: "system", content: systemPrompt },
           {
             role: "user",
-            content: `Generate the daily Christian encouragement. Variation seed: ${variationSeed}. Do not mention the seed.`,
+            content: `Generate the daily ${productMode === "graceward" ? "Christian " : ""}encouragement. Variation seed: ${variationSeed}. Do not mention the seed.`,
           },
         ],
       }),
@@ -403,9 +422,11 @@ Write ONLY the script text, nothing else.`;
       script = retryScript;
     }
 
-    script = enforceChristianGuidanceOutput(script, {
-      fallback: DAILY_ENCOURAGEMENT_FALLBACK,
-    });
+    if (productMode === "graceward") {
+      script = enforceChristianGuidanceOutput(script, {
+        fallback: DAILY_ENCOURAGEMENT_FALLBACK,
+      });
+    }
 
     console.log(`Script generated successfully for ${mentor.name}`);
 

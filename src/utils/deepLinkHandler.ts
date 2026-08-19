@@ -1,6 +1,11 @@
 import { App, type URLOpenListenerEvent } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { logger } from './logger';
+import { PRODUCT, type ProductMode } from '@/config/product';
+import {
+  getProductRuntimeIdentity,
+  type ProductRuntimeIdentity,
+} from '@/config/productRuntime';
 
 export type CalendarOAuthProvider = 'google' | 'outlook';
 export type CalendarOAuthStatus = 'success' | 'error';
@@ -10,7 +15,6 @@ const CALENDAR_OAUTH_CALLBACK_PATH = '/calendar/oauth/callback';
 const JOIN_EPIC_PATH = '/join';
 const JOURNEYS_PATH = '/journeys';
 const TODAY_PATH = '/mentor';
-const HOSTED_APP_LINK_HOSTS = new Set(['graceward.app', 'www.graceward.app', 'app.cosmiq.quest', 'cosmiq.quest']);
 const CALENDAR_CALLBACK_ORIGIN_PARAM = 'calendar_callback_origin';
 
 export interface DeepLinkData {
@@ -23,15 +27,27 @@ export interface DeepLinkData {
   rawUrl: string;
 }
 
-const isNativeAuthRecoveryLink = (parsed: URL): boolean => {
+const getHostedAppLinkHosts = (runtime: ProductRuntimeIdentity): Set<string> =>
+  new Set(runtime.webOrigins.map((origin) => new URL(origin).hostname));
+
+const isCurrentProductScheme = (
+  protocol: string,
+  runtime: ProductRuntimeIdentity,
+): boolean =>
+  protocol === `${runtime.nativeScheme}:` || protocol === `${runtime.iosBundleId}:`;
+
+const isNativeAuthRecoveryLink = (
+  parsed: URL,
+  runtime: ProductRuntimeIdentity,
+): boolean => {
   const isWebRecoveryLink = (
     ['https:', 'http:'].includes(parsed.protocol) &&
-    HOSTED_APP_LINK_HOSTS.has(parsed.hostname) &&
+    getHostedAppLinkHosts(runtime).has(parsed.hostname) &&
     parsed.pathname === AUTH_RESET_PATH
   );
 
   const isSchemeRecoveryLink = (
-    ['graceward:', 'com.darrylgraham.graceward:', 'cosmiq:', 'com.darrylgraham.revolution:'].includes(parsed.protocol) &&
+    isCurrentProductScheme(parsed.protocol, runtime) &&
     (
       (parsed.hostname === 'auth' && parsed.pathname === '/reset-password') ||
       parsed.pathname === AUTH_RESET_PATH
@@ -41,20 +57,31 @@ const isNativeAuthRecoveryLink = (parsed: URL): boolean => {
   return (isWebRecoveryLink || isSchemeRecoveryLink) && parsed.hash.includes('type=recovery');
 };
 
-const isHostedCalendarOAuthCallbackLink = (parsed: URL): boolean => (
+const isHostedCalendarOAuthCallbackLink = (
+  parsed: URL,
+  runtime: ProductRuntimeIdentity,
+): boolean => (
   ['https:', 'http:'].includes(parsed.protocol) &&
-  HOSTED_APP_LINK_HOSTS.has(parsed.hostname) &&
+  getHostedAppLinkHosts(runtime).has(parsed.hostname) &&
   parsed.pathname === CALENDAR_OAUTH_CALLBACK_PATH
 );
 
-const isNativeJoinEpicLink = (parsed: URL): boolean => (
-  parsed.protocol === 'cosmiq:' &&
+const isNativeJoinEpicLink = (
+  parsed: URL,
+  runtime: ProductRuntimeIdentity,
+): boolean => (
+  runtime.authProductMode === 'cosmiq' &&
+  isCurrentProductScheme(parsed.protocol, runtime) &&
   parsed.hostname === 'join' &&
   parsed.pathname.length > 1
 );
 
-const isNativeJourneysLink = (parsed: URL): boolean => (
-  parsed.protocol === 'cosmiq:' &&
+const isNativeJourneysLink = (
+  parsed: URL,
+  runtime: ProductRuntimeIdentity,
+): boolean => (
+  runtime.authProductMode === 'cosmiq' &&
+  isCurrentProductScheme(parsed.protocol, runtime) &&
   parsed.hostname === 'journeys' &&
   (parsed.pathname === '' || parsed.pathname === '/' || parsed.pathname === '/plan')
 );
@@ -69,19 +96,23 @@ const buildHostedCalendarOAuthCallbackPath = (parsed: URL): string => {
 /**
  * Parse incoming native deep links and universal links
  */
-export const parseDeepLink = (url: string): DeepLinkData => {
+export const parseDeepLinkForProduct = (
+  url: string,
+  productMode: ProductMode,
+): DeepLinkData => {
+  const runtime = getProductRuntimeIdentity(productMode);
   try {
-    if (url === 'graceward://today' || url === 'cosmiq://today') {
+    if (url === `${runtime.nativeScheme}://today`) {
       return { type: 'today', path: TODAY_PATH, rawUrl: url };
     }
 
-    // graceward://task/{taskId}
-    if (url.startsWith('graceward://task/') || url.startsWith('cosmiq://task/')) {
-      const taskId = url.replace(/^(graceward|cosmiq):\/\/task\//, '').split('?')[0];
+    const taskPrefix = `${runtime.nativeScheme}://task/`;
+    if (url.startsWith(taskPrefix)) {
+      const taskId = url.slice(taskPrefix.length).split('?')[0];
       return { type: 'task', taskId, rawUrl: url };
     }
 
-    if (url.startsWith('graceward://calendar/oauth/callback') || url.startsWith('cosmiq://calendar/oauth/callback')) {
+    if (url.startsWith(`${runtime.nativeScheme}://calendar/oauth/callback`)) {
       const parsed = new URL(url);
       const providerRaw = parsed.searchParams.get('provider');
       const statusRaw = parsed.searchParams.get('status');
@@ -101,7 +132,7 @@ export const parseDeepLink = (url: string): DeepLinkData => {
 
     const parsed = new URL(url);
 
-    if (isNativeJourneysLink(parsed)) {
+    if (isNativeJourneysLink(parsed, runtime)) {
       return {
         type: 'journeys',
         path: JOURNEYS_PATH,
@@ -109,7 +140,7 @@ export const parseDeepLink = (url: string): DeepLinkData => {
       };
     }
 
-    if (isNativeJoinEpicLink(parsed)) {
+    if (isNativeJoinEpicLink(parsed, runtime)) {
       return {
         type: 'join_epic',
         path: `${JOIN_EPIC_PATH}${parsed.pathname}`,
@@ -117,7 +148,7 @@ export const parseDeepLink = (url: string): DeepLinkData => {
       };
     }
 
-    if (isHostedCalendarOAuthCallbackLink(parsed)) {
+    if (isHostedCalendarOAuthCallbackLink(parsed, runtime)) {
       return {
         type: 'calendar_oauth_callback',
         path: buildHostedCalendarOAuthCallbackPath(parsed),
@@ -125,7 +156,7 @@ export const parseDeepLink = (url: string): DeepLinkData => {
       };
     }
 
-    if (isNativeAuthRecoveryLink(parsed)) {
+    if (isNativeAuthRecoveryLink(parsed, runtime)) {
       return {
         type: 'auth_recovery',
         path: `${AUTH_RESET_PATH}${parsed.search}${parsed.hash}`,
@@ -139,6 +170,9 @@ export const parseDeepLink = (url: string): DeepLinkData => {
     return { type: 'unknown', rawUrl: url };
   }
 };
+
+export const parseDeepLink = (url: string): DeepLinkData =>
+  parseDeepLinkForProduct(url, PRODUCT.mode);
 
 /**
  * Initialize deep link listener for native platforms

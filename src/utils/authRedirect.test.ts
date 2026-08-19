@@ -11,7 +11,8 @@ const mocks = vi.hoisted(() => {
 
   const companionLimitMock = vi.fn(() => ({ maybeSingle: companionMaybeSingleMock }));
   const companionOrderMock = vi.fn(() => ({ limit: companionLimitMock }));
-  const companionEqMock = vi.fn(() => ({ order: companionOrderMock }));
+  const companionProductEqMock = vi.fn(() => ({ order: companionOrderMock }));
+  const companionEqMock = vi.fn(() => ({ eq: companionProductEqMock }));
   const companionSelectMock = vi.fn(() => ({ eq: companionEqMock }));
 
   const fromMock = vi.fn((table: string) => {
@@ -42,6 +43,7 @@ const mocks = vi.hoisted(() => {
     profilesSelectMock,
     companionLimitMock,
     companionOrderMock,
+    companionProductEqMock,
     companionEqMock,
     companionSelectMock,
     fromMock,

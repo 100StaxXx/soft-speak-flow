@@ -46,10 +46,12 @@ import { useNavigate } from "react-router-dom";
 import { trackPaywallEvent } from "@/utils/paywallTelemetry";
 import {
   PREMIUM_APPLE_BILLING_DISCLOSURE,
+  PREMIUM_PRODUCT_NAME,
   PREMIUM_PLAN_NOTE,
   PREMIUM_SUBSCRIPTION_LEGAL_LINKS,
 } from "@/config/premiumBenefits";
 import { DISCORD_INVITE_URL } from "@/constants/community";
+import { PRODUCT } from "@/config/product";
 
 type PlanType = "monthly" | "yearly";
 export type PaywallVariant = "pre_trial_signup" | "trial_expired";
@@ -82,45 +84,85 @@ interface PaywallLandscapeSectionProps {
 
 const PAYWALL_CHECKOUT_ID = "daily-way-plus-plans";
 
-const paywallStorySections: PaywallStorySection[] = [
-  {
-    id: "paywall-scripture",
-    eyebrow: "Scripture and prayer",
-    title: "Begin the day by receiving before doing.",
-    body: "Return to reviewed Scripture, a grounded reflection, and a short prayer shaped for ordinary Christian life.",
-    icon: Target,
-  },
-  {
-    id: "paywall-practice",
-    eyebrow: "Daily practice",
-    title: "Receive one meaningful next step without building a plan.",
-    body: "Each day brings one small, ready-made activity for faith, mind, body, relationships, service, stewardship, or rest—plus an optional Evening Reflection.",
-    icon: Sparkles,
-  },
-];
+const paywallStorySections: PaywallStorySection[] = PRODUCT.mode === "christian"
+  ? [
+      {
+        id: "paywall-scripture",
+        eyebrow: "Scripture and prayer",
+        title: "Begin the day by receiving before doing.",
+        body: "Return to reviewed Scripture, a grounded reflection, and a short prayer shaped for ordinary Christian life.",
+        icon: Target,
+      },
+      {
+        id: "paywall-practice",
+        eyebrow: "Daily practice",
+        title: "Receive one meaningful next step without building a plan.",
+        body: "Each day brings one small, ready-made activity for faith, mind, body, relationships, service, stewardship, or rest—plus an optional Evening Reflection.",
+        icon: Sparkles,
+      },
+    ]
+  : [
+      {
+        id: "paywall-focus",
+        eyebrow: "Plan and focus",
+        title: "Turn intention into a clear next move.",
+        body: "Shape meaningful priorities, enter focused work, and keep momentum without losing the bigger picture.",
+        icon: Target,
+      },
+      {
+        id: "paywall-companion",
+        eyebrow: "Living companion",
+        title: "Grow with a companion that remembers the journey.",
+        body: "Reflect on progress, learn from patterns, and reveal new companion moments as your consistency grows.",
+        icon: Sparkles,
+      },
+    ];
 
-const paywallBenefits: PaywallBenefit[] = [
-  {
-    icon: MessageCircle,
-    title: "Guided reflections",
-    text: "Use clearly identified AI assistance for grounded questions and practical next steps without claims of divine revelation.",
-  },
-  {
-    icon: Target,
-    title: "Prepared daily formation",
-    text: "Complete one meaningful practice each day without creating goals, schedules, or custom systems.",
-  },
-  {
-    icon: Sparkles,
-    title: "Scripture and prayer",
-    text: "Begin with reviewed Scripture passages, a short reflection, prayer, and one small practice for the day.",
-  },
-  {
-    icon: Crown,
-    title: "Offline downloaded content",
-    text: "Keep downloaded guidance and content close when focus matters and connection is not guaranteed.",
-  },
-];
+const paywallBenefits: PaywallBenefit[] = PRODUCT.mode === "christian"
+  ? [
+      {
+        icon: MessageCircle,
+        title: "Guided reflections",
+        text: "Use clearly identified AI assistance for grounded questions and practical next steps without claims of divine revelation.",
+      },
+      {
+        icon: Target,
+        title: "Prepared daily formation",
+        text: "Complete one meaningful practice each day without creating goals, schedules, or custom systems.",
+      },
+      {
+        icon: Sparkles,
+        title: "Scripture and prayer",
+        text: "Begin with reviewed Scripture passages, a short reflection, prayer, and one small practice for the day.",
+      },
+      {
+        icon: Crown,
+        title: "Offline downloaded content",
+        text: "Keep downloaded guidance and content close when focus matters and connection is not guaranteed.",
+      },
+    ]
+  : [
+      {
+        icon: Target,
+        title: "Personalized planning",
+        text: "Turn priorities into a practical path that adapts as your day changes.",
+      },
+      {
+        icon: Sparkles,
+        title: "Focus support",
+        text: "Stay with the next meaningful action and carry momentum into the rest of your day.",
+      },
+      {
+        icon: MessageCircle,
+        title: "Guided reflections",
+        text: "Notice patterns, celebrate progress, and choose what matters next with companion insight.",
+      },
+      {
+        icon: Crown,
+        title: "Expanded companion growth",
+        text: "Unlock richer companion experiences and keep downloaded content available offline.",
+      },
+    ];
 
 const blurActiveElement = () => {
   if (typeof document === "undefined") return;
@@ -241,8 +283,8 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   const handleContactSupport = useCallback(() => {
     const currentIssue = productError === APP_STORE_SUBSCRIPTION_ALREADY_LINKED_MESSAGE
       ? [
-          "I am stuck on the paywall because my App Store subscription is already linked to another Graceward account.",
-          `Current Graceward account: ${user?.id ?? "unknown"}.`,
+          `I am stuck on the paywall because my App Store subscription is already linked to another ${PRODUCT.name} account.`,
+          `Current ${PRODUCT.name} account: ${user?.id ?? "unknown"}.`,
           "Please help reassign the purchase if this subscription belongs to me.",
         ].join("\n")
       : productError
@@ -272,7 +314,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
     if (!sanitized) {
       toast({
         title: "Enter a code",
-        description: "Enter your Graceward founding or referral code, then try again.",
+        description: `Enter your ${PRODUCT.name} founding or referral code, then try again.`,
       });
       return;
     }
@@ -465,22 +507,26 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
 
   const plans = {
     monthly: {
-      title: "Graceward Plus Monthly",
+      title: `${PREMIUM_PRODUCT_NAME} Monthly`,
       duration: "1 month",
-      fallbackPrice: "$8.99",
+      fallbackPrice: PRODUCT.mode === "cosmiq" ? "$9.99" : "$8.99",
       period: "/month",
       savings: null,
-      fallbackUnitPrice: "$8.99/month",
+      fallbackUnitPrice: PRODUCT.mode === "cosmiq" ? "$9.99/month" : "$8.99/month",
     },
     yearly: {
-      title: "Graceward Plus Yearly",
+      title: `${PREMIUM_PRODUCT_NAME} Yearly`,
       duration: "1 year",
-      fallbackPrice: hasOfferCode ? activeYearlyOfferPrice : "$49.99",
+      fallbackPrice: hasOfferCode
+        ? activeYearlyOfferPrice
+        : PRODUCT.mode === "cosmiq" ? "$99.99" : "$49.99",
       period: "/year",
       savings: hasOfferCode ? "Code applied" : "Best value",
       fallbackUnitPrice: hasOfferCode
         ? activeYearlyOfferUnitPrice
-        : "$4.17/month when billed yearly",
+        : PRODUCT.mode === "cosmiq"
+          ? "$8.33/month when billed yearly"
+          : "$4.17/month when billed yearly",
     },
   };
   const hasSelectedCreatorYearlyOffer = hasOfferCode && selectedPlan === "yearly";
@@ -519,19 +565,25 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   const copy = variant === "trial_expired"
     ? {
         checkoutEyebrow: "Continue your practice",
-        title: "Keep Graceward close each day.",
-        subtitle: "Subscribe for ready-made daily practices, Guide reflections, and offline access while keeping spiritual worth separate from app progress.",
+        title: `Keep ${PRODUCT.name} close each day.`,
+        subtitle: PRODUCT.mode === "christian"
+          ? "Subscribe for ready-made daily practices, Guide reflections, and offline access while keeping spiritual worth separate from app progress."
+          : "Subscribe for personalized planning, focus support, guided reflection, and expanded companion growth.",
         cta: `Subscribe ${selectedPlan === "yearly" ? "Yearly" : "Monthly"}`,
         legalIntro: hasSelectedCreatorYearlyOffer
           ? `Your founding code unlocks ${activeYearlyOfferPrice}/year, renewing at the same rate while the subscription remains active.`
           : "Payment will be charged to your Apple ID account at confirmation of purchase.",
-        heroBadge: "Continue with Graceward",
+        heroBadge: `Continue with ${PRODUCT.name}`,
         shortcutLabel: "Plans",
       }
     : {
-        checkoutEyebrow: "Start Graceward Plus",
-        title: "Begin a grounded daily practice.",
-        subtitle: "Unlock ready-made practices, guided reflection, and offline access—without turning faith into a score.",
+        checkoutEyebrow: `Start ${PREMIUM_PRODUCT_NAME}`,
+        title: PRODUCT.mode === "christian"
+          ? "Begin a grounded daily practice."
+          : "Build meaningful momentum.",
+        subtitle: PRODUCT.mode === "christian"
+          ? "Unlock ready-made practices, guided reflection, and offline access—without turning faith into a score."
+          : "Unlock personalized planning, focus support, reflection, and expanded companion experiences.",
         cta: hasSelectedCreatorYearlyOffer
           ? "Start Founding Membership"
           : hasSelectedFreeTrial
@@ -542,7 +594,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
           : hasSelectedFreeTrial
             ? "No charge today. Your Apple ID account will be charged when the free trial ends unless canceled at least 24 hours before the end of the trial."
             : "Payment will be charged to your Apple ID account at confirmation of purchase.",
-        heroBadge: freeTrialLabel ?? "Graceward Plus",
+        heroBadge: freeTrialLabel ?? PREMIUM_PRODUCT_NAME,
         shortcutLabel: hasSelectedFreeTrial ? "Start trial" : "Plans",
       };
   const ctaLabel = copy.cta;
@@ -558,7 +610,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
         type="button"
         onClick={scrollToCheckout}
         className="fixed right-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-[130] inline-flex h-10 items-center gap-2 border border-white/[0.18] bg-black/[0.32] px-4 text-xs font-semibold uppercase tracking-[0.18em] text-white/[0.84] backdrop-blur-xl transition hover:border-white/[0.36] hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100"
-        aria-label="View Graceward Plus plans"
+        aria-label={`View ${PREMIUM_PRODUCT_NAME} plans`}
       >
         {copy.shortcutLabel}
         <ArrowDown className="h-3.5 w-3.5" />
@@ -667,7 +719,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100">
-                      Graceward Plus
+                      {PREMIUM_PRODUCT_NAME}
                     </p>
                     <h3 className="mt-2 text-2xl font-semibold text-white">
                       Choose your path
@@ -695,7 +747,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                           No charge today.
                         </p>
                         <p className="mt-1 text-sm leading-6 text-white/[0.72]">
-                          Try the full Graceward Plus experience before your Apple ID account is charged.
+                          Try the full {PREMIUM_PRODUCT_NAME} experience before your Apple ID account is charged.
                         </p>
                       </div>
                     </div>
@@ -730,7 +782,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                           </p>
                           {hasOfferCode && appliedReferralCode ? (
                             <p className="text-xs text-white/[0.64]">
-                              Code <span className="font-mono tracking-[0.18em] text-white">{appliedReferralCode}</span> is linked to this Graceward account.
+                              Code <span className="font-mono tracking-[0.18em] text-white">{appliedReferralCode}</span> is linked to this {PRODUCT.name} account.
                             </p>
                           ) : null}
                         </div>

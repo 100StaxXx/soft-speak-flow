@@ -1,29 +1,21 @@
 import type { CompanionElementId } from "@/config/companionCatalog";
 import {
-  isPilotChristianCompanionForm,
-  isPilotChristianCompanionElement,
-} from "@/config/companionPilotAvailability";
-import {
   getChristianCompanionForm,
   type ChristianCompanionForm,
 } from "@/config/christianCompanionForms";
 import type { DailyFormationCategory } from "@/data/dailyFormationPractices";
+import {
+  getPremadeGracewardFormationAssetDescriptor,
+  type PremadeGracewardFormationAssetDescriptor,
+} from "@/config/premadeCompanionAssets";
 
-export type DailyFormationAnimationVariant = 1 | 2 | 3;
 export type CompanionReactionAnimation = "encourage" | "celebrate" | "rest";
 
 const MOTION_ASSET_ROOT = "/graceward-motion/v1";
+const LEGACY_REACTION_SPECIES = ["lion", "dove"] as const;
+const LEGACY_REACTION_ELEMENTS = ["light", "nature"] as const;
 
-const stableVariant = (seed: string): DailyFormationAnimationVariant => {
-  let hash = 2_166_136_261;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash ^= seed.charCodeAt(index);
-    hash = Math.imul(hash, 16_777_619);
-  }
-  return ((Math.abs(hash) % 3) + 1) as DailyFormationAnimationVariant;
-};
-
-const resolvePilotIdentity = ({
+const resolveLegacyReactionIdentity = ({
   species,
   element,
 }: {
@@ -34,46 +26,37 @@ const resolvePilotIdentity = ({
   elementId: CompanionElementId;
 } | null => {
   const form = getChristianCompanionForm(species);
-  if (!form || !isPilotChristianCompanionForm(form.id)) return null;
-  if (!isPilotChristianCompanionElement(element)) return null;
-  return { speciesId: form.id, elementId: element };
+  if (
+    !form ||
+    !(LEGACY_REACTION_SPECIES as readonly string[]).includes(form.id)
+  ) return null;
+  if (
+    typeof element !== "string" ||
+    !(LEGACY_REACTION_ELEMENTS as readonly string[]).includes(element)
+  ) return null;
+  return { speciesId: form.id, elementId: element as CompanionElementId };
 };
 
-export const getDailyFormationAnimationUrl = ({
+export const getDailyFormationAssetDescriptor = ({
   species,
   element,
+  stage,
   category,
   dateKey,
 }: {
   species: string | null | undefined;
   element: string | null | undefined;
+  stage: number | null | undefined;
   category: DailyFormationCategory;
   dateKey: string;
-}): string | null => {
-  const identity = resolvePilotIdentity({ species, element });
-  if (!identity) return null;
-
-  const variant = stableVariant(`${identity.speciesId}:${identity.elementId}:${category}:${dateKey}`);
-  return `${MOTION_ASSET_ROOT}/${identity.speciesId}/${identity.elementId}/${category.toLowerCase()}-${variant}.mp4`;
-};
-
-export const getDailyFormationStillUrl = ({
-  species,
-  element,
-  category,
-  dateKey,
-}: {
-  species: string | null | undefined;
-  element: string | null | undefined;
-  category: DailyFormationCategory;
-  dateKey: string;
-}): string | null => {
-  const identity = resolvePilotIdentity({ species, element });
-  if (!identity) return null;
-
-  const variant = stableVariant(`${identity.speciesId}:${identity.elementId}:${category}:${dateKey}`);
-  return `${MOTION_ASSET_ROOT}/${identity.speciesId}/${identity.elementId}/${category.toLowerCase()}-${variant}.jpg`;
-};
+}): PremadeGracewardFormationAssetDescriptor | null =>
+  getPremadeGracewardFormationAssetDescriptor({
+    species,
+    element,
+    stage,
+    category,
+    dateKey,
+  });
 
 export const getCompanionReactionAnimationUrl = ({
   species,
@@ -84,7 +67,7 @@ export const getCompanionReactionAnimationUrl = ({
   element: string | null | undefined;
   reaction: CompanionReactionAnimation;
 }): string | null => {
-  const identity = resolvePilotIdentity({ species, element });
+  const identity = resolveLegacyReactionIdentity({ species, element });
   if (!identity) return null;
   return `${MOTION_ASSET_ROOT}/${identity.speciesId}/${identity.elementId}/reaction-${reaction}.mp4`;
 };

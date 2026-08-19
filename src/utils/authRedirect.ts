@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 import type { Database } from "@/integrations/supabase/types";
 import {
   getOnboardingMentorId,
@@ -50,6 +51,7 @@ const fetchAuthRedirectCompanion = (userId: string) =>
     .from("user_companion")
     .select("id, preset_id, current_stage, current_image_url, initial_image_url")
     .eq("user_id", userId)
+    .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

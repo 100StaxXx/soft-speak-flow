@@ -2813,15 +2813,14 @@ All colors MUST be HSL.
     filter: drop-shadow(0 0 8px hsl(var(--primary) / 0.38)) drop-shadow(0 16px 18px rgba(0, 0, 0, 0.35));
   }
 
-  .mentor-spotlight-ring--outline {
-    stroke: hsl(var(--primary) / 0.95);
-    stroke-width: 3px;
-    filter: drop-shadow(0 0 3px hsl(var(--primary) / 0.32)) drop-shadow(0 0 14px hsl(var(--primary) / 0.42)) drop-shadow(0 10px 14px rgba(0, 0, 0, 0.22));
-  }
-
   .mentor-spotlight-target-elevated {
     position: relative;
     z-index: 110 !important;
+  }
+
+  .mentor-spotlight-target-outlined {
+    outline: 3px solid hsl(var(--primary) / 0.95) !important;
+    outline-offset: 2px;
   }
 
   /* Safe Area Support for Mobile Devices (iOS notches, home indicators) */
@@ -3422,7 +3421,8 @@ All colors MUST be HSL.
     }
   }
 
-  .tutorial-checkin-cta {
+  .tutorial-checkin-cta,
+  .tutorial-reflection-cta {
     position: relative;
     overflow: hidden;
     isolation: isolate;
@@ -3430,14 +3430,17 @@ All colors MUST be HSL.
   }
 
   .tutorial-checkin-cta::before,
-  .tutorial-checkin-cta::after {
+  .tutorial-checkin-cta::after,
+  .tutorial-reflection-cta::before,
+  .tutorial-reflection-cta::after {
     content: "";
     position: absolute;
     pointer-events: none;
     border-radius: inherit;
   }
 
-  .tutorial-checkin-cta::before {
+  .tutorial-checkin-cta::before,
+  .tutorial-reflection-cta::before {
     inset: 0;
     background:
       radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 72%),
@@ -3446,7 +3449,8 @@ All colors MUST be HSL.
     z-index: 0;
   }
 
-  .tutorial-checkin-cta::after {
+  .tutorial-checkin-cta::after,
+  .tutorial-reflection-cta::after {
     top: -20%;
     bottom: -20%;
     left: -35%;
@@ -3458,7 +3462,8 @@ All colors MUST be HSL.
     animation: shimmer-sweep 2.4s ease-in-out infinite;
   }
 
-  .tutorial-checkin-cta > * {
+  .tutorial-checkin-cta > *,
+  .tutorial-reflection-cta > * {
     position: relative;
     z-index: 1;
   }
@@ -3470,6 +3475,19 @@ All colors MUST be HSL.
       0 0 18px rgba(var(--primary-rgb), 0.28),
       0 12px 26px hsl(var(--primary) / 0.24);
     filter: saturate(1.05);
+  }
+
+  @keyframes tutorial-reflection-nudge {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(3px);
+    }
+  }
+
+  .tutorial-reflection-nudge {
+    animation: tutorial-reflection-nudge 1.1s ease-in-out infinite;
   }
 
   /* ========== SMITE-INSPIRED FRAME ANIMATIONS ========== */

@@ -11,6 +11,7 @@ import { PageTransition } from "@/components/PageTransition";
 import { useToast } from "@/hooks/use-toast";
 import { useResilience } from "@/contexts/ResilienceContext";
 import type { SupportReportCategory, SupportReportPayload } from "@/types/resilience";
+import { PRODUCT } from "@/config/product";
 
 type SupportReportLocationState = {
   defaultCategory?: SupportReportCategory;
@@ -69,7 +70,7 @@ export default function SupportReport() {
 
   const pageTitle = isFeedbackCategory ? "Send Feedback" : "Report a Problem";
   const pageDescription = isFeedbackCategory
-    ? "Share ideas, feature requests, or anything that would make Graceward better. If you're offline or services are down, this feedback will be queued and sent later."
+    ? `Share ideas, feature requests, or anything that would make ${PRODUCT.name} better. If you're offline or services are down, this feedback will be queued and sent later.`
     : "Tell us what happened. If you're offline or services are down, this report will be queued and sent later.";
   const messageLabel = isFeedbackCategory ? "What would you like to share?" : "What happened?";
   const messagePlaceholder = isFeedbackCategory

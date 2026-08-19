@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { getFallbackResponse, getConnectionErrorFallback } from "@/utils/mentorFallbacks";
 import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 import { MentorChatFeedback } from "./MentorChatFeedback";
+import { PRODUCT, type ProductMode } from "@/config/product";
 
 interface Message {
   role: "user" | "assistant";
@@ -69,6 +70,47 @@ const GRACEWARD_GUIDE_PROMPTS: Record<
   ],
 };
 
+const COSMIQ_MENTOR_PROMPTS: Record<
+  ActiveMentorSlug,
+  readonly [string, string, string]
+> = {
+  sage: [
+    "Help me slow down and sort through what's weighing on me",
+    "Ask me a reflection question for today",
+    "Help me notice one useful next step",
+  ],
+  lyra: [
+    "Help me sort what matters from what is noise",
+    "Ask me questions to help me make a wise decision",
+    "Help me understand a pattern I keep repeating",
+  ],
+  icon: [
+    "Help me decide whether I need a boundary",
+    "Help me say something honest and constructive",
+    "Help me make a choice that fits my values",
+  ],
+  charles: [
+    "Help me name what I'm avoiding",
+    "Give me one small action to take now",
+    "Hold me accountable without shaming me",
+  ],
+  princess: [
+    "Help me create a gentle rhythm for today",
+    "Help me make room for focus, care, and rest",
+    "Help me restart after falling out of a routine",
+  ],
+  operator: [
+    "Help me turn today's responsibilities into a realistic plan",
+    "Help me decide what to do first",
+    "Help me use my time and energy wisely",
+  ],
+  rival: [
+    "Help me face something I've been avoiding",
+    "Challenge me to take one courageous next step",
+    "Help me keep going when I want to quit",
+  ],
+};
+
 interface AskMentorChatProps {
   mentorName: string;
   mentorTone: string;
@@ -84,7 +126,8 @@ export const getSmartPrompts = (
   mentorSlug: string | undefined,
   mentorTone: string,
   hasActiveHabits: boolean,
-  hasActiveChallenges: boolean
+  hasActiveChallenges: boolean,
+  productMode: ProductMode = PRODUCT.mode,
 ): string[] => {
   const hour = new Date().getHours();
   const resolvedSlug = resolveMentorSlugAlias(mentorSlug);
@@ -92,13 +135,22 @@ export const getSmartPrompts = (
   const isEmpathetic = /empathetic|supportive/i.test(mentorTone);
 
   if (resolvedSlug && resolvedSlug !== "reign") {
-    return [...GRACEWARD_GUIDE_PROMPTS[resolvedSlug]];
+    return [
+      ...(productMode === "christian"
+        ? GRACEWARD_GUIDE_PROMPTS[resolvedSlug]
+        : COSMIQ_MENTOR_PROMPTS[resolvedSlug]),
+    ];
   }
   
   const prompts: string[] = [];
   
   if (hour >= 5 && hour < 12) {
-    prompts.push("Help me begin today with prayer and purpose", "What matters most today?");
+    prompts.push(
+      productMode === "christian"
+        ? "Help me begin today with prayer and purpose"
+        : "Help me begin today with clarity and purpose",
+      "What matters most today?",
+    );
   } else if (hour >= 12 && hour < 17) {
     prompts.push("Help me reset for the rest of today", "What needs my attention next?");
   } else {
@@ -108,15 +160,33 @@ export const getSmartPrompts = (
   if (isTough) {
     prompts.push("Tell me honestly what I may be avoiding");
   } else if (isEmpathetic) {
-    prompts.push("Help me receive grace and take one small step");
+    prompts.push(
+      productMode === "christian"
+        ? "Help me receive grace and take one small step"
+        : "Help me reset gently and take one small step",
+    );
   } else {
-    prompts.push("Help me choose one faithful next step");
+    prompts.push(
+      productMode === "christian"
+        ? "Help me choose one faithful next step"
+        : "Help me choose one meaningful next step",
+    );
   }
   
   if (hasActiveHabits || hasActiveChallenges) {
-    prompts.push(hasActiveHabits ? "Help me practice steady faithfulness" : "Help me keep going with courage");
+    prompts.push(
+      hasActiveHabits
+        ? productMode === "christian"
+          ? "Help me practice steady faithfulness"
+          : "Help me practice steady consistency"
+        : "Help me keep going with courage",
+    );
   } else {
-    prompts.push("Help me discern what I need today");
+    prompts.push(
+      productMode === "christian"
+        ? "Help me discern what I need today"
+        : "Help me understand what I need today",
+    );
   }
   
   return [

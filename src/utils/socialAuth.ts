@@ -1,4 +1,5 @@
 import { safeSessionStorage } from "./storage";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
 export type SocialAuthProvider = "apple" | "google";
 export type SocialAuthIntent = "sign_in" | "sign_up";
@@ -8,7 +9,9 @@ export interface PendingSocialAuthAttempt {
   intent: SocialAuthIntent;
 }
 
-const PENDING_SOCIAL_AUTH_STORAGE_KEY = "pending_social_auth_attempt";
+const PENDING_SOCIAL_AUTH_STORAGE_KEY = productScopedStorageKey(
+  "pending-social-auth-attempt",
+);
 
 const isSocialAuthProvider = (value: unknown): value is SocialAuthProvider =>
   value === "apple" || value === "google";

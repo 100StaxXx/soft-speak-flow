@@ -1,8 +1,22 @@
 import type { VisualIdentityProfile } from "./companionLineage.ts";
 
-const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
+const readOptionalEnv = (name: string): string | undefined => {
+  try {
+    return Deno.env.get(name)?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+};
+const OPENAI_API_BASE_URL = (readOptionalEnv("OPENAI_API_BASE_URL") ||
+  "https://api.openai.com").replace(/\/+$/, "");
+const OPENAI_CHAT_COMPLETIONS_URL =
+  `${OPENAI_API_BASE_URL}/v1/chat/completions`;
 
-export type CompanionImageJudgeMode = "bootstrap" | "egg" | "evolution" | "launcher";
+export type CompanionImageJudgeMode =
+  | "bootstrap"
+  | "egg"
+  | "evolution"
+  | "launcher";
 
 export interface CompanionImageJudgeScores {
   continuity: number;
@@ -128,7 +142,8 @@ export const judgeCompanionImage = async ({
     type: "function",
     function: {
       name: "score_companion_image",
-      description: "Score a fantasy companion image for continuity, difference, anatomy, centering, and overall quality.",
+      description:
+        "Score a fantasy companion image for continuity, difference, anatomy, centering, and overall quality.",
       parameters: {
         type: "object",
         properties: {
@@ -143,7 +158,18 @@ export const judgeCompanionImage = async ({
           subjectCenterY: { type: "number" },
           notes: { type: "string" },
         },
-        required: ["continuity", "difference", "anatomy", "stageMaturity", "centering", "backgroundCutout", "overall", "subjectCenterX", "subjectCenterY", "notes"],
+        required: [
+          "continuity",
+          "difference",
+          "anatomy",
+          "stageMaturity",
+          "centering",
+          "backgroundCutout",
+          "overall",
+          "subjectCenterX",
+          "subjectCenterY",
+          "notes",
+        ],
         additionalProperties: false,
       },
     },
@@ -181,9 +207,9 @@ export const judgeCompanionImage = async ({
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: Deno.env.get("OPENAI_COMPANION_JUDGE_MODEL")
-          ?? Deno.env.get("OPENAI_TEXT_MODEL")
-          ?? "gpt-4.1-mini",
+        model: Deno.env.get("OPENAI_COMPANION_JUDGE_MODEL") ??
+          Deno.env.get("OPENAI_TEXT_MODEL") ??
+          "gpt-4.1-mini",
         messages: [
           {
             role: "user",
@@ -201,7 +227,10 @@ export const judgeCompanionImage = async ({
     });
 
     if (!response.ok) {
-      console.warn("Companion image judge request failed", await response.text());
+      console.warn(
+        "Companion image judge request failed",
+        await response.text(),
+      );
       return null;
     }
 
@@ -217,25 +246,46 @@ export const judgeCompanionImage = async ({
       }>;
     };
 
-    const rawArguments = payload.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+    const rawArguments = payload.choices?.[0]?.message?.tool_calls?.[0]
+      ?.function?.arguments;
     if (typeof rawArguments !== "string") {
       return null;
     }
 
     const parsed = JSON.parse(rawArguments) as Record<string, unknown>;
     return {
-      continuity: clampScore(typeof parsed.continuity === "number" ? parsed.continuity : 0),
-      difference: clampScore(typeof parsed.difference === "number" ? parsed.difference : 0),
-      anatomy: clampScore(typeof parsed.anatomy === "number" ? parsed.anatomy : 0),
-      stageMaturity: clampScore(typeof parsed.stageMaturity === "number" ? parsed.stageMaturity : 0),
-      centering: clampScore(typeof parsed.centering === "number" ? parsed.centering : 0),
-      backgroundCutout: clampScore(typeof parsed.backgroundCutout === "number" ? parsed.backgroundCutout : 0),
-      overall: clampScore(typeof parsed.overall === "number" ? parsed.overall : 0),
+      continuity: clampScore(
+        typeof parsed.continuity === "number" ? parsed.continuity : 0,
+      ),
+      difference: clampScore(
+        typeof parsed.difference === "number" ? parsed.difference : 0,
+      ),
+      anatomy: clampScore(
+        typeof parsed.anatomy === "number" ? parsed.anatomy : 0,
+      ),
+      stageMaturity: clampScore(
+        typeof parsed.stageMaturity === "number" ? parsed.stageMaturity : 0,
+      ),
+      centering: clampScore(
+        typeof parsed.centering === "number" ? parsed.centering : 0,
+      ),
+      backgroundCutout: clampScore(
+        typeof parsed.backgroundCutout === "number"
+          ? parsed.backgroundCutout
+          : 0,
+      ),
+      overall: clampScore(
+        typeof parsed.overall === "number" ? parsed.overall : 0,
+      ),
       subjectCenterX: clampNormalizedCenter(
-        typeof parsed.subjectCenterX === "number" ? parsed.subjectCenterX : null,
+        typeof parsed.subjectCenterX === "number"
+          ? parsed.subjectCenterX
+          : null,
       ),
       subjectCenterY: clampNormalizedCenter(
-        typeof parsed.subjectCenterY === "number" ? parsed.subjectCenterY : null,
+        typeof parsed.subjectCenterY === "number"
+          ? parsed.subjectCenterY
+          : null,
       ),
       notes: typeof parsed.notes === "string" ? parsed.notes : "",
     };

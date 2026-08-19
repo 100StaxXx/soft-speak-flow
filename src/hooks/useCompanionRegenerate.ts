@@ -5,6 +5,7 @@ import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
 import type { GenerationPhase } from "@/components/ImageGenerationProgress";
 import { generateWithValidation } from "@/utils/validateCompanionImage";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 
 const MAX_REGENERATIONS = 2;
 
@@ -36,6 +37,7 @@ export const useCompanionRegenerate = () => {
         .select("image_regenerations_used")
         .eq("id", companion.id)
         .eq("user_id", user.id)
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
         .maybeSingle();
 
       if (latestCompanionError) {

@@ -12,8 +12,8 @@ describe("daily Guide thread", () => {
     expect(question.prompt).toBe("What kind of care would serve you today?");
     expect(question.options.map((option) => option.category)).toEqual([
       "Body",
-      "Rest",
-      "Relationships",
+      "Body",
+      "Soul",
     ]);
   });
 

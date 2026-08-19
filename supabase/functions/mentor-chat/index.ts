@@ -22,6 +22,7 @@ import {
   CHRISTIAN_GUIDANCE_POLICY,
   enforceChristianGuidanceOutput,
 } from "../_shared/christianGuidancePolicy.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const ChatSchema = z.object({
   message: z.string().min(1).max(1000),
@@ -329,6 +330,8 @@ export async function handleMentorChat(req: Request) {
     );
     const userId = protectedRequest.auth.userId;
     const supabaseAdmin = protectedRequest.supabase;
+    const productMode = await resolveUserProductMode(supabaseAdmin, userId);
+    const productName = productMode === "graceward" ? "Graceward" : "Cosmiq";
 
     const costGuardrails = createCostGuardrailSession({
       supabase: supabaseAdmin,
@@ -373,7 +376,7 @@ export async function handleMentorChat(req: Request) {
     // Build additional context for comprehensive mode
     let additionalContext = '';
     if (briefingContext) {
-      additionalContext += `\n\nCONNECTED DAILY CONTEXT FROM GRACEWARD:\n${briefingContext}\nUse this only when it helps the current request. Refer to remembered choices naturally, without claiming human memory or implying spiritual success or failure.\n`;
+      additionalContext += `\n\nCONNECTED DAILY CONTEXT FROM ${productName.toUpperCase()}:\n${briefingContext}\nUse this only when it helps the current request. Refer to remembered choices naturally, without claiming human memory.\n`;
     }
     if (comprehensiveMode) {
       additionalContext += '\nThe user wants comprehensive, data-aware guidance. Reference their activities and goals.';
@@ -435,7 +438,7 @@ export async function handleMentorChat(req: Request) {
           retryAfterSeconds,
         }),
         {
-          status: 503,
+          status: 429,
           headers: {
             ...corsHeaders,
             "Content-Type": "application/json",
@@ -474,12 +477,19 @@ export async function handleMentorChat(req: Request) {
       }
     });
 
-    const guideRoleContext = `DAILY WAY GUIDE ROLE:
+    const guideRoleContext = productMode === "graceward"
+      ? `DAILY WAY GUIDE ROLE:
 - ${mentorName} is an original fictional Guide profile inside Graceward, not a historical person, pastor, clergy member, or spiritual authority.
 - You are Graceward's AI reflection and planning assistant using ${mentorName}'s communication style. Never claim to literally be ${mentorName}.
-- Preserve the Guide's tone while keeping Scripture central and presenting every suggested practice as optional.`;
+- Preserve the Guide's tone while keeping Scripture central and presenting every suggested practice as optional.`
+      : `COSMIQ GUIDE ROLE:
+- ${mentorName} is an original fictional Guide profile inside Cosmiq, not a real person or professional authority.
+- You are Cosmiq's AI planning, reflection, and personal-growth assistant using ${mentorName}'s communication style. Never claim to literally be ${mentorName}.
+- Keep guidance practical and optional. Never import Graceward branding, Scripture, prayer, theology, or claims about spiritual standing unless the user explicitly raises their own beliefs.`;
 
-    const systemPrompt = `${baseSystemPrompt}\n\n${guideRoleContext}\n\n${CHRISTIAN_GUIDANCE_POLICY}`;
+    const systemPrompt = `${baseSystemPrompt}\n\n${guideRoleContext}${
+      productMode === "graceward" ? `\n\n${CHRISTIAN_GUIDANCE_POLICY}` : ""
+    }`;
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -557,7 +567,10 @@ export async function handleMentorChat(req: Request) {
     }
 
     const data = await response.json();
-    const assistantMessage = enforceChristianGuidanceOutput(data.choices[0].message.content);
+    const rawAssistantMessage = data.choices[0].message.content;
+    const assistantMessage = productMode === "graceward"
+      ? enforceChristianGuidanceOutput(rawAssistantMessage)
+      : rawAssistantMessage;
 
     // Validate output
     const validator = new OutputValidator(validationRules, outputConstraints);

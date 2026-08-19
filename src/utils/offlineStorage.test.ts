@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createIndexedDbReconnectMock } from "@/test/indexedDbReconnectMock";
+import { getProductIndexedDbName } from "@/config/productRuntime";
 import {
   __resetOfflineDBForTests,
   addPendingAction,
@@ -11,7 +12,7 @@ import {
   initOfflineDB,
 } from "./offlineStorage";
 
-const DB_NAME = "cosmiq-offline-db";
+const DB_NAME = getProductIndexedDbName("offline-db");
 const originalIndexedDb = globalThis.indexedDB;
 
 const supportsIndexedDb = typeof indexedDB !== "undefined";

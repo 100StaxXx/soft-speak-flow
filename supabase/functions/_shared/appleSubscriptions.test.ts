@@ -574,3 +574,26 @@ Deno.test("resolvePlanFromProduct rejects unknown Apple product ids", () => {
     "Expected unknown Apple products to fail closed instead of defaulting to monthly",
   );
 });
+
+Deno.test("Apple product boundary keeps Graceward and Cosmiq purchases separate", () => {
+  appleSubscriptionsModule.assertAppleProductBoundary(
+    "graceward_plus_yearly",
+    "graceward",
+  );
+  appleSubscriptionsModule.assertAppleProductBoundary(
+    "cosmiq_premium_monthly",
+    "cosmiq",
+  );
+
+  let rejected = false;
+  try {
+    appleSubscriptionsModule.assertAppleProductBoundary(
+      "cosmiq_premium_yearly",
+      "graceward",
+    );
+  } catch (error) {
+    rejected = error instanceof Error &&
+      error.message === appleSubscriptionsModule.APPLE_PRODUCT_BOUNDARY_ERROR;
+  }
+  assert(rejected, "Expected cross-product Apple purchase to be rejected");
+});

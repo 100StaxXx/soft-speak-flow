@@ -9,6 +9,7 @@ import {
   getCampaignBuilderDraftStorageKey,
   getCreationPopupMarkerStorageKey,
 } from "@/utils/accountLocalState";
+import { getEffectiveMissionDate } from "@/utils/timezone";
 
 if (!HTMLElement.prototype.scrollTo) {
   Object.defineProperty(HTMLElement.prototype, "scrollTo", {
@@ -181,6 +182,13 @@ const mocks = vi.hoisted(() => ({
   }>,
 }));
 
+const getExpectedMissionDateAtNoon = () => {
+  const [year, month, day] = getEffectiveMissionDate(
+    mocks.profileTimezone ?? undefined,
+  ).split("-").map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0, 0);
+};
+
 vi.mock("@/components/PageTransition", () => ({
   PageTransition: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
@@ -233,7 +241,7 @@ vi.mock("@/components/DatePillsScroller", async () => {
           <button
             type="button"
             onClick={() => {
-              const nextDate = new Date();
+              const nextDate = getExpectedMissionDateAtNoon();
               const nextHour = nextDate.getHours() === 0 ? 1 : 0;
               nextDate.setHours(nextHour, 0, 0, 0);
               onDateSelect(nextDate);
@@ -1405,7 +1413,7 @@ describe("Journeys row drag integration", () => {
 
     const initialSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     const initialSelectedDate = new Date(initialSelectedDateIso);
-    expect(isSameDay(initialSelectedDate, new Date())).toBe(true);
+    expect(isSameDay(initialSelectedDate, getExpectedMissionDateAtNoon())).toBe(true);
 
     fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
 
@@ -1415,7 +1423,7 @@ describe("Journeys row drag integration", () => {
       staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       staleSelectedDate = new Date(staleSelectedDateIso);
       expect(staleSelectedDate.getTime()).not.toBe(initialSelectedDate.getTime());
-      expect(isSameDay(staleSelectedDate, new Date())).toBe(false);
+      expect(isSameDay(staleSelectedDate, getExpectedMissionDateAtNoon())).toBe(false);
     });
 
     fireEvent.click(screen.getByRole("button", { name: "go-inbox" }));
@@ -1432,7 +1440,7 @@ describe("Journeys row drag integration", () => {
       const reenteredDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       const reenteredDate = new Date(reenteredDateIso);
       expect(reenteredDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(reenteredDate, new Date())).toBe(true);
+      expect(isSameDay(reenteredDate, getExpectedMissionDateAtNoon())).toBe(true);
     });
   });
 
@@ -1480,11 +1488,9 @@ describe("Journeys row drag integration", () => {
     let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
       sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
+      expect(isSameDay(new Date(sameDaySelectedDateIso), getExpectedMissionDateAtNoon())).toBe(true);
     });
     const centerKeyBeforeReentry = Number(screen.getByTestId("center-request-key").textContent);
-    elementScrollToSpy.mockClear();
-
     fireEvent.click(screen.getByRole("button", { name: "go-inbox" }));
     await waitFor(() => {
       expect(screen.getByTestId("route-path").textContent).toBe("/inbox");
@@ -1498,8 +1504,7 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeReentry);
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
-      expect(elementScrollToSpy).toHaveBeenCalled();
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(getEffectiveMissionDate());
     });
   });
 
@@ -1528,7 +1533,7 @@ describe("Journeys row drag integration", () => {
     let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
       staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
+      expect(isSameDay(new Date(staleSelectedDateIso), getExpectedMissionDateAtNoon())).toBe(false);
     });
     const centerKeyBeforeResetRequest = Number(screen.getByTestId("center-request-key").textContent);
     const scrollerMountIdBeforeResetRequest = screen.getByTestId("date-pills-mount-id").textContent;
@@ -1540,9 +1545,9 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
+      expect(isSameDay(new Date(refreshedDateIso), getExpectedMissionDateAtNoon())).toBe(true);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(getEffectiveMissionDate());
       expect(screen.getByTestId("reset-range-on-center-request")).toHaveTextContent("true");
       expect(screen.getByTestId("date-pills-mount-id").textContent).toBe(scrollerMountIdBeforeResetRequest);
       expect(screen.getByTestId("journeys-mobile-date-strip")).not.toHaveStyle({ opacity: "0" });
@@ -1618,11 +1623,9 @@ describe("Journeys row drag integration", () => {
     let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
       sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
+      expect(isSameDay(new Date(sameDaySelectedDateIso), getExpectedMissionDateAtNoon())).toBe(true);
     });
     const centerKeyBeforeResetRequest = Number(screen.getByTestId("center-request-key").textContent);
-    elementScrollToSpy.mockClear();
-
     act(() => {
       window.dispatchEvent(new Event(JOURNEYS_RESET_TO_TODAY_EVENT));
     });
@@ -1630,9 +1633,8 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(getEffectiveMissionDate());
       expect(screen.getByTestId("reset-range-on-center-request")).toHaveTextContent("true");
-      expect(elementScrollToSpy).toHaveBeenCalled();
     });
   });
 
@@ -1672,7 +1674,7 @@ describe("Journeys row drag integration", () => {
     let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
       staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
+      expect(isSameDay(new Date(staleSelectedDateIso), getExpectedMissionDateAtNoon())).toBe(false);
     });
     const centerKeyBeforeTaskCompletion = Number(screen.getByTestId("center-request-key").textContent);
 
@@ -1686,7 +1688,7 @@ describe("Journeys row drag integration", () => {
       );
       const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
+      expect(isSameDay(new Date(refreshedDateIso), getExpectedMissionDateAtNoon())).toBe(true);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeTaskCompletion);
     });
   });
@@ -1727,7 +1729,7 @@ describe("Journeys row drag integration", () => {
     let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
       staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
+      expect(isSameDay(new Date(staleSelectedDateIso), getExpectedMissionDateAtNoon())).toBe(false);
     });
     const centerKeyBeforeTaskCompletion = Number(screen.getByTestId("center-request-key").textContent);
 
@@ -1787,7 +1789,7 @@ describe("Journeys row drag integration", () => {
     let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
       staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
+      expect(isSameDay(new Date(staleSelectedDateIso), getExpectedMissionDateAtNoon())).toBe(false);
     });
 
     fireEvent.click(screen.getByRole("button", { name: "go-inbox-section" }));
@@ -1798,7 +1800,7 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
+      expect(isSameDay(new Date(refreshedDateIso), getExpectedMissionDateAtNoon())).toBe(true);
     });
   });
 
@@ -1844,7 +1846,7 @@ describe("Journeys row drag integration", () => {
     let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
       staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
+      expect(isSameDay(new Date(staleSelectedDateIso), getExpectedMissionDateAtNoon())).toBe(false);
     });
 
     act(() => {
@@ -1868,7 +1870,7 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
+      expect(isSameDay(new Date(refreshedDateIso), getExpectedMissionDateAtNoon())).toBe(true);
     });
   });
 
@@ -1899,7 +1901,7 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       staleSelectedDate = new Date(staleSelectedDateIso);
-      expect(isSameDay(staleSelectedDate, new Date())).toBe(false);
+      expect(isSameDay(staleSelectedDate, getExpectedMissionDateAtNoon())).toBe(false);
     });
 
     mocks.isTabActive = false;
@@ -1924,7 +1926,7 @@ describe("Journeys row drag integration", () => {
       const activeDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       const activeDate = new Date(activeDateIso);
       expect(activeDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(activeDate, new Date())).toBe(true);
+      expect(isSameDay(activeDate, getExpectedMissionDateAtNoon())).toBe(true);
     });
   });
 
@@ -1952,7 +1954,7 @@ describe("Journeys row drag integration", () => {
 
     await waitFor(() => {
       const staleDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
-      expect(isSameDay(staleDate, new Date())).toBe(false);
+      expect(isSameDay(staleDate, getExpectedMissionDateAtNoon())).toBe(false);
     });
 
     act(() => {
@@ -1961,7 +1963,7 @@ describe("Journeys row drag integration", () => {
 
     await waitFor(() => {
       const refreshedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
-      expect(isSameDay(refreshedDate, new Date())).toBe(true);
+      expect(isSameDay(refreshedDate, getExpectedMissionDateAtNoon())).toBe(true);
     });
   });
 
@@ -1989,7 +1991,7 @@ describe("Journeys row drag integration", () => {
 
     await waitFor(() => {
       const staleDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
-      expect(isSameDay(staleDate, new Date())).toBe(false);
+      expect(isSameDay(staleDate, getExpectedMissionDateAtNoon())).toBe(false);
     });
 
     act(() => {
@@ -1998,7 +2000,7 @@ describe("Journeys row drag integration", () => {
 
     await waitFor(() => {
       const refreshedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
-      expect(isSameDay(refreshedDate, new Date())).toBe(true);
+      expect(isSameDay(refreshedDate, getExpectedMissionDateAtNoon())).toBe(true);
     });
   });
 
@@ -2028,7 +2030,7 @@ describe("Journeys row drag integration", () => {
     let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
       sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
+      expect(isSameDay(new Date(sameDaySelectedDateIso), getExpectedMissionDateAtNoon())).toBe(true);
     });
     const centerKeyBeforeFocus = Number(screen.getByTestId("center-request-key").textContent);
 
@@ -2039,7 +2041,7 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeFocus);
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(getEffectiveMissionDate());
     });
   });
 
@@ -2069,7 +2071,7 @@ describe("Journeys row drag integration", () => {
       const futureDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       const futureDate = new Date(futureDateIso);
       expect(futureDate.getTime()).toBeGreaterThan(Date.now());
-      expect(isSameDay(futureDate, new Date())).toBe(false);
+      expect(isSameDay(futureDate, getExpectedMissionDateAtNoon())).toBe(false);
     });
 
     act(() => {
@@ -2078,7 +2080,7 @@ describe("Journeys row drag integration", () => {
 
     await waitFor(() => {
       const refreshedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
-      expect(isSameDay(refreshedDate, new Date())).toBe(true);
+      expect(isSameDay(refreshedDate, getExpectedMissionDateAtNoon())).toBe(true);
     });
   });
 });

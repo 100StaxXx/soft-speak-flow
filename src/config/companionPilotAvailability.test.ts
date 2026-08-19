@@ -17,8 +17,22 @@ import {
 
 describe("companionPilotAvailability", () => {
   it("keeps the Graceward and Cosmiq launch matrices separate", () => {
-    expect(PILOT_CHRISTIAN_COMPANION_FORM_IDS).toEqual(["lion", "dove"]);
-    expect(PILOT_CHRISTIAN_COMPANION_ELEMENT_IDS).toEqual(["light", "nature"]);
+    expect(PILOT_CHRISTIAN_COMPANION_FORM_IDS).toEqual([
+      "lamb",
+      "lion",
+      "stag",
+      "dove",
+      "eagle",
+      "wolf",
+    ]);
+    expect(PILOT_CHRISTIAN_COMPANION_ELEMENT_IDS).toEqual([
+      "fire",
+      "ice",
+      "storm",
+      "nature",
+      "void",
+      "light",
+    ]);
     expect(PILOT_COMPANION_PRESET_IDS).toEqual(["fox", "phoenix", "leviathan"]);
     expect(PILOT_COMPANION_ELEMENT_IDS).toEqual(["fire", "ice", "nature"]);
     expect(COMPANION_FUTURE_STATE_LABEL).toBe("Coming Soon");
@@ -33,9 +47,13 @@ describe("companionPilotAvailability", () => {
     expect(isPilotCompanionElement("ice")).toBe(true);
     expect(isPilotCompanionElement("storm")).toBe(false);
     expect(isPilotChristianCompanionForm("lion")).toBe(true);
+    expect(isPilotChristianCompanionForm("lamb")).toBe(true);
+    expect(isPilotChristianCompanionForm("eagle")).toBe(true);
+    expect(isPilotChristianCompanionForm("wolf")).toBe(true);
     expect(isPilotChristianCompanionForm("fox")).toBe(false);
     expect(isPilotChristianCompanionElement("light")).toBe(true);
-    expect(isPilotChristianCompanionElement("fire")).toBe(false);
+    expect(isPilotChristianCompanionElement("fire")).toBe(true);
+    expect(isPilotChristianCompanionElement("storm")).toBe(true);
   });
 
   it("returns stable supported defaults", () => {

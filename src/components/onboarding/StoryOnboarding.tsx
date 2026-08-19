@@ -57,6 +57,9 @@ import type { OnboardingResumeStep } from "@/utils/profileOnboarding";
 import { safeLocalStorage } from "@/utils/storage";
 import { resolveAssignedMentorFromActiveMentors } from "@/config/onboardingMentorAssignments";
 import { trackOnboardingTutorialEvent } from "@/utils/onboardingTutorialTelemetry";
+import { PRODUCT } from "@/config/product";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
+import { fetchActiveProductMentors } from "@/services/productMentorCatalog";
 
 type OnboardingStage = 
   | "prologue" 
@@ -516,7 +519,7 @@ export const GracewardOnboarding = ({
   const persistStageBeforeAdvance = useCallback(async (
     nextStep: OnboardingResumeStep,
     dataPatch: Record<string, unknown> = {},
-    nextStage: OnboardingStage = nextStep,
+    nextStage?: OnboardingStage,
   ) => {
     if (persistStepInFlightRef.current) return false;
 
@@ -524,7 +527,11 @@ export const GracewardOnboarding = ({
     setIsPersistingOnboardingStep(true);
     try {
       await persistOnboardingProgress(nextStep, dataPatch);
-      setStage(nextStage);
+      setStage(nextStage ?? (
+        nextStep === "destiny" || nextStep === "faction"
+          ? "questionnaire"
+          : nextStep
+      ));
       return true;
     } catch (error) {
       onboardingLog.warn("Failed to persist onboarding step before advancing", {
@@ -541,14 +548,12 @@ export const GracewardOnboarding = ({
   }, [persistOnboardingProgress, user?.id]);
 
   const fetchActiveMentors = useCallback(async (): Promise<Mentor[]> => {
-    const { data, error } = await supabase
-      .from("graceward_guides")
-      .select("*")
-      .eq("is_active", true);
-
-    if (error) {
+    let data;
+    try {
+      data = await fetchActiveProductMentors();
+    } catch (error) {
       onboardingLog.error("Failed to load active mentors", {
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
       });
       return [];
     }
@@ -564,7 +569,7 @@ export const GracewardOnboarding = ({
       description: mentorRow.description,
       tone_description: mentorRow.tone_description,
       avatar_url: mentorRow.avatar_url ?? undefined,
-      tags: mentorRow.tags || [],
+      tags: mentorRow.tags,
       mentor_type: mentorRow.mentor_type,
       target_user_type: mentorRow.target_user_type ?? undefined,
       slug: mentorRow.slug || "",
@@ -664,7 +669,7 @@ export const GracewardOnboarding = ({
     setUserName(name);
     void persistStageBeforeAdvance("questionnaire", {
       userName: name,
-      product_mode: "graceward",
+      product_mode: PRODUCT_RUNTIME.authProductMode,
     });
   };
 
@@ -1113,6 +1118,7 @@ export const GracewardOnboarding = ({
             .from("user_companion")
             .select("id, current_xp, current_stage, preset_id")
             .eq("user_id", user.id)
+            .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle()
@@ -1249,6 +1255,7 @@ export const GracewardOnboarding = ({
                 .from("user_companion")
                 .select("id, spirit_animal")
                 .eq("user_id", user.id)
+                .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
                 .order("created_at", { ascending: false })
                 .limit(1)
                 .maybeSingle();
@@ -1381,11 +1388,15 @@ export const GracewardOnboarding = ({
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
           onboarding_data: {
             ...existingData,
-            product_mode: "graceward",
-            graceward_onboarding_version: 1,
-            // Retain the old version key for installed clients that still use
-            // it to identify the faith-specific onboarding generation.
-            christian_onboarding_version: 3,
+            product_mode: PRODUCT_RUNTIME.authProductMode,
+            ...(PRODUCT.mode === "christian"
+              ? {
+                  graceward_onboarding_version: 1,
+                  // Retain the old version key for installed clients that still use
+                  // it to identify the faith-specific onboarding generation.
+                  christian_onboarding_version: 3,
+                }
+              : { cosmiq_onboarding_version: 1 }),
             walkthrough_completed: true,
             story_tone:
               typeof existingData.story_tone === "string"
@@ -1415,8 +1426,8 @@ export const GracewardOnboarding = ({
         userId: user.id,
         mode,
       });
-      toast.success("Welcome to Graceward. Your daily path is ready.");
-      safeNavigate(navigate, "/mentor");
+      toast.success(`Welcome to ${PRODUCT.name}. Your daily path is ready.`);
+      safeNavigate(navigate, PRODUCT.mode === "cosmiq" ? "/journeys" : "/mentor");
       return true;
     } catch (error) {
       logger.error("Journey completion finalization failed", {
@@ -1682,11 +1693,11 @@ export const GracewardOnboarding = ({
             exit={{ opacity: 0 }}
             className="relative z-10 w-full"
           >
-            {isMigrationMode ? (
+            {isMigrationMode || PRODUCT.mode === "cosmiq" ? (
               <CompanionPersonalization
                 onComplete={handleCompanionComplete}
                 isLoading={isCreatingCompanion}
-                mode="migration"
+                mode={isMigrationMode ? "migration" : isResetMode ? "reset" : "onboarding"}
                 initialCompanionName={existingCompanion?.companion_name ?? null}
               />
             ) : (

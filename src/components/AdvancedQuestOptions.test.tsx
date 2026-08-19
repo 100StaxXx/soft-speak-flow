@@ -492,7 +492,7 @@ describe("AdvancedQuestOptions reminder picker", () => {
     });
 
     expect(getReminderSection().getByRole("button", { name: "90 minutes before" })).toBeInTheDocument();
-  });
+  }, 10_000);
 
   it("renders the custom reminder date and time editor before preset options", () => {
     render(<DateTimeReminderHarness />);
@@ -551,7 +551,7 @@ describe("AdvancedQuestOptions reminder picker", () => {
     expect(screen.getByText("Choose a reminder time in the future.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
     expect(screen.getByTestId("reminder-offsets-state")).toHaveTextContent("none");
-  });
+  }, 10_000);
 
   it("supports selecting multiple reminder offsets", async () => {
     render(<MultiReminderHarness />);

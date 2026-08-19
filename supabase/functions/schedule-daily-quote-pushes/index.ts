@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,9 +40,13 @@ serve(async (req) => {
 
     for (const user of users || []) {
       try {
+        if (await resolveUserProductMode(supabase, user.id) !== "cosmiq") {
+          continue;
+        }
+
         // Get mentor slug
         const { data: mentor } = await supabase
-          .from('graceward_guides')
+          .from('mentors')
           .select('slug')
           .eq('id', user.selected_mentor_id)
           .single();

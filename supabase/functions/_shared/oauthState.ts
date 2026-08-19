@@ -1,6 +1,7 @@
 export type OAuthProvider = "google" | "outlook";
-export type OAuthSyncMode = "send_only";
+export type OAuthSyncMode = "send_only" | "full_sync";
 export type OAuthSource = "web" | "native";
+export type OAuthProductMode = "graceward" | "cosmiq";
 
 const OAUTH_STATE_VERSION = 1;
 const DEFAULT_TTL_SECONDS = 10 * 60;
@@ -11,6 +12,7 @@ export interface OAuthStatePayload {
   userId: string;
   syncMode: OAuthSyncMode;
   source: OAuthSource;
+  productMode: OAuthProductMode;
   redirectUri?: string;
   exp: number;
   nonce: string;
@@ -59,7 +61,7 @@ function secureEqual(a: Uint8Array, b: Uint8Array): boolean {
 }
 
 function isSyncMode(value: unknown): value is OAuthSyncMode {
-  return value === "send_only";
+  return value === "send_only" || value === "full_sync";
 }
 
 function isProvider(value: unknown): value is OAuthProvider {
@@ -68,6 +70,10 @@ function isProvider(value: unknown): value is OAuthProvider {
 
 function isSource(value: unknown): value is OAuthSource {
   return value === "web" || value === "native";
+}
+
+function isProductMode(value: unknown): value is OAuthProductMode {
+  return value === "graceward" || value === "cosmiq";
 }
 
 function randomNonce(): string {
@@ -81,12 +87,14 @@ export async function createSignedOAuthState(args: {
   userId: string;
   syncMode: OAuthSyncMode;
   source?: OAuthSource;
+  productMode?: OAuthProductMode;
   redirectUri?: string;
   secret: string;
   ttlSeconds?: number;
 }): Promise<string> {
   const { provider, userId, syncMode, secret } = args;
   const source = args.source ?? "web";
+  const productMode = args.productMode ?? "graceward";
   const ttlSeconds = args.ttlSeconds ?? DEFAULT_TTL_SECONDS;
   const nowSeconds = Math.floor(Date.now() / 1000);
 
@@ -96,6 +104,7 @@ export async function createSignedOAuthState(args: {
     userId,
     syncMode,
     source,
+    productMode,
     exp: nowSeconds + ttlSeconds,
     nonce: randomNonce(),
   };
@@ -142,6 +151,13 @@ function parsePayload(rawPayload: string): OAuthStatePayload {
     throw new Error("Invalid OAuth state");
   }
 
+  const productMode = payload.productMode === undefined
+    ? "graceward"
+    : payload.productMode;
+  if (!isProductMode(productMode)) {
+    throw new Error("Invalid OAuth state");
+  }
+
   const redirectUri = payload.redirectUri === undefined ? undefined : payload.redirectUri;
   const normalizedRedirectUri = typeof redirectUri === "string" ? redirectUri.trim() : undefined;
   if (redirectUri !== undefined && (!normalizedRedirectUri || normalizedRedirectUri.length === 0)) {
@@ -162,6 +178,7 @@ function parsePayload(rawPayload: string): OAuthStatePayload {
     userId: payload.userId,
     syncMode: payload.syncMode,
     source,
+    productMode,
     ...(normalizedRedirectUri ? { redirectUri: normalizedRedirectUri } : {}),
     exp: payload.exp,
     nonce: payload.nonce,

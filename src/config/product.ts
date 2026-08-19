@@ -7,8 +7,18 @@
  */
 export type ProductMode = "christian" | "cosmiq";
 
-const configuredMode = import.meta.env.VITE_PRODUCT_MODE?.trim().toLowerCase();
-const mode: ProductMode = configuredMode === "cosmiq" ? "cosmiq" : "christian";
+// Shared product-language modules are imported by both Vite and Deno edge
+// tests. Vite supplies `import.meta.env`; Deno does not, so keep the read
+// optional instead of forcing every backend test through Vite's ambient types.
+const configuredMode = (import.meta as ImportMeta & {
+  readonly env?: Record<string, string | boolean | undefined>;
+}).env?.VITE_PRODUCT_MODE;
+const normalizedConfiguredMode = typeof configuredMode === "string"
+  ? configuredMode.trim().toLowerCase()
+  : undefined;
+const mode: ProductMode = normalizedConfiguredMode === "cosmiq"
+  ? "cosmiq"
+  : "christian";
 
 const PRODUCT_CONFIG = {
   christian: {

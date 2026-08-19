@@ -1,6 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/utils/logger";
 import { safeSessionStorage } from "@/utils/storage";
+import {
+  PRODUCT_RUNTIME,
+  productScopedStorageKey,
+} from "@/config/productRuntime";
 
 export type ProductExperienceEventName =
   | "app_opened"
@@ -17,12 +21,14 @@ export type ProductExperienceEventName =
   | "feedback_prompt_opened"
   | "feedback_prompt_dismissed"
   | "memory_preference_changed"
+  | "daily_adventure_choice_selected"
+  | "daily_adventure_question_viewed"
   | "companion_interacted";
 
 type EventProperty = string | number | boolean | null;
 type EventProperties = Record<string, EventProperty | undefined>;
 
-const SESSION_STORAGE_KEY = "graceward:experience-session:v1";
+const SESSION_STORAGE_KEY = productScopedStorageKey("experience-session:v1");
 const SENSITIVE_PROPERTY_KEY = /content|description|email|label|message|name|note|prompt|reflection|text|title/i;
 const log = logger.scope("ProductExperience");
 
@@ -69,7 +75,10 @@ export async function trackProductExperience(
       event_name: eventName,
       surface: surface.toLowerCase().replace(/[^a-z0-9_-]/g, "-").slice(0, 40),
       session_id: getSessionId(),
-      properties: sanitizeProductEventProperties(properties),
+      properties: {
+        ...sanitizeProductEventProperties(properties),
+        product_mode: PRODUCT_RUNTIME.authProductMode,
+      },
       occurred_at: new Date().toISOString(),
     });
 

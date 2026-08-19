@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { Card } from "@/components/ui/card";
 import { BookOpen, Moon } from "lucide-react";
+import { PRODUCT } from "@/config/product";
 
 interface NotificationExample {
   icon: typeof BookOpen;
@@ -10,7 +11,7 @@ interface NotificationExample {
   color: string;
 }
 
-const exampleNotifications: NotificationExample[] = [
+const exampleNotifications: NotificationExample[] = PRODUCT.mode === "christian" ? [
   {
     icon: BookOpen,
     title: "Morning Daily Grace",
@@ -25,6 +26,21 @@ const exampleNotifications: NotificationExample[] = [
     time: "8:00 PM",
     color: "text-primary"
   }
+] : [
+  {
+    icon: BookOpen,
+    title: "Morning Plan",
+    message: "Your priorities, Guide context, and next actions are ready.",
+    time: "8:00 AM",
+    color: "text-primary",
+  },
+  {
+    icon: Moon,
+    title: "Evening Reflection",
+    message: "Review what moved, what changed, and what to carry forward.",
+    time: "8:00 PM",
+    color: "text-primary",
+  },
 ];
 
 export const NotificationPreview = memo(() => {
@@ -35,7 +51,9 @@ export const NotificationPreview = memo(() => {
           What You'll Receive
         </h3>
         <p className="text-sm text-muted-foreground">
-          Graceward keeps delivery simple: one morning package and an optional evening invitation.
+          {PRODUCT.mode === "christian"
+            ? "Graceward keeps delivery simple: one morning package and an optional evening invitation."
+            : "Cosmiq keeps delivery focused on the planning and reflection reminders you enable."}
         </p>
       </div>
 

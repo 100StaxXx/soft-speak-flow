@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => {
       isPro: true,
       activePlan: "yearly" as "monthly" | "yearly" | null,
       currentEntitlement: {
-        productId: "cosmiq_premium_yearly",
+        productId: "graceward_plus_yearly",
         expirationDate: "2099-01-01T00:00:00.000Z",
         transactionId: "local-tx",
         appAccountToken: "11111111-1111-4111-8111-111111111111",
@@ -153,7 +153,7 @@ describe("useAccessState", () => {
       isPro: true,
       activePlan: "yearly",
       currentEntitlement: {
-        productId: "cosmiq_premium_yearly",
+        productId: "graceward_plus_yearly",
         expirationDate: "2099-01-01T00:00:00.000Z",
         transactionId: "local-tx",
         appAccountToken: "11111111-1111-4111-8111-111111111111",
@@ -209,7 +209,7 @@ describe("useAccessState", () => {
       isPro: true,
       activePlan: "monthly",
       currentEntitlement: {
-        productId: "cosmiq_premium_monthly",
+        productId: "graceward_plus_monthly",
         expirationDate: "2099-01-01T00:00:00.000Z",
         transactionId: "monthly-local-tx",
         appAccountToken: "11111111-1111-4111-8111-111111111111",
@@ -244,7 +244,7 @@ describe("useAccessState", () => {
       isPro: true,
       activePlan: "yearly",
       currentEntitlement: {
-        productId: "cosmiq_premium_yearly",
+        productId: "graceward_plus_yearly",
         expirationDate: "2099-01-01T00:00:00.000Z",
         transactionId: "tokenless-testflight-tx",
         revenueCatOriginalAppUserId: "11111111-1111-4111-8111-111111111111",
@@ -382,7 +382,7 @@ describe("useAccessState", () => {
       isPro: false,
       activePlan: null,
       currentEntitlement: {
-        productId: "cosmiq_premium_monthly",
+        productId: "graceward_plus_monthly",
         expirationDate: "2099-01-01T00:00:00.000Z",
         transactionId: "tokenless-sandbox-tx",
         isSandbox: true,
@@ -408,7 +408,7 @@ describe("useAccessState", () => {
 
   it("does not grant local fallback for a transaction rejected by backend binding", async () => {
     globalThis.localStorage.setItem(
-      "cosmiq.rejectedLocalSubscriptionTransactions.v1.11111111-1111-4111-8111-111111111111",
+      "graceward:rejected-local-subscription-transactions:v1.11111111-1111-4111-8111-111111111111",
       JSON.stringify({
         transactionKeys: ["conflict-original-tx", "conflict-current-tx"],
         updatedAt: "2026-05-17T19:12:00.000Z",
@@ -420,7 +420,7 @@ describe("useAccessState", () => {
       isPro: true,
       activePlan: "yearly",
       currentEntitlement: {
-        productId: "cosmiq_premium_yearly",
+        productId: "graceward_plus_yearly",
         expirationDate: "2099-01-01T00:00:00.000Z",
         transactionId: "conflict-current-tx",
         originalTransactionId: "conflict-original-tx",
@@ -475,7 +475,7 @@ describe("useAccessState", () => {
   it("uses remembered local subscription access when the backend is unreachable and StoreKit has not returned yet", async () => {
     mockSubscriptionCheckError(new Error("Failed to send a request to the Edge Function"));
     globalThis.localStorage.setItem(
-      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      "graceward:local-subscription-access:v1.11111111-1111-4111-8111-111111111111",
       JSON.stringify({
         has_access: true,
         access_source: "subscription",
@@ -513,7 +513,7 @@ describe("useAccessState", () => {
   it("uses remembered local subscription access when the backend is unreachable and StoreKit entitlement refresh fails", async () => {
     mockSubscriptionCheckError(new Error("Failed to send a request to the Edge Function"));
     globalThis.localStorage.setItem(
-      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      "graceward:local-subscription-access:v1.11111111-1111-4111-8111-111111111111",
       JSON.stringify({
         has_access: true,
         access_source: "subscription",
@@ -550,7 +550,7 @@ describe("useAccessState", () => {
 
   it("does not let remembered local access override a completed StoreKit check with no entitlement", async () => {
     globalThis.localStorage.setItem(
-      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      "graceward:local-subscription-access:v1.11111111-1111-4111-8111-111111111111",
       JSON.stringify({
         has_access: true,
         access_source: "subscription",
@@ -586,7 +586,7 @@ describe("useAccessState", () => {
 
   it("uses fresh post-purchase local access over a neutral backend response after StoreKit finishes with no entitlement", async () => {
     globalThis.localStorage.setItem(
-      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      "graceward:local-subscription-access:v1.11111111-1111-4111-8111-111111111111",
       JSON.stringify({
         version: 2,
         storedAt: new Date().toISOString(),
@@ -628,7 +628,7 @@ describe("useAccessState", () => {
 
   it("does not use stale post-purchase local access after StoreKit finishes with no entitlement", async () => {
     globalThis.localStorage.setItem(
-      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      "graceward:local-subscription-access:v1.11111111-1111-4111-8111-111111111111",
       JSON.stringify({
         version: 2,
         storedAt: "2000-01-01T00:00:00.000Z",
@@ -669,7 +669,7 @@ describe("useAccessState", () => {
 
   it("does not let remembered local access override an explicit backend subscription revocation", async () => {
     globalThis.localStorage.setItem(
-      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      "graceward:local-subscription-access:v1.11111111-1111-4111-8111-111111111111",
       JSON.stringify({
         has_access: true,
         access_source: "subscription",
@@ -782,7 +782,7 @@ describe("useAccessState", () => {
 
     await waitFor(() => {
       expect(globalThis.localStorage.getItem(
-        "cosmiq.rejectedLocalSubscriptionTransactions.v1.11111111-1111-4111-8111-111111111111",
+        "graceward:rejected-local-subscription-transactions:v1.11111111-1111-4111-8111-111111111111",
       )).toContain("local-tx");
     });
     expect(result.current.accessState).toMatchObject({
@@ -829,7 +829,7 @@ describe("useAccessState", () => {
     mocks.storeKit = {
       ...mocks.storeKit,
       currentEntitlement: {
-        productId: "cosmiq_premium_yearly",
+        productId: "graceward_plus_yearly",
         expirationDate: "2099-01-01T00:00:00.000Z",
         transactionId: "sandbox-local-tx",
         originalTransactionId: "sandbox-local-orig",
@@ -855,13 +855,13 @@ describe("useAccessState", () => {
       plan: "yearly",
     });
     expect(globalThis.localStorage.getItem(
-      "cosmiq.rejectedLocalSubscriptionTransactions.v1.11111111-1111-4111-8111-111111111111",
+      "graceward:rejected-local-subscription-transactions:v1.11111111-1111-4111-8111-111111111111",
     )).toBeNull();
   });
 
   it("does not let remembered local access override a StoreKit entitlement for a different user", async () => {
     globalThis.localStorage.setItem(
-      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      "graceward:local-subscription-access:v1.11111111-1111-4111-8111-111111111111",
       JSON.stringify({
         has_access: true,
         access_source: "subscription",
@@ -878,7 +878,7 @@ describe("useAccessState", () => {
       isPro: false,
       activePlan: null,
       currentEntitlement: {
-        productId: "cosmiq_premium_yearly",
+        productId: "graceward_plus_yearly",
         expirationDate: "2099-01-01T00:00:00.000Z",
         transactionId: "other-user-tx",
         appAccountToken: "22222222-2222-4222-8222-222222222222",
@@ -931,7 +931,7 @@ describe("useAccessState", () => {
 
     await waitFor(() => {
       expect(globalThis.localStorage.getItem(
-        "cosmiq.rejectedLocalSubscriptionTransactions.v1.11111111-1111-4111-8111-111111111111",
+        "graceward:rejected-local-subscription-transactions:v1.11111111-1111-4111-8111-111111111111",
       )).toContain("local-tx");
     });
     expect(result.current.accessState).toMatchObject({

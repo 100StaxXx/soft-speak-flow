@@ -99,6 +99,60 @@ describe("MentorGuidanceCard", () => {
     expect(panel).toHaveClass("mx-auto", "w-full", "max-w-[22rem]", "sm:max-w-4xl");
   });
 
+  it("keeps the panel hidden until its target-aware placement is measured", async () => {
+    const frameCallbacks: FrameRequestCallback[] = [];
+    const rafSpy = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      frameCallbacks.push(callback);
+      return frameCallbacks.length;
+    });
+    const cancelRafSpy = vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
+      const element = this as HTMLElement;
+      if (element.dataset.tutorial === "mentor-dialogue-panel" || element.dataset.testid === "mentor-guidance-card-panel") {
+        return rect({ top: 620, left: 0, width: 390, height: 224 });
+      }
+      if (element.dataset.tour === "campaign-builder-launcher") {
+        return rect({ top: 690, left: 30, width: 330, height: 58 });
+      }
+      return rect({ top: 0, left: 0, width: 0, height: 0 });
+    });
+
+    const { container } = render(<MentorGuidanceCard />);
+    const wrapper = container.querySelector('[data-tutorial="mentor-dialogue-panel"]');
+    const panel = container.querySelector('[data-testid="mentor-guidance-card-panel"]');
+
+    expect(wrapper).toHaveAttribute("data-placement-ready", "false");
+    expect(wrapper).toHaveClass("invisible");
+    expect(panel).toHaveClass("opacity-0", "translate-y-2");
+
+    act(() => {
+      document.body.insertAdjacentHTML(
+        "afterbegin",
+        '<button data-tour="campaign-builder-launcher">Create campaign</button>',
+      );
+      window.dispatchEvent(new Event("resize"));
+    });
+
+    await waitFor(() => {
+      expect(wrapper).toHaveAttribute("data-placement-ready", "true");
+      expect(wrapper).toHaveAttribute("data-entered", "false");
+      expect(wrapper).toHaveAttribute("data-placement", "floating");
+      expect(wrapper).toHaveClass("visible");
+      expect(panel).toHaveClass("opacity-0", "translate-y-2");
+    });
+
+    act(() => {
+      frameCallbacks.splice(0).forEach((callback) => callback(0));
+    });
+
+    expect(wrapper).toHaveAttribute("data-entered", "true");
+    expect(panel).toHaveClass("opacity-100", "translate-y-0");
+
+    rectSpy.mockRestore();
+    rafSpy.mockRestore();
+    cancelRafSpy.mockRestore();
+  });
+
   it("places the panel against the visible duplicate target", async () => {
     document.body.innerHTML = `
       <button data-tour="campaign-builder-launcher" data-kind="hidden" style="display:none">hidden</button>
@@ -189,7 +243,7 @@ describe("MentorGuidanceCard", () => {
     mocks.guidance.onDialogueAction = mocks.onDialogueAction;
 
     render(<MentorGuidanceCard />);
-    fireEvent.click(screen.getByRole("button", { name: "Start Tutorial" }));
+    fireEvent.click(screen.getByText("Start Tutorial"));
 
     expect(mocks.onDialogueAction).toHaveBeenCalledTimes(1);
 
@@ -237,7 +291,7 @@ describe("MentorGuidanceCard", () => {
     mocks.guidance.onDialogueAction = mocks.onDialogueAction;
 
     render(<MentorGuidanceCard />);
-    fireEvent.click(screen.getByRole("button", { name: "Start my journey" }));
+    fireEvent.click(screen.getByText("Start my journey"));
 
     expect(screen.getByText("Sage portrait")).toBeInTheDocument();
     expect(screen.getByText("Sage")).toBeInTheDocument();
@@ -255,7 +309,7 @@ describe("MentorGuidanceCard", () => {
     mocks.guidance.onDialogueAction = mocks.onDialogueAction;
 
     render(<MentorGuidanceCard />);
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByText("Continue"));
 
     expect(mocks.onDialogueAction).toHaveBeenCalledTimes(1);
 
@@ -612,6 +666,8 @@ describe("MentorGuidanceCard CSS var", () => {
   });
 
   it("writes the bottom inset variable while bottom-anchored", async () => {
+    mocks.guidance.activeTargetSelectors = [];
+    mocks.guidance.activeTargetSelector = null;
     Object.defineProperty(window, "innerHeight", {
       configurable: true,
       value: 844,
@@ -636,6 +692,8 @@ describe("MentorGuidanceCard CSS var", () => {
   });
 
   it("resets the bottom inset variable when the panel unmounts", async () => {
+    mocks.guidance.activeTargetSelectors = [];
+    mocks.guidance.activeTargetSelector = null;
     Object.defineProperty(window, "innerHeight", {
       configurable: true,
       value: 844,

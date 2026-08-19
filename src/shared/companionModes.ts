@@ -1,4 +1,5 @@
 import type { CompanionDialogueTonePack } from "../config/companionDialoguePacks";
+import { PRODUCT } from "../config/product";
 import {
   LOCKED_COMPANION_BOND_LEVEL_DIALOGUE,
   LOCKED_COMPANION_ENCOURAGEMENT_TEMPLATES,
@@ -27,6 +28,7 @@ export interface CompanionModeConfig {
 }
 
 export const DEFAULT_COMPANION_MODE: CompanionModeId = "alpha";
+const IS_GRACEWARD = PRODUCT.mode === "christian";
 
 const SHARED_BOND_DIALOGUE = {
   "1": [
@@ -35,15 +37,21 @@ const SHARED_BOND_DIALOGUE = {
   ],
   "2": [
     "A steady rhythm of reflection is beginning to take shape.",
-    "Small, faithful choices are becoming a practice.",
+    IS_GRACEWARD
+      ? "Small, faithful choices are becoming a practice."
+      : "Small, intentional choices are becoming a practice.",
   ],
   "3": [
     "Your patterns are becoming clearer, so the next step can be more personal and practical.",
     "You have practiced returning with honesty and intention.",
   ],
   "4": [
-    "You have made space for both growth and grace.",
-    "This is becoming deeper than motivation; it is a practice of faithful attention.",
+    IS_GRACEWARD
+      ? "You have made space for both growth and grace."
+      : "You have made space for both growth and balance.",
+    IS_GRACEWARD
+      ? "This is becoming deeper than motivation; it is a practice of faithful attention."
+      : "This is becoming deeper than motivation; it is a practice of intentional attention.",
   ],
   "5": [
     "You have built a meaningful practice of reflection and follow-through.",
@@ -52,10 +60,14 @@ const SHARED_BOND_DIALOGUE = {
 } satisfies Record<string, string[]>;
 
 const ALPHA_ENCOURAGEMENT = [
-  "Choose one faithful step, then give it your full attention.",
+  IS_GRACEWARD
+    ? "Choose one faithful step, then give it your full attention."
+    : "Choose one meaningful step, then give it your full attention.",
   "Courage can be quiet. Begin with what is yours to do.",
   "Let conviction guide the next step, not pressure or fear.",
-  "Do the next honest thing with steadiness and grace.",
+  IS_GRACEWARD
+    ? "Do the next honest thing with steadiness and grace."
+    : "Do the next honest thing with steadiness and care.",
 ];
 
 const CALM_ENCOURAGEMENT = [
@@ -74,9 +86,15 @@ const STRATEGIC_ENCOURAGEMENT = [
 
 const MENTOR_ENCOURAGEMENT = [
   "Character grows through small choices made with love and integrity.",
-  "A faithful practice often becomes quieter as it becomes stronger.",
-  "Choose the step that reflects who you are called to become.",
-  "Grace gives us room to grow without pretending to be perfect.",
+  IS_GRACEWARD
+    ? "A faithful practice often becomes quieter as it becomes stronger."
+    : "A meaningful practice often becomes quieter as it becomes stronger.",
+  IS_GRACEWARD
+    ? "Choose the step that reflects who you are called to become."
+    : "Choose the step that reflects who you want to become.",
+  IS_GRACEWARD
+    ? "Grace gives us room to grow without pretending to be perfect."
+    : "Self-compassion gives us room to grow without pretending to be perfect.",
 ];
 
 export const COMPANION_MODE_REGISTRY: Record<CompanionModeId, CompanionModeConfig> = {
@@ -84,10 +102,13 @@ export const COMPANION_MODE_REGISTRY: Record<CompanionModeId, CompanionModeConfi
     id: "alpha",
     label: "Steadfast",
     shortLabel: "Steadfast",
-    description: "Direct, courageous, and grounded in grace.",
+    description: IS_GRACEWARD
+      ? "Direct, courageous, and grounded in grace."
+      : "Direct, courageous, and grounded in purpose.",
     tonePack: "witty_sassy",
-    companionVoiceStyle:
-      "Steadfast mode. Direct, courageous, hopeful, and grounded in grace. Encourages one faithful next step without pressure or shame.",
+    companionVoiceStyle: IS_GRACEWARD
+      ? "Steadfast mode. Direct, courageous, hopeful, and grounded in grace. Encourages one faithful next step without pressure or shame."
+      : "Steadfast mode. Direct, courageous, hopeful, and grounded in purpose. Encourages one meaningful next step without pressure or shame.",
     journeysVoiceStyle:
       "Steadfast mode for Journeys. Confident and direct, but grounded, plainspoken, and practical.",
     personalityTraits: [
@@ -106,8 +127,9 @@ export const COMPANION_MODE_REGISTRY: Record<CompanionModeId, CompanionModeConfi
     shortLabel: "Grounded",
     description: "Warm, patient, and steady under pressure.",
     tonePack: "soft",
-    companionVoiceStyle:
-      "Grounded mode. Warm, reflective, prayer-aware, and reassuring without sounding clinical or overly precious.",
+    companionVoiceStyle: IS_GRACEWARD
+      ? "Grounded mode. Warm, reflective, prayer-aware, and reassuring without sounding clinical or overly precious."
+      : "Grounded mode. Warm, reflective, calm, and reassuring without sounding clinical or overly precious.",
     journeysVoiceStyle:
       "Grounded mode for Journeys. Clear, practical, and composed with a concise delivery.",
     personalityTraits: [
@@ -157,10 +179,13 @@ export const COMPANION_MODE_REGISTRY: Record<CompanionModeId, CompanionModeConfi
     id: "mentor",
     label: "Reflective",
     shortLabel: "Reflective",
-    description: "Thoughtful, discerning, and faith-aware.",
+    description: IS_GRACEWARD
+      ? "Thoughtful, discerning, and faith-aware."
+      : "Thoughtful, discerning, and values-aware.",
     tonePack: "soft",
-    companionVoiceStyle:
-      "Reflective mode. Thoughtful, composed, discerning, and faith-aware. Invites honest reflection without claiming spiritual authority.",
+    companionVoiceStyle: IS_GRACEWARD
+      ? "Reflective mode. Thoughtful, composed, discerning, and faith-aware. Invites honest reflection without claiming spiritual authority."
+      : "Reflective mode. Thoughtful, composed, discerning, and values-aware. Invites honest reflection without claiming special authority.",
     journeysVoiceStyle:
       "Reflective mode for Journeys. Wise, grounded, and action-oriented without sounding preachy.",
     personalityTraits: [
@@ -168,7 +193,7 @@ export const COMPANION_MODE_REGISTRY: Record<CompanionModeId, CompanionModeConfi
       "disciplined",
       "measured",
       "reflective",
-      "faith-aware",
+      IS_GRACEWARD ? "faith-aware" : "values-aware",
     ],
     encouragementTemplates: MENTOR_ENCOURAGEMENT,
     bondLevelDialogue: SHARED_BOND_DIALOGUE,

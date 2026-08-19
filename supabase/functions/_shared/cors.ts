@@ -24,14 +24,14 @@
 
 const DEFAULT_ALLOWED_ORIGINS = [
   // Production domains
-  "https://graceward.app",
-  "https://www.graceward.app",
   "https://cosmiq.app",
   "https://www.cosmiq.app",
   "https://app.cosmiq.app",
   "https://cosmiq.quest",
   "https://www.cosmiq.quest",
   "https://app.cosmiq.quest", // Native app redirect base
+  "https://graceward.app",
+  "https://www.graceward.app",
   // Capacitor apps (iOS/Android)
   "capacitor://localhost",
   "ionic://localhost",

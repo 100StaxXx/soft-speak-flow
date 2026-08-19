@@ -12,6 +12,7 @@ export interface SubmitFalKlingVideoParams {
   endImageUrl?: string | null;
   prompt: string;
   durationSeconds?: number;
+  generateAudio?: boolean;
 }
 
 export interface FalQueueSubmitResult {
@@ -32,6 +33,13 @@ export interface FalQueueResult {
   raw: Record<string, unknown>;
 }
 
+export interface CancelFalKlingRequestParams {
+  fetchFn: typeof fetch;
+  apiKey: string;
+  model: string;
+  requestId: string;
+}
+
 export class FalKlingVideoError extends Error {
   status: number | null;
   code: string;
@@ -50,7 +58,15 @@ export class FalKlingVideoError extends Error {
   }
 }
 
-const FAL_QUEUE_BASE_URL = "https://queue.fal.run";
+const readOptionalEnv = (name: string): string | undefined => {
+  try {
+    return Deno.env.get(name)?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+};
+const FAL_QUEUE_BASE_URL = (readOptionalEnv("FAL_QUEUE_BASE_URL") ||
+  "https://queue.fal.run").replace(/\/+$/, "");
 const DEFAULT_NEGATIVE_PROMPT =
   "photorealism, live action, realistic fur, realistic feathers, natural-history footage, CGI, 3D render, painterly realism, style drift, identity drift, distorted anatomy, extra limbs, extra heads, text, captions, logos, franchise resemblance, cuts, scene changes, jitter, blur, low quality";
 
@@ -107,6 +123,43 @@ const falQueueRequestUrls = (
 const shouldTryNextQueueUrl = (error: unknown): boolean =>
   error instanceof FalKlingVideoError &&
   (error.status === 404 || error.status === 405);
+
+export const cancelFalKlingRequest = async ({
+  fetchFn,
+  apiKey,
+  model,
+  requestId,
+}: CancelFalKlingRequestParams): Promise<boolean> => {
+  const urls = falQueueRequestUrls(model, requestId, "/cancel");
+  for (const [index, url] of urls.entries()) {
+    let response: Response;
+    try {
+      response = await fetchFn(url, {
+        method: "PUT",
+        headers: { Authorization: `Key ${apiKey}` },
+      });
+    } catch (error) {
+      throw new FalKlingVideoError(
+        `fal cancellation failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        { code: "fal_cancel_failed", retryable: true },
+      );
+    }
+    if (response.ok || response.status === 409) return true;
+    const failure = new FalKlingVideoError(
+      `fal cancellation failed with status ${response.status}`,
+      {
+        status: response.status,
+        code: "fal_cancel_failed",
+        retryable: response.status === 429 || response.status >= 500,
+      },
+    );
+    if (index < urls.length - 1 && shouldTryNextQueueUrl(failure)) continue;
+    throw failure;
+  }
+  return false;
+};
 
 const parseJsonResponse = async (
   response: Response,
@@ -210,22 +263,37 @@ export const submitFalKlingVideo = async ({
   endImageUrl,
   prompt,
   durationSeconds = DEFAULT_COMPANION_ANIMATION_DURATION_SECONDS,
+  generateAudio = false,
 }: SubmitFalKlingVideoParams): Promise<FalQueueSubmitResult> => {
-  const response = await fetchFn(falQueueUrl(model), {
-    method: "POST",
-    headers: {
-      Authorization: `Key ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      start_image_url: imageUrl,
-      ...(endImageUrl ? { end_image_url: endImageUrl } : {}),
-      prompt,
-      duration: String(durationSeconds),
-      generate_audio: false,
-      negative_prompt: DEFAULT_NEGATIVE_PROMPT,
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetchFn(falQueueUrl(model), {
+      method: "POST",
+      headers: {
+        Authorization: `Key ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        start_image_url: imageUrl,
+        ...(endImageUrl ? { end_image_url: endImageUrl } : {}),
+        prompt,
+        duration: String(durationSeconds),
+        generate_audio: generateAudio,
+        negative_prompt: DEFAULT_NEGATIVE_PROMPT,
+      }),
+    });
+  } catch (error) {
+    if (error instanceof FalKlingVideoError) throw error;
+    if (error instanceof TypeError) {
+      // A connection failure after POST may mean fal accepted the job but the
+      // response never reached us. Retrying would risk duplicate paid work.
+      throw new FalKlingVideoError(
+        `fal submission outcome is ambiguous: ${error.message}`,
+        { code: "fal_submit_ambiguous", retryable: false },
+      );
+    }
+    throw error;
+  }
   const payload = await parseJsonResponse(response);
   const requestId = firstString([
     payload.request_id,

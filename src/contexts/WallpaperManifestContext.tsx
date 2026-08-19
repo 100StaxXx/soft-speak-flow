@@ -15,7 +15,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { queryKeys } from "@/lib/queryKeys";
+import { PRODUCT, type ProductMode } from "@/config/product";
 import { safeLocalStorage } from "@/utils/storage";
+import { productScopedStorageKey } from "@/config/productRuntime";
 import {
   addDaysToWallpaperDate,
   getEffectiveWallpaperDate,
@@ -52,7 +54,8 @@ interface WallpaperManifestContextValue {
 
 const WallpaperManifestContext = createContext<WallpaperManifestContextValue | null>(null);
 
-const CACHE_KEY = "wallpaper-manifest-cache-v2";
+const CACHE_KEY = productScopedStorageKey("wallpaper-manifest-cache-v2");
+const LEGACY_CACHE_KEY = "wallpaper-manifest-cache-v2";
 const CACHE_VERSION = 3;
 
 interface WallpaperManifestCachePayload {
@@ -84,7 +87,17 @@ const mergeDateKeys = (current: string[], next: string[]) => (
 const readWallpaperManifestCache = (
   targetDates: string[],
 ): WallpaperManifestCachePayload | null => {
-  const raw = safeLocalStorage.getItem(CACHE_KEY);
+  // The live wallpaper catalog predates Graceward and contains Cosmiq art.
+  // Fail closed until that backend catalog has an explicit product column.
+  if (PRODUCT.mode !== "cosmiq") {
+    safeLocalStorage.removeItem(CACHE_KEY);
+    safeLocalStorage.removeItem(LEGACY_CACHE_KEY);
+    return null;
+  }
+
+  const currentRaw = safeLocalStorage.getItem(CACHE_KEY);
+  const legacyRaw = currentRaw ? null : safeLocalStorage.getItem(LEGACY_CACHE_KEY);
+  const raw = currentRaw ?? legacyRaw;
   if (!raw) return null;
 
   try {
@@ -108,12 +121,19 @@ const readWallpaperManifestCache = (
         .filter((dateKey): dateKey is string => typeof dateKey === "string" && targetDates.includes(dateKey))
       : Object.keys(manifestByDate);
 
-    return {
+    const normalizedCache = {
       version: CACHE_VERSION,
       savedAt: parsed.savedAt,
       manifestByDate,
       resolvedDateKeys,
-    };
+    } satisfies WallpaperManifestCachePayload;
+
+    if (legacyRaw) {
+      safeLocalStorage.setItem(CACHE_KEY, JSON.stringify(normalizedCache));
+      safeLocalStorage.removeItem(LEGACY_CACHE_KEY);
+    }
+
+    return normalizedCache;
   } catch (_error) {
     return null;
   }
@@ -122,6 +142,8 @@ const readWallpaperManifestCache = (
 const writeWallpaperManifestCache = (
   payload: Pick<WallpaperManifestCachePayload, "manifestByDate" | "resolvedDateKeys">,
 ) => {
+  if (PRODUCT.mode !== "cosmiq") return;
+
   safeLocalStorage.setItem(
     CACHE_KEY,
     JSON.stringify({
@@ -202,7 +224,14 @@ const toResolvedWallpaper = (
 
 export const fetchWallpaperManifest = async (
   dateKeys: string[],
+  productMode: ProductMode = PRODUCT.mode,
 ) => {
+  // Do not expose the shared legacy Cosmiq catalog in Graceward. Graceward
+  // uses its bundled product-specific fallbacks until the catalog is scoped.
+  if (productMode !== "cosmiq") {
+    return {} as Record<string, Partial<Record<WallpaperPageKey, LiveWallpaperManifestEntry>>>;
+  }
+
   const uniqueDates = [...new Set(dateKeys)].filter(Boolean);
   if (uniqueDates.length === 0) {
     return {} as Record<string, Partial<Record<WallpaperPageKey, LiveWallpaperManifestEntry>>>;

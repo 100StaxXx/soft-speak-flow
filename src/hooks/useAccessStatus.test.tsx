@@ -9,6 +9,12 @@ const mocks = vi.hoisted(() => ({
     access_source: "none",
     trial_ends_at: null,
     subscribed: false,
+  } as {
+    has_access: boolean;
+    access_source: string;
+    trial_ends_at: string | null;
+    subscribed: boolean;
+    status?: string | null;
   },
   accessLoading: false,
 }));

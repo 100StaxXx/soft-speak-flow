@@ -63,6 +63,11 @@ import {
   mergeCompletionFeedbackDaySignalTasks,
   type CompletionFeedbackDaySignalTask,
 } from "@/utils/completionFeedbackDaySignals";
+import {
+  dispatchCalendarTaskUpdated,
+  requestCalendarTaskDeleteSync,
+} from "@/utils/calendarSyncEvents";
+import { dispatchCompanionAgendaEvent } from "@/lib/companionAgendaEvents";
 
 export {
   getTaskCompletionDisciplineAward,
@@ -1446,6 +1451,7 @@ export const useTaskMutations = (taskDate: string) => {
         toast(queuedToast);
         return;
       }
+      dispatchCalendarTaskUpdated(createdTask?.id);
       toast({ title: "Action added" });
       const warningToast = getTaskCreateWarningToast(createdTask?.postCreateWarnings ?? []);
       if (warningToast) {
@@ -1781,6 +1787,12 @@ export const useTaskMutations = (taskDate: string) => {
       if (result?.queued) {
         if (completed === true && !wasAlreadyCompleted) {
           syncCompletionFeedbackQueuedDayCompletion(taskId, true, taskDate, completedAt);
+          dispatchCompanionAgendaEvent({
+            eventType: "task-complete",
+            category: taskCategory,
+            taskId,
+            taskTitle: taskText,
+          });
         }
         toast({
           title: "Action update queued",
@@ -1788,6 +1800,8 @@ export const useTaskMutations = (taskDate: string) => {
         });
         return;
       }
+
+      dispatchCalendarTaskUpdated(taskId);
 
       // Handle undo success
       if (isUndo) {
@@ -1807,6 +1821,12 @@ export const useTaskMutations = (taskDate: string) => {
         window.dispatchEvent(new CustomEvent('action-completed'));
         window.dispatchEvent(new CustomEvent('mission-completed'));
         window.dispatchEvent(new CustomEvent('quest-completed'));
+        dispatchCompanionAgendaEvent({
+          eventType: "task-complete",
+          category: taskCategory,
+          taskId,
+          taskTitle: taskText,
+        });
 
         console.log('[TaskMutations] About to track completion:', {
           taskId,
@@ -1983,6 +2003,8 @@ export const useTaskMutations = (taskDate: string) => {
         });
         return { queued: true };
       }
+
+      await requestCalendarTaskDeleteSync(remoteTaskId);
 
       const { error } = await supabase
         .from('daily_tasks')
@@ -2494,6 +2516,8 @@ export const useTaskMutations = (taskDate: string) => {
         return;
       }
 
+      dispatchCalendarTaskUpdated(variables.taskId);
+
       if (data?.attachmentsSkippedDueToSchema) {
         toast({
           title: "Attachments unavailable",
@@ -2716,7 +2740,7 @@ export const useTaskMutations = (taskDate: string) => {
       }
       return { ...normalizedScheduling, queued: false };
     }),
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
       if (data?.queued) {
@@ -2725,6 +2749,7 @@ export const useTaskMutations = (taskDate: string) => {
           description: "We'll sync this move when connection is restored.",
         });
       }
+      if (!data?.queued) dispatchCalendarTaskUpdated(variables.taskId);
       if (data?.normalizedToInbox) {
         toast({
           title: "Moved to Inbox",
@@ -2834,6 +2859,7 @@ export const useTaskMutations = (taskDate: string) => {
           description: "We'll sync this move when connection is restored.",
         });
       }
+      if (!data?.queued) dispatchCalendarTaskUpdated(data?.taskId);
       if (data?.normalizedToInbox) {
         toast({
           title: "Moved to Inbox",

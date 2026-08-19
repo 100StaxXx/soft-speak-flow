@@ -150,6 +150,14 @@ vi.mock("@/hooks/useCompanion", () => ({
   }),
 }));
 
+vi.mock("@/services/productMentorCatalog", () => ({
+  fetchActiveProductMentors: async () => {
+    const result = await mocks.mentorsEq();
+    if (result?.error) throw result.error;
+    return result?.data ?? [];
+  },
+}));
+
 vi.mock("@/utils/mentorExplanation", () => ({
   generateMentorExplanation: () => ({
     title: "Your Guide is: The Sage",

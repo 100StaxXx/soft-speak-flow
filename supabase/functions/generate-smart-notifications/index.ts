@@ -10,6 +10,7 @@ import {
   resolveCompanionSpiritLockProfile,
 } from "../_shared/companionSpiritLock.ts";
 import { requireServiceRoleAuth } from "../_shared/auth.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 import {
   NOTIFICATION_COMPANION_FALLBACK_NAME,
   isAssignedCompanionName,
@@ -521,6 +522,10 @@ serve(async (req) => {
 
     for (const profile of profiles || []) {
       try {
+        if (await resolveUserProductMode(supabase, profile.id) !== "cosmiq") {
+          continue;
+        }
+
         const dedupeKey = `smart_notification:${profile.id}:${today}`;
 
         // Check if user already has a notification scheduled for today
@@ -555,7 +560,7 @@ serve(async (req) => {
             .eq('user_id', profile.id)
             .maybeSingle(),
           profile.selected_mentor_id 
-            ? supabase.from('graceward_guides').select('name, tone_description').eq('id', profile.selected_mentor_id).maybeSingle()
+            ? supabase.from('mentors').select('name, tone_description').eq('id', profile.selected_mentor_id).maybeSingle()
             : Promise.resolve({ data: null }),
           supabase
             .from('daily_check_ins')

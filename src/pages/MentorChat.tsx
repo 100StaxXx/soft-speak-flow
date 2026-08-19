@@ -17,12 +17,14 @@ import { useHapticFeedback } from "@/hooks/useHapticFeedback";
 import { PageTransition } from "@/components/PageTransition";
 import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
+import { fetchProductMentorById } from "@/services/productMentorCatalog";
 import {
   getConsultMentorIdFromState,
   withConsultMentorState,
 } from "@/utils/mentorChatLocationState";
 import { useDailyGuideThread } from "@/hooks/useDailyGuideThread";
 import { buildDailyGuideContinuityContext } from "@/lib/dailyGuideThread";
+import { PRODUCT } from "@/config/product";
 
 
 export default function MentorChat() {
@@ -79,14 +81,7 @@ export default function MentorChat() {
     queryKey: ['mentor', currentChatMentorId],
     queryFn: async () => {
       if (!currentChatMentorId) return null;
-      const { data, error } = await supabase
-        .from('graceward_guides')
-        .select('*')
-        .eq('id', currentChatMentorId)
-        .maybeSingle();
-      
-      if (error) throw error;
-      return data;
+      return fetchProductMentorById(currentChatMentorId);
     },
     enabled: !!currentChatMentorId,
   });
@@ -95,14 +90,7 @@ export default function MentorChat() {
     queryKey: ['mentor-primary', resolvedMentorId],
     queryFn: async () => {
       if (!resolvedMentorId) return null;
-      const { data, error } = await supabase
-        .from('graceward_guides')
-        .select('id, name')
-        .eq('id', resolvedMentorId)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data;
+      return fetchProductMentorById(resolvedMentorId);
     },
     enabled: Boolean(resolvedMentorId && isConsultMode),
   });
@@ -291,7 +279,7 @@ export default function MentorChat() {
             <p className="text-sm text-muted-foreground text-center">
               {isConsultMode && primaryMentor?.name
                 ? `${primaryMentor.name} remains your primary guide`
-                : "Reflect and plan with your Graceward Guide"}
+                : `Reflect and plan with your ${PRODUCT.name} Guide`}
             </p>
           </div>
         </div>
@@ -390,13 +378,15 @@ export default function MentorChat() {
         description={
           isConsultMode
             ? `${mentor.name} is joining this conversation as a consult. ${primaryMentor?.name || "Your primary guide"} is still your main guide across the app.`
-            : "Your Graceward Guide offers a consistent voice for reflection, encouragement, and practical next steps."
+            : `Your ${PRODUCT.name} Guide offers a consistent voice for reflection, encouragement, and practical next steps.`
         }
         features={[
           "Reflect on what you are carrying",
           "Turn intentions into practical next steps",
           "Receive encouragement in your Guide's tone",
-          "Bring weightier spiritual questions to Scripture and trusted pastoral care"
+          PRODUCT.mode === "christian"
+            ? "Bring weightier spiritual questions to Scripture and trusted pastoral care"
+            : "Review important health, legal, financial, or safety questions with a qualified professional"
         ]}
         tip={
           isConsultMode

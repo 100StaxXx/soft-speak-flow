@@ -240,7 +240,7 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
           <StoryJournalInfoTooltip />
         </div>
         <p className="text-muted-foreground">
-          New chapters unlock with each Graceward form, from the first hatch through Grand.
+          New chapters unlock as your companion grows, from the first hatch through Grand.
         </p>
       </div>
 

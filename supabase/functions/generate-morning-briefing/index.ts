@@ -18,6 +18,7 @@ import {
   enforceChristianGuidanceOutput,
   validateChristianGuidanceOutput,
 } from "../_shared/christianGuidancePolicy.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
@@ -98,6 +99,7 @@ Deno.serve(async (req) => {
     const { auth, supabase, requestId: protectedRequestId } = protectedRequest;
     requestId = protectedRequestId;
     const user = { id: auth.userId };
+    const productMode = await resolveUserProductMode(supabase, user.id);
     const costGuardrails = createCostGuardrailSession({
       supabase,
       endpointKey: "generate-morning-briefing",
@@ -171,7 +173,7 @@ Deno.serve(async (req) => {
     let mentor = null;
     if (profile?.selected_mentor_id) {
       const { data: mentorData, error: mentorError } = await supabase
-        .from('graceward_guides')
+        .from(productMode === "graceward" ? "graceward_guides" : "mentors")
         .select('id, name, tone_description, personality_traits')
         .eq('id', profile.selected_mentor_id)
         .maybeSingle();
@@ -184,7 +186,7 @@ Deno.serve(async (req) => {
     // If no mentor selected, get a default mentor
     if (!mentor) {
       const { data: defaultMentor, error: defaultMentorError } = await supabase
-        .from('graceward_guides')
+        .from(productMode === "graceward" ? "graceward_guides" : "mentors")
         .select('id, name, tone_description, personality_traits')
         .limit(1)
         .maybeSingle();
@@ -374,14 +376,18 @@ const challenges: ChallengeData[] = (challengesResult.data || []).map(c => ({
       return `Yesterday: ${yesterdayXP} XP earned. Last 30 days: ${weekXP} XP total.`;
     };
 
-    // Build the system prompt
-    const systemPrompt = `You are Graceward's AI morning reflection assistant. You are software, not a pastor, human mentor, or spiritual authority.
+    // Build a product-specific system prompt. Guide copy and faith policy must
+    // never cross into Cosmiq's planning experience.
+    const productPolicy = productMode === "graceward"
+      ? `You are Graceward's AI morning reflection assistant. You are software, not a pastor, human mentor, or spiritual authority.\n\n${CHRISTIAN_GUIDANCE_POLICY}`
+      : `You are Cosmiq's clearly identified AI planning and reflection guide. You are software, not a human mentor or professional adviser. Do not introduce Scripture, prayer, theology, or Graceward's faith framing. Do not make medical, mental-health, legal, or financial claims.`;
+    const systemPrompt = `${productPolicy}
 
 Communication style: ${mentorInfo.tone_description}
 
 Use only the activity data supplied below. Your job is to:
 1. Summarize observable patterns without claiming hidden knowledge or sensitive traits
-2. Notice effort, rest, and returns without treating streaks or output as spiritual worth
+2. Notice effort, rest, and returns without treating streaks or output as ${productMode === "graceward" ? "spiritual worth" : "personal worth"}
 3. Name what appears workable and what may need gentler scope
 4. Offer ONE optional, concrete focus for today
 5. Create a follow-up reflection question
@@ -389,8 +395,6 @@ Use only the activity data supplied below. Your job is to:
 Any suggested goal must be framed as a possibility grounded in explicit activity names, not as a fact about the user's identity, faith, health, calling, or private motives.
 
 Be specific where helpful, but do not shame missed work or make certainty claims.
-
-${CHRISTIAN_GUIDANCE_POLICY}
 
 Your response MUST be valid JSON with this exact structure:
 {
@@ -423,7 +427,7 @@ ${calculateXPSummary()}
 
 ---
 
-Based only on this data, generate a grounded morning reflection. Describe possible goals cautiously, notice progress without spiritual scoring, and offer one humane focus for today.`;
+Based only on this data, generate a grounded morning reflection. Describe possible goals cautiously, notice progress without scoring the person's worth, and offer one humane focus for today.`;
 
     // Call OpenAI GPT-5
     const openaiResponse = await guardedFetch("https://api.openai.com/v1/chat/completions", {
@@ -504,21 +508,27 @@ Based only on this data, generate a grounded morning reflection. Describe possib
       });
     }
 
-    const sanitizedBriefing = enforceChristianGuidanceOutput(parsedResponse.briefing.trim());
+    const sanitizedBriefing = productMode === "graceward"
+      ? enforceChristianGuidanceOutput(parsedResponse.briefing.trim())
+      : parsedResponse.briefing.trim();
     const sanitizedInferredGoals = toStringArray(parsedResponse.inferredGoals)
-      .filter((goal) => validateChristianGuidanceOutput(goal).safe)
+      .filter((goal) => productMode !== "graceward" || validateChristianGuidanceOutput(goal).safe)
       .slice(0, 3);
     const rawTodaysFocus = toTrimmedStringOrNull(parsedResponse.todaysFocus);
     const sanitizedTodaysFocus = rawTodaysFocus
-      ? enforceChristianGuidanceOutput(rawTodaysFocus, {
-        fallback: "Choose one small action that serves what matters most today.",
-      })
+      ? (productMode === "graceward"
+        ? enforceChristianGuidanceOutput(rawTodaysFocus, {
+          fallback: "Choose one small action that serves what matters most today.",
+        })
+        : rawTodaysFocus)
       : null;
     const rawActionPrompt = toTrimmedStringOrNull(parsedResponse.actionPrompt);
     const sanitizedActionPrompt = rawActionPrompt
-      ? enforceChristianGuidanceOutput(rawActionPrompt, {
-        fallback: "What is one small, honest step I can take today?",
-      })
+      ? (productMode === "graceward"
+        ? enforceChristianGuidanceOutput(rawActionPrompt, {
+          fallback: "What is one small, honest step I can take today?",
+        })
+        : rawActionPrompt)
       : null;
 
     // Store the data snapshot for debugging/context

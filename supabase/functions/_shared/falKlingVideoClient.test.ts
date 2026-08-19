@@ -4,7 +4,9 @@ import {
 } from "https://deno.land/std@0.168.0/testing/asserts.ts";
 import {
   buildCompanionAnimationPrompt,
+  cancelFalKlingRequest,
   downloadFalVideo,
+  FalKlingVideoError,
   getFalKlingQueueResult,
   getFalKlingQueueStatus,
   resolveFalKlingModelFromEnv,
@@ -120,6 +122,43 @@ Deno.test("submitFalKlingVideo posts the Kling image-to-video queue payload", as
   });
 });
 
+Deno.test("submitFalKlingVideo can request native cinematic audio", async () => {
+  const bodies: Array<Record<string, unknown>> = [];
+  await submitFalKlingVideo({
+    fetchFn: ((_url: string | URL | Request, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return Promise.resolve(new Response(JSON.stringify({ request_id: "audio-request" })));
+    }) as typeof fetch,
+    apiKey: "fal-key",
+    model: "fal-ai/kling-video/v3/pro/image-to-video",
+    imageUrl: "https://example.com/start.png",
+    endImageUrl: "https://example.com/end.png",
+    prompt: "A premium reveal with sound",
+    durationSeconds: 12,
+    generateAudio: true,
+  });
+
+  assertEquals(bodies[0]?.generate_audio, true);
+});
+
+Deno.test("submitFalKlingVideo does not retry an ambiguous paid POST", async () => {
+  const error = await assertRejects(
+    () =>
+      submitFalKlingVideo({
+        fetchFn: (() =>
+          Promise.reject(new TypeError("connection reset"))) as typeof fetch,
+        apiKey: "fal-key",
+        model: "fal-ai/kling-video/v3/standard/image-to-video",
+        imageUrl: "https://example.com/start.png",
+        prompt: "Animate carefully",
+      }),
+    FalKlingVideoError,
+    "fal submission outcome is ambiguous",
+  );
+  assertEquals(error.code, "fal_submit_ambiguous");
+  assertEquals(error.retryable, false);
+});
+
 Deno.test("getFalKlingQueueStatus and result parse fal queue responses", async () => {
   const fetchFn = ((url: string | URL | Request) => {
     const stringUrl = String(url);
@@ -159,6 +198,22 @@ Deno.test("getFalKlingQueueStatus and result parse fal queue responses", async (
 
   assertEquals(status.status, "COMPLETED");
   assertEquals(result.videoUrl, "https://example.com/result.mp4");
+});
+
+Deno.test("cancelFalKlingRequest cancels a queued paid render", async () => {
+  const calls: Array<{ url: string; method: string | undefined }> = [];
+  const cancelled = await cancelFalKlingRequest({
+    fetchFn: ((url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), method: init?.method });
+      return Promise.resolve(new Response(null, { status: 204 }));
+    }) as typeof fetch,
+    apiKey: "fal-key",
+    model: "fal-ai/kling-video/v3/standard/image-to-video",
+    requestId: "request-1",
+  });
+  assertEquals(cancelled, true);
+  assertEquals(calls[0]?.method, "PUT");
+  assertEquals(calls[0]?.url.endsWith("/requests/request-1/cancel"), true);
 });
 
 Deno.test("downloadFalVideo rejects empty video payloads", async () => {

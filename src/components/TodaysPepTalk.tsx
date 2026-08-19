@@ -8,7 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
-import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp, Wand2, Loader2, History, MessageCircle, Check } from "lucide-react";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
+import {
+  fetchProductMentorById,
+  fetchProductMentorBySlug,
+} from "@/services/productMentorCatalog";
+import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp, Wand2, Loader2, History, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { getActiveWordIndex } from "@/utils/captionTiming";
@@ -32,12 +37,7 @@ import {
 import { estimateWordTiming } from "@/utils/estimatedWordTiming";
 import { MentorAvatar } from "@/components/MentorAvatar";
 import { useDailyGuideThread } from "@/hooks/useDailyGuideThread";
-import {
-  DAILY_ENCOURAGEMENT_COMPLETED_EVENT,
-  DAILY_GUIDE_FOCUS_SELECTED_EVENT,
-  getDailyGuideQuestion,
-  type DailyGuideQuestionOption,
-} from "@/lib/dailyGuideThread";
+import { DAILY_ENCOURAGEMENT_COMPLETED_EVENT } from "@/lib/dailyGuideThread";
 import { trackProductExperience } from "@/lib/productAnalytics";
 
 interface CaptionWord {
@@ -124,15 +124,7 @@ async function fetchTodayPepTalk(
   resolvedMentorId: string,
   effectiveDate: string,
 ): Promise<TodayPepTalkQueryData> {
-  const { data: mentor, error: mentorError } = await supabase
-    .from("graceward_guides")
-    .select("id, slug, name, avatar_url, primary_color")
-    .eq("id", resolvedMentorId)
-    .maybeSingle();
-
-  if (mentorError) {
-    throw mentorError;
-  }
+  const mentor = await fetchProductMentorById(resolvedMentorId);
 
   if (!mentor) {
     return {
@@ -148,6 +140,7 @@ async function fetchTodayPepTalk(
   const { data: todayPepTalk, error: pepTalkError } = await supabase
     .from("daily_pep_talks")
     .select("*")
+    .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
     .eq("for_date", effectiveDate)
     .eq("mentor_slug", mentorSlug)
     .maybeSingle();
@@ -179,6 +172,7 @@ async function fetchTodayPepTalk(
   const { data: fallbackPepTalk, error: fallbackError } = await supabase
     .from("daily_pep_talks")
     .select("*")
+    .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
     .eq("mentor_slug", mentorSlug)
     .order("for_date", { ascending: false })
     .limit(1)
@@ -232,7 +226,7 @@ export const TodaysPepTalk = memo(() => {
   const queryClient = useQueryClient();
   const { awardPepTalkListenedAsync } = useXPRewards();
   const { checkFirstTimeAchievements, checkPepTalkListeningAchievements } = useAchievements();
-  const { thread, isUpdating: isThreadUpdating, updateThread } = useDailyGuideThread({
+  const { thread, updateThread } = useDailyGuideThread({
     enabled: isTabActive,
   });
   const [isPlaying, setIsPlaying] = useState(false);
@@ -312,15 +306,6 @@ export const TodaysPepTalk = memo(() => {
   const error = pepTalkQuery.isError && !pepTalk;
   const { refetch: refetchPepTalk } = pepTalkQuery;
   const backdropSource = pepTalkWallpaper ? "remote" : "fallback";
-  const dailyGuideQuestion = useMemo(
-    () => getDailyGuideQuestion(pepTalk?.topic_category),
-    [pepTalk?.topic_category],
-  );
-  const selectedFocusOption = useMemo(
-    () => dailyGuideQuestion.options.find((option) => option.id === thread?.focus_option_id) ?? null,
-    [dailyGuideQuestion.options, thread?.focus_option_id],
-  );
-
   useEffect(() => {
     setCurrentTime(0);
     setDuration(0);
@@ -497,11 +482,9 @@ export const TodaysPepTalk = memo(() => {
           typeof generatedPepTalk.mentor_slug === "string"
             ? generatedPepTalk.mentor_slug
             : nextMentorSlug;
-        const { data: generatedMentor } = await supabase
-          .from("graceward_guides")
-          .select("id, name, slug, avatar_url, primary_color")
-          .eq("slug", generatedMentorSlug)
-          .maybeSingle();
+        const generatedMentor = await fetchProductMentorBySlug(
+          generatedMentorSlug,
+        ).catch(() => null);
 
         return {
           pepTalk: normalizeDailyPepTalk(generatedPepTalk, generatedMentor?.name),
@@ -748,41 +731,6 @@ export const TodaysPepTalk = memo(() => {
       audio.removeEventListener("ended", handleEnded);
     };
   }, [announceEncouragementCompleted, maybeAwardPepTalkXP, pepTalk?.id]);
-
-  const handleFocusSelection = async (option: DailyGuideQuestionOption) => {
-    if (!mentor?.id || !pepTalk?.id || thread?.focus_answered_at || isThreadUpdating) return;
-
-    await updateThread({
-      mentor_id: mentor.id,
-      mentor_name: mentor.name,
-      daily_pep_talk_id: pepTalk.id,
-      encouragement_title: pepTalk.title,
-      guide_question_id: dailyGuideQuestion.id,
-      guide_question: dailyGuideQuestion.prompt,
-      focus_option_id: option.id,
-      focus_label: option.label,
-      focus_category: option.category,
-      focus_answered_at: new Date().toISOString(),
-      companion_response: option.companionResponse,
-      companion_acknowledged_at: null,
-    });
-    void trackProductExperience("focus_selected", {
-      surface: "today",
-      properties: {
-        category: option.category,
-        option_id: option.id,
-      },
-    });
-
-    window.dispatchEvent(new CustomEvent(DAILY_GUIDE_FOCUS_SELECTED_EVENT, {
-      detail: {
-        category: option.category,
-        focusLabel: option.label,
-        guideName: mentor.name,
-        source: "guide",
-      },
-    }));
-  };
 
   const openGuideConversation = () => {
     if (!pepTalk || !mentor) return;
@@ -1199,65 +1147,6 @@ export const TodaysPepTalk = memo(() => {
             <p className="text-sm text-muted-foreground leading-relaxed">
               {pepTalk.summary}
             </p>
-          </div>
-
-          <div className="rounded-2xl border border-primary/25 bg-background/65 p-4 text-left shadow-soft backdrop-blur-sm">
-            {thread?.companion_answered_at && thread.focus_label ? (
-              <div className="flex items-start gap-3">
-                <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary">
-                  <Check className="h-4 w-4" aria-hidden="true" />
-                </span>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
-                    Your Guide receives the path
-                  </p>
-                  <p className="mt-1.5 text-sm font-semibold leading-6 text-foreground">
-                    {thread.focus_label}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-foreground/70">
-                    Your choice with your Companion now connects this encouragement, today’s quest, your next Guide conversation, and tonight’s reflection.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <>
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
-                  {mentor?.name ?? pepTalk.mentor_name ?? "Your Guide"} asks
-                </p>
-                <p className="mt-1.5 text-sm font-semibold leading-6 text-foreground">
-                  {dailyGuideQuestion.prompt}
-                </p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-3" role="group" aria-label="Choose today's focus">
-                  {dailyGuideQuestion.options.map((option) => {
-                    const selected = selectedFocusOption?.id === option.id;
-                    return (
-                      <Button
-                        key={option.id}
-                        type="button"
-                        variant={selected ? "default" : "outline"}
-                        size="sm"
-                        className="h-auto min-h-10 whitespace-normal rounded-xl px-3 py-2 leading-4 disabled:opacity-100"
-                        disabled={Boolean(thread?.focus_answered_at) || isThreadUpdating}
-                        aria-pressed={selected}
-                        onClick={() => void handleFocusSelection(option)}
-                      >
-                        {selected ? <Check className="mr-1.5 h-3.5 w-3.5 shrink-0" /> : null}
-                        {option.label}
-                      </Button>
-                    );
-                  })}
-                </div>
-                {thread?.focus_label ? (
-                  <p className="mt-3 text-xs leading-5 text-foreground/70">
-                    Today’s thread is carrying <span className="font-semibold text-foreground">{thread.focus_label}</span> into your quest, Companion, and evening reflection.
-                  </p>
-                ) : (
-                  <p className="mt-3 text-xs leading-5 text-foreground/60">
-                    Choose once and Graceward will carry this focus through the rest of your day.
-                  </p>
-                )}
-              </>
-            )}
           </div>
 
           <audio

@@ -49,18 +49,16 @@ Graceward Plus adds deeper guided reflection, ready-made daily practices, Guide 
 
 ## URLs
 
-- Support: `https://app.cosmiq.quest/help`
-- Privacy policy: `https://app.cosmiq.quest/privacy`
-- Terms: `https://app.cosmiq.quest/terms`
-- Marketing: `https://app.cosmiq.quest`
-
-These URLs can move to the Graceward domain without changing the binary once the new domain is registered and deployed.
+- Support: `https://graceward.app/help`
+- Privacy policy: `https://graceward.app/privacy`
+- Terms: `https://graceward.app/terms`
+- Marketing: `https://graceward.app`
 
 ## Review notes
 
 Graceward is a Christian daily-practice application. AI-assisted Guide responses are clearly disclosed and constrained from claiming spiritual authority, divine revelation, pastoral status, or certainty about God's private will. Reviewed Scripture excerpts are stored as curated records and identify their translation.
 
-Sign in with Apple and Google are available. Calendar, camera, microphone, speech recognition, photo-library, and notification access are optional and requested only when the corresponding feature is used.
+Sign in with Apple and email are available. Calendar, camera, microphone, speech recognition, photo-library, and notification access are optional and requested only when the corresponding feature is used.
 
 ## Pre-order
 

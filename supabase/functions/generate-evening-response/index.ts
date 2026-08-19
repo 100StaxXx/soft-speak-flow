@@ -13,6 +13,7 @@ import {
   CHRISTIAN_GUIDANCE_POLICY,
   enforceChristianGuidanceOutput,
 } from "../_shared/christianGuidancePolicy.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 interface GenerateEveningResponseDeps {
   authenticate: (req: Request, corsHeaders: HeadersInit) => Promise<RequestAuth | Response>;
@@ -20,6 +21,7 @@ interface GenerateEveningResponseDeps {
   fetchImpl: typeof fetch;
   now: () => number;
   applyAbuseProtectionFn?: typeof applyAbuseProtection;
+  resolveProductMode?: (supabase: any, userId: string) => Promise<"graceward" | "cosmiq">;
 }
 
 const MODEL_NAME = "google/gemini-2.5-flash";
@@ -125,6 +127,11 @@ export async function handleGenerateEveningResponse(
       return errorResponse(404, "Reflection not found", corsHeaders);
     }
 
+    const productMode = await (deps.resolveProductMode ?? resolveUserProductMode)(
+      supabase,
+      requestAuth.userId,
+    );
+
     if (typeof supabase.rpc === "function") {
       const abuseResult = await (deps.applyAbuseProtectionFn ?? applyAbuseProtection)(req, supabase, {
         profileKey: "ai.standard",
@@ -150,7 +157,7 @@ export async function handleGenerateEveningResponse(
     let mentorTone = "warm and supportive";
     if (reflection.profiles?.selected_mentor_id) {
       const { data: mentor } = await supabase
-        .from("graceward_guides")
+        .from(productMode === "graceward" ? "graceward_guides" : "mentors")
         .select("name, tone_description")
         .eq("id", reflection.profiles.selected_mentor_id)
         .single();
@@ -170,10 +177,10 @@ ${reflection.additional_reflection ? `- Additional reflection: ${reflection.addi
 ${reflection.tomorrow_adjustment ? `- Tomorrow adjustment: ${reflection.tomorrow_adjustment}` : ""}
 ${reflection.gratitude ? `- Gratitude: ${reflection.gratitude}` : ""}
 ${dailyThread?.focus_label ? `- Focus they chose with ${mentorName} this morning: ${dailyThread.focus_label}` : ""}
-${dailyThread?.focus_label ? `- Connected Faithful Step: ${dailyThread.practice_completed_at ? "completed" : "not recorded as complete"}` : ""}
+${dailyThread?.focus_label ? `- Connected ${productMode === "graceward" ? "Faithful Step" : "next step"}: ${dailyThread.practice_completed_at ? "completed" : "not recorded as complete"}` : ""}
 ${dailyThread?.companion_answer_label ? `- Companion check-in answer: ${dailyThread.companion_answer_label}` : ""}
 
-Write a brief, warm acknowledgment (2-3 sentences max) in ${mentorName}'s Guide voice. When a morning focus or Companion check-in is present, gently return to at most one relevant detail without implying success or failure. Notice gratitude, grace, difficulty, repair, rest, or a small next step without turning the day into a spiritual score. Do not make theological claims about why events happened.`;
+Write a brief, warm acknowledgment (2-3 sentences max) in ${mentorName}'s Guide voice. When a morning focus or Companion check-in is present, gently return to at most one relevant detail without implying success or failure. Notice gratitude, difficulty, repair, rest, or a small next step without turning the day into a score.${productMode === "graceward" ? " Do not make theological claims about why events happened." : " Do not introduce religious or theological framing."}`;
 
     const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openAIApiKey) {
@@ -195,7 +202,9 @@ Write a brief, warm acknowledgment (2-3 sentences max) in ${mentorName}'s Guide 
         messages: [
           {
             role: "system",
-            content: `You are Graceward's AI reflection assistant. Keep responses brief, warm, and transparent about your limits.\n\n${CHRISTIAN_GUIDANCE_POLICY}`,
+            content: productMode === "graceward"
+              ? `You are Graceward's AI reflection assistant. Keep responses brief, warm, and transparent about your limits.\n\n${CHRISTIAN_GUIDANCE_POLICY}`
+              : "You are Cosmiq's clearly identified AI reflection guide. Keep responses brief, practical, warm, and non-religious. Do not import Graceward's Christian framing or claim professional authority.",
           },
           { role: "user", content: prompt },
         ],
@@ -212,7 +221,9 @@ Write a brief, warm acknowledgment (2-3 sentences max) in ${mentorName}'s Guide 
 
     const aiData = await aiResponse.json();
     const rawResponse = aiData.choices?.[0]?.message?.content?.trim();
-    const mentorResponse = rawResponse ? enforceChristianGuidanceOutput(rawResponse) : null;
+    const mentorResponse = rawResponse
+      ? (productMode === "graceward" ? enforceChristianGuidanceOutput(rawResponse) : rawResponse)
+      : null;
 
     if (mentorResponse) {
       const { error: updateError } = await supabase

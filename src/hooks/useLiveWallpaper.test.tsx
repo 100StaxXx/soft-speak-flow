@@ -2,7 +2,9 @@ import type { ReactNode } from "react";
 import { act, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { productScopedStorageKey } from "@/config/productRuntime";
 import {
+  fetchWallpaperManifest,
   WallpaperManifestProvider,
   useResolvedWallpaper,
   useWallpaperManifest,
@@ -24,6 +26,14 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
+// Exercise the live wallpaper implementation as the Cosmiq build. Graceward
+// intentionally refuses this legacy unscoped catalog and is covered below.
+vi.mock("@/config/product", () => ({
+  PRODUCT: {
+    mode: "cosmiq",
+  },
+}));
+
 vi.mock("@capacitor/core", () => ({
   Capacitor: {
     isNativePlatform: () => mocks.isNativePlatform,
@@ -36,7 +46,8 @@ vi.mock("@capacitor/app", () => ({
   },
 }));
 
-const CACHE_KEY = "wallpaper-manifest-cache-v2";
+const CACHE_KEY = productScopedStorageKey("wallpaper-manifest-cache-v2");
+const LEGACY_CACHE_KEY = "wallpaper-manifest-cache-v2";
 
 const makeQueryClient = () => new QueryClient({
   defaultOptions: {
@@ -165,6 +176,11 @@ describe("WallpaperManifestProvider", () => {
     localStorageState.store.clear();
   });
 
+  it("does not query the legacy Cosmiq wallpaper catalog for Graceward", async () => {
+    await expect(fetchWallpaperManifest(["2026-04-08"], "christian")).resolves.toEqual({});
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
+
   it("uses a remote wallpaper after a successful manifest fetch", async () => {
     mocks.from.mockImplementation(() => ({
       select: () => ({
@@ -277,6 +293,37 @@ describe("WallpaperManifestProvider", () => {
     expect(screen.getByTestId("current-date")).toHaveTextContent("2026-04-08");
     expect(screen.getByTestId("wallpaper-source")).toHaveTextContent("remote");
     expect(screen.getByTestId("wallpaper-url")).toHaveTextContent("https://example.com/today.png");
+  });
+
+  it("migrates the shipped unscoped wallpaper cache on first read", async () => {
+    localStorage.setItem(LEGACY_CACHE_KEY, JSON.stringify({
+      version: 3,
+      savedAt: "2026-04-08T10:20:00.000Z",
+      resolvedDateKeys: ["2026-04-08"],
+      manifestByDate: {
+        "2026-04-08": {
+          guide: {
+            forDate: "2026-04-08",
+            pageKey: "guide",
+            assignmentSource: "auto",
+            imageUrl: "https://example.com/legacy-cache.png",
+            mobileFocusX: 50,
+            mobileFocusY: 30,
+            desktopFocusX: 52,
+            desktopFocusY: 34,
+            updatedAt: "2026-04-08T10:00:00.000Z",
+          },
+        },
+      },
+    }));
+
+    await renderProvider(<TestConsumer />, false);
+
+    expect(screen.getByTestId("wallpaper-url")).toHaveTextContent(
+      "https://example.com/legacy-cache.png",
+    );
+    expect(localStorage.getItem(CACHE_KEY)).toContain("legacy-cache.png");
+    expect(localStorage.getItem(LEGACY_CACHE_KEY)).toBeNull();
   });
 
   it("switches to the preloaded next-day wallpaper at the 2 AM boundary without showing the old date again", async () => {

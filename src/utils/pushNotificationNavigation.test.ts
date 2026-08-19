@@ -25,11 +25,27 @@ describe("push notification navigation", () => {
     ).toBe("/guide");
   });
 
-  it("maps Cosmiq task deep links to Today", () => {
+  it("maps Cosmiq task deep links to Today only for Cosmiq", () => {
     expect(
       resolvePushNotificationDestination({
         deepLink: "cosmiq://task/task-2",
-      }),
+      }, null, "cosmiq"),
+    ).toBe("/mentor");
+  });
+
+  it("does not honor a Cosmiq app URL in Graceward", () => {
+    expect(
+      resolvePushNotificationDestination({
+        url: "https://app.cosmiq.quest/journeys?day=today",
+      }, null, "christian"),
+    ).toBe("/mentor");
+  });
+
+  it("does not honor a Graceward app URL in Cosmiq", () => {
+    expect(
+      resolvePushNotificationDestination({
+        url: "https://graceward.app/pep-talk/private",
+      }, null, "cosmiq"),
     ).toBe("/mentor");
   });
 

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { getAuthUserAccountEmail } from "@/utils/authUser";
 
 import { ProfilePreferences } from "@/types/profile";
 
@@ -111,7 +112,7 @@ export const useProfile = () => {
           .from("profiles")
           .upsert({
             id: user.id,
-            email: user.email ?? null,
+            email: getAuthUserAccountEmail(user),
           }, {
             onConflict: 'id',
             ignoreDuplicates: false

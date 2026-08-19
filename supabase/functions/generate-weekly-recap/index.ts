@@ -16,6 +16,7 @@ import {
   CHRISTIAN_GUIDANCE_POLICY,
   enforceChristianGuidanceOutput,
 } from "../_shared/christianGuidancePolicy.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 interface GenerateWeeklyRecapDeps {
   authenticate: (req: Request, corsHeaders: HeadersInit) => Promise<RequestAuth | Response>;
@@ -149,6 +150,7 @@ export async function handleGenerateWeeklyRecap(
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const productMode = await resolveUserProductMode(supabase, userId);
 
     if (typeof supabase.rpc === "function") {
       const abuseResult = await (deps.applyAbuseProtectionFn ?? applyAbuseProtection)(req, supabase, {
@@ -277,7 +279,7 @@ export async function handleGenerateWeeklyRecap(
 
       if (profile?.selected_mentor_id) {
         const { data: mentor } = await supabase
-          .from("graceward_guides")
+          .from(productMode === "graceward" ? "graceward_guides" : "mentors")
           .select("name, slug, tone_description")
           .eq("id", profile.selected_mentor_id)
           .single();
@@ -351,7 +353,7 @@ export async function handleGenerateWeeklyRecap(
       const missedCheckIns = Math.max(0, expectedWeeklyEntries - stats.checkIns);
       const missedReflections = Math.max(0, expectedWeeklyEntries - stats.reflections);
 
-      const storyPrompt = `Write a concise weekly review using the communication style of the original fictional Graceward Guide ${guideName}. Do not speak as ${guideName}, claim to be a person, or claim spiritual authority.
+      const storyPrompt = `Write a concise weekly review using the communication style of the fictional ${productMode === "graceward" ? "Graceward Guide" : "Cosmiq guide"} ${guideName}. Do not speak as ${guideName}, claim to be a person, or claim spiritual authority.
 
 GUIDE VOICE & STYLE:
 ${narrativeProfile?.narrativeVoice || "Warm and supportive"}
@@ -405,8 +407,8 @@ WRITING REQUIREMENTS:
 - Mention missed check-ins and missed reflections naturally
 - Light warmth is allowed (up to 1-2 mild encouraging lines), but avoid heavy fluff
 - Avoid poetic language, metaphors, or dramatic scene setting
-- Do not treat productivity or completion as proof of holiness, worth, or God's favor
-- Do not infer what God is doing, what God wants in this situation, or why an event happened
+- Do not treat productivity or completion as proof of ${productMode === "graceward" ? "holiness, worth, or God's favor" : "identity or personal worth"}
+- ${productMode === "graceward" ? "Do not infer what God is doing, what God wants in this situation, or why an event happened" : "Do not introduce Scripture, prayer, theology, or Graceward's faith framing"}
 - Final sentence should offer one small, optional focus for next week`;
 
       try {
@@ -421,7 +423,9 @@ WRITING REQUIREMENTS:
             messages: [
               {
                 role: "system",
-                content: `You are Graceward's AI reflection assistant. Use the communication style of the fictional Guide ${guideName} without claiming to be ${guideName}. Address the user as "you". Write plain-text review paragraphs that are readable, behavior-specific, and balanced between encouragement and accountability.\n\n${CHRISTIAN_GUIDANCE_POLICY}`,
+                content: productMode === "graceward"
+                  ? `You are Graceward's AI reflection assistant. Use the communication style of the fictional Guide ${guideName} without claiming to be ${guideName}. Address the user as "you". Write plain-text review paragraphs that are readable, behavior-specific, and balanced between encouragement and accountability.\n\n${CHRISTIAN_GUIDANCE_POLICY}`
+                  : `You are Cosmiq's clearly identified AI reflection guide. Use ${guideName}'s communication style without claiming to be a person. Address the user as "you". Write practical, behavior-specific review paragraphs. Do not introduce religious framing or professional advice.`,
               },
               { role: "user", content: storyPrompt },
             ],
@@ -433,7 +437,9 @@ WRITING REQUIREMENTS:
           const aiData = await aiResponse.json();
           const rawGeneratedRecap = aiData.choices?.[0]?.message?.content?.trim();
           const generatedRecap = rawGeneratedRecap
-            ? enforceChristianGuidanceOutput(rawGeneratedRecap)
+            ? (productMode === "graceward"
+              ? enforceChristianGuidanceOutput(rawGeneratedRecap)
+              : rawGeneratedRecap)
             : null;
           mentorStory = generatedRecap || null;
           mentorInsight = generatedRecap ? buildMentorInsightPreview(generatedRecap) : null;

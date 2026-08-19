@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import confetti from "canvas-confetti";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Volume2, VolumeX } from "lucide-react";
 import { haptics } from "@/utils/haptics";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { EvolutionErrorFallback } from "@/components/ErrorFallback";
@@ -415,6 +415,7 @@ const CompanionEvolutionContent = ({
   const hatchVideoBackdropRef = useRef<HTMLVideoElement | null>(null);
   const animationVideoRef = useRef<HTMLVideoElement | null>(null);
   const [isHatchVideoMuted, setIsHatchVideoMuted] = useState(() => globalAudio.getMuted());
+  const videoMutedRef = useRef(isHatchVideoMuted);
   const [disableHatchVideo, setDisableHatchVideo] = useState(false);
   const [hatchVideoAspectRatio, setHatchVideoAspectRatio] = useState(
     HATCH_FOREGROUND_STAGE_FALLBACK_ASPECT_RATIO,
@@ -574,6 +575,7 @@ const CompanionEvolutionContent = ({
 
   useEffect(() => {
     return globalAudio.subscribe((muted) => {
+      videoMutedRef.current = muted;
       setIsHatchVideoMuted(muted);
     });
   }, []);
@@ -582,6 +584,11 @@ const CompanionEvolutionContent = ({
     if (!hatchVideoRef.current) return;
     hatchVideoRef.current.muted = isHatchVideoMuted;
   }, [isHatchVideoMuted, useHatchVideo]);
+
+  useEffect(() => {
+    if (!animationVideoRef.current) return;
+    animationVideoRef.current.muted = isHatchVideoMuted;
+  }, [isHatchVideoMuted, shouldPrepareAnimationVideo]);
 
   useEffect(() => {
     if (!hatchVideoBackdropRef.current) return;
@@ -616,7 +623,7 @@ const CompanionEvolutionContent = ({
     const videoElement = animationVideoRef.current;
     if (!shouldPrepareAnimationVideo || !videoElement) return;
 
-    videoElement.muted = true;
+    videoElement.muted = videoMutedRef.current;
     videoElement.playsInline = true;
     videoElement.preload = "auto";
 
@@ -625,13 +632,13 @@ const CompanionEvolutionContent = ({
     } catch {
       // Some mobile browsers only allow seeking after metadata is available.
     }
-  }, [animationVideoUrl, shouldPrepareAnimationVideo]);
+  }, [animationVideoUrl, isHatchVideoMuted, shouldPrepareAnimationVideo]);
 
   useEffect(() => {
     const videoElement = animationVideoRef.current;
     if (!showAnimationVideo || !videoElement) return;
 
-    videoElement.muted = true;
+    videoElement.muted = videoMutedRef.current;
     videoElement.playsInline = true;
     try {
       videoElement.currentTime = 0;
@@ -639,14 +646,38 @@ const CompanionEvolutionContent = ({
       // Playback can still begin from the initial frame if early seeking is blocked.
     }
 
-    void videoElement.play().catch((error) => {
-      log.warn("Evolution animation video playback failed", {
-        animationVideoUrl,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      setAnimationVideoFailed(true);
-      onAnimationError?.();
-    });
+    void (async () => {
+      try {
+        await globalAudio.ensureReady();
+        await videoElement.play();
+      } catch (error) {
+        let playbackError: unknown = error;
+        if (!videoElement.muted) {
+          log.warn("Unmuted evolution cinematic was blocked, retrying muted", {
+            animationVideoUrl,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          try {
+            videoElement.currentTime = 0;
+            videoElement.muted = true;
+            await videoElement.play();
+            videoMutedRef.current = true;
+            setIsHatchVideoMuted(true);
+            return;
+          } catch (mutedError) {
+            playbackError = mutedError;
+          }
+        }
+        log.warn("Evolution animation video playback failed", {
+          animationVideoUrl,
+          error: playbackError instanceof Error
+            ? playbackError.message
+            : String(playbackError),
+        });
+        setAnimationVideoFailed(true);
+        onAnimationError?.();
+      }
+    })();
   }, [animationVideoUrl, onAnimationError, showAnimationVideo]);
 
   useEffect(() => {
@@ -1503,7 +1534,7 @@ const CompanionEvolutionContent = ({
                     src={animationVideoUrl}
                     className="absolute inset-0 z-[4] h-full w-full rounded-[2rem] object-contain shadow-2xl transition-opacity duration-500"
                     aria-hidden={!showAnimationVideo}
-                    muted
+                    muted={isHatchVideoMuted}
                     playsInline
                     preload="auto"
                     poster={revealDisplayImageUrl ?? undefined}
@@ -1535,6 +1566,28 @@ const CompanionEvolutionContent = ({
                     }}
                   />
                 )}
+
+                {showAnimationVideo ? (
+                  <button
+                    type="button"
+                    className="absolute right-3 top-3 z-[6] rounded-full border border-white/15 bg-black/55 p-2.5 text-white shadow-lg backdrop-blur-md transition hover:bg-black/75"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      const nextMuted = !isHatchVideoMuted;
+                      videoMutedRef.current = nextMuted;
+                      setIsHatchVideoMuted(nextMuted);
+                      globalAudio.setMuted(nextMuted);
+                    }}
+                    aria-label={isHatchVideoMuted ? "Unmute evolution cinematic" : "Mute evolution cinematic"}
+                    data-testid="evolution-animation-audio-toggle"
+                  >
+                    {isHatchVideoMuted ? (
+                      <VolumeX className="h-4 w-4" />
+                    ) : (
+                      <Volume2 className="h-4 w-4" />
+                    )}
+                  </button>
+                ) : null}
 
                 {(phase === "reveal" || phase === "settle") && (
                   <>

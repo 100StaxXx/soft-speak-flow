@@ -20,6 +20,7 @@ export interface AppleTransactionInfo {
   appAccountToken?: string;
   offerIdentifier?: string;
   offerType?: number;
+  bundleId?: string;
 }
 
 export interface AppleSubscriptionStatus {

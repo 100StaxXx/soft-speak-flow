@@ -363,7 +363,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({
           <DrawerHeader className="px-0 pb-4">
             <DrawerTitle className="flex items-center gap-2 text-xl">
               <Star className="w-5 h-5 text-stardust-gold fill-stardust-gold/30" />
-              Today's Graceward Rhythms
+              Today&apos;s Rhythms
             </DrawerTitle>
           </DrawerHeader>
           

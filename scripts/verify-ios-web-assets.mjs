@@ -11,7 +11,10 @@ const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 
 const distAssetsDir = path.join(projectRoot, "dist", "assets");
+const distRoot = path.join(projectRoot, "dist");
+const iosPublicRoot = path.join(projectRoot, "ios", "App", "App", "public");
 const iosAssetsDir = path.join(projectRoot, "ios", "App", "App", "public", "assets");
+const iosCapacitorConfigPath = path.join(projectRoot, "ios", "App", "App", "capacitor.config.json");
 const generatedBuildRoots = [
   path.join(projectRoot, "ios", "App", "build-cli"),
   path.join(projectRoot, "ios", "App", "build-cli-device-smoke"),
@@ -23,6 +26,20 @@ const LEGACY_JOURNEY_PATH_CONTRACT_PATTERN =
   /generate-journey-path["']?\s*,\s*\{[\s\S]{0,250}?body:\{[\s\S]{0,250}?userId:/;
 const LEGACY_JOURNEY_PATH_ERROR =
   "Missing required parameters: epicId, milestoneIndex, userId";
+const EXPECTED_NATIVE_PRODUCT = "Graceward";
+const EXPECTED_NATIVE_BUNDLE_ID = "com.darrylgraham.graceward";
+const FORBIDDEN_NATIVE_PRODUCT_PATTERNS = [
+  /Cosmiq/i,
+  /cosmiq:\/\//i,
+  /com\.darrylgraham\.revolution/i,
+];
+const PRODUCT_IDENTITY_FILES = [
+  "index.html",
+  "manifest.webmanifest",
+  "calendar/oauth/callback.html",
+  "apple-app-site-association",
+  ".well-known/apple-app-site-association",
+];
 
 const prefix = "[ios:verify-assets]";
 
@@ -32,7 +49,7 @@ const info = (message) => {
 
 const fail = (message) => {
   console.error(`${prefix} ${message}`);
-  console.error(`${prefix} Run \`npm run build && npm run ios:sync\` and retry.`);
+  console.error(`${prefix} Run \`npm run ios:sync\` and retry.`);
   process.exit(1);
 };
 
@@ -156,6 +173,70 @@ const hashFile = async (filePath) => {
   return createHash("sha256").update(fileBuffer).digest("hex");
 };
 
+const verifyGracewardNativeProductIdentity = async () => {
+  for (const relativePath of PRODUCT_IDENTITY_FILES) {
+    const distPath = path.join(distRoot, relativePath);
+    const iosPath = path.join(iosPublicRoot, relativePath);
+
+    let distContents;
+    let iosContents;
+    try {
+      [distContents, iosContents] = await Promise.all([
+        fs.readFile(distPath, "utf8"),
+        fs.readFile(iosPath, "utf8"),
+      ]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      fail(`Missing required ${EXPECTED_NATIVE_PRODUCT} identity artifact ${relativePath}: ${message}`);
+    }
+
+    if (distContents !== iosContents) {
+      fail(`Capacitor iOS identity artifact is stale: ${relativePath}`);
+    }
+
+    const forbiddenPattern = FORBIDDEN_NATIVE_PRODUCT_PATTERNS.find((pattern) =>
+      pattern.test(distContents)
+    );
+    if (forbiddenPattern) {
+      fail(
+        `${relativePath} contains a Cosmiq identifier and cannot be packaged in the ${EXPECTED_NATIVE_PRODUCT} iOS target.`,
+      );
+    }
+  }
+
+  const manifest = JSON.parse(await fs.readFile(path.join(distRoot, "manifest.webmanifest"), "utf8"));
+  if (manifest.short_name !== EXPECTED_NATIVE_PRODUCT) {
+    fail(
+      `Expected ${EXPECTED_NATIVE_PRODUCT} manifest, got ${String(manifest.short_name ?? "missing short_name")}.`,
+    );
+  }
+
+  const association = JSON.parse(
+    await fs.readFile(path.join(distRoot, "apple-app-site-association"), "utf8"),
+  );
+  const associatedAppIds = association?.applinks?.details?.map((detail) => detail.appID) ?? [];
+  const expectedAssociatedAppId = `B6VW78ABTR.${EXPECTED_NATIVE_BUNDLE_ID}`;
+  if (
+    associatedAppIds.length !== 1
+    || associatedAppIds[0] !== expectedAssociatedAppId
+  ) {
+    fail(
+      `Expected only ${expectedAssociatedAppId} in the native association artifact; got ${associatedAppIds.join(", ") || "none"}.`,
+    );
+  }
+
+  const capacitorConfig = JSON.parse(await fs.readFile(iosCapacitorConfigPath, "utf8"));
+  if (
+    capacitorConfig.appId !== EXPECTED_NATIVE_BUNDLE_ID
+    || capacitorConfig.appName !== EXPECTED_NATIVE_PRODUCT
+  ) {
+    fail(
+      `Capacitor native identity mismatch: expected ${EXPECTED_NATIVE_PRODUCT} (${EXPECTED_NATIVE_BUNDLE_ID}), `
+      + `got ${String(capacitorConfig.appName)} (${String(capacitorConfig.appId)}).`,
+    );
+  }
+};
+
 const verifyNoLegacyJourneyPathContract = async (directory, bundles) => {
   const offenders = [];
 
@@ -225,6 +306,7 @@ const verifyAssets = async () => {
 
   await verifyNoLegacyJourneyPathContract(distAssetsDir, distJavaScriptBundles);
   await verifyDirectoryMatchesDist(iosAssetsDir, distBundles, distJavaScriptBundles, "Capacitor iOS public assets");
+  await verifyGracewardNativeProductIdentity();
 
   const buildAssetDirs = new Set();
   if (scanGeneratedBuilds && !skipGeneratedBuildScan) {

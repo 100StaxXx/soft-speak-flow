@@ -83,6 +83,8 @@ import {
 import { getEffectiveMissionDate } from "@/utils/timezone";
 import { createPlanDayCompanionLaunchIntent } from "@/utils/companionPlannerLaunchContext";
 import { PRODUCT } from "@/config/product";
+import { ExternalCalendarAgenda } from "@/components/ExternalCalendarAgenda";
+import { useExternalCalendarEvents } from "@/hooks/useExternalCalendarEvents";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -215,6 +217,12 @@ const Journeys = () => {
     location.pathname === JOURNEYS_ROUTE || location.pathname === "/advanced-planner"
   );
   const journeysLocationSignature = `${location.pathname}${location.search}`;
+  const externalCalendarHorizon = isDesktopLayout && desktopPlannerMode === "week" ? "week" : "day";
+  const { events: externalCalendarEvents } = useExternalCalendarEvents(
+    selectedDate,
+    externalCalendarHorizon,
+    { enabled: PRODUCT.mode === "cosmiq" && isJourneysRouteActive },
+  );
 
   // Auth and profile for onboarding
   const { user } = useAuth();
@@ -1666,6 +1674,10 @@ const Journeys = () => {
                 sectionRef={inboxSectionRef}
               />
             </motion.div>
+          ) : null}
+
+          {PRODUCT.mode === "cosmiq" ? (
+            <ExternalCalendarAgenda events={externalCalendarEvents} />
           ) : null}
 
           {/* Main Content Area */}

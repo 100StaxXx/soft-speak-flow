@@ -626,6 +626,7 @@ interface RunAgentParams {
   request: CompanionAgentRequest;
   openAIApiKey?: string;
   requestId?: string | null;
+  productMode?: "graceward" | "cosmiq";
 }
 
 interface ToolCall {
@@ -1688,17 +1689,23 @@ async function loadCompanionId(
   supabase: any,
   userId: string,
   requestId?: string | null,
+  productMode?: "graceward" | "cosmiq",
 ) {
-  const loadWithSelect = async (selectColumns: string) =>
-    maybeSingle<Record<string, unknown>>(
-      supabase
+  const loadWithSelect = async (selectColumns: string) => {
+    let query = supabase
         .from("user_companion")
         .select(selectColumns)
-        .eq("user_id", userId)
+        .eq("user_id", userId);
+    if (productMode) {
+      query = query.eq("product_mode", productMode);
+    }
+    return maybeSingle<Record<string, unknown>>(
+      query
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
     );
+  };
 
   const companionSelects = [
     {
@@ -3525,7 +3532,13 @@ const buildAffectedEntities = (
 export async function runCompanionAgent(params: RunAgentParams) {
   const companion = await wrapSubStage(
     "context_load",
-    () => loadCompanionId(params.supabase, params.userId, params.requestId),
+    () =>
+      loadCompanionId(
+        params.supabase,
+        params.userId,
+        params.requestId,
+        params.productMode,
+      ),
   );
   const context = await wrapSubStage(
     "context_load",

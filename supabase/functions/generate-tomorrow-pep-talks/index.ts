@@ -106,6 +106,7 @@ serve(async (req) => {
           const { data: existing } = await supabase
             .from("daily_pep_talks")
             .select("id")
+            .eq("product_mode", "graceward")
             .eq("mentor_slug", mentorSlug)
             .eq("for_date", tomorrowDate)
             .maybeSingle();
@@ -133,6 +134,7 @@ serve(async (req) => {
             "generate-full-mentor-audio",
             {
               mentorSlug,
+              productMode: "graceward",
               topic_category: theme.topic_category,
               intensity: theme.intensity,
               emotionalTriggers: theme.triggers,
@@ -205,6 +207,7 @@ serve(async (req) => {
                 .from("pep_talks")
                 .insert({
                   title,
+                  product_mode: "graceward",
                   description: summary,
                   quote: script.substring(0, 200) + "...",
                   audio_url: audioUrl,
@@ -231,6 +234,7 @@ serve(async (req) => {
             },
             insertPayload: {
               mentor_slug: mentorSlug,
+              product_mode: "graceward",
               topic_category: theme.topic_category,
               emotional_triggers: theme.triggers,
               intensity: theme.intensity,

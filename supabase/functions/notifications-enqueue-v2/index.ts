@@ -20,6 +20,7 @@ import {
 } from "../_shared/dailyNotificationToggles.ts";
 import { composeNotificationCopy, type CompanionNotificationContext } from "../_shared/notificationComposer.ts";
 import { resolveNotificationCompanionContextMap } from "../_shared/companionName.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 import {
   buildDailyPepQueueDedupeKey,
   buildDailyQuoteQueueDedupeKey,
@@ -326,7 +327,17 @@ serve(async (req) => {
         return (data as ProfileRow[] | null) ?? [];
       },
       processPage: async (dailyProfiles) => {
-        const mentorIds = [...new Set(dailyProfiles.map((row) => row.selected_mentor_id).filter((value): value is string => typeof value === "string"))];
+        const productModes = await Promise.all(
+          dailyProfiles.map(async (profile) => [
+            profile.id,
+            await resolveUserProductMode(supabase, profile.id),
+          ] as const),
+        );
+        const gracewardUserIds = new Set(
+          productModes.filter(([, mode]) => mode === "graceward").map(([userId]) => userId),
+        );
+        const gracewardProfiles = dailyProfiles.filter((profile) => gracewardUserIds.has(profile.id));
+        const mentorIds = [...new Set(gracewardProfiles.map((row) => row.selected_mentor_id).filter((value): value is string => typeof value === "string"))];
         const mentors = mentorIds.length > 0
           ? (await supabase
             .from("graceward_guides")
@@ -336,7 +347,7 @@ serve(async (req) => {
         const mentorSlugById = new Map((mentors ?? []).map((row) => [row.id, row.slug]));
 
         const dailySourceProfiles: DailySourceProfile[] = [];
-        for (const profile of dailyProfiles) {
+        for (const profile of gracewardProfiles) {
           const mentorId = profile.selected_mentor_id;
           if (!mentorId) continue;
 
@@ -349,7 +360,13 @@ serve(async (req) => {
 
           const timezone = normalizeTimezone(profile.timezone);
           const localDate = getLocalDateTimeParts(now, timezone).localDate;
-          dailySourceProfiles.push({ profile, mentorId, mentorSlug, localDate, timezone });
+          dailySourceProfiles.push({
+            profile: { ...profile, daily_quote_push_enabled: false },
+            mentorId,
+            mentorSlug,
+            localDate,
+            timezone,
+          });
         }
 
         dailyProfilesScanned += dailySourceProfiles.length;
@@ -361,6 +378,7 @@ serve(async (req) => {
           ? (await supabase
             .from("daily_pep_talks")
             .select("id, mentor_slug, title, summary, for_date")
+            .eq("product_mode", "graceward")
             .in("mentor_slug", dailyMentorSlugs)
             .in("for_date", dailyLocalDates)).data as DailyPepTalkRow[] | null
           : [];
@@ -394,6 +412,7 @@ serve(async (req) => {
             ? (await supabase
               .from("quotes")
               .select("id, mentor_id, text, author")
+              .eq("product_mode", "cosmiq")
               .in("mentor_id", missingQuoteMentorIds)
               .order("id", { ascending: true })).data as QuoteRow[] | null
             : [];
@@ -553,7 +572,8 @@ serve(async (req) => {
         daily_pep_talks (
           title,
           summary,
-          mentor_slug
+          mentor_slug,
+          product_mode
         )
       `)
       .is("delivered_at", null)
@@ -563,6 +583,9 @@ serve(async (req) => {
     if (pepError) throw pepError;
 
     const pepUserIds = [...new Set((duePepPushes ?? []).map((row) => row.user_id as string))];
+    const pepProductModes = new Map(await Promise.all(
+      pepUserIds.map(async (userId) => [userId, await resolveUserProductMode(supabase, userId)] as const),
+    ));
     const pepProfileMap = await loadDailyNotificationProfileMap(supabase, pepUserIds);
     const companionMap = await loadCompanionContextMap(
       supabase,
@@ -582,6 +605,10 @@ serve(async (req) => {
       }
 
       const pepTalk = Array.isArray(push.daily_pep_talks) ? push.daily_pep_talks[0] : push.daily_pep_talks;
+      if (!pepTalk || pepTalk.product_mode !== pepProductModes.get(push.user_id)) {
+        disabledPepSourceIds.push(push.id);
+        continue;
+      }
       inserts.push(rowForQueue({
         userId: push.user_id,
         type: "daily_pep",
@@ -613,6 +640,9 @@ serve(async (req) => {
     if (dueQuoteError) throw dueQuoteError;
 
     const quoteUserIds = [...new Set((dueQuotePushes ?? []).map((row) => row.user_id as string))];
+    const quoteProductModes = new Map(await Promise.all(
+      quoteUserIds.map(async (userId) => [userId, await resolveUserProductMode(supabase, userId)] as const),
+    ));
     const quoteProfileMap = await loadDailyNotificationProfileMap(supabase, quoteUserIds);
     const dueDailyQuoteIds = [...new Set((dueQuotePushes ?? []).map((row) => row.daily_quote_id as string))];
     const dueDailyQuotes = dueDailyQuoteIds.length > 0
@@ -628,12 +658,17 @@ serve(async (req) => {
       ? (await supabase
         .from("quotes")
         .select("id, text, author, mentor_id")
+        .eq("product_mode", "cosmiq")
         .in("id", dueQuoteIds)).data as QuoteRow[] | null
       : [];
     const dueQuoteById = new Map((dueQuotes ?? []).map((row) => [row.id, row]));
 
     const disabledQuoteSourceIds: string[] = [];
     for (const push of dueQuotePushes ?? []) {
+      if (quoteProductModes.get(push.user_id) !== "cosmiq") {
+        disabledQuoteSourceIds.push(push.id);
+        continue;
+      }
       const disabledReason = getDisabledDailyNotificationReason(
         "daily_quote",
         quoteProfileMap.get(push.user_id),

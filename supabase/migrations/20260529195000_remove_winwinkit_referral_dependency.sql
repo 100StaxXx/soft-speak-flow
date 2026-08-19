@@ -1,3 +1,12 @@
+-- The legacy constraints reject the replacement `supabase` value, so they
+-- must be removed before converting existing rows. The migration is
+-- transactional; the stricter constraints are restored before commit.
+ALTER TABLE public.referral_codes
+  DROP CONSTRAINT IF EXISTS referral_codes_affiliate_provider_check;
+
+ALTER TABLE public.affiliate_conversions
+  DROP CONSTRAINT IF EXISTS affiliate_conversions_provider_check;
+
 UPDATE public.referral_codes
 SET
   affiliate_provider = 'supabase',
@@ -14,39 +23,13 @@ UPDATE public.affiliate_conversions
 SET provider = 'supabase'
 WHERE provider = 'winwinkit';
 
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'referral_codes_affiliate_provider_check'
-  ) THEN
-    ALTER TABLE public.referral_codes
-      DROP CONSTRAINT referral_codes_affiliate_provider_check;
-  END IF;
+ALTER TABLE public.referral_codes
+  ADD CONSTRAINT referral_codes_affiliate_provider_check
+  CHECK (affiliate_provider IS NULL OR affiliate_provider IN ('tolt', 'supabase'));
 
-  ALTER TABLE public.referral_codes
-    ADD CONSTRAINT referral_codes_affiliate_provider_check
-    CHECK (affiliate_provider IS NULL OR affiliate_provider IN ('tolt', 'supabase'));
-END;
-$$;
-
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'affiliate_conversions_provider_check'
-  ) THEN
-    ALTER TABLE public.affiliate_conversions
-      DROP CONSTRAINT affiliate_conversions_provider_check;
-  END IF;
-
-  ALTER TABLE public.affiliate_conversions
-    ADD CONSTRAINT affiliate_conversions_provider_check
-    CHECK (provider IN ('tolt', 'supabase'));
-END;
-$$;
+ALTER TABLE public.affiliate_conversions
+  ADD CONSTRAINT affiliate_conversions_provider_check
+  CHECK (provider IN ('tolt', 'supabase'));
 
 CREATE OR REPLACE FUNCTION public.get_applied_referral_code_state(
   p_user_id UUID

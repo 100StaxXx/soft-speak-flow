@@ -35,6 +35,28 @@ Deno.test("buildSystemPrompt enforces Graceward's Christian reflection voice ove
   assertEquals(prompt.includes("streetwise slang"), false);
 });
 
+Deno.test("buildSystemPrompt keeps Cosmiq guidance outside Graceward's faith policy", () => {
+  const prompt = buildSystemPrompt({
+    companion: {
+      product_mode: "cosmiq",
+      current_stage: 2,
+      current_mood: "steady",
+      bond_level: 3,
+    },
+    learning: null,
+    memories: [],
+    voiceTemplate: null,
+    enrichedContext: null,
+    surface: "journeys",
+  });
+
+  assertStringIncludes(prompt, "Cosmiq's AI planning, reflection, and personal-growth assistant");
+  assertStringIncludes(prompt, "Never introduce Scripture, prayer, theology");
+  assertEquals(prompt.includes("Warm, natural Christian reflection companion"), false);
+  assertEquals(prompt.includes("Offer a short prayer only when"), false);
+  assertEquals(prompt.includes("CHRISTIAN GUIDANCE SAFETY POLICY"), false);
+});
+
 Deno.test("buildSystemPrompt connects recent Guide, practice, Companion, and mood context without scoring", () => {
   const prompt = buildSystemPrompt({
     companion: null,

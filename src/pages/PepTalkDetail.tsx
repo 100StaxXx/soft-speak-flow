@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PRODUCT } from "@/config/product";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import {
@@ -54,6 +55,7 @@ const loadDailyEncouragement = async (id: string): Promise<DailyEncouragement | 
     .from("daily_pep_talks")
     .select("id, title, summary, script, audio_url, transcript, topic_category, mentor_slug")
     .eq("id", id)
+    .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
     .maybeSingle();
 
   if (dailyError) throw dailyError;
@@ -76,6 +78,7 @@ const loadDailyEncouragement = async (id: string): Promise<DailyEncouragement | 
     .from("pep_talks")
     .select("id, title, category, description, quote, audio_url, transcript, mentor_slug")
     .eq("id", id)
+    .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
     .maybeSingle();
 
   if (libraryError) throw libraryError;
@@ -285,7 +288,9 @@ export default function PepTalkDetail() {
             </Button>
 
             <p className="px-2 text-center text-xs leading-5 text-muted-foreground">
-              Graceward offers AI-generated reflection, not divine revelation or pastoral care.
+              {PRODUCT.mode === "christian"
+                ? "Graceward offers AI-generated reflection, not divine revelation or pastoral care."
+                : "Cosmiq offers AI-assisted reflection and planning, not medical, mental-health, legal, or financial advice."}
             </p>
           </main>
         </div>

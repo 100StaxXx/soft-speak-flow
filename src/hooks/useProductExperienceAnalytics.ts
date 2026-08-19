@@ -5,9 +5,10 @@ import { useProfile } from "@/hooks/useProfile";
 import { trackProductExperience } from "@/lib/productAnalytics";
 import { safeLocalStorage, safeSessionStorage } from "@/utils/storage";
 import { getEffectiveDailyDate } from "@/utils/timezone";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
-const LAST_OPEN_PREFIX = "graceward:experience:last-open";
-const OPENED_SESSION_PREFIX = "graceward:experience:opened-session";
+const LAST_OPEN_PREFIX = productScopedStorageKey("experience:last-open");
+const OPENED_SESSION_PREFIX = productScopedStorageKey("experience:opened-session");
 
 const dayDistance = (previous: string, current: string): number => {
   const previousMs = Date.parse(`${previous}T12:00:00Z`);

@@ -172,8 +172,14 @@ describe("CinematicPageBackground", () => {
     });
   });
 
-  it("omits the cosmic polish layer for quieter presets", () => {
-    render(<CinematicPageBackground preset="profile" />);
+  it.each([
+    "guide",
+    "quests",
+    "campaigns",
+    "companion",
+    "profile",
+  ] as CinematicPageBackgroundKey[])("omits Cosmiq star polish from the Graceward %s preset", (preset) => {
+    render(<CinematicPageBackground preset={preset} />);
 
     expect(
       screen.getByTestId("cinematic-background").querySelector('[data-cinematic-stars="true"]'),

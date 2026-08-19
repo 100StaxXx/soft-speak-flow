@@ -66,6 +66,54 @@ export const APPLE_BINDING_MISSING_ERROR =
   "This purchase is missing its app-account binding. Update the app and restore the purchase again.";
 export const APPLE_UNSUPPORTED_PRODUCT_ERROR =
   "This Apple product is not configured as a premium subscription.";
+export const APPLE_PRODUCT_BOUNDARY_ERROR =
+  "This Apple purchase belongs to the other app.";
+
+export type AppleProductMode = "graceward" | "cosmiq";
+
+const GRACEWARD_APPLE_PRODUCT_IDS = [
+  "graceward_plus_monthly",
+  "graceward_plus_yearly",
+  "graceward_plus_founder_yearly",
+] as const;
+const COSMIQ_APPLE_PRODUCT_IDS = [
+  "cosmiq_premium_monthly",
+  "cosmiq_premium_yearly",
+  "com.darrylgraham.revolution.monthly",
+  "com.darrylgraham.revolution.yearly",
+] as const;
+
+export function resolveAppleProductMode(
+  productId: string | null | undefined,
+): AppleProductMode | null {
+  const normalized = productId?.trim().toLowerCase();
+  if (!normalized) return null;
+  if (GRACEWARD_APPLE_PRODUCT_IDS.some((id) => id.toLowerCase() === normalized)) {
+    return "graceward";
+  }
+  if (COSMIQ_APPLE_PRODUCT_IDS.some((id) => id.toLowerCase() === normalized)) {
+    return "cosmiq";
+  }
+  return null;
+}
+
+export function resolveAppleBundleProductMode(
+  bundleId: string | null | undefined,
+): AppleProductMode | null {
+  if (bundleId === "com.darrylgraham.graceward") return "graceward";
+  if (bundleId === "com.darrylgraham.revolution") return "cosmiq";
+  return null;
+}
+
+export function assertAppleProductBoundary(
+  productId: string | null | undefined,
+  expectedProductMode: AppleProductMode | null,
+): void {
+  const actualProductMode = resolveAppleProductMode(productId);
+  if (actualProductMode && expectedProductMode && actualProductMode !== expectedProductMode) {
+    throw new Error(APPLE_PRODUCT_BOUNDARY_ERROR);
+  }
+}
 
 export function getDiscountedYearlyOfferId() {
   return (

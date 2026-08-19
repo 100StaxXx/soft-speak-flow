@@ -12,6 +12,7 @@ import {
   buildEstablishedProfileSelfHealPatch,
   getOnboardingGateState,
 } from "@/utils/profileOnboarding";
+import { PRODUCT } from "@/config/product";
 
 const ONBOARDING_GATE_BYPASS_PATHS = new Set([
   "/welcome",
@@ -86,7 +87,7 @@ export const OnboardingExperienceGate = ({ children }: { children: ReactNode }) 
   const authPending = status === "loading" || status === "recovering" || authLoading;
   const companionDecisionPending = !canResolveWithoutCompanion && companionLoading;
   if (authPending || profileLoading || companionDecisionPending) {
-    return <PageLoader message="Preparing your Graceward journey…" />;
+    return <PageLoader message={`Preparing your ${PRODUCT.name} journey…`} />;
   }
 
   if (profileError || !profile || (!canResolveWithoutCompanion && companionError)) {
@@ -98,7 +99,7 @@ export const OnboardingExperienceGate = ({ children }: { children: ReactNode }) 
           </p>
           <h1 className="mt-3 text-2xl font-semibold">We couldn't load your setup</h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            Retry before continuing so Graceward doesn't lose your place in onboarding.
+            Retry before continuing so {PRODUCT.name} doesn&apos;t lose your place in onboarding.
           </p>
           <Button
             type="button"

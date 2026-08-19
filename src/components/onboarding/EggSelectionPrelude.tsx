@@ -6,6 +6,7 @@ import {
   COMPANION_STORY_TONES,
   type CompanionStoryTone,
 } from "@/config/companionCatalog";
+import { PRODUCT } from "@/config/product";
 
 interface EggSelectionPreludeProps {
   storyTone: CompanionStoryTone;
@@ -14,15 +15,23 @@ interface EggSelectionPreludeProps {
   onBack?: () => void;
 }
 
-const PRELUDE_LINES = [
-  "Your Path has given today a direction...",
-  "Now choose a symbol to grow alongside your practice.",
-  "Your companion will make steady progress visible, one day at a time.",
-] as const;
+const PRELUDE_LINES = PRODUCT.mode === "christian"
+  ? [
+      "Your Path has given today a direction...",
+      "Now choose a symbol to grow alongside your practice.",
+      "Your companion will make steady progress visible, one day at a time.",
+    ]
+  : [
+      "Your path has given today a direction...",
+      "Now choose a companion to grow alongside your actions.",
+      "Your companion will make steady momentum visible, one day at a time.",
+    ];
 
 const TONE_PRELUDE_COPY: Record<CompanionStoryTone, string> = {
   soft_gentle: "A gentle presence can remind you to meet each day with patience.",
-  epic_adventure: "A brave presence can remind you to take the next faithful step.",
+  epic_adventure: PRODUCT.mode === "christian"
+    ? "A brave presence can remind you to take the next faithful step."
+    : "A brave presence can remind you to take the next meaningful step.",
   emotional_heartfelt: "A heartfelt presence can remind you to grow with honesty and compassion.",
   dark_intense: "A resolute presence can remind you that difficult seasons do not define you.",
   whimsical_playful: "A playful presence can remind you to notice joy along the way.",

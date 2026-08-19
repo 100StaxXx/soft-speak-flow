@@ -79,10 +79,27 @@ describe("useLivingCompanionPresence", () => {
     vi.useRealTimers();
   });
 
-  it("offers one daily question, records the answer, and does not repeat it", () => {
+  it("does not cover the Companion with an automatic daily question", () => {
+    const { result } = renderHook(() => useLivingCompanionPresence({
+      ...defaultOptions,
+      enableDailyQuestion: false,
+    }));
+
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+
+    expect(result.current.prompt).toBeNull();
+    expect(localStorage.getItem("graceward:living-companion:question:companion-1:2026-08-09")).toBeNull();
+  });
+
+  it("preserves Cosmiq's daily question, answer, and one-off behavior", () => {
     const answerListener = vi.fn();
     window.addEventListener("companion-daily-question-answered", answerListener);
-    const first = renderHook(() => useLivingCompanionPresence(defaultOptions));
+    const first = renderHook(() => useLivingCompanionPresence({
+      ...defaultOptions,
+      enableDailyQuestion: true,
+    }));
 
     act(() => {
       vi.advanceTimersByTime(3_200);
@@ -117,7 +134,10 @@ describe("useLivingCompanionPresence", () => {
     });
 
     first.unmount();
-    const second = renderHook(() => useLivingCompanionPresence(defaultOptions));
+    const second = renderHook(() => useLivingCompanionPresence({
+      ...defaultOptions,
+      enableDailyQuestion: true,
+    }));
     act(() => {
       vi.advanceTimersByTime(3_200);
     });
@@ -125,7 +145,7 @@ describe("useLivingCompanionPresence", () => {
     window.removeEventListener("companion-daily-question-answered", answerListener);
   });
 
-  it("acknowledges the Guide-led daily thread before offering a separate question", async () => {
+  it("acknowledges the Guide-led daily thread without adding a separate question", async () => {
     mocks.dailyGuideThread = {
       updated_at: "2026-08-09T09:00:00.000Z",
       companion_response: "Clarity, then. I’ll help you keep the next step simple today.",

@@ -17,6 +17,7 @@ import {
   isTierBoundaryLevel,
 } from "@/config/progression";
 import { supabase } from "@/integrations/supabase/client";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 import { useAuth } from "@/hooks/useAuth";
 import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 import { isSupabaseMissingRelationError } from "@/utils/supabaseSchemaErrors";
@@ -105,6 +106,7 @@ export const EvolutionMomentsPanel = ({
         .from("user_companion")
         .select("id")
         .eq("user_id", user.id)
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();

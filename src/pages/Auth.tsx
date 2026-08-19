@@ -1,19 +1,36 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Capacitor } from '@capacitor/core';
+import { Capacitor } from "@capacitor/core";
 import { safeNavigate } from "@/utils/nativeNavigation";
-import { SignInWithApple, SignInWithAppleResponse } from '@capacitor-community/apple-sign-in';
+import {
+  SignInWithApple,
+  SignInWithAppleResponse,
+} from "@capacitor-community/apple-sign-in";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  announceAuthProductMismatch,
+  validateSessionProductBoundary,
+  type AuthProductBoundaryResult,
+} from "@/services/authProductBoundary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
-import { getAuthRedirectPath, getProfileAwareAuthFallbackPath } from "@/utils/authRedirect";
+import {
+  getAuthRedirectPath,
+  getProfileAwareAuthFallbackPath,
+} from "@/utils/authRedirect";
+import { PRODUCT } from "@/config/product";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
+import {
+  getAuthUserAccountEmail,
+  type AuthProductMode,
+} from "@/utils/authUser";
 import { logger } from "@/utils/logger";
 import { hasWalkthroughCompleted } from "@/utils/profileOnboarding";
-import { getRedirectUrlWithPath, getRedirectUrl } from '@/utils/redirectUrl';
+import { getRedirectUrlWithPath, getRedirectUrl } from "@/utils/redirectUrl";
 import {
   isRetriableFunctionInvokeError,
   parseFunctionInvokeError,
@@ -33,7 +50,7 @@ import {
 import { Eye, EyeOff } from "lucide-react";
 
 const POST_AUTH_NAVIGATION_TIMEOUT_MS = 5000;
-const POST_AUTH_DEFAULT_PATH = '/onboarding';
+const POST_AUTH_DEFAULT_PATH = "/onboarding";
 const AUTH_GATEWAY_RETRY_DELAY_MS = 350;
 const FUNCTION_TRANSPORT_ERROR_MESSAGES = new Set([
   "edge function returned a non-2xx status code",
@@ -55,8 +72,21 @@ const AUTH_TEMPORARY_OUTAGE_MESSAGE =
 const APPLE_AUTH_TEMPORARY_OUTAGE_MESSAGE =
   "Sign in with Apple is temporarily unavailable. Please try again in a moment.";
 const ACCOUNT_CREATION_ERROR_TOAST_TITLE = "Couldn't create account";
+const getProductBoundaryErrorMessage = (
+  boundary: AuthProductBoundaryResult,
+): string => {
+  const otherProductName = boundary.actualProductMode === "cosmiq" ? "Cosmiq" : "Graceward";
+  return boundary.actualProductMode
+    ? `That session belongs to your ${otherProductName} account, so ${PRODUCT.name} signed it out. Use or create a separate ${PRODUCT.name} account.`
+    : `${PRODUCT.name} couldn't safely verify this Apple account. Use ${PRODUCT.name}'s Sign up with Apple flow to create a separate account.`;
+};
+const APPLE_NATIVE_PRODUCT_MODE: AuthProductMode =
+  PRODUCT_RUNTIME.authProductMode;
+const APPLE_NATIVE_CLIENT_ID = PRODUCT_RUNTIME.iosBundleId;
+const APPLE_NATIVE_REDIRECT_URI = `${APPLE_NATIVE_CLIENT_ID}://`;
 
-type AuthGatewayAction = "sign_in_password" | "sign_up_password" | "reset_password";
+type AuthGatewayAction =
+  "sign_in_password" | "sign_up_password" | "reset_password";
 type PostAuthProvider = "apple" | null;
 
 interface PostAuthNavigationContext {
@@ -75,32 +105,47 @@ const hasOAuthCallbackParams = (): boolean => {
   if (typeof window === "undefined") return false;
 
   const url = new URL(window.location.href);
-  return Boolean(url.searchParams.get("code") || url.hash.includes("access_token"));
+  return Boolean(
+    url.searchParams.get("code") || url.hash.includes("access_token"),
+  );
 };
 
-const authSchema = z.object({
-  email: z.string()
-    .trim()
-    .toLowerCase()
-    .email("Invalid email address")
-    .min(3, "Email too short")
-    .max(255, "Email too long")
-    .regex(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, "Invalid email format"),
-  password: z.string()
-    .min(8, "Password must be at least 8 characters")
-    .max(100, "Password too long")
-    .regex(/^(?=.*[a-zA-Z])(?=.*[0-9]|.*[!@#$%^&*])/, "Password must contain letters and at least one number or special character"),
-  confirmPassword: z.string().optional()
-}).refine((data) => {
-  // Only validate password match during signup (when confirmPassword is provided)
-  if (data.confirmPassword !== undefined) {
-    return data.password === data.confirmPassword;
-  }
-  return true;
-}, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"]
-});
+const authSchema = z
+  .object({
+    email: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .email("Invalid email address")
+      .min(3, "Email too short")
+      .max(255, "Email too long")
+      .regex(
+        /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+        "Invalid email format",
+      ),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .max(100, "Password too long")
+      .regex(
+        /^(?=.*[a-zA-Z])(?=.*[0-9]|.*[!@#$%^&*])/,
+        "Password must contain letters and at least one number or special character",
+      ),
+    confirmPassword: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      // Only validate password match during signup (when confirmPassword is provided)
+      if (data.confirmPassword !== undefined) {
+        return data.password === data.confirmPassword;
+      }
+      return true;
+    },
+    {
+      message: "Passwords do not match",
+      path: ["confirmPassword"],
+    },
+  );
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) return error.message;
@@ -121,7 +166,7 @@ const getAppleErrorDescription = (error: unknown): string => {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("apple_email_missing")) {
-    return "Apple did not share an email for this account. Remove Graceward from Sign in with Apple settings, then try again.";
+    return `Apple did not share an email for this account. Remove ${PRODUCT.name} from Sign in with Apple settings, then try again.`;
   }
 
   if (normalized.includes("nonce") || normalized.includes("security check")) {
@@ -160,11 +205,13 @@ const getAuthGatewayActionDescription = (action: AuthGatewayAction): string => {
 const isFunctionTransportErrorMessage = (message: string): boolean =>
   FUNCTION_TRANSPORT_ERROR_MESSAGES.has(message.trim().toLowerCase());
 
-const getParsedFunctionErrorCode = (parsed: ParsedFunctionInvokeError): string | undefined =>
-  parsed.code ?? parsed.responsePayload?.code;
+const getParsedFunctionErrorCode = (
+  parsed: ParsedFunctionInvokeError,
+): string | undefined => parsed.code ?? parsed.responsePayload?.code;
 
-const getParsedFunctionRequestId = (parsed: ParsedFunctionInvokeError): string | undefined =>
-  parsed.requestId ?? parsed.responsePayload?.requestId;
+const getParsedFunctionRequestId = (
+  parsed: ParsedFunctionInvokeError,
+): string | undefined => parsed.requestId ?? parsed.responsePayload?.requestId;
 
 const logAuthFunctionError = (
   label: string,
@@ -198,7 +245,10 @@ const getAuthGatewayErrorMessage = async (
     return AUTH_TEMPORARY_OUTAGE_MESSAGE;
   }
 
-  if (typeof parsed.backendMessage === "string" && parsed.backendMessage.trim()) {
+  if (
+    typeof parsed.backendMessage === "string" &&
+    parsed.backendMessage.trim()
+  ) {
     return parsed.backendMessage;
   }
 
@@ -213,7 +263,9 @@ const getAuthGatewayErrorMessage = async (
 };
 
 const getAppleAuthActionDescription = (intent: SocialAuthIntent): string =>
-  intent === "sign_in" ? "sign you in with Apple" : "create your account with Apple";
+  intent === "sign_in"
+    ? "sign you in with Apple"
+    : "create your account with Apple";
 
 const getAppleAuthErrorMessage = async (
   error: unknown,
@@ -263,9 +315,15 @@ const invokeAuthGateway = async (payload: AuthGatewayPayload) => {
   try {
     const data = await retryWithBackoff(
       async () => {
-        const { data, error } = await supabase.functions.invoke("auth-gateway", {
-          body: payload,
-        });
+        const { data, error } = await supabase.functions.invoke(
+          "auth-gateway",
+          {
+            body: {
+              ...payload,
+              productMode: PRODUCT_RUNTIME.authProductMode,
+            },
+          },
+        );
 
         if (error) {
           throw error;
@@ -288,7 +346,9 @@ const invokeAuthGateway = async (payload: AuthGatewayPayload) => {
 };
 
 const readFunctionErrorContext = async (error: unknown) => {
-  const maybeErrorWithContext = error as { context?: { json?: () => Promise<Record<string, unknown>> } };
+  const maybeErrorWithContext = error as {
+    context?: { json?: () => Promise<Record<string, unknown>> };
+  };
   if (!maybeErrorWithContext.context?.json) {
     return null;
   }
@@ -300,7 +360,6 @@ const readFunctionErrorContext = async (error: unknown) => {
   }
 };
 
-
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -311,10 +370,11 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showSignupPassword, setShowSignupPassword] = useState(false);
-  const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false);
+  const [showSignupConfirmPassword, setShowSignupConfirmPassword] =
+    useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<'apple' | null>(null);
+  const [oauthLoading, setOauthLoading] = useState<"apple" | null>(null);
   const { toast } = useToast();
   const pendingPostAuthNavigationContextRef = useRef<
     (PostAuthNavigationContext & { userId: string }) | null
@@ -329,13 +389,16 @@ const Auth = () => {
     [],
   );
 
-  const clearPendingPostAuthNavigationContext = useCallback((userId?: string | null) => {
-    const pendingContext = pendingPostAuthNavigationContextRef.current;
-    if (!pendingContext) return;
-    if (!userId || pendingContext.userId === userId) {
-      pendingPostAuthNavigationContextRef.current = null;
-    }
-  }, []);
+  const clearPendingPostAuthNavigationContext = useCallback(
+    (userId?: string | null) => {
+      const pendingContext = pendingPostAuthNavigationContextRef.current;
+      if (!pendingContext) return;
+      if (!userId || pendingContext.userId === userId) {
+        pendingPostAuthNavigationContextRef.current = null;
+      }
+    },
+    [],
+  );
 
   const resolvePostAuthNavigationContext = useCallback(
     (
@@ -347,7 +410,11 @@ const Auth = () => {
       }
 
       const pendingContext = pendingPostAuthNavigationContextRef.current;
-      if (!session?.user?.id || !pendingContext || pendingContext.userId !== session.user.id) {
+      if (
+        !session?.user?.id ||
+        !pendingContext ||
+        pendingContext.userId !== session.user.id
+      ) {
         return DEFAULT_POST_AUTH_NAVIGATION_CONTEXT;
       }
 
@@ -371,144 +438,218 @@ const Auth = () => {
     [],
   );
 
-  const handlePostAuthNavigation = useCallback(async (
-    session: Session | null,
-    source: string,
-    context?: PostAuthNavigationContext,
-  ) => {
-    const startTime = Date.now();
-    const navigationContext = resolvePostAuthNavigationContext(session, context);
-    logger.info(`[Auth ${source}] handlePostAuthNavigation START`, {
-      hasSession: !!session,
-      hasRedirected: hasRedirected.current,
-      userId: session?.user?.id?.substring(0, 8),
-      provider: navigationContext.provider,
-      intent: navigationContext.intent,
-      preferGuardedLanding: navigationContext.preferGuardedLanding,
-    });
-
-    // Synchronous guard - check and set IMMEDIATELY before any async work
-    if (!session || hasRedirected.current) {
-      logger.info(`[Auth ${source}] Skipping - session: ${!!session}, hasRedirected: ${hasRedirected.current}`);
-      return;
-    }
-    hasRedirected.current = true;
-
-    let navigationFinalized = false;
-    const finalizeNavigation = (path: string, reason: string): boolean => {
-      if (navigationFinalized) {
-        logger.debug(`[Auth ${source}] Navigation already finalized, skipping ${reason}`);
-        return false;
-      }
-
-      const normalizedPath = normalizePostAuthPath(path, navigationContext);
-      navigationFinalized = true;
-      logger.info(
-        `[Auth ${source}] Finalizing navigation to ${normalizedPath} via ${reason} (total time: ${Date.now() - startTime}ms)`,
-        {
-          rawPath: path,
-          normalizedPath,
-          provider: navigationContext.provider,
-          intent: navigationContext.intent,
-          preferGuardedLanding: navigationContext.preferGuardedLanding,
-        },
+  const handlePostAuthNavigation = useCallback(
+    async (
+      session: Session | null,
+      source: string,
+      context?: PostAuthNavigationContext,
+    ) => {
+      const startTime = Date.now();
+      const navigationContext = resolvePostAuthNavigationContext(
+        session,
+        context,
       );
-      safeNavigate(navigate, normalizedPath);
-
-      // Safety valve: if routing fails and we are still on /auth, allow retry.
-      setTimeout(() => {
-        if (window.location.pathname === '/auth') {
-          logger.warn(`[Auth ${source}] Navigation did not leave /auth, resetting redirect guard`);
-          hasRedirected.current = false;
-        }
-      }, 1500);
-
-      return true;
-    };
-
-    const emitTimeoutTelemetry = () => {
-      void Promise.resolve((async () => {
-        const telemetryStart = Date.now();
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("onboarding_completed, onboarding_data")
-          .eq("id", session.user.id)
-          .maybeSingle();
-
-        if (error) {
-          logger.warn(`[Auth ${source}] Timeout telemetry profile check failed`, { error: error.message });
-          return;
-        }
-
-        logger.info(`[Auth ${source}] Timeout telemetry profile check completed`, {
-          onboardingCompleted: data?.onboarding_completed,
-          walkthroughCompleted: hasWalkthroughCompleted(data?.onboarding_data),
-          durationMs: Date.now() - telemetryStart,
-        });
-      })()).catch((error: unknown) => {
-        logger.warn(`[Auth ${source}] Timeout telemetry failed`, { error });
+      logger.info(`[Auth ${source}] handlePostAuthNavigation START`, {
+        hasSession: !!session,
+        hasRedirected: hasRedirected.current,
+        userId: session?.user?.id?.substring(0, 8),
+        provider: navigationContext.provider,
+        intent: navigationContext.intent,
+        preferGuardedLanding: navigationContext.preferGuardedLanding,
       });
-    };
 
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const deadlineTask = new Promise<"deadline">((resolve) => {
-      timeoutId = setTimeout(() => {
-        logger.warn(`[Auth ${source}] TIMEOUT after ${POST_AUTH_NAVIGATION_TIMEOUT_MS}ms - resolving profile-aware fallback path`);
+      // Synchronous guard - check and set IMMEDIATELY before any async work
+      if (!session || hasRedirected.current) {
+        logger.info(
+          `[Auth ${source}] Skipping - session: ${!!session}, hasRedirected: ${hasRedirected.current}`,
+        );
+        return;
+      }
+      hasRedirected.current = true;
 
-        void Promise.resolve((async () => {
-          let fallbackPath = POST_AUTH_DEFAULT_PATH;
-
-          try {
-            const fallbackStartTime = Date.now();
-            fallbackPath = await getProfileAwareAuthFallbackPath(session.user.id, {
-              email: session.user.email ?? null,
-            });
-            logger.info(`[Auth ${source}] Profile-aware timeout fallback resolved to "${fallbackPath}" in ${Date.now() - fallbackStartTime}ms`);
-          } catch (error) {
-            logger.warn(`[Auth ${source}] Profile-aware timeout fallback failed, defaulting to ${POST_AUTH_DEFAULT_PATH}`, { error });
-          }
-
-          finalizeNavigation(fallbackPath, "deadline-profile-aware");
-          emitTimeoutTelemetry();
-          resolve("deadline");
-        })());
-      }, POST_AUTH_NAVIGATION_TIMEOUT_MS);
-    });
-
-    const coreTask = (async (): Promise<"core"> => {
-      try {
-        logger.info(`[Auth ${source}] Calling getAuthRedirectPath...`);
-        const redirectStartTime = Date.now();
-        const path = await getAuthRedirectPath(session.user.id, {
-          email: session.user.email ?? null,
+      const productBoundary = await validateSessionProductBoundary(session);
+      if (!productBoundary.allowed) {
+        logger.warn(`[Auth ${source}] Rejected cross-product session`, {
+          expectedProductMode: productBoundary.expectedProductMode,
+          actualProductMode: productBoundary.actualProductMode,
+          reason: productBoundary.reason,
         });
-        logger.info(`[Auth ${source}] getAuthRedirectPath returned "${path}" in ${Date.now() - redirectStartTime}ms`);
+        clearPendingSocialAuthAttempt();
+        clearPendingPostAuthNavigationContext(session.user.id);
+        announceAuthProductMismatch(productBoundary);
 
-        finalizeNavigation(path, "resolved-path");
-      } catch (error) {
-        logger.error(`[Auth ${source}] Navigation error after ${Date.now() - startTime}ms`, { error });
-        finalizeNavigation(POST_AUTH_DEFAULT_PATH, "error");
+        try {
+          await supabase.auth.signOut();
+        } catch (error) {
+          logger.warn(
+            `[Auth ${source}] Failed to clear cross-product session`,
+            { error },
+          );
+        }
+
+        hasRedirected.current = false;
+        setIsLogin(true);
+        setIsForgotPassword(false);
+        setInlineError(getProductBoundaryErrorMessage(productBoundary));
+        return;
       }
 
-      return "core";
-    })();
+      let navigationFinalized = false;
+      const finalizeNavigation = (path: string, reason: string): boolean => {
+        if (navigationFinalized) {
+          logger.debug(
+            `[Auth ${source}] Navigation already finalized, skipping ${reason}`,
+          );
+          return false;
+        }
 
-    const winner = await Promise.race([coreTask, deadlineTask]);
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
+        const normalizedPath = normalizePostAuthPath(path, navigationContext);
+        navigationFinalized = true;
+        logger.info(
+          `[Auth ${source}] Finalizing navigation to ${normalizedPath} via ${reason} (total time: ${Date.now() - startTime}ms)`,
+          {
+            rawPath: path,
+            normalizedPath,
+            provider: navigationContext.provider,
+            intent: navigationContext.intent,
+            preferGuardedLanding: navigationContext.preferGuardedLanding,
+          },
+        );
+        safeNavigate(navigate, normalizedPath);
 
-    if (winner === "deadline") {
-      logger.warn(`[Auth ${source}] Navigation deadline won race; continuing in background if needed`);
-    }
-  }, [navigate, normalizePostAuthPath, resolvePostAuthNavigationContext, toast]);
-  
+        // Safety valve: if routing fails and we are still on /auth, allow retry.
+        setTimeout(() => {
+          if (window.location.pathname === "/auth") {
+            logger.warn(
+              `[Auth ${source}] Navigation did not leave /auth, resetting redirect guard`,
+            );
+            hasRedirected.current = false;
+          }
+        }, 1500);
+
+        return true;
+      };
+
+      const emitTimeoutTelemetry = () => {
+        void Promise.resolve(
+          (async () => {
+            const telemetryStart = Date.now();
+            const { data, error } = await supabase
+              .from("profiles")
+              .select("onboarding_completed, onboarding_data")
+              .eq("id", session.user.id)
+              .maybeSingle();
+
+            if (error) {
+              logger.warn(
+                `[Auth ${source}] Timeout telemetry profile check failed`,
+                { error: error.message },
+              );
+              return;
+            }
+
+            logger.info(
+              `[Auth ${source}] Timeout telemetry profile check completed`,
+              {
+                onboardingCompleted: data?.onboarding_completed,
+                walkthroughCompleted: hasWalkthroughCompleted(
+                  data?.onboarding_data,
+                ),
+                durationMs: Date.now() - telemetryStart,
+              },
+            );
+          })(),
+        ).catch((error: unknown) => {
+          logger.warn(`[Auth ${source}] Timeout telemetry failed`, { error });
+        });
+      };
+
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+      const deadlineTask = new Promise<"deadline">((resolve) => {
+        timeoutId = setTimeout(() => {
+          logger.warn(
+            `[Auth ${source}] TIMEOUT after ${POST_AUTH_NAVIGATION_TIMEOUT_MS}ms - resolving profile-aware fallback path`,
+          );
+
+          void Promise.resolve(
+            (async () => {
+              let fallbackPath = POST_AUTH_DEFAULT_PATH;
+
+              try {
+                const fallbackStartTime = Date.now();
+                fallbackPath = await getProfileAwareAuthFallbackPath(
+                  session.user.id,
+                  {
+                    email: getAuthUserAccountEmail(session.user),
+                  },
+                );
+                logger.info(
+                  `[Auth ${source}] Profile-aware timeout fallback resolved to "${fallbackPath}" in ${Date.now() - fallbackStartTime}ms`,
+                );
+              } catch (error) {
+                logger.warn(
+                  `[Auth ${source}] Profile-aware timeout fallback failed, defaulting to ${POST_AUTH_DEFAULT_PATH}`,
+                  { error },
+                );
+              }
+
+              finalizeNavigation(fallbackPath, "deadline-profile-aware");
+              emitTimeoutTelemetry();
+              resolve("deadline");
+            })(),
+          );
+        }, POST_AUTH_NAVIGATION_TIMEOUT_MS);
+      });
+
+      const coreTask = (async (): Promise<"core"> => {
+        try {
+          logger.info(`[Auth ${source}] Calling getAuthRedirectPath...`);
+          const redirectStartTime = Date.now();
+          const path = await getAuthRedirectPath(session.user.id, {
+            email: getAuthUserAccountEmail(session.user),
+          });
+          logger.info(
+            `[Auth ${source}] getAuthRedirectPath returned "${path}" in ${Date.now() - redirectStartTime}ms`,
+          );
+
+          finalizeNavigation(path, "resolved-path");
+        } catch (error) {
+          logger.error(
+            `[Auth ${source}] Navigation error after ${Date.now() - startTime}ms`,
+            { error },
+          );
+          finalizeNavigation(POST_AUTH_DEFAULT_PATH, "error");
+        }
+
+        return "core";
+      })();
+
+      const winner = await Promise.race([coreTask, deadlineTask]);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      if (winner === "deadline") {
+        logger.warn(
+          `[Auth ${source}] Navigation deadline won race; continuing in background if needed`,
+        );
+      }
+    },
+    [
+      clearPendingPostAuthNavigationContext,
+      navigate,
+      normalizePostAuthPath,
+      resolvePostAuthNavigationContext,
+      toast,
+    ],
+  );
+
   // Ref to track Apple OAuth fallback timeout (for cleanup)
   const appleFallbackTimeout = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Ref to track if initial session check has redirected
   const hasRedirected = useRef(false);
-  
+
   // Ref to prevent re-renders during initialization
   const initializationComplete = useRef(false);
   const oauthCallbackInProgress = useRef(hasOAuthCallbackParams());
@@ -517,14 +658,20 @@ const Auth = () => {
 
   const blockSocialSignIn = useCallback(
     async (attempt: PendingSocialAuthAttempt, source: string) => {
-      logger.warn(`[Auth ${source}] Blocking social sign-in with no returning account match`, attempt);
+      logger.warn(
+        `[Auth ${source}] Blocking social sign-in with no returning account match`,
+        attempt,
+      );
       clearPendingSocialAuthAttempt();
       clearPendingPostAuthNavigationContext();
 
       try {
         await supabase.auth.signOut();
       } catch (error) {
-        logger.warn(`[Auth ${source}] Failed to clear blocked social auth session`, { error });
+        logger.warn(
+          `[Auth ${source}] Failed to clear blocked social auth session`,
+          { error },
+        );
       }
 
       hasRedirected.current = false;
@@ -536,9 +683,19 @@ const Auth = () => {
   );
 
   const handleResolvedSocialAuth = useCallback(
-    async (session: Session | null, source: string, attempt: PendingSocialAuthAttempt | null) => {
+    async (
+      session: Session | null,
+      source: string,
+      attempt: PendingSocialAuthAttempt | null,
+    ) => {
       if (!session) {
         clearPendingSocialAuthAttempt();
+        await handlePostAuthNavigation(session, source);
+        return;
+      }
+
+      const productBoundary = await validateSessionProductBoundary(session);
+      if (!productBoundary.allowed) {
         await handlePostAuthNavigation(session, source);
         return;
       }
@@ -561,7 +718,10 @@ const Auth = () => {
           return;
         }
       } catch (error) {
-        logger.warn(`[Auth ${source}] Failed to preflight social sign-in redirect, continuing`, { error });
+        logger.warn(
+          `[Auth ${source}] Failed to preflight social sign-in redirect, continuing`,
+          { error },
+        );
       }
 
       clearPendingSocialAuthAttempt();
@@ -572,7 +732,7 @@ const Auth = () => {
 
   // If we ever land back on /auth, allow redirects to run again
   useEffect(() => {
-    if (location.pathname === '/auth' && hasRedirected.current) {
+    if (location.pathname === "/auth" && hasRedirected.current) {
       hasRedirected.current = false;
     }
   }, [location.pathname]);
@@ -601,15 +761,18 @@ const Auth = () => {
       return;
     }
 
-    const platform = Capacitor.getPlatform?.() ?? 'web';
-    if (platform !== 'ios') {
+    const platform = Capacitor.getPlatform?.() ?? "web";
+    if (platform !== "ios") {
       setAppleNativeReady(false);
       return;
     }
 
-    const pluginAvailable = Capacitor.isPluginAvailable?.('SignInWithApple') ?? false;
+    const pluginAvailable =
+      Capacitor.isPluginAvailable?.("SignInWithApple") ?? false;
     if (!pluginAvailable) {
-      logger.warn('[OAuth Init] SignInWithApple plugin unavailable - falling back to web OAuth for Apple');
+      logger.warn(
+        "[OAuth Init] SignInWithApple plugin unavailable - falling back to web OAuth for Apple",
+      );
     }
     setAppleNativeReady(pluginAvailable);
   }, []);
@@ -617,7 +780,12 @@ const Auth = () => {
   // Handle OAuth callback parameters that return the user to /auth with a valid code/token
   useEffect(() => {
     const handleOAuthCallback = async () => {
-      if (typeof window === "undefined" || hasRedirected.current || !oauthCallbackInProgress.current) return;
+      if (
+        typeof window === "undefined" ||
+        hasRedirected.current ||
+        !oauthCallbackInProgress.current
+      )
+        return;
 
       const url = new URL(window.location.href);
       const hasAccessToken = url.hash.includes("access_token");
@@ -630,19 +798,32 @@ const Auth = () => {
       try {
         // If Supabase didn't automatically exchange the code, do it manually
         if (code) {
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          const { data, error } =
+            await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
-          await handleResolvedSocialAuth(data.session, "oauthCodeExchange", pendingAttempt);
+          await handleResolvedSocialAuth(
+            data.session,
+            "oauthCodeExchange",
+            pendingAttempt,
+          );
         } else {
           // Hash-based tokens (implicit flow)
-          const { data: { session } } = await supabase.auth.getSession();
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
           if (session) {
-            await handleResolvedSocialAuth(session, "oauthHashSession", pendingAttempt);
+            await handleResolvedSocialAuth(
+              session,
+              "oauthHashSession",
+              pendingAttempt,
+            );
           }
         }
       } catch (error) {
         clearPendingSocialAuthAttempt();
-        logger.error("[OAuth Callback] Failed to complete OAuth login", { error });
+        logger.error("[OAuth Callback] Failed to complete OAuth login", {
+          error,
+        });
         toast({
           title: "Error",
           description: "Something went wrong signing you in. Please try again.",
@@ -669,35 +850,50 @@ const Auth = () => {
   useEffect(() => {
     const checkSession = async () => {
       if (oauthCallbackInProgress.current) {
-        logger.debug("[Auth checkSession] Deferring session redirect while OAuth callback is processing");
+        logger.debug(
+          "[Auth checkSession] Deferring session redirect while OAuth callback is processing",
+        );
         return;
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session) {
-        await handlePostAuthNavigation(session, 'checkSession');
+        await handlePostAuthNavigation(session, "checkSession");
       }
     };
 
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       // Handle all sign-in events including setSession() which triggers TOKEN_REFRESHED
-      if (['SIGNED_IN', 'TOKEN_REFRESHED', 'INITIAL_SESSION'].includes(event) && session) {
+      if (
+        ["SIGNED_IN", "TOKEN_REFRESHED", "INITIAL_SESSION"].includes(event) &&
+        session
+      ) {
         if (oauthCallbackInProgress.current) {
-          logger.debug(`[Auth onAuthStateChange] Deferring ${event} while OAuth callback is processing`);
+          logger.debug(
+            `[Auth onAuthStateChange] Deferring ${event} while OAuth callback is processing`,
+          );
           return;
         }
 
         // Skip if already redirected by direct OAuth call, checkSession, or previous event
         if (hasRedirected.current) {
-          logger.debug(`[Auth onAuthStateChange] Skipping ${event} - already redirected`);
+          logger.debug(
+            `[Auth onAuthStateChange] Skipping ${event} - already redirected`,
+          );
           return;
         }
-        
+
         const timestamp = Date.now();
-        logger.info(`[Auth onAuthStateChange] Event: ${event} at ${timestamp}, redirecting...`);
-        await new Promise(resolve => setTimeout(resolve, 100));
+        logger.info(
+          `[Auth onAuthStateChange] Event: ${event} at ${timestamp}, redirecting...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 100));
         await handlePostAuthNavigation(session, `onAuthStateChange:${event}`);
       }
     });
@@ -715,13 +911,16 @@ const Auth = () => {
   // Import the redirect URL helper at the top of the component
   // (moved to import statement)
 
-  const showAccountCreationError = useCallback((message: string) => {
-    toast({
-      title: ACCOUNT_CREATION_ERROR_TOAST_TITLE,
-      description: message,
-      variant: "destructive",
-    });
-  }, [toast]);
+  const showAccountCreationError = useCallback(
+    (message: string) => {
+      toast({
+        title: ACCOUNT_CREATION_ERROR_TOAST_TITLE,
+        description: message,
+        variant: "destructive",
+      });
+    },
+    [toast],
+  );
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -730,10 +929,10 @@ const Auth = () => {
 
     // Sanitize inputs before validation
     const sanitizedEmail = email.trim().toLowerCase();
-    const result = authSchema.safeParse({ 
-      email: sanitizedEmail, 
+    const result = authSchema.safeParse({
+      email: sanitizedEmail,
       password,
-      confirmPassword: isLogin ? undefined : confirmPassword 
+      confirmPassword: isLogin ? undefined : confirmPassword,
     });
     if (!result.success) {
       const message = result.error.errors[0].message;
@@ -754,46 +953,65 @@ const Auth = () => {
           password,
         });
 
-        const accessToken = typeof authData.access_token === "string" ? authData.access_token : null;
-        const refreshToken = typeof authData.refresh_token === "string" ? authData.refresh_token : null;
+        const accessToken =
+          typeof authData.access_token === "string"
+            ? authData.access_token
+            : null;
+        const refreshToken =
+          typeof authData.refresh_token === "string"
+            ? authData.refresh_token
+            : null;
 
         if (!accessToken || !refreshToken) {
           throw new Error("Invalid email or password.");
         }
 
-        const { error: sessionError, data: { session } } = await supabase.auth.setSession({
+        const {
+          error: sessionError,
+          data: { session },
+        } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken,
         });
 
         if (sessionError) throw sessionError;
 
-        await handlePostAuthNavigation(session, 'passwordSignIn');
+        await handlePostAuthNavigation(session, "passwordSignIn");
       } else {
         const authData = await invokeAuthGateway({
           action: "sign_up_password",
           email: sanitizedEmail,
           password,
-          redirectTo: getRedirectUrlWithPath('/'),
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          redirectTo: getRedirectUrlWithPath("/"),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
         });
 
-        const accessToken = typeof authData.access_token === "string" ? authData.access_token : null;
-        const refreshToken = typeof authData.refresh_token === "string" ? authData.refresh_token : null;
+        const accessToken =
+          typeof authData.access_token === "string"
+            ? authData.access_token
+            : null;
+        const refreshToken =
+          typeof authData.refresh_token === "string"
+            ? authData.refresh_token
+            : null;
 
         if (accessToken && refreshToken) {
-          const { error: sessionError, data: { session } } = await supabase.auth.setSession({
+          const {
+            error: sessionError,
+            data: { session },
+          } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
 
           if (sessionError) throw sessionError;
 
-          await handlePostAuthNavigation(session, 'signUpImmediate');
+          await handlePostAuthNavigation(session, "signUpImmediate");
         } else {
           toast({
             title: "Check your email",
-            description: "We've sent you a confirmation link to complete your registration.",
+            description:
+              "We've sent you a confirmation link to complete your registration.",
           });
         }
       }
@@ -811,9 +1029,9 @@ const Auth = () => {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setInlineError(null);
-    
+
     const sanitizedEmail = email.trim().toLowerCase();
-    
+
     if (!sanitizedEmail) {
       setInlineError("Please enter your email address.");
       return;
@@ -832,7 +1050,7 @@ const Auth = () => {
       await invokeAuthGateway({
         action: "reset_password",
         email: sanitizedEmail,
-        redirectTo: getRedirectUrlWithPath('/auth/reset-password'),
+        redirectTo: getRedirectUrlWithPath("/auth/reset-password"),
       });
 
       toast({
@@ -843,13 +1061,15 @@ const Auth = () => {
       setIsForgotPassword(false);
       setEmail("");
     } catch (error) {
-      setInlineError(error instanceof Error ? error.message : "An unexpected error occurred");
+      setInlineError(
+        error instanceof Error ? error.message : "An unexpected error occurred",
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOAuthSignIn = async (provider: 'apple') => {
+  const handleOAuthSignIn = async (provider: "apple") => {
     const socialAuthIntent: SocialAuthIntent = getSocialAuthIntent(isLogin);
     let storedPendingSocialAuth = false;
 
@@ -857,110 +1077,145 @@ const Auth = () => {
     setInlineError(null);
     setOauthLoading(provider);
     console.log(`[OAuth Debug] Starting ${provider} sign-in flow`);
-    console.log(`[OAuth Debug] Platform: ${Capacitor.isNativePlatform() ? 'Native' : 'Web'}`);
-    
+    console.log(
+      `[OAuth Debug] Platform: ${Capacitor.isNativePlatform() ? "Native" : "Web"}`,
+    );
+
     try {
       const isNative = Capacitor.isNativePlatform();
-      const platform = Capacitor.getPlatform?.() ?? 'web';
-      const providerSupportsNative = isNative && platform === 'ios';
+      const platform = Capacitor.getPlatform?.() ?? "web";
+      const providerSupportsNative = isNative && platform === "ios";
 
       // Native Apple Sign-In for iOS
-      if (provider === 'apple' && providerSupportsNative && appleNativeReady) {
+      if (provider === "apple" && providerSupportsNative && appleNativeReady) {
         const appleFlowStart = Date.now();
         const applePostAuthNavigationContext: PostAuthNavigationContext = {
           provider: "apple",
           intent: socialAuthIntent,
           preferGuardedLanding: socialAuthIntent === "sign_in",
         };
-        console.log('[Apple OAuth] Initiating native Apple sign-in');
-        
+        console.log("[Apple OAuth] Initiating native Apple sign-in");
+
         // Generate secure random nonce (Supabase provides this method)
         const rawNonce = crypto.randomUUID();
-        console.log('[Apple OAuth] Raw nonce generated:', rawNonce.substring(0, 8) + '...');
-        
+        console.log(
+          "[Apple OAuth] Raw nonce generated:",
+          rawNonce.substring(0, 8) + "...",
+        );
+
         // Hash the nonce for Apple (Apple requires SHA-256 hashed nonce)
         const encoder = new TextEncoder();
         const encodedData = encoder.encode(rawNonce);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', encodedData);
+        const hashBuffer = await crypto.subtle.digest("SHA-256", encodedData);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hashedNonce = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        
-        console.log('[Apple OAuth] Hashed nonce:', hashedNonce.substring(0, 16) + '...');
+        const hashedNonce = hashArray
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
 
-        console.log('[Apple OAuth] Calling SignInWithApple.authorize with clientId: com.darrylgraham.graceward');
-        
+        console.log(
+          "[Apple OAuth] Hashed nonce:",
+          hashedNonce.substring(0, 16) + "...",
+        );
+
+        console.log(
+          `[Apple OAuth] Calling SignInWithApple.authorize with clientId: ${APPLE_NATIVE_CLIENT_ID}`,
+        );
+
         const authorizeStart = Date.now();
-        const result: SignInWithAppleResponse = await SignInWithApple.authorize({
-          clientId: 'com.darrylgraham.graceward', // Use bundle ID for native iOS
-          redirectURI: 'com.darrylgraham.graceward://',
-          scopes: 'email name',
-          state: crypto.randomUUID(), // Random state for security
-          nonce: hashedNonce, // Hashed nonce for Apple
-        });
-        console.log(`[Apple OAuth] authorize() completed in ${Date.now() - authorizeStart}ms`);
+        const result: SignInWithAppleResponse = await SignInWithApple.authorize(
+          {
+            clientId: APPLE_NATIVE_CLIENT_ID,
+            redirectURI: APPLE_NATIVE_REDIRECT_URI,
+            scopes: "email name",
+            state: crypto.randomUUID(), // Random state for security
+            nonce: hashedNonce, // Hashed nonce for Apple
+          },
+        );
+        console.log(
+          `[Apple OAuth] authorize() completed in ${Date.now() - authorizeStart}ms`,
+        );
 
-        console.log('[Apple OAuth] SignInWithApple result:', {
+        console.log("[Apple OAuth] SignInWithApple result:", {
           hasIdentityToken: !!result.response.identityToken,
           hasEmail: !!result.response.email,
-          hasUser: !!result.response.user
+          hasUser: !!result.response.user,
         });
 
         // Verify identity token exists
         if (!result.response.identityToken) {
-          console.error('[Apple OAuth] No identity token in response');
-          throw new Error('Apple Sign-In failed - no identity token returned');
+          console.error("[Apple OAuth] No identity token in response");
+          throw new Error("Apple Sign-In failed - no identity token returned");
         }
 
-        console.log('[Apple OAuth] Calling apple-native-auth edge function');
+        console.log("[Apple OAuth] Calling apple-native-auth edge function");
 
         // Call our edge function to handle native Apple auth
         const edgeInvokeStart = Date.now();
-        const { data: sessionData, error: functionError } = await supabase.functions.invoke('apple-native-auth', {
-          body: {
-            identityToken: result.response.identityToken,
-            rawNonce,
-            intent: socialAuthIntent,
-          }
-        });
-        const functionErrorBody = functionError ? await readFunctionErrorContext(functionError) : null;
-        console.log(`[Apple OAuth] apple-native-auth completed in ${Date.now() - edgeInvokeStart}ms`);
+        const { data: sessionData, error: functionError } =
+          await supabase.functions.invoke("apple-native-auth", {
+            body: {
+              identityToken: result.response.identityToken,
+              rawNonce,
+              intent: socialAuthIntent,
+              productMode: APPLE_NATIVE_PRODUCT_MODE,
+            },
+          });
+        const functionErrorBody = functionError
+          ? await readFunctionErrorContext(functionError)
+          : null;
+        console.log(
+          `[Apple OAuth] apple-native-auth completed in ${Date.now() - edgeInvokeStart}ms`,
+        );
 
-        console.log('[Apple OAuth] Edge function response:', { 
+        console.log("[Apple OAuth] Edge function response:", {
           hasAccessToken: !!sessionData?.access_token,
           hasRefreshToken: !!sessionData?.refresh_token,
           error: functionErrorBody?.error || functionError?.message,
-          errorCode: functionErrorBody?.code
+          errorCode: functionErrorBody?.code,
         });
 
         if (functionError) {
-          if (functionErrorBody?.code === 'ACCOUNT_NOT_FOUND') {
-            setInlineError(getSocialAccountNotFoundMessage('apple'));
+          if (functionErrorBody?.code === "ACCOUNT_NOT_FOUND") {
+            setInlineError(getSocialAccountNotFoundMessage("apple"));
             setIsLogin(true);
             setIsForgotPassword(false);
             return;
           }
 
-          if (functionErrorBody?.code === 'APPLE_EMAIL_MISSING') {
-            console.warn('[Apple OAuth] Missing email for Apple ID, prompting user to re-register');
-            setInlineError("We couldn’t create an account with your Apple ID. Open Settings, remove Graceward from Sign in with Apple, then try again and share your email.");
+          if (functionErrorBody?.code === "APPLE_EMAIL_MISSING") {
+            console.warn(
+              "[Apple OAuth] Missing email for Apple ID, prompting user to re-register",
+            );
+            setInlineError(
+              `We couldn’t create an account with your Apple ID. Open Settings, remove ${PRODUCT.name} from Sign in with Apple, then try again and share your email.`,
+            );
             setIsLogin(true);
             setIsForgotPassword(false);
             return;
           }
 
-          if (functionErrorBody?.code === 'APPLE_NONCE_MISSING' || functionErrorBody?.code === 'APPLE_NONCE_MISMATCH') {
-            throw new Error('Apple Sign-In security check failed. Please try again.');
+          if (
+            functionErrorBody?.code === "APPLE_NONCE_MISSING" ||
+            functionErrorBody?.code === "APPLE_NONCE_MISMATCH"
+          ) {
+            throw new Error(
+              "Apple Sign-In security check failed. Please try again.",
+            );
           }
 
-          throw new Error(await getAppleAuthErrorMessage(functionError, socialAuthIntent));
+          throw new Error(
+            await getAppleAuthErrorMessage(functionError, socialAuthIntent),
+          );
         }
         if (!sessionData?.access_token || !sessionData?.refresh_token) {
           clearPendingPostAuthNavigationContext();
-          throw new Error('Failed to get session tokens from edge function');
+          throw new Error("Failed to get session tokens from edge function");
         }
 
         const nativeAppleSessionUserId =
-          sessionData?.user && typeof sessionData.user === "object" && "id" in sessionData.user
+          sessionData?.user &&
+          typeof sessionData.user === "object" &&
+          "id" in sessionData.user
             ? (sessionData.user.id as string | undefined)
             : undefined;
 
@@ -973,11 +1228,16 @@ const Auth = () => {
 
         // Set the session with tokens from edge function
         const setSessionStart = Date.now();
-        const { error: sessionError, data: { session: newSession } } = await supabase.auth.setSession({
+        const {
+          error: sessionError,
+          data: { session: newSession },
+        } = await supabase.auth.setSession({
           access_token: sessionData.access_token,
           refresh_token: sessionData.refresh_token,
         });
-        console.log(`[Apple OAuth] setSession completed in ${Date.now() - setSessionStart}ms`);
+        console.log(
+          `[Apple OAuth] setSession completed in ${Date.now() - setSessionStart}ms`,
+        );
 
         if (sessionError) {
           clearPendingPostAuthNavigationContext(nativeAppleSessionUserId);
@@ -985,12 +1245,16 @@ const Auth = () => {
         }
 
         // Ensure Supabase client state reflects the session before navigating
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        const {
+          data: { session: currentSession },
+        } = await supabase.auth.getSession();
         const sessionToUse = newSession ?? currentSession;
 
         if (!sessionToUse) {
           clearPendingPostAuthNavigationContext(nativeAppleSessionUserId);
-          throw new Error('Failed to establish Supabase session after Apple sign-in');
+          throw new Error(
+            "Failed to establish Supabase session after Apple sign-in",
+          );
         }
 
         setPendingPostAuthNavigationContext(
@@ -999,34 +1263,49 @@ const Auth = () => {
         );
 
         const sessionSetTime = Date.now();
-        console.log(`[Apple OAuth] Session set successfully at ${sessionSetTime}, proceeding to navigation`);
-        console.log('[Apple OAuth] Triggering post-auth navigation');
+        console.log(
+          `[Apple OAuth] Session set successfully at ${sessionSetTime}, proceeding to navigation`,
+        );
+        console.log("[Apple OAuth] Triggering post-auth navigation");
         void handlePostAuthNavigation(
           sessionToUse,
-          'appleNative',
+          "appleNative",
           applePostAuthNavigationContext,
         );
-        console.log(`[Apple OAuth] Total native flow completed in ${Date.now() - appleFlowStart}ms`);
+        console.log(
+          `[Apple OAuth] Total native flow completed in ${Date.now() - appleFlowStart}ms`,
+        );
 
         // Fallback: manually redirect if onAuthStateChange doesn't fire (increased to 800ms to avoid race conditions)
         if (sessionToUse.user) {
           appleFallbackTimeout.current = setTimeout(async () => {
             try {
               // Check if already redirected by onAuthStateChange
-              if (window.location.pathname !== '/auth') {
-                console.log(`[Apple OAuth Fallback] Already redirected, skipping (${Date.now() - sessionSetTime}ms since session set)`);
+              if (window.location.pathname !== "/auth") {
+                console.log(
+                  `[Apple OAuth Fallback] Already redirected, skipping (${Date.now() - sessionSetTime}ms since session set)`,
+                );
                 return;
               }
-              console.log(`[Apple OAuth Fallback] Executing manual redirect at ${Date.now()} (${Date.now() - sessionSetTime}ms since session set)`);
+              console.log(
+                `[Apple OAuth Fallback] Executing manual redirect at ${Date.now()} (${Date.now() - sessionSetTime}ms since session set)`,
+              );
               await handlePostAuthNavigation(
                 sessionToUse,
-                'appleNativeFallback',
+                "appleNativeFallback",
                 applePostAuthNavigationContext,
               );
             } catch (error) {
-              console.error('[Apple OAuth Fallback] Error during redirect:', error);
+              console.error(
+                "[Apple OAuth Fallback] Error during redirect:",
+                error,
+              );
               // Fallback to guarded home for native Apple sign-in, or onboarding otherwise.
-              navigate(applePostAuthNavigationContext.preferGuardedLanding ? '/' : '/onboarding');
+              navigate(
+                applePostAuthNavigationContext.preferGuardedLanding
+                  ? "/"
+                  : "/onboarding",
+              );
             }
           }, 800);
         }
@@ -1035,7 +1314,9 @@ const Auth = () => {
 
       // Web OAuth fallback for Apple Sign-In
       if (providerSupportsNative && !appleNativeReady) {
-        console.warn(`[${provider} OAuth] Native plugin unavailable - falling back to web flow`);
+        console.warn(
+          `[${provider} OAuth] Native plugin unavailable - falling back to web flow`,
+        );
       }
 
       console.log(`[${provider} OAuth] Using web OAuth flow`);
@@ -1049,14 +1330,14 @@ const Auth = () => {
       const { data: oauthData, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: getRedirectUrlWithPath('/auth'),
+          redirectTo: getRedirectUrlWithPath("/auth"),
         },
       });
 
-      console.log(`[${provider} OAuth] OAuth response:`, { 
-        hasUrl: !!oauthData?.url, 
+      console.log(`[${provider} OAuth] OAuth response:`, {
+        hasUrl: !!oauthData?.url,
         provider: oauthData?.provider,
-        error: error?.message 
+        error: error?.message,
       });
 
       if (error) throw error;
@@ -1071,11 +1352,14 @@ const Auth = () => {
         message,
         code: (error as { code?: string })?.code,
         status: (error as { status?: number })?.status,
-        fullError: error
+        fullError: error,
       });
-      
+
       // Handle user cancellation gracefully (don't show error toast)
-      if (message.includes('1001') || message.toLowerCase().includes('cancel')) {
+      if (
+        message.includes("1001") ||
+        message.toLowerCase().includes("cancel")
+      ) {
         console.log(`[${provider} OAuth] User cancelled sign-in`);
         return; // User cancelled, just return silently
       }
@@ -1086,12 +1370,15 @@ const Auth = () => {
     }
   };
 
-  const fieldLabelClassName = "text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-[#3f5f46]";
+  const fieldLabelClassName =
+    "text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-[#3f5f46]";
   const fieldInputClassName =
     "h-[3.35rem] rounded-[1.15rem] border border-[#2f5938]/20 bg-white/70 px-5 text-[0.98rem] font-medium text-[#203124] shadow-[0_12px_30px_rgba(32,49,36,0.08)] placeholder:text-[#617064] focus-visible:border-[#2f5938]/60 focus-visible:ring-[3px] focus-visible:ring-[#2f5938]/[0.12] focus-visible:ring-offset-0";
   const passwordToggleButtonClassName =
     "absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-[#526456] transition-colors hover:text-[#203124] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2f5938]/35";
-  const passwordInputClassName = isLogin ? fieldInputClassName : `${fieldInputClassName} pr-14`;
+  const passwordInputClassName = isLogin
+    ? fieldInputClassName
+    : `${fieldInputClassName} pr-14`;
   const switchMode = () => {
     setInlineError(null);
     if (isForgotPassword) {
@@ -1116,13 +1403,21 @@ const Auth = () => {
         <div className="relative z-10 w-full max-w-[20.5rem] py-4 sm:max-w-[21.75rem]">
           <div className="mb-8 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] bg-[#2f5938] shadow-[0_16px_35px_rgba(47,89,56,0.22)]">
-              <span className="font-serif text-3xl text-[#f8f4e8]">†</span>
+              <span className="font-serif text-3xl text-[#f8f4e8]">{PRODUCT.mode === "christian" ? "†" : "✦"}</span>
             </div>
-            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.26em] text-[#496f4c]">Graceward</p>
-            <p className="mt-2 text-sm text-[#5b685e]">Faith for the shape of your day.</p>
+            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.26em] text-[#496f4c]">
+              {PRODUCT.name}
+            </p>
+            <p className="mt-2 text-sm text-[#5b685e]">
+              {PRODUCT.mode === "christian" ? "Faith for the shape of your day." : PRODUCT.tagline}
+            </p>
           </div>
           <h1 className="sr-only">
-            {isForgotPassword ? "Reset password" : isLogin ? "Sign in" : "Create account"}
+            {isForgotPassword
+              ? "Reset password"
+              : isLogin
+                ? "Sign in"
+                : "Create account"}
           </h1>
 
           <div className="space-y-5">
@@ -1134,7 +1429,9 @@ const Auth = () => {
                   </p>
                 </div>
                 <div className="space-y-3">
-                  <Label htmlFor="email" className={fieldLabelClassName}>Email</Label>
+                  <Label htmlFor="email" className={fieldLabelClassName}>
+                    Email
+                  </Label>
                   <Input
                     id="email"
                     type="email"
@@ -1163,7 +1460,9 @@ const Auth = () => {
             ) : (
               <form onSubmit={handleAuth} className="space-y-5">
                 <div className="space-y-3">
-                  <Label htmlFor="email" className={fieldLabelClassName}>Email</Label>
+                  <Label htmlFor="email" className={fieldLabelClassName}>
+                    Email
+                  </Label>
                   <Input
                     id="email"
                     type="email"
@@ -1182,27 +1481,37 @@ const Auth = () => {
                   />
                 </div>
                 <div className="space-y-3">
-                  <Label htmlFor="password" className={fieldLabelClassName}>Password</Label>
+                  <Label htmlFor="password" className={fieldLabelClassName}>
+                    Password
+                  </Label>
                   <div className="relative">
                     <Input
                       id="password"
-                      type={!isLogin && showSignupPassword ? "text" : "password"}
+                      type={
+                        !isLogin && showSignupPassword ? "text" : "password"
+                      }
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => {
                         setInlineError(null);
                         setPassword(e.target.value);
                       }}
-                      autoComplete={isLogin ? "current-password" : "new-password"}
+                      autoComplete={
+                        isLogin ? "current-password" : "new-password"
+                      }
                       required
                       className={passwordInputClassName}
                     />
                     {!isLogin && (
                       <button
                         type="button"
-                        aria-label={showSignupPassword ? "Hide password" : "Show password"}
+                        aria-label={
+                          showSignupPassword ? "Hide password" : "Show password"
+                        }
                         aria-pressed={showSignupPassword}
-                        onClick={() => setShowSignupPassword((isVisible) => !isVisible)}
+                        onClick={() =>
+                          setShowSignupPassword((isVisible) => !isVisible)
+                        }
                         className={passwordToggleButtonClassName}
                       >
                         {showSignupPassword ? (
@@ -1228,7 +1537,12 @@ const Auth = () => {
                 </div>
                 {!isLogin && (
                   <div className="space-y-3">
-                    <Label htmlFor="confirmPassword" className={fieldLabelClassName}>Confirm Password</Label>
+                    <Label
+                      htmlFor="confirmPassword"
+                      className={fieldLabelClassName}
+                    >
+                      Confirm Password
+                    </Label>
                     <div className="relative">
                       <Input
                         id="confirmPassword"
@@ -1245,9 +1559,17 @@ const Auth = () => {
                       />
                       <button
                         type="button"
-                        aria-label={showSignupConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                        aria-label={
+                          showSignupConfirmPassword
+                            ? "Hide confirm password"
+                            : "Show confirm password"
+                        }
                         aria-pressed={showSignupConfirmPassword}
-                        onClick={() => setShowSignupConfirmPassword((isVisible) => !isVisible)}
+                        onClick={() =>
+                          setShowSignupConfirmPassword(
+                            (isVisible) => !isVisible,
+                          )
+                        }
                         className={passwordToggleButtonClassName}
                       >
                         {showSignupConfirmPassword ? (
@@ -1284,18 +1606,22 @@ const Auth = () => {
 
                 <Button
                   type="button"
-                  onClick={() => handleOAuthSignIn('apple')}
+                  onClick={() => handleOAuthSignIn("apple")}
                   disabled={loading || oauthLoading !== null}
                   className="h-[3.15rem] w-full rounded-[1rem] border border-[#203124]/[0.12] bg-white text-[0.98rem] font-semibold text-black shadow-[0_16px_30px_rgba(32,49,36,0.1)] hover:bg-white/95"
                 >
-                  {oauthLoading === 'apple' ? (
+                  {oauthLoading === "apple" ? (
                     <div className="animate-spin h-5 w-5 border-2 border-black/20 border-t-black rounded-full" />
                   ) : (
                     <>
-                      <svg className="h-[1.05rem] w-[1.05rem]" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                      <svg
+                        className="h-[1.05rem] w-[1.05rem]"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
+                        <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
                       </svg>
-                      {isLogin ? 'Sign in with Apple' : 'Sign up with Apple'}
+                      {isLogin ? "Sign in with Apple" : "Sign up with Apple"}
                     </>
                   )}
                 </Button>
@@ -1307,8 +1633,12 @@ const Auth = () => {
                 role="alert"
                 className="rounded-[1.35rem] bg-[#ea5d57] px-5 py-5 shadow-[0_22px_46px_rgba(60,8,16,0.34)]"
               >
-                <p className="text-[0.95rem] font-semibold text-pure-white">Error</p>
-                <p className="mt-1 text-sm leading-6 text-pure-white/[0.88]">{inlineError}</p>
+                <p className="text-[0.95rem] font-semibold text-pure-white">
+                  Error
+                </p>
+                <p className="mt-1 text-sm leading-6 text-pure-white/[0.88]">
+                  {inlineError}
+                </p>
               </div>
             ) : null}
 
@@ -1318,9 +1648,11 @@ const Auth = () => {
                 onClick={switchMode}
                 className="text-[0.93rem] font-medium text-[#526456] underline underline-offset-[3px] transition-colors hover:text-[#203124]"
               >
-                {isForgotPassword 
-                  ? "Back to Sign In" 
-                  : isLogin ? "Need an account? Sign up" : "Already have an account? Sign in"}
+                {isForgotPassword
+                  ? "Back to Sign In"
+                  : isLogin
+                    ? "Need an account? Sign up"
+                    : "Already have an account? Sign in"}
               </button>
             </div>
           </div>

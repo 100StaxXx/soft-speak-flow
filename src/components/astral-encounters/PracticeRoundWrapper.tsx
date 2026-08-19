@@ -86,7 +86,7 @@ const PracticeIntro = memo(({
   const gameName = {
     energy_beam: 'Star Defender',
     tap_sequence: 'Tap Sequence',
-    astral_frequency: 'Graceward Dash',
+    astral_frequency: 'Cosmiq Dash',
     eclipse_timing: 'Stellar Beats',
     starfall_dodge: 'Starfall Dodge',
     soul_serpent: 'Soul Serpent',

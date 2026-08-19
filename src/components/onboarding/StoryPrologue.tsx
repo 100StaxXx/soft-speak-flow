@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronRight, Sunrise } from "lucide-react";
 import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
+import { PRODUCT } from "@/config/product";
 
 interface StoryPrologueProps {
   onComplete: (name: string) => void;
@@ -83,10 +84,12 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
           className="text-center mb-8"
         >
           <h1 className="text-4xl font-bold text-white mb-3">
-            Welcome to Graceward
+            Welcome to {PRODUCT.name}
           </h1>
           <p className="text-white/70 text-lg">
-            A daily path of prayer, encouragement, and faithful action begins here.
+            {PRODUCT.mode === "christian"
+              ? "A daily path of prayer, encouragement, and faithful action begins here."
+              : "A living path of planning, focus, reflection, and meaningful momentum begins here."}
           </p>
         </motion.div>
 

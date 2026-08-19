@@ -108,8 +108,8 @@ describe("GracewardDailyFormationBoard", () => {
     expect(onFormationMediaChange).toHaveBeenLastCalledWith(expect.objectContaining({
       category: "Mind",
       playVideo: true,
-      videoUrl: expect.stringMatching(/^\/graceward-motion\/v1\/lion\/light\/mind-[123]\.mp4$/),
-      stillUrl: expect.stringMatching(/^\/graceward-motion\/v1\/lion\/light\/mind-[123]\.jpg$/),
+      videoUrl: expect.stringMatching(/\/companion-animation-videos\/premade\/v1\/graceward\/lion\/light\/formation\/level-1\/mind-[12]\.mp4$/),
+      stillUrl: expect.stringMatching(/\/companion-presets\/premade\/v1\/graceward\/lion\/light\/formation\/level-1\/mind-[12]\.jpg$/),
     }));
   });
 
@@ -143,7 +143,7 @@ describe("GracewardDailyFormationBoard", () => {
 
     render(
       <GracewardDailyFormationBoard
-        companion={makeCompanion({ spirit_animal: "Dove", preset_id: "dove", core_element: "nature" })}
+        companion={makeCompanion({ spirit_animal: "Lamb", preset_id: "lamb", core_element: "nature" })}
         onFormationMediaChange={onFormationMediaChange}
       />,
     );
@@ -153,8 +153,8 @@ describe("GracewardDailyFormationBoard", () => {
       expect(onFormationMediaChange).toHaveBeenLastCalledWith(expect.objectContaining({
         category: "Soul",
         playVideo: false,
-        videoUrl: expect.stringMatching(/^\/graceward-motion\/v1\/dove\/nature\/soul-[123]\.mp4$/),
-        stillUrl: expect.stringMatching(/^\/graceward-motion\/v1\/dove\/nature\/soul-[123]\.jpg$/),
+        videoUrl: expect.stringMatching(/\/companion-animation-videos\/premade\/v1\/graceward\/lamb\/nature\/formation\/level-1\/soul-1\.mp4$/),
+        stillUrl: expect.stringMatching(/\/companion-presets\/premade\/v1\/graceward\/lamb\/nature\/formation\/level-1\/soul-1\.jpg$/),
       }));
     });
   });
@@ -203,7 +203,7 @@ describe("GracewardDailyFormationBoard", () => {
     }));
   });
 
-  it("keeps the controls available for legacy Graceward forms with an animated prop fallback", () => {
+  it("resolves the full Graceward species and element launch matrix", () => {
     const onFormationMediaChange = vi.fn();
     render(
       <GracewardDailyFormationBoard
@@ -217,6 +217,46 @@ describe("GracewardDailyFormationBoard", () => {
     expect(screen.getByTestId("graceward-formation-controls")).toBeInTheDocument();
     expect(onFormationMediaChange).toHaveBeenLastCalledWith(expect.objectContaining({
       category: "Mind",
+      playVideo: true,
+      videoUrl: expect.stringMatching(/\/companion-animation-videos\/premade\/v1\/graceward\/wolf\/nature\/formation\/level-1\/mind-[123]\.mp4$/),
+      stillUrl: expect.stringMatching(/\/companion-presets\/premade\/v1\/graceward\/wolf\/nature\/formation\/level-1\/mind-[123]\.jpg$/),
+      phase: "practice",
+    }));
+  });
+
+  it("uses the animated prop fallback beyond the Level 5 launch scope", () => {
+    const onFormationMediaChange = vi.fn();
+    render(
+      <GracewardDailyFormationBoard
+        companion={makeCompanion({ current_stage: 13 })}
+        onFormationMediaChange={onFormationMediaChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Mind" }));
+
+    expect(onFormationMediaChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      category: "Mind",
+      playVideo: true,
+      videoUrl: null,
+      stillUrl: null,
+      phase: "practice",
+    }));
+  });
+
+  it("uses the animated prop fallback when the selected formation clip is not published yet", () => {
+    const onFormationMediaChange = vi.fn();
+    render(
+      <GracewardDailyFormationBoard
+        companion={makeCompanion({ spirit_animal: "Eagle", preset_id: "eagle", core_element: "fire" })}
+        onFormationMediaChange={onFormationMediaChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Body" }));
+
+    expect(onFormationMediaChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      category: "Body",
       playVideo: true,
       videoUrl: null,
       stillUrl: null,

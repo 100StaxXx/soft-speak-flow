@@ -1,4 +1,6 @@
-export const COMPANION_CHAT_OPENING_LINES = [
+import { PRODUCT, type ProductMode } from "../config/product";
+
+const GRACEWARD_COMPANION_CHAT_OPENING_LINES = [
   "I'm here. What's on your heart today?",
   "How are you really doing today?",
   "What are you carrying today?",
@@ -31,18 +33,48 @@ export const COMPANION_CHAT_OPENING_LINES = [
   "Tell me what today has felt like so far.",
 ] as const;
 
+const COSMIQ_COMPANION_CHAT_OPENING_LINES = GRACEWARD_COMPANION_CHAT_OPENING_LINES.map(
+  (line) => {
+    switch (line) {
+      case "Would it help to reflect, pray, or take one small step?":
+        return "Would it help to reflect, plan, or take one small step?";
+      case "Where could you use a little grace today?":
+        return "Where could you use a little breathing room today?";
+      case "Would you like encouragement, a short prayer, or a practical next step?":
+        return "Would you like encouragement, a quick reset, or a practical next step?";
+      case "Is there anything you'd like to bring into prayer?":
+        return "Is there anything you'd like to pause and reflect on?";
+      case "What would a faithful next step look like today?":
+        return "What would a practical next step look like today?";
+      case "Where have you noticed grace recently?":
+        return "Where have you noticed progress recently?";
+      default:
+        return line;
+    }
+  },
+);
+
+export const getCompanionChatOpeningLines = (
+  productMode: ProductMode = PRODUCT.mode,
+): readonly string[] => productMode === "christian"
+  ? GRACEWARD_COMPANION_CHAT_OPENING_LINES
+  : COSMIQ_COMPANION_CHAT_OPENING_LINES;
+
+export const COMPANION_CHAT_OPENING_LINES = getCompanionChatOpeningLines();
+
 export type CompanionChatOpeningLine =
   (typeof COMPANION_CHAT_OPENING_LINES)[number];
 
 export const getRandomCompanionChatOpeningLine = (
   random: () => number = Math.random,
+  productMode: ProductMode = PRODUCT.mode,
 ): CompanionChatOpeningLine => {
+  const openingLines = getCompanionChatOpeningLines(productMode);
   const rawValue = random();
   const clampedValue = Number.isFinite(rawValue)
     ? Math.max(0, Math.min(rawValue, 0.999999999999))
     : 0;
-  const index = Math.floor(clampedValue * COMPANION_CHAT_OPENING_LINES.length);
+  const index = Math.floor(clampedValue * openingLines.length);
 
-  return COMPANION_CHAT_OPENING_LINES[index] ??
-    COMPANION_CHAT_OPENING_LINES[0];
+  return (openingLines[index] ?? openingLines[0]) as CompanionChatOpeningLine;
 };

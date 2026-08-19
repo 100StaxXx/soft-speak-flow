@@ -4,6 +4,7 @@ import { useAuth } from "./useAuth";
 import { useCompanion } from "./useCompanion";
 import { useMemo } from "react";
 import { normalizeCompanionAssetSourceUrls } from "@/lib/companionAssetResolver";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 
 export type CompanionMoodState = 'happy' | 'content' | 'neutral' | 'worried' | 'sad' | 'sick';
 
@@ -57,6 +58,7 @@ export const useCompanionHealth = () => {
         .from('user_companion')
         .select('inactive_days, last_activity_date, neglected_image_url, neglected_image_focal_x, neglected_image_focal_y, current_mood, body, mind, soul, current_image_url, current_image_focal_x, current_image_focal_y, is_alive, hunger, happiness, care_score, recovery_progress')
         .eq('user_id', user.id)
+        .eq('product_mode', PRODUCT_RUNTIME.authProductMode)
         .maybeSingle();
 
       if (error) {

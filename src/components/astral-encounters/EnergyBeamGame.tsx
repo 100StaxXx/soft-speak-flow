@@ -654,7 +654,7 @@ export function EnergyBeamGame({
   const formationDirection = useRef(1);
   const formationOffset = useRef(0);
   const touchStartX = useRef<number | null>(null);
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
   const lastUpdateTime = useRef(0);
   const isWaveTransitioning = useRef(false);
   const gameStateRef = useRef(gameState);

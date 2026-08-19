@@ -75,7 +75,10 @@ describe("useGlobalWidgetSync", () => {
   it("syncs one prepared daily practice instead of custom tasks", () => {
     renderHook(() => useGlobalWidgetSync());
 
-    expect(mocks.useAdaptiveDailyFormationMock).toHaveBeenCalledWith({ enabled: true });
+    expect(mocks.useAdaptiveDailyFormationMock).toHaveBeenCalledWith({
+      enabled: true,
+      category: "Soul",
+    });
     expect(mocks.useWidgetSyncMock).toHaveBeenCalledWith(
       [expect.objectContaining({
         id: "task-1",
@@ -92,7 +95,10 @@ describe("useGlobalWidgetSync", () => {
   it("disables querying and syncing when hook is disabled", () => {
     renderHook(() => useGlobalWidgetSync({ enabled: false }));
 
-    expect(mocks.useAdaptiveDailyFormationMock).toHaveBeenCalledWith({ enabled: false });
+    expect(mocks.useAdaptiveDailyFormationMock).toHaveBeenCalledWith({
+      enabled: false,
+      category: "Soul",
+    });
     expect(mocks.useWidgetSyncMock).toHaveBeenCalledWith(
       [expect.objectContaining({ source: "faithful_step" })],
       mocks.formationState.assignment.practiceDate,
@@ -105,7 +111,10 @@ describe("useGlobalWidgetSync", () => {
 
     renderHook(() => useGlobalWidgetSync());
 
-    expect(mocks.useAdaptiveDailyFormationMock).toHaveBeenCalledWith({ enabled: true });
+    expect(mocks.useAdaptiveDailyFormationMock).toHaveBeenCalledWith({
+      enabled: true,
+      category: "Soul",
+    });
     expect(mocks.useWidgetSyncMock).toHaveBeenCalledWith(
       [expect.objectContaining({ source: "faithful_step" })],
       mocks.formationState.assignment.practiceDate,
@@ -119,7 +128,10 @@ describe("useGlobalWidgetSync", () => {
 
     renderHook(() => useGlobalWidgetSync());
 
-    expect(mocks.useAdaptiveDailyFormationMock).toHaveBeenCalledWith({ enabled: false });
+    expect(mocks.useAdaptiveDailyFormationMock).toHaveBeenCalledWith({
+      enabled: false,
+      category: "Soul",
+    });
     expect(mocks.useWidgetSyncMock).toHaveBeenCalledWith(
       [],
       mocks.formationState.assignment.practiceDate,

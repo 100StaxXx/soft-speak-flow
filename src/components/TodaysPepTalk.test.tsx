@@ -127,7 +127,7 @@ const mocks = vi.hoisted(() => {
       order: vi.fn(() => builder),
       limit: vi.fn(() => builder),
       maybeSingle: vi.fn(async () => {
-        if (table === "mentors") {
+        if (table === "graceward_guides") {
           return { data: state.mentor, error: null };
         }
         if (table === "daily_pep_talks") {
@@ -424,32 +424,14 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     expect(screen.getByRole("button", { name: /past encouragements/i })).toBeInTheDocument();
   });
 
-  it("makes the encouragement feel Guide-led and carries the chosen focus forward", async () => {
-    const focusEvent = vi.fn();
-    window.addEventListener("daily-guide-focus-selected", focusEvent);
+  it("keeps the encouragement player focused on listening", async () => {
+    renderComponent();
 
-    try {
-      renderComponent();
-
-      expect(await screen.findByText("A word from Carmen")).toBeInTheDocument();
-      expect(screen.getByText("Carmen asks")).toBeInTheDocument();
-      expect(screen.getByText("Where would a little more direction help today?")).toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole("button", { name: "Clarity" }));
-
-      await waitFor(() => {
-        expect(mocks.updateDailyGuideThread).toHaveBeenCalledWith(expect.objectContaining({
-          mentor_id: "mentor-1",
-          mentor_name: "Carmen",
-          focus_option_id: "clarity",
-          focus_label: "Clarity",
-          focus_category: "Mind",
-        }));
-      });
-      expect(focusEvent).toHaveBeenCalledTimes(1);
-    } finally {
-      window.removeEventListener("daily-guide-focus-selected", focusEvent);
-    }
+    expect(await screen.findByText("A word from Carmen")).toBeInTheDocument();
+    expect(screen.getByText("Execute Your Vision")).toBeInTheDocument();
+    expect(screen.queryByText("Carmen asks")).not.toBeInTheDocument();
+    expect(screen.queryByText("Where would a little more direction help today?")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clarity" })).not.toBeInTheDocument();
   });
 
   it("resolves legacy mentor slugs before querying and refreshing daily pep talks", async () => {

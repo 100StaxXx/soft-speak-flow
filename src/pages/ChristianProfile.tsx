@@ -34,6 +34,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PRODUCT } from "@/config/product";
+import { getAuthUserAccountEmail } from "@/utils/authUser";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import {
@@ -182,7 +183,7 @@ export default function ChristianProfile() {
               <div className="flex items-center gap-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary"><User className="h-5 w-5" /></div>
                 <div className="min-w-0">
-                  <p className="truncate font-semibold">{user?.email ?? "Graceward account"}</p>
+                  <p className="truncate font-semibold">{getAuthUserAccountEmail(user) ?? "Graceward account"}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{translation} Scripture · Daily practice prepared for you</p>
                 </div>
               </div>

@@ -41,6 +41,7 @@ import {
   CHRISTIAN_GUIDANCE_POLICY,
   enforceChristianGuidanceOutput,
 } from "../_shared/christianGuidancePolicy.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 const JourneysTaskSchema = z.object({
   title: z.string(),
   taskDate: z.string().nullable(),
@@ -293,6 +294,7 @@ async function fetchConversationContext(
   supabase: any,
   userId: string,
   companionId: string,
+  productMode: "graceward" | "cosmiq",
   currentDate?: string,
 ) {
   const { data: profileRow, error: profileError } = await supabase
@@ -323,9 +325,10 @@ async function fetchConversationContext(
   ] = await Promise.all([
     supabase
       .from("user_companion")
-      .select("id, spirit_animal, current_stage, current_mood, bond_level, total_interactions, last_interaction_at, care_consistency, care_responsiveness, care_balance, care_intent, care_recovery")
+      .select("id, product_mode, spirit_animal, current_stage, current_mood, bond_level, total_interactions, last_interaction_at, care_consistency, care_responsiveness, care_balance, care_intent, care_recovery")
       .eq("id", companionId)
       .eq("user_id", userId)
+      .eq("product_mode", productMode)
       .maybeSingle(),
     supabase
       .from("user_ai_learning")
@@ -475,12 +478,19 @@ export const buildSystemPrompt = (context: {
   journeysContext?: JourneysContext;
 }) => {
   const isJourneysSurface = context.surface === "journeys";
-  const voiceStyle = isJourneysSurface
-    ? "Calm, direct, low-drama Christian reflection and planning assistant. Plainspoken, concise, grounded, and helpful."
-    : "Warm, natural Christian reflection companion. Hopeful, emotionally present, prayer-aware, and practical without sounding preachy. Encourages grace, discernment, rest, and small faithful action.";
-  const traits = isJourneysSurface
-    ? "clear, grounded, respectful, practical, spiritually humble"
-    : "warm, hopeful, honest, encouraging, prayer-aware, spiritually humble";
+  const isCosmiq = context.companion?.product_mode === "cosmiq";
+  const voiceStyle = isCosmiq
+    ? isJourneysSurface
+      ? "Calm, direct, low-drama planning and reflection assistant. Plainspoken, concise, grounded, and helpful."
+      : "Warm, natural personal-growth companion. Curious, emotionally present, practical, and momentum-aware without becoming pushy."
+    : isJourneysSurface
+      ? "Calm, direct, low-drama Christian reflection and planning assistant. Plainspoken, concise, grounded, and helpful."
+      : "Warm, natural Christian reflection companion. Hopeful, emotionally present, prayer-aware, and practical without sounding preachy. Encourages grace, discernment, rest, and small faithful action.";
+  const traits = isCosmiq
+    ? "clear, grounded, curious, respectful, practical"
+    : isJourneysSurface
+      ? "clear, grounded, respectful, practical, spiritually humble"
+      : "warm, hopeful, honest, encouraging, prayer-aware, spiritually humble";
   const memoryEnabled = context.memoryEnabled !== false;
   const memories = (memoryEnabled ? context.memories : [])
     .map((memory) => {
@@ -498,8 +508,8 @@ export const buildSystemPrompt = (context: {
       thread.focus_label ? `focus “${thread.focus_label}”` : null,
       thread.focus_label
         ? thread.practice_completed_at
-          ? "connected Faithful Step completed"
-          : "connected Faithful Step not recorded complete"
+          ? `connected ${isCosmiq ? "action" : "Faithful Step"} completed`
+          : `connected ${isCosmiq ? "action" : "Faithful Step"} not recorded complete`
         : null,
       thread.companion_answer_label
         ? `companion check-in “${thread.companion_answer_label}”`
@@ -526,7 +536,9 @@ export const buildSystemPrompt = (context: {
   );
 
   return [
-    "You are Graceward's AI planning and reflection assistant. You are software, not a creature, person, pastor, or spiritual authority.",
+    isCosmiq
+      ? "You are Cosmiq's AI planning, reflection, and personal-growth assistant. You are software, not a creature, person, therapist, or professional authority. Never use Graceward branding or import Christian framing unless the user explicitly raises their own beliefs."
+      : "You are Graceward's AI planning and reflection assistant. You are software, not a creature, person, pastor, or spiritual authority.",
     `Voice style: ${voiceStyle}.`,
     traits ? `Personality traits: ${traits}.` : "",
     context.companion
@@ -582,9 +594,15 @@ export const buildSystemPrompt = (context: {
     "For a casual greeting or short check-in, respond warmly and directly. Do not turn every message into a lesson or productivity prompt.",
     "Keep most replies to 2-5 sentences and ask at most one useful question at a time.",
     "When recent daily continuity is available, reference at most one relevant detail naturally. An unfinished practice is context, never a debt or failure.",
-    "Use Christian language naturally when it fits the user's message. Do not force a Bible verse, prayer, or devotional framing into every reply.",
-    "Offer a short prayer only when the user asks or when it is clearly helpful, and make the offer optional rather than assuming consent.",
-    "Connect growth to grace, stewardship, faithfulness, love, repair, and wise limits. Never imply that productivity earns worth, favor, or spiritual standing.",
+    isCosmiq
+      ? "Keep growth language grounded in the user's choices, actions, recovery, curiosity, and sustainable momentum. Never introduce Scripture, prayer, theology, or spiritual-standing claims on your own."
+      : "Use Christian language naturally when it fits the user's message. Do not force a Bible verse, prayer, or devotional framing into every reply.",
+    isCosmiq
+      ? "Do not offer prayers or devotional exercises unless the user explicitly requests faith-related support."
+      : "Offer a short prayer only when the user asks or when it is clearly helpful, and make the offer optional rather than assuming consent.",
+    isCosmiq
+      ? "Never imply that productivity determines a person's worth."
+      : "Connect growth to grace, stewardship, faithfulness, love, repair, and wise limits. Never imply that productivity earns worth, favor, or spiritual standing.",
     "The companion is a symbolic app interface for reflection. Do not roleplay as a living animal, spiritual being, supernatural presence, or emotionally dependent friend.",
     "You may refer sparingly to a companion's symbolic trait, such as steadiness or courage, but keep the focus on the user rather than performing as the creature.",
     "Do not use profanity, vulgar wording, or insults.",
@@ -594,7 +612,7 @@ export const buildSystemPrompt = (context: {
     isJourneysSurface
       ? "If the user asks for planning, scheduling, reminders, campaigns, rituals, quests, or saving changes, answer conversationally without claiming anything was saved, drafted, scheduled, created, or changed."
       : "If the user asks for planning, scheduling, reminders, campaigns, rituals, or saving changes, steer them to the planning surface instead of inventing saved changes yourself.",
-    CHRISTIAN_GUIDANCE_POLICY,
+    isCosmiq ? "" : CHRISTIAN_GUIDANCE_POLICY,
   ].filter(Boolean).join("\n");
 };
 
@@ -604,6 +622,7 @@ async function generateCompanionReply(params: {
   conversationHistory: Array<{ role: "assistant" | "user"; content: string }>;
   message: string;
   surface: CompanionChatSurface;
+  productMode: "graceward" | "cosmiq";
 }) {
   const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
   if (!openAIApiKey) {
@@ -638,7 +657,9 @@ async function generateCompanionReply(params: {
     throw new Error("Companion reply was empty");
   }
 
-  return enforceChristianGuidanceOutput(reply as string);
+  return params.productMode === "graceward"
+    ? enforceChristianGuidanceOutput(reply as string)
+    : reply as string;
 }
 
 async function maybeExtractConversationMemory(params: {
@@ -842,6 +863,10 @@ export const handleCompanionChatRequest = async (req: Request) => {
     }
 
     const userId = protectedRequest.auth.userId;
+    const productMode = await resolveUserProductMode(
+      protectedRequest.supabase,
+      userId,
+    );
     const sessionId = parsed.data.sessionId ?? crypto.randomUUID();
     const surface = normalizeCompanionChatSurface(parsed.data.surface);
 
@@ -863,6 +888,7 @@ export const handleCompanionChatRequest = async (req: Request) => {
       protectedRequest.supabase,
       userId,
       parsed.data.companionId,
+      productMode,
       parsed.data.currentDate,
     );
 
@@ -917,6 +943,7 @@ export const handleCompanionChatRequest = async (req: Request) => {
         conversationHistory: parsed.data.conversationHistory,
         message: parsed.data.message,
         surface,
+        productMode,
       });
     }
 

@@ -59,6 +59,7 @@ const TERMINAL_CODES = new Set([
   "rate_limited",
   "evolution_quality_gate_failed",
   "evolution_continuity_unverified",
+  "premade_asset_unavailable",
 ]);
 
 const isRetryableError = (message: string) =>
@@ -917,11 +918,15 @@ export const handleProcessCompanionEvolutionJob = async (
           retryable = error.retryable;
         }
 
-        const shouldRetry = retryable && retryCount <= 2;
+        const maxRetryCount = errorCode === "cinema_event_preparing" ? 30 : 2;
+        const shouldRetry = retryable && retryCount <= maxRetryCount;
 
         if (shouldRetry) {
           const nextRetryAt = new Date(
-            now.getTime() + BASE_RETRY_DELAY_MS * 2 ** (retryCount - 1),
+            now.getTime() + Math.min(
+              2 * 60 * 1000,
+              BASE_RETRY_DELAY_MS * 2 ** (retryCount - 1),
+            ),
           ).toISOString();
           await supabase
             .from("companion_evolution_jobs")

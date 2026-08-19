@@ -207,7 +207,9 @@ const PLAYFUL_RAW: RawTonePack = {
       "what would help you feel grounded",
       "where could you use encouragement",
       "what are you grateful for",
-      "would reflection, prayer, or action help most",
+      PRODUCT.mode === "christian"
+        ? "would reflection, prayer, or action help most"
+        : "would reflection, planning, or action help most",
       "what is one kind step you can take",
     ],
     [" today?"],
@@ -315,8 +317,12 @@ const WITTY_RAW: RawTonePack = {
     [
       "what deserves your attention most",
       "what can you release without guilt",
-      "would prayer, reflection, or action help",
-      "what is the next faithful step",
+      PRODUCT.mode === "christian"
+        ? "would prayer, reflection, or action help"
+        : "would planning, reflection, or action help",
+      PRODUCT.mode === "christian"
+        ? "what is the next faithful step"
+        : "what is the next useful step",
       "where do you need courage today",
     ],
     ["?"],
@@ -454,3 +460,4 @@ export const getLinesForToneAndBucket = (
 
 export const getAllLinesForBucket = (bucketKey: CompanionDialogueBucketKey): CompanionDialogueLine[] =>
   COMPANION_DIALOGUE_TONE_PACKS.flatMap((tonePack) => COMPANION_DIALOGUE_PACKS[tonePack][bucketKey]);
+import { PRODUCT } from "@/config/product";

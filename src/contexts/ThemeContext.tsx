@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchProductMentorById } from "@/services/productMentorCatalog";
 
 interface MentorTheme {
   primary: string;
@@ -52,11 +52,7 @@ export const ThemeProvider = ({ children, mentorId }: ThemeProviderProps) => {
 
       try {
         // Fetch theme data BEFORE showing transition
-        const { data: mentor } = await supabase
-          .from("graceward_guides")
-          .select("theme_config")
-          .eq("id", mentorId)
-          .maybeSingle();
+        const mentor = await fetchProductMentorById(mentorId);
 
         if (!isMounted) return;
 

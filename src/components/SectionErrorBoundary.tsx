@@ -238,7 +238,7 @@ export const HoroscopeErrorBoundary = ({ children }: { children: ReactNode }) =>
   <SectionErrorBoundary
     section="horoscope"
     title="Horoscope unavailable"
-    description="Unable to load Graceward insights right now"
+    description="Unable to load your cosmic insights right now"
   >
     {children}
   </SectionErrorBoundary>

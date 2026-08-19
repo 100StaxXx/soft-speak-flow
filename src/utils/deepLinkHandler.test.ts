@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { parseDeepLink } from "./deepLinkHandler";
+import { parseDeepLink, parseDeepLinkForProduct } from "./deepLinkHandler";
 
 describe("parseDeepLink", () => {
   it("parses task deep links", () => {
-    const parsed = parseDeepLink("cosmiq://task/task-123?from=widget");
+    const parsed = parseDeepLinkForProduct(
+      "cosmiq://task/task-123?from=widget",
+      "cosmiq",
+    );
     expect(parsed).toEqual({
       type: "task",
       taskId: "task-123",
@@ -11,8 +14,11 @@ describe("parseDeepLink", () => {
     });
   });
 
-  it.each(["graceward://today", "cosmiq://today"])("parses Today widget deep links from %s", (url) => {
-    expect(parseDeepLink(url)).toEqual({
+  it.each([
+    ["graceward://today", "christian"],
+    ["cosmiq://today", "cosmiq"],
+  ] as const)("parses Today widget deep links from %s", (url, productMode) => {
+    expect(parseDeepLinkForProduct(url, productMode)).toEqual({
       type: "today",
       path: "/mentor",
       rawUrl: url,
@@ -20,8 +26,9 @@ describe("parseDeepLink", () => {
   });
 
   it("parses calendar oauth callback deep links", () => {
-    const parsed = parseDeepLink(
+    const parsed = parseDeepLinkForProduct(
       "cosmiq://calendar/oauth/callback?provider=google&status=error&message=OAuth%20failed",
+      "cosmiq",
     );
     expect(parsed).toEqual({
       type: "calendar_oauth",
@@ -34,7 +41,7 @@ describe("parseDeepLink", () => {
   });
 
   it("parses app-only epic invite deep links", () => {
-    const parsed = parseDeepLink("cosmiq://join/EPIC-QUEST-1234");
+    const parsed = parseDeepLinkForProduct("cosmiq://join/EPIC-QUEST-1234", "cosmiq");
     expect(parsed).toEqual({
       type: "join_epic",
       path: "/join/EPIC-QUEST-1234",
@@ -43,7 +50,10 @@ describe("parseDeepLink", () => {
   });
 
   it("preserves encoded epic invite codes in app-only deep links", () => {
-    const parsed = parseDeepLink("cosmiq://join/EPIC%20QUEST%2F1234");
+    const parsed = parseDeepLinkForProduct(
+      "cosmiq://join/EPIC%20QUEST%2F1234",
+      "cosmiq",
+    );
     expect(parsed).toEqual({
       type: "join_epic",
       path: "/join/EPIC%20QUEST%2F1234",
@@ -54,7 +64,7 @@ describe("parseDeepLink", () => {
   it.each(["cosmiq://journeys", "cosmiq://journeys/plan"])(
     "parses widget journeys deep links from %s",
     (url) => {
-      const parsed = parseDeepLink(url);
+      const parsed = parseDeepLinkForProduct(url, "cosmiq");
       expect(parsed).toEqual({
         type: "journeys",
         path: "/journeys",
@@ -64,8 +74,9 @@ describe("parseDeepLink", () => {
   );
 
   it("parses hosted auth recovery links", () => {
-    const parsed = parseDeepLink(
+    const parsed = parseDeepLinkForProduct(
       "https://app.cosmiq.quest/auth/reset-password#access_token=token&refresh_token=refresh&type=recovery",
+      "cosmiq",
     );
     expect(parsed).toEqual({
       type: "auth_recovery",
@@ -76,8 +87,9 @@ describe("parseDeepLink", () => {
   });
 
   it("parses hosted calendar oauth callback universal links", () => {
-    const parsed = parseDeepLink(
+    const parsed = parseDeepLinkForProduct(
       "https://app.cosmiq.quest/calendar/oauth/callback?code=oauth-code&state=signed-state",
+      "cosmiq",
     );
     expect(parsed).toEqual({
       type: "calendar_oauth_callback",
@@ -89,14 +101,32 @@ describe("parseDeepLink", () => {
   });
 
   it("parses custom-scheme auth recovery links", () => {
-    const parsed = parseDeepLink(
+    const parsed = parseDeepLinkForProduct(
       "cosmiq://auth/reset-password#access_token=token&refresh_token=refresh&type=recovery",
+      "cosmiq",
     );
     expect(parsed).toEqual({
       type: "auth_recovery",
       path: "/auth/reset-password#access_token=token&refresh_token=refresh&type=recovery",
       rawUrl:
         "cosmiq://auth/reset-password#access_token=token&refresh_token=refresh&type=recovery",
+    });
+  });
+
+  it("rejects Cosmiq links in a Graceward build", () => {
+    expect(parseDeepLink("cosmiq://today")).toEqual({
+      type: "unknown",
+      rawUrl: "cosmiq://today",
+    });
+    expect(
+      parseDeepLinkForProduct(
+        "https://app.cosmiq.quest/calendar/oauth/callback?code=cosmiq-code",
+        "christian",
+      ),
+    ).toEqual({
+      type: "unknown",
+      rawUrl:
+        "https://app.cosmiq.quest/calendar/oauth/callback?code=cosmiq-code",
     });
   });
 });

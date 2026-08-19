@@ -10,7 +10,7 @@ const authState = vi.hoisted(() => ({
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => authState }));
 vi.mock("@/utils/authRedirect", () => ({ getAuthRedirectPath: vi.fn() }));
 
-import Welcome from "./Welcome";
+import Welcome, { getWelcomeProductContent } from "./Welcome";
 
 describe("Graceward welcome", () => {
   beforeEach(() => {
@@ -53,5 +53,14 @@ describe("Graceward welcome", () => {
 
     expect(screen.getByRole("link", { name: /^terms$/i })).toHaveAttribute("href", "/terms");
     expect(screen.getByRole("link", { name: /^privacy$/i })).toHaveAttribute("href", "/privacy");
+  });
+
+  it("keeps Cosmiq landing copy free of Graceward faith language", () => {
+    const content = getWelcomeProductContent("cosmiq");
+    const allCopy = JSON.stringify(content);
+
+    expect(content.eyebrow).toMatch(/living companion/i);
+    expect(content.finalCopy).toMatch(/cinematic moments/i);
+    expect(allCopy).not.toMatch(/scripture|prayer|church|god/i);
   });
 });

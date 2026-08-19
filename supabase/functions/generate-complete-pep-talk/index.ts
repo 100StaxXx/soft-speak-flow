@@ -9,6 +9,7 @@ import {
   logRateLimitedInvocation,
 } from "../_shared/rateLimiter.ts";
 import { errorResponse, type RequestAuth, requireRequestAuth } from "../_shared/auth.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -109,8 +110,10 @@ export async function handleGenerateCompletePepTalk(
       requestId = abuseResult.requestId;
     }
 
+    const productMode = await resolveUserProductMode(supabase, requestAuth.userId);
+
     const { data: mentor, error: mentorError } = await supabase
-      .from("graceward_guides")
+      .from(productMode === "graceward" ? "graceward_guides" : "mentors")
       .select("*")
       .eq("slug", mentorSlug)
       .single();

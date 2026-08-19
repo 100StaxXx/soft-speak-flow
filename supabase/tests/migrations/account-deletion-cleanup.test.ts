@@ -17,6 +17,12 @@ Deno.test("account deletion cleanup migrations restore hardened relational clean
       import.meta.url,
     ),
   );
+  const extendedTimeoutSource = await Deno.readTextFile(
+    new URL(
+      "../../migrations/20260813202000_allow_account_deletion_cleanup_to_finish.sql",
+      import.meta.url,
+    ),
+  );
 
   assert(
     source.includes("CREATE OR REPLACE FUNCTION public.delete_user_account") &&
@@ -44,5 +50,13 @@ Deno.test("account deletion cleanup migrations restore hardened relational clean
       timeoutSource.includes("statement_timeout") &&
       timeoutSource.includes("'20s'"),
     "Expected the account deletion RPC to have enough statement-timeout budget for multi-table cleanup",
+  );
+  assert(
+    extendedTimeoutSource.includes(
+      "ALTER FUNCTION public.delete_user_account(uuid)",
+    ) &&
+      extendedTimeoutSource.includes("statement_timeout") &&
+      extendedTimeoutSource.includes("'120s'"),
+    "Expected account deletion to have enough time for the current production schema",
   );
 });

@@ -1,14 +1,12 @@
+import { PRODUCT, type ProductMode } from "@/config/product";
+import { getProductRuntimeIdentity } from "@/config/productRuntime";
+
 export interface PushNotificationNavigationDetail {
   url: string;
   queueId?: string | null;
 }
 
 const INTERNAL_PATH_PATTERN = /^\/(?!\/)/;
-const APP_ORIGINS = new Set([
-  "https://graceward.app",
-  "https://www.graceward.app",
-  "https://app.cosmiq.quest",
-]);
 
 const readString = (value: unknown): string | null => {
   if (typeof value !== "string") return null;
@@ -21,12 +19,21 @@ const readRecord = (value: unknown): Record<string, unknown> | null =>
     ? value as Record<string, unknown>
     : null;
 
-const normalizeInternalPath = (value: string | null | undefined): string | null => {
-  if (!value || !INTERNAL_PATH_PATTERN.test(value)) return null;
+const normalizeInternalPath = (
+  value: string | null | undefined,
+  productMode: ProductMode,
+): string | null => {
+  if (
+    !value ||
+    (!INTERNAL_PATH_PATTERN.test(value) && !value.startsWith("https://"))
+  ) {
+    return null;
+  }
 
   try {
-    const parsed = new URL(value, "https://graceward.app");
-    if (!APP_ORIGINS.has(parsed.origin)) return null;
+    const runtime = getProductRuntimeIdentity(productMode);
+    const parsed = new URL(value, runtime.primaryWebOrigin);
+    if (!runtime.webOrigins.includes(parsed.origin)) return null;
     return `${parsed.pathname}${parsed.search}${parsed.hash}`;
   } catch {
     return null;
@@ -36,7 +43,9 @@ const normalizeInternalPath = (value: string | null | undefined): string | null 
 export function resolvePushNotificationDestination(
   payloadInput: unknown,
   notificationType?: string | null,
+  productMode: ProductMode = PRODUCT.mode,
 ): string {
+  const runtime = getProductRuntimeIdentity(productMode);
   const payload = readRecord(payloadInput) ?? {};
   const taskId = readString(payload.task_id) ?? readString(payload.taskId);
   const dailyEncouragementId = readString(payload.pep_talk_id) ?? readString(payload.pepTalkId);
@@ -44,15 +53,18 @@ export function resolvePushNotificationDestination(
   const rawUrl = readString(payload.url);
   const deepLink = readString(payload.deepLink);
 
-  if (deepLink?.startsWith("graceward://task/") || deepLink?.startsWith("cosmiq://task/")) {
+  if (deepLink?.startsWith(`${runtime.nativeScheme}://task/`)) {
     return "/mentor";
   }
 
-  if (deepLink === "graceward://journeys/plan" || deepLink === "cosmiq://journeys/plan") {
+  if (
+    runtime.authProductMode === "cosmiq" &&
+    deepLink === `${runtime.nativeScheme}://journeys/plan`
+  ) {
     return "/journeys";
   }
 
-  const safeUrl = normalizeInternalPath(rawUrl);
+  const safeUrl = normalizeInternalPath(rawUrl, productMode);
   if (safeUrl) {
     if (safeUrl === "/tasks" || safeUrl.startsWith("/tasks?")) {
       return "/mentor";

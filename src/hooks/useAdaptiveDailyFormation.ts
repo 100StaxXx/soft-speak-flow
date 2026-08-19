@@ -19,6 +19,7 @@ import {
   type FormationReflectionSignal,
 } from "@/lib/adaptiveDailyFormation";
 import { getEffectiveDailyDate } from "@/utils/timezone";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 
 export const DAILY_FORMATION_QUERY_KEY = "daily-formation";
 export const FORMATION_PROGRESS_QUERY_KEY = "formation-progress";
@@ -196,7 +197,7 @@ export function useAdaptiveDailyFormation({
   const effectiveDateAtNoon = new Date(`${dateKey}T12:00:00`);
   const reviewedFallback = selectAdaptiveDailyFormation({
     dateKey,
-    userId: user?.id ?? "graceward-preview",
+    userId: user?.id ?? `${PRODUCT_RUNTIME.authProductMode}-preview`,
     path: profile?.faction === "starfall" || profile?.faction === "void" || profile?.faction === "stellar"
       ? profile.faction
       : null,

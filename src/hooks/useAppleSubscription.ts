@@ -13,6 +13,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import { parseFunctionInvokeError, type ParsedFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 import { getYearlyOfferDisplay, getYearlyOfferTier } from "@/utils/appleOfferPricing";
 import { resolvePlanFromProductId } from "@/utils/appleIAP";
+import { PRODUCT } from "@/config/product";
 import type { StoreKitTransaction } from "@/types/subscription";
 import {
   buildLocalSubscriptionAccessState,
@@ -28,7 +29,7 @@ const APPLE_MISSING_EXPIRATION_ERROR =
   "This Apple transaction is missing its subscription expiration date.";
 export const APP_STORE_SUBSCRIPTION_ALREADY_LINKED_TITLE = "Subscription already linked";
 export const APP_STORE_SUBSCRIPTION_ALREADY_LINKED_MESSAGE =
-  "This App Store subscription is already linked to another Graceward account. Sign in to that account, or contact support if this is your purchase.";
+  `This App Store subscription is already linked to another ${PRODUCT.name} account. Sign in to that account, or contact support if this is your purchase.`;
 const INACTIVE_ACCESS_STATE = {
   has_access: false,
   access_source: "none" as const,
@@ -460,7 +461,7 @@ export function useAppleSubscription() {
           verifySandboxRecoveryInBackground(currentEntitlement, surface, currentPlan);
           if (options.showSuccessToast !== false) {
             toast({
-              title: "Graceward unlocked",
+              title: `${PRODUCT.name} unlocked`,
               description: "Your existing TestFlight subscription is active on this account.",
             });
           }
@@ -479,7 +480,7 @@ export function useAppleSubscription() {
         verifySandboxRecoveryInBackground(recoveredTransaction, surface, plan);
         if (options.showSuccessToast !== false) {
           toast({
-            title: "Graceward unlocked",
+            title: `${PRODUCT.name} unlocked`,
             description: "Your existing TestFlight subscription is active on this account.",
           });
         }
@@ -495,7 +496,7 @@ export function useAppleSubscription() {
 
       if (options.showSuccessToast !== false) {
         toast({
-          title: "Graceward unlocked",
+          title: `${PRODUCT.name} unlocked`,
           description: "Your existing App Store subscription is active on this account.",
         });
       }
@@ -527,7 +528,7 @@ export function useAppleSubscription() {
     if (!user?.id) {
       toast({
         title: "Sign in required",
-        description: "Please sign in before purchasing Graceward.",
+        description: `Please sign in before purchasing ${PRODUCT.name}.`,
         variant: "destructive",
       });
       return false;
@@ -540,7 +541,7 @@ export function useAppleSubscription() {
     ) {
       toast({
         title: "Subscription already active",
-        description: "Graceward is already unlocked for this account.",
+        description: `${PRODUCT.name} is already unlocked for this account.`,
       });
       return true;
     }
@@ -550,7 +551,7 @@ export function useAppleSubscription() {
       if (recovered === "verified") {
         toast({
           title: "Existing TestFlight subscription restored",
-          description: "Graceward was unlocked from an existing sandbox/App Store entitlement, so no new trial purchase was needed.",
+          description: `${PRODUCT.name} was unlocked from an existing sandbox/App Store entitlement, so no new trial purchase was needed.`,
         });
         return true;
       }
@@ -574,7 +575,15 @@ export function useAppleSubscription() {
       return false;
     }
 
-    const plan = productId.includes("yearly") ? "yearly" : "monthly";
+    const plan = resolvePlanFromProductId(productId);
+    if (!plan) {
+      toast({
+        title: "Product unavailable",
+        description: `That subscription does not belong to ${PRODUCT.name}.`,
+        variant: "destructive",
+      });
+      return false;
+    }
     const purchaseProductId = productId;
     const usesOfferCodeDiscount = hasOfferCode && plan === "yearly";
 
@@ -600,10 +609,10 @@ export function useAppleSubscription() {
 
       trackPaywallEvent("purchase_completed", { surface, plan, productId: purchaseProductId, hasOfferCode });
       toast({
-        title: "Graceward unlocked",
+        title: `${PRODUCT.name} unlocked`,
         description: usesOfferCodeDiscount
           ? "Your $29.99 founding yearly rate is active and stays locked while your subscription remains active."
-          : "Graceward is now active on your account.",
+          : `${PRODUCT.name} is now active on your account.`,
       });
       return true;
     } catch (error) {
@@ -665,7 +674,10 @@ export function useAppleSubscription() {
       const entitlement = await restorePurchases();
 
       if (entitlement) {
-        const plan = entitlement.productId.includes("yearly") ? "yearly" : "monthly";
+        const plan = resolvePlanFromProductId(entitlement.productId);
+        if (!plan) {
+          throw new Error(`The restored subscription does not belong to ${PRODUCT.name}.`);
+        }
         const verified = await verifyCompletedTransaction(entitlement, surface, plan);
         if (!verified) return false;
       }

@@ -169,8 +169,9 @@ export function TaskAdvancedEditSheet({
     ? `${activeReminderOffsets.length} reminders: ${activeReminderOffsets.map(formatQuestReminderOffset).join(', ')}`
     : formatQuestReminderOffset(activeReminderOffsets[0] ?? reminderMinutes);
   const selectedReminderOffsets = new Set(activeReminderOffsets);
-  const hasCustomReminderOffset = activeReminderOffsets.some((offset) => !REMINDER_PRESET_VALUES.has(offset));
-  const customReminderOffsets = activeReminderOffsets.filter((offset) => !REMINDER_PRESET_VALUES.has(offset));
+  const reminderPresetValues: ReadonlySet<number> = REMINDER_PRESET_VALUES;
+  const hasCustomReminderOffset = activeReminderOffsets.some((offset) => !reminderPresetValues.has(offset));
+  const customReminderOffsets = activeReminderOffsets.filter((offset) => !reminderPresetValues.has(offset));
   const customReminderQuestStart = parseQuestReminderDateTime(scheduledDate, scheduledTime);
   const usesCustomReminderDateTime = Boolean(customReminderQuestStart);
   const customReminderAt = usesCustomReminderDateTime

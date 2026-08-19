@@ -472,7 +472,20 @@ export const isTransientDeleteUserInfrastructureError = (
   }
 
   const status = getErrorStatus(error);
+  const code = getErrorCode(error);
   const normalizedText = getNormalizedErrorText(error);
+
+  // PostgreSQL cancels a statement with 57014 after the configured
+  // statement_timeout. Retrying the same account cleanup immediately only
+  // repeats the full transaction and can keep the Edge Function busy until
+  // its request timeout. Let the caller return the stage-specific error after
+  // one attempt instead.
+  if (
+    code === "57014" ||
+    normalizedText.includes("canceling statement due to statement timeout")
+  ) {
+    return false;
+  }
 
   if (status === 401 || status === 403 || status === 404) {
     return false;

@@ -5,6 +5,7 @@ import type {
   WidgetSyncProbeResult,
   WidgetTask,
 } from './WidgetDataPlugin';
+import { PRODUCT_RUNTIME } from '@/config/productRuntime';
 
 export class WidgetDataWeb extends WebPlugin implements WidgetDataPlugin {
   async updateWidgetData(_options: {
@@ -39,7 +40,7 @@ export class WidgetDataWeb extends WebPlugin implements WidgetDataPlugin {
       payloadDate: null,
       payloadUpdatedAt: null,
       payloadByteCount: 0,
-      appGroupId: 'group.com.darrylgraham.graceward',
+      appGroupId: `group.${PRODUCT_RUNTIME.iosBundleId}`,
       dataKey: 'widget_tasks_data',
       lastErrorCode: null,
       lastErrorMessage: null,

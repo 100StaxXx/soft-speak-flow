@@ -78,4 +78,14 @@ describe("getSmartPrompts", () => {
       "Help me use my time and energy wisely",
     ]);
   });
+
+  it("keeps Graceward faith language out of Cosmiq prompts", () => {
+    const prompts = getSmartPrompts("princess", "", false, false, "cosmiq");
+    expect(prompts).toEqual([
+      "Help me create a gentle rhythm for today",
+      "Help me make room for focus, care, and rest",
+      "Help me restart after falling out of a routine",
+    ]);
+    expect(prompts.join(" ")).not.toMatch(/\b(?:pray|prayer|faithful|grace)\b/i);
+  });
 });

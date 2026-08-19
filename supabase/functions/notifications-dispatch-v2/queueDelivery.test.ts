@@ -116,7 +116,7 @@ Deno.test("keeps daily encouragement notifications focused on the Guide reflecti
     spiritAnimal: "Leviathan",
   });
 
-  if (copy.title !== "Your daily encouragement is ready") {
+  if (copy.title !== "A word from Your Guide") {
     throw new Error(`Expected Graceward daily encouragement title, got ${copy.title}`);
   }
 

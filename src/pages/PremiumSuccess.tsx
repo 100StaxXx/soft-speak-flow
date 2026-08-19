@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useSubscription } from "@/hooks/useSubscription";
 import Confetti from "react-confetti";
-import { PREMIUM_BENEFITS } from "@/config/premiumBenefits";
+import { PREMIUM_BENEFITS, PREMIUM_PRODUCT_NAME } from "@/config/premiumBenefits";
 
 const CHECKOUT_SESSION_WEBHOOK_DELAY_MS = 2000;
 const ACTIVATION_RETRY_DELAYS_MS = [0, 1000, 2000, 4000] as const;
@@ -138,7 +138,7 @@ export default function PremiumSuccess() {
         <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
 
         <h1 className="font-display text-4xl text-foreground mb-3">
-          Welcome to Graceward Plus!
+          Welcome to {PREMIUM_PRODUCT_NAME}!
         </h1>
 
         <p className="text-muted-foreground mb-6 text-lg">

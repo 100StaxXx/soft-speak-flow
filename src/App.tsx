@@ -24,6 +24,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RealtimeSyncProvider } from "@/components/RealtimeSyncProvider";
 import { GlobalEvolutionListener } from "@/components/GlobalEvolutionListener";
+import { GlobalCompanionAgendaListener } from "@/components/GlobalCompanionAgendaListener";
 import { InstallPWA } from "@/components/InstallPWA";
 import { lockToPortrait } from "@/utils/orientationLock";
 import { UpdateAvailablePrompt } from "@/components/UpdateAvailablePrompt";
@@ -45,6 +46,7 @@ import { shouldShowBottomNav } from "@/utils/bottomNavVisibility";
 import { ResilienceProvider } from "@/contexts/ResilienceContext";
 import { ResilienceStatusBanner } from "@/components/resilience/ResilienceStatusBanner";
 import { GlobalWidgetSyncBridge } from "@/components/GlobalWidgetSyncBridge";
+import { GlobalCalendarSyncBridge } from "@/components/GlobalCalendarSyncBridge";
 import { StoreKitProvider } from "@/providers/StoreKitProvider";
 import { EVENING_REFLECTION_CANONICAL_PATH } from "@/utils/eveningReflectionNavigation";
 import { useReferralSync } from "@/hooks/useReferralSync";
@@ -68,11 +70,14 @@ import { PRODUCT } from "@/config/product";
 
 // Lazy load pages for code splitting
 const Auth = lazy(() => import("./pages/Auth"));
+const CalendarOAuthCallback = lazy(() => import("./pages/CalendarOAuthCallback"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Welcome = lazy(() => import("./pages/Welcome"));
 
-const Profile = lazy(() => import("./pages/ChristianProfile"));
+const Profile = PRODUCT.mode === "cosmiq"
+  ? lazy(() => import("./pages/Profile"))
+  : lazy(() => import("./pages/ChristianProfile"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
@@ -111,7 +116,9 @@ const queryClient = new QueryClient({
 // Prefetch critical routes during idle time for instant navigation
 const prefetchCriticalRoutes = () => {
   const routes = [
-    () => import('./pages/ChristianProfile'),
+    PRODUCT.mode === "cosmiq"
+      ? () => import('./pages/Profile')
+      : () => import('./pages/ChristianProfile'),
     () => import('./pages/Today'),
   ];
   routes.forEach(route => route());
@@ -255,16 +262,19 @@ const AppContent = memo(() => {
       if (!detail) return;
 
       if (detail.queueId) {
-        void supabase.rpc("mark_push_notification_opened", {
-          p_queue_id: detail.queueId,
-        }).then(({ error }) => {
-          if (error) {
-            logger.warn("Failed to mark native push notification opened", { error: error.message });
+        void (async () => {
+          try {
+            const { error } = await supabase.rpc("mark_push_notification_opened", {
+              p_queue_id: detail.queueId,
+            });
+            if (error) {
+              logger.warn("Failed to mark native push notification opened", { error: error.message });
+            }
+          } finally {
+            void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_INBOX_QUERY_KEY] });
+            void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_UNREAD_COUNT_QUERY_KEY] });
           }
-        }).finally(() => {
-          void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_INBOX_QUERY_KEY] });
-          void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_UNREAD_COUNT_QUERY_KEY] });
-        });
+        })();
       }
 
       navigate(detail.url);
@@ -397,7 +407,7 @@ const AppContent = memo(() => {
     <ResilienceProvider>
         <DailyWayThemeProvider>
           <WallpaperManifestProvider
-            enabled={Boolean(session?.user)}
+            enabled={Boolean(session?.user) && PRODUCT.mode === "christian"}
             userTimezone={profile?.timezone ?? null}
           >
             <ResilienceStatusBanner />
@@ -406,6 +416,7 @@ const AppContent = memo(() => {
                 <TalkPopupProvider>
                   <XPProvider>
                     <GlobalWidgetSyncBridge enabled={Boolean(session?.user)} />
+                    <GlobalCalendarSyncBridge enabled={Boolean(session?.user)} />
                     {session?.user ? <ProductExperienceAnalyticsBridge /> : null}
                     <PostOnboardingMentorGuidanceProvider>
                       <WeeklyRecapProvider>
@@ -414,6 +425,7 @@ const AppContent = memo(() => {
                             <OnboardingExperienceGate>
                             <Suspense fallback={<LoadingFallback />}>
                           <GlobalEvolutionListener />
+                          <GlobalCompanionAgendaListener />
                           {activeMainTabPath ? (
                             <ProtectedRoute>
                               <MainTabsKeepAlive activePath={activeMainTabPath} />
@@ -423,7 +435,7 @@ const AppContent = memo(() => {
                             <Routes location={location} key={location.pathname}>
                   <Route path="/welcome" element={<Welcome />} />
                   <Route path="/auth" element={<Auth />} />
-                  <Route path="/calendar/oauth/callback" element={<Navigate to="/mentor" replace />} />
+                  <Route path="/calendar/oauth/callback" element={<CalendarOAuthCallback />} />
                   <Route path="/auth/reset-password" element={<ResetPassword />} />
                   <Route path="/creator" element={<Navigate to="/welcome" replace />} />
                   <Route path="/creator/dashboard" element={<Navigate to="/welcome" replace />} />
