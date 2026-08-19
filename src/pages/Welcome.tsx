@@ -57,7 +57,7 @@ export default function Welcome() {
               {PRODUCT.name}
             </h1>
             <p className="mt-6 max-w-2xl text-xl leading-8 text-[#3f4d41] sm:text-2xl sm:leading-9">
-              {PRODUCT.tagline} Scripture, prayer, reflection, and faithful action—woven into the day you actually have.
+              {PRODUCT.tagline} Scripture, prayer, reflection, and faithful action for the day you actually have.
             </p>
 
             <div className="mt-9 flex w-full max-w-xl flex-col gap-3 sm:flex-row">

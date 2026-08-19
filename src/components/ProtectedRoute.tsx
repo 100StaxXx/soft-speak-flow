@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAccessStatus, type AccessGateReason } from "@/hooks/useAccessStatus";
 import { Progress } from "@/components/ui/progress";
 import { Paywall } from "@/components/Paywall";
+import { PRODUCT } from "@/config/product";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -16,7 +17,7 @@ export const PROTECTED_ROUTE_AUTH_STALL_MS = 6_000;
 export const ProtectedRoute = ({
   children,
   requireMentor: _requireMentor = true,
-  requireAccess = true,
+  requireAccess = PRODUCT.requiresSubscription,
 }: ProtectedRouteProps) => {
   const { user, loading: authLoading, status } = useAuth();
   const { hasAccess, gateReason, loading: accessLoading } = useAccessStatus();

@@ -35,6 +35,8 @@ describe("Graceward welcome", () => {
 
     expect(screen.getByRole("heading", { name: "Graceward", level: 1 })).toBeInTheDocument();
     expect(screen.getByText(/a christian daily companion/i)).toBeInTheDocument();
+    expect(screen.getByText(/faithful action for the day you actually have/i)).toBeInTheDocument();
+    expect(screen.queryByText(/—/)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /receive the day/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /without pretending to speak for god/i })).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /begin|start a daily rhythm/i })[0]).toHaveAttribute("href", "/auth?mode=signup");

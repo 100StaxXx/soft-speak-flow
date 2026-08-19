@@ -18,6 +18,7 @@ const PRODUCT_CONFIG = {
     description:
       "A Christian companion for Scripture, prayer, reflection, and faithful action.",
     supportEmail: "hello@graceward.app",
+    requiresSubscription: false,
   },
   cosmiq: {
     name: "Cosmiq",
@@ -26,6 +27,7 @@ const PRODUCT_CONFIG = {
     description:
       "A living companion for planning, focus, reflection, and personal growth.",
     supportEmail: "hello@cosmiq.app",
+    requiresSubscription: true,
   },
 } as const;
 
