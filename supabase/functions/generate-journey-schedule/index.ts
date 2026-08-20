@@ -2,19 +2,22 @@ import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
 installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
+import {
+  createSafeErrorResponse,
+  requireProtectedRequest,
+} from "../_shared/abuseProtection.ts";
 import {
   createFallbackScheduleParts,
   enforceExecutionModelSemantics,
+  type ExecutionModel,
   getExecutionModelInstructions,
   inferExecutionModel,
   normalizeJourneyMilestonePercents,
-  type ExecutionModel,
 } from "./planner.ts";
 import {
   DEFAULT_RITUAL_TIME_SLOTS,
-  normalizeJourneyRitual,
   type JourneyRitual,
+  normalizeJourneyRitual,
 } from "./ritualNormalization.ts";
 import {
   buildCostGuardrailBlockedResponse,
@@ -25,19 +28,25 @@ import {
   CHRISTIAN_GUIDANCE_POLICY,
   validateChristianGuidanceOutput,
 } from "../_shared/christianGuidancePolicy.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 // Normalize difficulty values to valid database enum values
-function normalizeDifficulty(value: unknown): 'easy' | 'medium' | 'hard' {
-  if (typeof value !== 'string') return 'medium';
+function normalizeDifficulty(value: unknown): "easy" | "medium" | "hard" {
+  if (typeof value !== "string") return "medium";
   const lower = value.toLowerCase().trim();
-  if (['easy', 'simple', 'beginner', 'low', '1'].includes(lower)) return 'easy';
-  if (['hard', 'difficult', 'advanced', 'high', 'challenging', '3'].includes(lower)) return 'hard';
-  return 'medium';
+  if (["easy", "simple", "beginner", "low", "1"].includes(lower)) return "easy";
+  if (
+    ["hard", "difficult", "advanced", "high", "challenging", "3"].includes(
+      lower,
+    )
+  ) return "hard";
+  return "medium";
 }
 
 interface JourneyPhase {
@@ -74,14 +83,24 @@ interface ScheduleRequest {
   };
 }
 
-type StoryTypeSlug = 'treasure_hunt' | 'mystery' | 'pilgrimage' | 'heroes_journey' | 'rescue_mission' | 'exploration';
-type ThemeColorId = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
+type StoryTypeSlug =
+  | "treasure_hunt"
+  | "mystery"
+  | "pilgrimage"
+  | "heroes_journey"
+  | "rescue_mission"
+  | "exploration";
+type ThemeColorId = "heroic" | "warrior" | "mystic" | "nature" | "solar";
 
 interface ScheduleResponse {
   feasibilityAssessment: {
     daysAvailable: number;
     typicalDays: number;
-    feasibility: 'comfortable' | 'achievable' | 'aggressive' | 'very_aggressive';
+    feasibility:
+      | "comfortable"
+      | "achievable"
+      | "aggressive"
+      | "very_aggressive";
     message: string;
   };
   phases: JourneyPhase[];
@@ -95,8 +114,42 @@ interface ScheduleResponse {
   planningStyleReason?: string;
 }
 
+function createFallbackScheduleResponse(
+  executionModel: ExecutionModel,
+  planningStyleReason: string,
+  now: Date,
+  deadline: string,
+  daysAvailable: number,
+): ScheduleResponse {
+  const fallback = createFallbackScheduleParts(
+    executionModel,
+    now,
+    deadline,
+    daysAvailable,
+  );
+
+  return {
+    feasibilityAssessment: {
+      daysAvailable,
+      typicalDays: daysAvailable,
+      feasibility: "achievable",
+      message:
+        `You have ${daysAvailable} days to achieve your goal. Let's create a solid plan!`,
+    },
+    phases: fallback.phases,
+    milestones: fallback.milestones,
+    rituals: fallback.rituals,
+    weeklyHoursEstimate: 5,
+    suggestedChapterCount: fallback.suggestedChapterCount,
+    suggestedStoryType: "heroes_journey",
+    suggestedThemeColor: "heroic",
+    executionModel,
+    planningStyleReason,
+  };
+}
+
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -106,6 +159,7 @@ serve(async (req) => {
     const protectedRequest = await requireProtectedRequest(req, {
       profileKey: "ai.standard",
       endpointName: "generate-journey-schedule",
+      allowServiceRole: false,
     });
     if (protectedRequest instanceof Response) {
       return protectedRequest;
@@ -113,25 +167,34 @@ serve(async (req) => {
     const { auth, supabase, requestId: protectedRequestId } = protectedRequest;
     requestId = protectedRequestId;
 
-    const { goal, deadline, clarificationAnswers, epicContext, timelineContext, adjustmentRequest, previousSchedule } = await req.json() as ScheduleRequest;
+    const {
+      goal,
+      deadline,
+      clarificationAnswers,
+      epicContext,
+      timelineContext,
+      adjustmentRequest,
+      previousSchedule,
+    } = await req.json() as ScheduleRequest;
 
     if (!goal || goal.trim().length < 3) {
       return new Response(
-        JSON.stringify({ error: 'Goal must be at least 3 characters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: "Goal must be at least 3 characters" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
 
     if (!deadline) {
       return new Response(
-        JSON.stringify({ error: 'Deadline is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: "Deadline is required" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
-    }
-
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY is not configured');
     }
 
     const costGuardrails = createCostGuardrailSession({
@@ -149,24 +212,31 @@ serve(async (req) => {
     // Calculate days until deadline
     const deadlineDate = new Date(deadline);
     const now = new Date();
-    const daysAvailable = Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const daysAvailable = Math.ceil(
+      (deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+    );
 
     if (daysAvailable < 7) {
       return new Response(
-        JSON.stringify({ error: 'Deadline must be at least 7 days from now' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: "Deadline must be at least 7 days from now" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
 
     // Build context from clarification answers
-    let clarificationContext = '';
+    let clarificationContext = "";
     if (clarificationAnswers && Object.keys(clarificationAnswers).length > 0) {
       clarificationContext = `
 User's context:
-${Object.entries(clarificationAnswers)
-  .filter(([_, v]) => v !== undefined && v !== '')
-  .map(([key, value]) => `- ${key.replace(/_/g, ' ')}: ${value}`)
-  .join('\n')}
+${
+        Object.entries(clarificationAnswers)
+          .filter(([_, v]) => v !== undefined && v !== "")
+          .map(([key, value]) => `- ${key.replace(/_/g, " ")}: ${value}`)
+          .join("\n")
+      }
 `;
     }
 
@@ -176,9 +246,15 @@ ${Object.entries(clarificationAnswers)
       timelineContext,
       clarificationAnswers,
     });
+    const productMode = await resolveUserProductMode(supabase, auth.userId);
+    const productGuidancePolicy = productMode === "graceward"
+      ? CHRISTIAN_GUIDANCE_POLICY
+      : `COSMIQ PRODUCT BOUNDARY (highest priority):
+- Keep the plan secular and centered on the user's stated goal.
+- Do not add Christian, biblical, prayer, church, pastoral, or Graceward-specific language unless the user explicitly included it in their goal or context.`;
 
     // Build timeline context prompt
-    let timelineContextPrompt = '';
+    let timelineContextPrompt = "";
     if (timelineContext && timelineContext.trim()) {
       timelineContextPrompt = `
 IMPORTANT CONTEXT from the user about their situation:
@@ -196,7 +272,7 @@ Adjust the timeline based on this context.
     }
 
     // Build adjustment context for negotiation
-    let adjustmentContext = '';
+    let adjustmentContext = "";
     if (adjustmentRequest && previousSchedule) {
       adjustmentContext = `
 ADJUSTMENT REQUEST: The user wants to modify the plan.
@@ -204,7 +280,9 @@ User's feedback: "${adjustmentRequest}"
 
 Previous plan had:
 - ${previousSchedule.phases.length} phases
-- ${previousSchedule.milestones.length} milestones (${previousSchedule.milestones.filter(m => m.isPostcardMilestone).length} postcard/chapter milestones)
+- ${previousSchedule.milestones.length} milestones (${
+        previousSchedule.milestones.filter((m) => m.isPostcardMilestone).length
+      } postcard/chapter milestones)
 - ${previousSchedule.rituals.length} rituals
 
 Adjust the plan based on the user's feedback while keeping the same deadline.
@@ -212,7 +290,8 @@ Keep the same number of postcard milestones unless the feedback specifically ask
 `;
     }
 
-    const systemPrompt = `You are an expert goal planner who creates detailed, deadline-driven schedules. You work backwards from deadlines to create realistic phased plans.
+    const systemPrompt =
+      `You are an expert goal planner who creates detailed, deadline-driven schedules. You work backwards from deadlines to create realistic phased plans.
 
 Your job is to:
 1. Assess the feasibility of the goal given the deadline
@@ -257,7 +336,7 @@ ${getExecutionModelInstructions(planningShape.executionModel)}
 
 Milestones should have actual dates, not just weeks. Spread them across phases.
 
-${CHRISTIAN_GUIDANCE_POLICY}
+${productGuidancePolicy}
 
 CRITICAL: Return ONLY valid JSON with this exact structure:
 {
@@ -311,15 +390,15 @@ CRITICAL: Return ONLY valid JSON with this exact structure:
   "planningStyleReason": "parallelizable_goal" | "deadline_driven_linear_goal" | "fallback_default"
 }`;
 
-    const today = new Date().toISOString().split('T')[0];
-    
+    const today = new Date().toISOString().split("T")[0];
+
     const userPrompt = `Create a detailed schedule for this goal:
 
 Goal: "${goal}"
 Today's date: ${today}
 Deadline: ${deadline} (${daysAvailable} days from now)
 ${clarificationContext}
-${epicContext ? `Context type: ${epicContext}` : ''}
+${epicContext ? `Context type: ${epicContext}` : ""}
 Expected planning shape: ${planningShape.executionModel}
 ${timelineContextPrompt}
 ${adjustmentContext}
@@ -338,41 +417,142 @@ Generate a phased schedule working backwards from the deadline. Make sure:
 11. Every ritual object must include both "preferredTime" and "estimatedMinutes"
 12. Give each ritual a preferredTime in local 24-hour "HH:mm" format, spreading rituals across sensible dayparts when there are multiple
 13. Give each ritual an estimatedMinutes integer between 1 and 1440
-${timelineContext ? '14. Adjust the schedule based on the user\'s context (existing skills, constraints, etc.)' : ''}`;
+${
+      timelineContext
+        ? "14. Adjust the schedule based on the user's context (existing skills, constraints, etc.)"
+        : ""
+    }`;
 
-    console.log('Generating journey schedule for goal:', goal, 'deadline:', deadline, 'days:', daysAvailable, 'context:', timelineContext);
+    console.log(
+      "Generating journey schedule for goal:",
+      goal,
+      "deadline:",
+      deadline,
+      "days:",
+      daysAvailable,
+      "context:",
+      timelineContext,
+    );
 
-    const response = await guardedFetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.7,
-        response_format: { type: 'json_object' },
-      }),
-    });
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) {
+      console.warn(
+        "[Journey Schedule] Using deterministic fallback because the provider key is unavailable",
+      );
+      return new Response(
+        JSON.stringify(createFallbackScheduleResponse(
+          planningShape.executionModel,
+          planningShape.planningStyleReason,
+          now,
+          deadline,
+          daysAvailable,
+        )),
+        {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "X-Cosmiq-Plan-Source": "fallback",
+          },
+        },
+      );
+    }
+
+    let response: Response;
+    try {
+      response = await guardedFetch(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${OPENAI_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            temperature: 0.7,
+            response_format: { type: "json_object" },
+          }),
+        },
+      );
+    } catch (error) {
+      if (isCostGuardrailBlockedError(error)) throw error;
+      console.error(
+        "[Journey Schedule] Provider request failed; using deterministic fallback",
+        error,
+      );
+      return new Response(
+        JSON.stringify(createFallbackScheduleResponse(
+          planningShape.executionModel,
+          planningShape.planningStyleReason,
+          now,
+          deadline,
+          daysAvailable,
+        )),
+        {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "X-Cosmiq-Plan-Source": "fallback",
+          },
+        },
+      );
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
-      throw new Error('Failed to generate schedule');
+      console.error("AI gateway error:", response.status, errorText);
+      return new Response(
+        JSON.stringify(createFallbackScheduleResponse(
+          planningShape.executionModel,
+          planningShape.planningStyleReason,
+          now,
+          deadline,
+          daysAvailable,
+        )),
+        {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "X-Cosmiq-Plan-Source": "fallback",
+          },
+        },
+      );
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
 
     // Log raw AI response for debugging
-    console.log('[Journey Schedule] Raw AI response length:', content?.length, 'chars');
+    console.log(
+      "[Journey Schedule] Raw AI response length:",
+      content?.length,
+      "chars",
+    );
 
     if (!content) {
-      throw new Error('No content in AI response');
+      console.warn(
+        "[Journey Schedule] Provider returned no content; using deterministic fallback",
+      );
+      return new Response(
+        JSON.stringify(createFallbackScheduleResponse(
+          planningShape.executionModel,
+          planningShape.planningStyleReason,
+          now,
+          deadline,
+          daysAvailable,
+        )),
+        {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "X-Cosmiq-Plan-Source": "fallback",
+          },
+        },
+      );
     }
 
     // Parse the JSON from the response
@@ -383,46 +563,57 @@ ${timelineContext ? '14. Adjust the schedule based on the user\'s context (exist
       if (jsonMatch) {
         jsonStr = jsonMatch[1].trim();
       }
-      
+
       schedule = JSON.parse(jsonStr);
 
-      const guidanceSafety = validateChristianGuidanceOutput(JSON.stringify(schedule));
-      if (!guidanceSafety.safe) {
-        throw new Error(`Unsafe guidance output: ${guidanceSafety.reason}`);
+      if (productMode === "graceward") {
+        const guidanceSafety = validateChristianGuidanceOutput(
+          JSON.stringify(schedule),
+        );
+        if (!guidanceSafety.safe) {
+          throw new Error(`Unsafe guidance output: ${guidanceSafety.reason}`);
+        }
       }
-      
+
       // Log parsed rituals for debugging
-      console.log('[Journey Schedule] Parsed rituals:', schedule.rituals?.length, schedule.rituals?.map(r => r.title));
-      
+      console.log(
+        "[Journey Schedule] Parsed rituals:",
+        schedule.rituals?.length,
+        schedule.rituals?.map((r) => r.title),
+      );
+
       // Validate and fix IDs
       schedule.phases = schedule.phases.map((p, i) => ({
         ...p,
         id: p.id || `phase-${Date.now()}-${i}`,
         phaseOrder: p.phaseOrder || i + 1,
       }));
-      
+
       schedule.milestones = normalizeJourneyMilestonePercents(
         schedule.milestones.map((m, i) => ({
           ...m,
           id: m.id || `milestone-${Date.now()}-${i}`,
           isPostcardMilestone: m.isPostcardMilestone ?? false,
-          milestonePercent: m.milestonePercent ?? Math.round((i + 1) / schedule.milestones.length * 100),
+          milestonePercent: m.milestonePercent ??
+            Math.round((i + 1) / schedule.milestones.length * 100),
         })),
       );
-      
+
       schedule.rituals = schedule.rituals.map((ritual, index) =>
         normalizeJourneyRitual(
           ritual,
           ritual.id || `ritual-${Date.now()}-${index}`,
           normalizeDifficulty,
           DEFAULT_RITUAL_TIME_SLOTS[index % DEFAULT_RITUAL_TIME_SLOTS.length],
-        ),
+        )
       );
 
-      schedule.executionModel = schedule.executionModel === 'overlap_early' || schedule.executionModel === 'sequential'
+      schedule.executionModel = schedule.executionModel === "overlap_early" ||
+          schedule.executionModel === "sequential"
         ? schedule.executionModel
         : planningShape.executionModel;
-      schedule.planningStyleReason = schedule.planningStyleReason || planningShape.planningStyleReason;
+      schedule.planningStyleReason = schedule.planningStyleReason ||
+        planningShape.planningStyleReason;
 
       const semanticallyEnforced = enforceExecutionModelSemantics({
         executionModel: schedule.executionModel,
@@ -432,67 +623,75 @@ ${timelineContext ? '14. Adjust the schedule based on the user\'s context (exist
         daysAvailable,
       });
       schedule.phases = semanticallyEnforced.phases;
-      schedule.milestones = normalizeJourneyMilestonePercents(semanticallyEnforced.milestones);
-      
+      schedule.milestones = normalizeJourneyMilestonePercents(
+        semanticallyEnforced.milestones,
+      );
+
       // Ensure suggestedChapterCount matches actual postcard milestone count
-      const postcardCount = schedule.milestones.filter(m => m.isPostcardMilestone).length;
-      schedule.suggestedChapterCount = postcardCount > 0 ? postcardCount : (schedule.suggestedChapterCount || 5);
-      
+      const postcardCount = schedule.milestones.filter((m) =>
+        m.isPostcardMilestone
+      ).length;
+      schedule.suggestedChapterCount = postcardCount > 0
+        ? postcardCount
+        : (schedule.suggestedChapterCount || 5);
+
       // Ensure story type and theme color have valid values
-      const validStoryTypes: StoryTypeSlug[] = ['treasure_hunt', 'mystery', 'pilgrimage', 'heroes_journey', 'rescue_mission', 'exploration'];
-      const validThemeColors: ThemeColorId[] = ['heroic', 'warrior', 'mystic', 'nature', 'solar'];
-      
+      const validStoryTypes: StoryTypeSlug[] = [
+        "treasure_hunt",
+        "mystery",
+        "pilgrimage",
+        "heroes_journey",
+        "rescue_mission",
+        "exploration",
+      ];
+      const validThemeColors: ThemeColorId[] = [
+        "heroic",
+        "warrior",
+        "mystic",
+        "nature",
+        "solar",
+      ];
+
       if (!validStoryTypes.includes(schedule.suggestedStoryType)) {
-        schedule.suggestedStoryType = 'heroes_journey';
+        schedule.suggestedStoryType = "heroes_journey";
       }
       if (!validThemeColors.includes(schedule.suggestedThemeColor)) {
         // Default theme based on story type
         const themeMap: Record<StoryTypeSlug, ThemeColorId> = {
-          treasure_hunt: 'heroic',
-          heroes_journey: 'heroic',
-          rescue_mission: 'warrior',
-          mystery: 'mystic',
-          exploration: 'nature',
-          pilgrimage: 'nature',
+          treasure_hunt: "heroic",
+          heroes_journey: "heroic",
+          rescue_mission: "warrior",
+          mystery: "mystic",
+          exploration: "nature",
+          pilgrimage: "nature",
         };
-        schedule.suggestedThemeColor = themeMap[schedule.suggestedStoryType] || 'solar';
+        schedule.suggestedThemeColor = themeMap[schedule.suggestedStoryType] ||
+          "solar";
       }
-      
     } catch (parseError) {
-      console.error('Failed to parse AI response:', parseError, content);
-      const fallback = createFallbackScheduleParts(planningShape.executionModel, now, deadline, daysAvailable);
-
-      schedule = {
-        feasibilityAssessment: {
-          daysAvailable,
-          typicalDays: daysAvailable,
-          feasibility: 'achievable',
-          message: `You have ${daysAvailable} days to achieve your goal. Let's create a solid plan!`,
-        },
-        phases: fallback.phases,
-        milestones: fallback.milestones,
-        rituals: fallback.rituals,
-        weeklyHoursEstimate: 5,
-        suggestedChapterCount: fallback.suggestedChapterCount,
-        suggestedStoryType: 'heroes_journey',
-        suggestedThemeColor: 'heroic',
-        executionModel: planningShape.executionModel,
-        planningStyleReason: 'fallback_default',
-      };
+      console.error("Failed to parse AI response:", parseError, content);
+      schedule = createFallbackScheduleResponse(
+        planningShape.executionModel,
+        "fallback_default",
+        now,
+        deadline,
+        daysAvailable,
+      );
     }
 
-    console.log(`Generated schedule with ${schedule.phases.length} phases, ${schedule.milestones.length} milestones (${schedule.suggestedChapterCount} chapters), ${schedule.rituals.length} rituals`);
+    console.log(
+      `Generated schedule with ${schedule.phases.length} phases, ${schedule.milestones.length} milestones (${schedule.suggestedChapterCount} chapters), ${schedule.rituals.length} rituals`,
+    );
 
     return new Response(
       JSON.stringify(schedule),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
-
   } catch (error) {
     if (isCostGuardrailBlockedError(error)) {
       return buildCostGuardrailBlockedResponse(error, corsHeaders);
     }
-    console.error('Error generating journey schedule:', error);
+    console.error("Error generating journey schedule:", error);
     return createSafeErrorResponse(req, {
       status: 500,
       code: "INTERNAL_ERROR",
