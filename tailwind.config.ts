@@ -90,6 +90,7 @@ export default {
         'cosmiq-glow': 'hsl(var(--cosmiq-glow))',
       },
       fontFamily: {
+        'serif': ['Libre Baskerville', 'Georgia', 'serif'],
         'heading': ['Bebas Neue', 'Oswald', 'sans-serif'],
         'body': ['Barlow', 'sans-serif'],
         'quote': ['Playfair Display', 'serif'],

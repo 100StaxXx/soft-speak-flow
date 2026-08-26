@@ -82,6 +82,7 @@ const DEFAULT_STAGE_UNLOCKS: CompanionElementOverlayRecipeDefinition["stageUnloc
 
 const DEFAULT_EVENT_BURSTS: Record<CompanionMotionEventType, EventBurstProfile> = {
   idle: { ringInset: "18%", secondaryInset: "24%", rays: false, swirl: false, beam: false },
+  task_start: { ringInset: "18%", secondaryInset: "24%", rays: false, swirl: false, beam: false },
   xp_gain: { ringInset: "18%", secondaryInset: "26%", rays: false, swirl: false, beam: false },
   quest_complete: { ringInset: "16%", secondaryInset: "22%", rays: false, swirl: true, beam: false },
   streak: { ringInset: "12%", secondaryInset: "18%", rays: true, swirl: true, beam: false },

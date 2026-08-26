@@ -7,6 +7,37 @@ function assert(condition: boolean, message: string): void {
 Deno.env.set("SUPABASE_FUNCTIONS_TEST", "1");
 const checkAppleSubscriptionModule = await import("./index.ts");
 
+Deno.test("subscription check rejects a temporarily unauthenticated request instead of denying access", async () => {
+  const response = await checkAppleSubscriptionModule
+    .handleCheckAppleSubscription(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { Authorization: "Bearer expired-access-token" },
+      }),
+      {
+        createSupabaseClient: () =>
+          ({
+            auth: {
+              getUser: async () => ({
+                data: { user: null },
+                error: new Error("JWT expired"),
+              }),
+            },
+          }) as never,
+      },
+    );
+
+  assert(
+    response.status === 401,
+    `Expected an auth failure, got ${response.status}`,
+  );
+  const payload = await response.json();
+  assert(
+    payload.error === "Unauthorized",
+    `Expected Unauthorized, got ${payload.error}`,
+  );
+});
+
 Deno.test("completed onboarding without stored access returns inactive manual no-access", () => {
   const response = checkAppleSubscriptionModule
     .buildCompletedOnboardingNoAccessResponse({

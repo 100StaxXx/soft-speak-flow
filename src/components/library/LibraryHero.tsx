@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Search, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useMemo } from "react";
+import { PRODUCT } from "@/config/product";
 
 interface LibraryHeroProps {
   searchQuery: string;
@@ -75,7 +76,7 @@ export const LibraryHero = ({
           >
             <Sparkles className="h-5 w-5 text-stardust-gold" />
             <span className="text-stardust-gold text-sm font-medium uppercase tracking-widest">
-              Cosmiq Library
+              {PRODUCT.name} Library
             </span>
             <Sparkles className="h-5 w-5 text-stardust-gold" />
           </motion.div>

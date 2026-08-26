@@ -112,8 +112,8 @@ describe("useUpdateAvailability", () => {
       },
     );
     mocks.getInfoMock.mockResolvedValue({
-      name: "Cosmiq",
-      id: "com.darrylgraham.revolution",
+      name: "Graceward",
+      id: "com.darrylgraham.graceward",
       version: "1.0.0",
       build: "1",
     });
@@ -172,7 +172,7 @@ describe("useUpdateAvailability", () => {
           resultCount: 1,
           results: [
             {
-              bundleId: "com.darrylgraham.revolution",
+              bundleId: "com.darrylgraham.graceward",
               version: "1.1.0",
               trackViewUrl: "https://apps.apple.com/app/id1234567890",
             },
@@ -203,7 +203,7 @@ describe("useUpdateAvailability", () => {
           resultCount: 1,
           results: [
             {
-              bundleId: "com.darrylgraham.revolution",
+              bundleId: "com.darrylgraham.graceward",
               version: "1.1.0",
               trackViewUrl: "https://apps.apple.com/app/id1234567890",
             },

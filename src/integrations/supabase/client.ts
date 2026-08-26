@@ -3,15 +3,43 @@ import { createClient } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import type { Database } from './types';
 import { safeLocalStorage } from '@/utils/storage';
+import { PRODUCT_RUNTIME } from '@/config/productRuntime';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const EXPECTED_SUPABASE_PROJECT_REF =
+  import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_REF?.trim();
+
+const getSupabaseProjectRef = (url: string): string => {
+  try {
+    return new URL(url).hostname.split('.')[0] || 'project';
+  } catch {
+    return 'project';
+  }
+};
+
+const projectRef = getSupabaseProjectRef(SUPABASE_URL ?? '');
+const LEGACY_SUPABASE_AUTH_STORAGE_KEY = `sb-${projectRef}-auth-token`;
+export const SUPABASE_AUTH_STORAGE_KEY =
+  `${LEGACY_SUPABASE_AUTH_STORAGE_KEY}-${PRODUCT_RUNTIME.authProductMode}`;
 
 // Validate required environment variables
-if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+if (
+  !SUPABASE_URL ||
+  !SUPABASE_PUBLISHABLE_KEY ||
+  !EXPECTED_SUPABASE_PROJECT_REF
+) {
   throw new Error(
-    'Missing required environment variables: VITE_SUPABASE_URL and/or VITE_SUPABASE_PUBLISHABLE_KEY. ' +
+    'Missing required environment variables: VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY, ' +
+    'and/or VITE_EXPECTED_SUPABASE_PROJECT_REF. ' +
     'Copy .env.example to .env.local and populate the Supabase values before starting the app.'
+  );
+}
+
+if (projectRef !== EXPECTED_SUPABASE_PROJECT_REF) {
+  throw new Error(
+    `Blocked ${PRODUCT_RUNTIME.authProductMode} startup: Supabase project ${projectRef} does not match ` +
+    `the expected project ${EXPECTED_SUPABASE_PROJECT_REF}.`,
   );
 }
 
@@ -36,12 +64,27 @@ const nativeAuthLock = async <Result>(
 
 const authLock = Capacitor.isNativePlatform() ? nativeAuthLock : undefined;
 
+// Preserve existing sign-ins during the rollout, but move them into a
+// product-specific slot. AuthProvider validates the migrated session before it
+// can become visible, so a legacy Cosmiq session cannot be exposed by Graceward.
+if (
+  !safeLocalStorage.getItem(SUPABASE_AUTH_STORAGE_KEY) &&
+  safeLocalStorage.getItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY)
+) {
+  safeLocalStorage.setItem(
+    SUPABASE_AUTH_STORAGE_KEY,
+    safeLocalStorage.getItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY) as string,
+  );
+  safeLocalStorage.removeItem(LEGACY_SUPABASE_AUTH_STORAGE_KEY);
+}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: supabaseStorage,
+    storageKey: SUPABASE_AUTH_STORAGE_KEY,
     persistSession: true,
     autoRefreshToken: true,
     lock: authLock,

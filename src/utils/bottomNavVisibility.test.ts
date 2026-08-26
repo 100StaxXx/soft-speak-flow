@@ -17,6 +17,8 @@ describe("shouldShowBottomNav", () => {
     expect(shouldShowBottomNav("/privacy", true)).toBe(false);
     expect(shouldShowBottomNav("/test-scroll", true)).toBe(false);
     expect(shouldShowBottomNav("/test-day-planner", true)).toBe(false);
+    expect(shouldShowBottomNav("/mentor-chat", true)).toBe(true);
+    expect(shouldShowBottomNav("/mentor-selection", true)).toBe(false);
   });
 
   it("hides nav on auth/onboarding paths", () => {

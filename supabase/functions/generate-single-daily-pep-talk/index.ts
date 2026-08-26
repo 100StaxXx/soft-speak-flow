@@ -16,9 +16,14 @@ import {
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
 import {
+  getDailyEncouragementSummary,
+  getDailyEncouragementTitle,
+} from "../_shared/dailyEncouragementCopy.ts";
+import {
   resolveSingleDailyPepTalkDateContext,
   type ProfileTimezoneSupabaseClient,
 } from "./workflow.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -93,46 +98,8 @@ function parseUpstreamError(rawBody: string): string | null {
   }
 }
 
-function generateTitle(_mentorSlug: string, category: string): string {
-  const titles: Record<string, string[]> = {
-    discipline: ['Lock In and Execute', 'Stay Consistent Today', 'Build Your Discipline', 'No Excuses, Just Action'],
-    confidence: ['Step Into Your Power', 'Believe in Yourself', 'Own Your Worth', 'Rise Above Doubt'],
-    physique: ['Train Like a Champion', 'Push Your Limits', 'Build Your Body', 'Strength Is Earned'],
-    focus: ['Stay Locked In', 'Focus on What Matters', 'Eliminate Distractions', 'Sharp Mind, Clear Goals'],
-    mindset: ['Shift Your Perspective', 'Master Your Mind', 'Think Bigger Today', 'Growth Starts Here'],
-    business: ['Execute Your Vision', 'Build Your Empire', 'Make It Happen', 'Business Moves Today'],
-    strategy: ['Find the Signal', 'Choose the Leverage Point', 'See the Pattern', 'Make the Clean Move'],
-    boundaries: ['Protect the Standard', 'Choose What Aligns', 'Hold the Line', 'Respect Your Energy'],
-    habits: ['Build the Ritual', 'Repeat the Standard', 'Small Steps, Real Trust', 'Return to the Routine'],
-    identity: ['Act Like the Future You', 'Become on Purpose', 'Choose Your Standard', 'Move in Alignment'],
-    reflection: ['Read the Pattern', 'Learn From This Season', 'Find the Clear Lesson', 'Step Back and See']
-  };
-
-  const categoryTitles = titles[category] || ['Take Action Today'];
-  const randomIndex = Math.floor(Math.random() * categoryTitles.length);
-  return categoryTitles[randomIndex];
-}
-
-function generateSummary(category: string): string {
-  const summaries: Record<string, string> = {
-    discipline: 'A powerful reminder to stay consistent and take action, no matter how you feel.',
-    confidence: 'Build unshakeable confidence and step into your power with clarity and purpose.',
-    physique: 'Push your physical limits and transform your body through dedication and effort.',
-    focus: 'Cut through distractions and lock in on what truly matters for your success.',
-    mindset: 'Shift your thinking, overcome mental blocks, and embrace a growth-oriented perspective.',
-    business: 'Take strategic action and build momentum toward your entrepreneurial goals.',
-    strategy: 'Separate signal from noise and choose the highest-leverage next move.',
-    boundaries: 'Protect your energy, honor your standard, and choose what truly aligns.',
-    habits: 'Build sustainable consistency through small routines you can trust.',
-    identity: 'Make choices that reinforce the person you are becoming.',
-    reflection: 'Step back, read the pattern clearly, and carry the lesson forward.'
-  };
-
-  return summaries[category] || 'A daily push to help you move forward with purpose and intention.';
-}
-
-function buildPepTalkRequestKey(mentorSlug: string, forDate: string): string {
-  return `daily:${mentorSlug}:${forDate}`;
+function buildPepTalkRequestKey(productMode: string, mentorSlug: string, forDate: string): string {
+  return `daily:${productMode}:${mentorSlug}:${forDate}`;
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -340,6 +307,7 @@ serve(async (req) => {
     }
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     idempotencySupabase = supabase as unknown as PepTalkGenerationRpcClient;
+    const productMode = await resolveUserProductMode(supabase, auth.userId);
 
     const { effectiveDate: todayDate, themeAnchorDate, timezone } = await resolveSingleDailyPepTalkDateContext({
       supabase: supabase as unknown as ProfileTimezoneSupabaseClient,
@@ -352,6 +320,7 @@ serve(async (req) => {
     const { data: existing, error: checkError } = await supabase
       .from('daily_pep_talks')
       .select('*')
+      .eq('product_mode', productMode)
       .eq('mentor_slug', resolvedMentorSlug)
       .eq('for_date', todayDate)
       .maybeSingle();
@@ -390,7 +359,7 @@ serve(async (req) => {
 
     // Fetch mentor details
     const { data: mentor, error: mentorError } = await supabase
-      .from('mentors')
+      .from(productMode === "graceward" ? "graceward_guides" : "mentors")
       .select('*')
       .eq('slug', resolvedMentorSlug)
       .maybeSingle();
@@ -425,8 +394,8 @@ serve(async (req) => {
       );
 
     const requestKey = forceRegenerate
-      ? `${buildPepTalkRequestKey(resolvedMentorSlug, todayDate)}:force:${crypto.randomUUID()}`
-      : buildPepTalkRequestKey(resolvedMentorSlug, todayDate);
+      ? `${buildPepTalkRequestKey(productMode, resolvedMentorSlug, todayDate)}:force:${crypto.randomUUID()}`
+      : buildPepTalkRequestKey(productMode, resolvedMentorSlug, todayDate);
     let idempotencyState = await beginPepTalkGenerationRequest({
       supabase,
       requestKey,
@@ -490,6 +459,7 @@ serve(async (req) => {
     
     const audioResponse = await invokeInternalFunction("generate-full-mentor-audio", {
       mentorSlug: resolvedMentorSlug,
+      productMode,
       topic_category: theme.topic_category,
       intensity: theme.intensity,
       emotionalTriggers: theme.triggers,
@@ -536,6 +506,10 @@ serve(async (req) => {
     const audioProvider = typeof generatedData.audioProvider === "string"
       ? generatedData.audioProvider
       : null;
+    const transcript = Array.isArray(generatedData.transcript)
+      ? generatedData.transcript
+      : [];
+    const hasWordTimestamps = transcript.length > 0;
     
     if (!script || !audioUrl) {
       return await failGeneration(
@@ -547,13 +521,14 @@ serve(async (req) => {
     }
 
     // Generate title and summary
-    const title = generateTitle(resolvedMentorSlug, theme.topic_category);
-    const summary = generateSummary(theme.topic_category);
+    const title = getDailyEncouragementTitle(theme.topic_category, productMode);
+    const summary = getDailyEncouragementSummary(theme.topic_category, productMode);
 
     console.log(`Generated content for ${resolvedMentorSlug}: ${title}`);
 
     const dailyPepTalkPayload = {
       mentor_slug: resolvedMentorSlug,
+      product_mode: productMode,
       topic_category: theme.topic_category,
       emotional_triggers: theme.triggers,
       intensity: theme.intensity,
@@ -562,10 +537,12 @@ serve(async (req) => {
       script,
       audio_url: audioUrl,
       for_date: todayDate,
-      transcript: [],
-      transcript_status: TRANSCRIPT_STATUS_PENDING,
+      transcript,
+      transcript_status: hasWordTimestamps ? "ready" : TRANSCRIPT_STATUS_PENDING,
       transcript_attempt_count: 0,
-      transcript_next_retry_at: new Date().toISOString(),
+      transcript_next_retry_at: hasWordTimestamps ? null : new Date().toISOString(),
+      transcript_ready_at: hasWordTimestamps ? new Date().toISOString() : null,
+      transcript_last_error: null,
     };
 
     const dailyPepTalkWrite = existing && forceRegenerate
@@ -591,6 +568,7 @@ serve(async (req) => {
         const { data: existingAfterConflict, error: conflictFetchError } = await supabase
           .from('daily_pep_talks')
           .select('*')
+          .eq('product_mode', productMode)
           .eq('mentor_slug', resolvedMentorSlug)
           .eq('for_date', todayDate)
           .maybeSingle();
@@ -640,12 +618,13 @@ serve(async (req) => {
         emotional_triggers: theme.triggers,
         intensity: theme.intensity,
         mentor_slug: resolvedMentorSlug,
+        product_mode: productMode,
         mentor_id: mentor.id,
         source: 'user_generated',
         for_date: todayDate,
         is_featured: false,
         is_premium: false,
-        transcript: []
+        transcript,
       });
     if (libraryInsertError) {
       console.error("Error inserting pep talk into library (non-blocking):", libraryInsertError);
@@ -663,8 +642,9 @@ serve(async (req) => {
       }
     };
 
-    // Non-blocking transcript sync to reduce client-side sync retries.
-    try {
+    // ElevenLabs returns exact timing alongside new audio. Older/fallback audio
+    // still enters the repair path below.
+    if (!hasWordTimestamps) try {
       console.log(`Syncing transcript for daily pep talk ${dailyPepTalk.id}...`);
       const syncResponse = await invokeInternalFunction("sync-daily-pep-talk-transcript", {
         id: dailyPepTalk.id,

@@ -227,15 +227,19 @@ Deno.test("habit reminder resolution allows the next local day after a prior sen
   }
 });
 
-Deno.test("composer applies companion context only to companion-led types", () => {
+Deno.test("composer attributes daily encouragement to the user's Guide", () => {
   const dailyPep = composeNotificationCopy({
     type: "daily_pep",
-    payload: { summary: "Your pep talk is ready." },
+    payload: { summary: "Your encouragement is ready.", mentor_slug: "operator" },
     companion: { cachedCreatureName: "Nova" },
   });
 
-  if (!dailyPep.title.includes("Nova")) {
-    throw new Error(`Expected companion name in daily pep title, got ${dailyPep.title}`);
+  if (dailyPep.title !== "A word from Ezra") {
+    throw new Error(`Expected Guide attribution in daily pep title, got ${dailyPep.title}`);
+  }
+
+  if (dailyPep.title.includes("Nova")) {
+    throw new Error(`Daily encouragement should not be companion branded, got ${dailyPep.title}`);
   }
 
   const morningCheckin = composeNotificationCopy({
@@ -249,10 +253,10 @@ Deno.test("composer applies companion context only to companion-led types", () =
   }
 });
 
-Deno.test("composer never surfaces the species label as a companion push title", () => {
+Deno.test("composer ignores companion species when composing Guide encouragement", () => {
   const dailyPep = composeNotificationCopy({
     type: "daily_pep",
-    payload: { summary: "Your pep talk is ready." },
+    payload: { summary: "Your encouragement is ready.", mentor_slug: "sage" },
     companion: {
       cachedCreatureName: "Phoenix",
       spiritAnimal: "Phoenix",
@@ -263,8 +267,8 @@ Deno.test("composer never surfaces the species label as a companion push title",
     throw new Error(`Expected species label to be suppressed, got ${dailyPep.title}`);
   }
 
-  if (!dailyPep.title.startsWith("Your companion")) {
-    throw new Error(`Expected generic fallback title, got ${dailyPep.title}`);
+  if (dailyPep.title !== "A word from Micah") {
+    throw new Error(`Expected Guide title, got ${dailyPep.title}`);
   }
 });
 
@@ -294,7 +298,7 @@ Deno.test("composer formats ritual task copy from ritual payload hints", () => {
     },
   });
 
-  if (ritualStart.title !== "Ritual starting now") {
+  if (ritualStart.title !== "Your rhythm is ready") {
     throw new Error(`Expected ritual start title, got ${ritualStart.title}`);
   }
 
@@ -307,7 +311,7 @@ Deno.test("composer formats ritual task copy from ritual payload hints", () => {
     },
   });
 
-  if (ritualReminder.title !== "Ritual reminder") {
+  if (ritualReminder.title !== "Rhythm reminder") {
     throw new Error(`Expected ritual reminder title, got ${ritualReminder.title}`);
   }
 

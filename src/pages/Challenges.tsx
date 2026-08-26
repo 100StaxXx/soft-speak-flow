@@ -99,9 +99,9 @@ export default function Challenges() {
       const challenge = userChallenge.challenges;
       if (!challenge) return false;
 
-      if (userChallenge.status === "completed") return true;
+      if (userChallenge.completed === true) return true;
 
-      return (completedDaysByChallengeId.get(userChallenge.id) ?? 0) >= challenge.total_days;
+      return (completedDaysByChallengeId.get(userChallenge.id) ?? 0) >= challenge.duration_days;
     });
   }, [completedDaysByChallengeId, userChallenges]);
 
@@ -114,7 +114,7 @@ export default function Challenges() {
   useEffect(() => {
     const pendingCompletions = completedChallenges.filter((userChallenge) => {
       return (
-        userChallenge.status !== "completed" &&
+        userChallenge.completed !== true &&
         !syncedCompletedChallengeIdsRef.current.has(userChallenge.id) &&
         Boolean(userChallenge.challenges)
       );
@@ -129,12 +129,11 @@ export default function Challenges() {
     void (async () => {
       const results = await Promise.all(
         pendingCompletions.map(async (userChallenge) => {
-          const challenge = userChallenge.challenges;
           const { error } = await supabase
             .from("user_challenges")
             .update({
-              status: "completed",
-              current_day: challenge?.total_days ?? userChallenge.current_day,
+              completed: true,
+              is_active: false,
             })
             .eq("id", userChallenge.id);
 
@@ -173,8 +172,8 @@ export default function Challenges() {
         challenge_id: challengeId,
         start_date: formatDate(startDate),
         end_date: formatDate(endDate),
-        current_day: 1,
-        status: "active",
+        is_active: true,
+        completed: false,
       });
 
       if (error) throw error;
@@ -250,8 +249,15 @@ export default function Challenges() {
 
                 const progressPercentage = getProgressPercentage(
                   userChallenge.id,
-                  challenge.total_days
+                  challenge.duration_days
                 );
+                const completedDays = completedDaysByChallengeId.get(userChallenge.id) ?? 0;
+                const currentDay = Math.min(challenge.duration_days, completedDays + 1);
+                const challengeStatus = userChallenge.completed
+                  ? "completed"
+                  : userChallenge.is_active
+                    ? "active"
+                    : "inactive";
 
                 return (
                   <Card
@@ -267,12 +273,12 @@ export default function Challenges() {
                         <div className="flex flex-wrap gap-2 mb-4">
                           <Badge variant="outline" className="border-primary/30">
                             <Calendar className="h-3 w-3 mr-1" />
-                            Day {userChallenge.current_day} of {challenge.total_days}
+                            Day {currentDay} of {challenge.duration_days}
                           </Badge>
                           <Badge
-                            variant={userChallenge.status === "active" ? "default" : "secondary"}
+                            variant={challengeStatus === "active" ? "default" : "secondary"}
                           >
-                            {formatDisplayLabel(userChallenge.status)}
+                            {formatDisplayLabel(challengeStatus)}
                           </Badge>
                         </div>
                       </div>
@@ -298,7 +304,7 @@ export default function Challenges() {
               <div className="grid gap-6">
                 {availableChallenges.map((challenge) => {
                   const isActive = userChallenges?.some(
-                    (uc) => uc.challenge_id === challenge.id && uc.status === "active"
+                    (uc) => uc.challenge_id === challenge.id && uc.is_active && !uc.completed
                   );
 
                   return (
@@ -315,7 +321,7 @@ export default function Challenges() {
                               <Badge variant="outline">{challenge.category}</Badge>
                             )}
                             <Badge variant="outline" className="border-accent/30">
-                              {challenge.total_days} Days
+                              {challenge.duration_days} Days
                             </Badge>
                           </div>
                         </div>
@@ -328,7 +334,7 @@ export default function Challenges() {
                         </Badge>
                       ) : (
                         <Button
-                          onClick={() => handleStartChallenge(challenge.id, challenge.total_days)}
+                          onClick={() => handleStartChallenge(challenge.id, challenge.duration_days)}
                           className="w-full bg-gradient-to-r from-primary to-accent"
                         >
                           Start Challenge

@@ -148,9 +148,9 @@ export const useReferrals = () => {
       if (suppressToast) return;
 
       const defaultMessage = result.code_type === "special"
-        ? "Genesis code applied! Your yearly plan is now eligible for the $49.99 Apple offer."
+        ? "Founding code applied! Your $29.99 yearly Apple rate stays locked while your subscription remains active."
         : result.code_type === "affiliate"
-          ? "Creator code applied! Your yearly plan is now eligible for the Apple discount flow."
+          ? "Creator code applied! Your account can now purchase the $29.99 founding yearly plan through Apple."
           : "Referral code applied! Your friend will earn rewards when you reach Stage 5 • Initiate.";
 
       toast.success(result.message || defaultMessage);

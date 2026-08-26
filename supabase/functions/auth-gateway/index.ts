@@ -4,6 +4,7 @@ import { applyAbuseProtection, createAbuseAdminClient, createSafeErrorResponse, 
 import { findMissingRequiredEnv, logAuthEvent, logAuthSafeError, readSafeErrorResponseContext, toAuthErrorMessage } from "../_shared/authLogging.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { sendAPNSNotification } from "../_shared/apns.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 type AuthGatewayAction =
   | "sign_in_password"
@@ -20,6 +21,7 @@ interface AuthGatewayRequest {
   source?: string | null;
   timezone?: string;
   website?: string | null;
+  productMode?: "graceward" | "cosmiq";
 }
 
 interface AuthGatewayDeps {
@@ -60,6 +62,64 @@ function normalizeOptionalText(value: unknown, maxLength: number): string | null
   const normalized = value.trim();
   if (!normalized) return null;
   return normalized.slice(0, maxLength);
+}
+
+type AuthProductMode = "graceward" | "cosmiq";
+
+function normalizeAuthProductMode(value: unknown): AuthProductMode {
+  return value === "cosmiq" ? "cosmiq" : "graceward";
+}
+
+function readUserProductMode(user: any): AuthProductMode | null {
+  const trustedMode = user?.app_metadata?.auth_product_mode;
+  return trustedMode === "graceward" || trustedMode === "cosmiq"
+    ? trustedMode
+    : null;
+}
+
+async function resolvePasswordUserProductMode(
+  adminClient: any,
+  user: any,
+): Promise<AuthProductMode | null> {
+  const trustedMode = readUserProductMode(user);
+  if (trustedMode) return trustedMode;
+
+  if (
+    !user?.id ||
+    typeof adminClient?.auth?.admin?.getUserById !== "function" ||
+    typeof adminClient?.from !== "function"
+  ) {
+    return null;
+  }
+
+  return await resolveUserProductMode(adminClient, user.id);
+}
+
+async function bindPasswordUserToProduct(
+  adminClient: any,
+  user: any,
+  productMode: AuthProductMode,
+  accountEmail: string,
+): Promise<void> {
+  if (!user?.id || typeof adminClient?.auth?.admin?.updateUserById !== "function") {
+    return;
+  }
+
+  const existingMode = readUserProductMode(user);
+  if (existingMode && existingMode !== productMode) {
+    throw new Error("ACCOUNT_PRODUCT_MISMATCH");
+  }
+
+  const { error } = await adminClient.auth.admin.updateUserById(user.id, {
+    app_metadata: {
+      ...(user.app_metadata ?? {}),
+      auth_product_mode: productMode,
+      account_email: accountEmail,
+    },
+  });
+  if (error) {
+    throw new Error("ACCOUNT_PRODUCT_BINDING_FAILED");
+  }
 }
 
 function readConfiguredOwnerUserIds(): string[] {
@@ -432,6 +492,7 @@ export async function handleAuthGateway(
 
     action = payload.action;
     const email = normalizeEmailTarget(payload.email);
+    const productMode = normalizeAuthProductMode(payload.productMode);
     const requestContext = buildRequestContext(action, ipAddress, payload);
 
     if (!action || !["sign_in_password", "sign_up_password", "reset_password", "early_access_signup"].includes(action)) {
@@ -594,6 +655,51 @@ export async function handleAuthGateway(
         });
       }
 
+      let boundProductMode: AuthProductMode | null;
+      try {
+        boundProductMode = await resolvePasswordUserProductMode(adminClient, data.user);
+      } catch {
+        return createLoggedSafeErrorResponse({
+          status: 503,
+          code: "ACCOUNT_PRODUCT_BINDING_FAILED",
+          error: "We could not verify which app this account belongs to. Please try again.",
+        }, {
+          ...requestContext,
+          phase: "product_boundary",
+          userId: data.user.id,
+        });
+      }
+
+      if (boundProductMode && boundProductMode !== productMode) {
+        return createLoggedSafeErrorResponse({
+          status: 403,
+          code: "ACCOUNT_PRODUCT_MISMATCH",
+          error: `This account belongs to ${boundProductMode === "graceward" ? "Graceward" : "Cosmiq"}. Sign in from that app instead.`,
+        }, {
+          ...requestContext,
+          phase: "product_boundary",
+          userId: data.user.id,
+          expectedProductMode: productMode,
+          actualProductMode: boundProductMode,
+        });
+      }
+
+      if (!readUserProductMode(data.user) && boundProductMode === productMode) {
+        try {
+          await bindPasswordUserToProduct(adminClient, data.user, productMode, email);
+        } catch {
+          return createLoggedSafeErrorResponse({
+            status: 503,
+            code: "ACCOUNT_PRODUCT_BINDING_FAILED",
+            error: "We could not finish securing this account to the app. Please try again.",
+          }, {
+            ...requestContext,
+            phase: "product_boundary",
+            userId: data.user.id,
+          });
+        }
+      }
+
       const userProtection = await deps.applyAbuseProtectionFn(req, adminClient, {
         profileKey: "auth.sign_in",
         endpointName: "auth-gateway:sign_in_password",
@@ -662,6 +768,7 @@ export async function handleAuthGateway(
           emailRedirectTo: payload.redirectTo,
           data: {
             timezone: payload.timezone || "UTC",
+            auth_product_mode: productMode,
           },
         },
       });
@@ -684,6 +791,34 @@ export async function handleAuthGateway(
           ...requestContext,
           phase: "provider_auth",
         });
+      }
+
+
+      if (data.user) {
+        try {
+          await bindPasswordUserToProduct(
+            adminClient,
+            data.user,
+            productMode,
+            email,
+          );
+        } catch (bindingError) {
+          const bindingCode = bindingError instanceof Error
+            ? bindingError.message
+            : "ACCOUNT_PRODUCT_BINDING_FAILED";
+          return createLoggedSafeErrorResponse({
+            status: bindingCode === "ACCOUNT_PRODUCT_MISMATCH" ? 403 : 500,
+            code: bindingCode,
+            error: bindingCode === "ACCOUNT_PRODUCT_MISMATCH"
+              ? "This email is already registered to the other app. Sign in there instead."
+              : "Could not finish creating this account. Please try again.",
+          }, {
+            ...requestContext,
+            phase: "product_binding",
+            userId: data.user.id,
+            productMode,
+          });
+        }
       }
 
       return jsonSuccess(req, {

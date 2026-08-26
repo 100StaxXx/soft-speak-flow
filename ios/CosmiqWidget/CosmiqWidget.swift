@@ -4,20 +4,35 @@ import SwiftUI
 import UIKit
 #endif
 
-// MARK: - Cosmic Color Palette
+// MARK: - Product Color Palette
 
 extension Color {
-    static let cosmicBackground = Color(red: 0.05, green: 0.02, blue: 0.15)
-    static let cosmicPurple = Color(red: 0.55, green: 0.36, blue: 0.95)
-    static let cosmicGold = Color(red: 0.95, green: 0.75, blue: 0.30)
-    static let cosmicText = Color.white
-    static let cosmicSecondary = Color.white.opacity(0.72)
-    static let cosmicGreen = Color(red: 0.4, green: 0.9, blue: 0.5)
-    static let profileWidgetBase = Color(red: 0.08, green: 0.10, blue: 0.14)
-    static let profileWidgetMid = Color(red: 0.12, green: 0.15, blue: 0.20)
-    static let profileWidgetEdge = Color(red: 0.18, green: 0.22, blue: 0.28)
-    static let profileWidgetHighlight = Color(red: 0.75, green: 0.83, blue: 0.88)
-    static let profileWidgetGlow = Color(red: 0.30, green: 0.43, blue: 0.50)
+    // These names remain stable because older widget code references them.
+#if COSMIQ_PRODUCT
+    static let cosmicBackground = Color(red: 0.03, green: 0.06, blue: 0.12)
+    static let cosmicPurple = Color(red: 0.55, green: 0.34, blue: 0.96)
+    static let cosmicGold = Color(red: 0.98, green: 0.64, blue: 0.19)
+    static let cosmicText = Color(red: 0.97, green: 0.98, blue: 1.0)
+    static let cosmicSecondary = Color(red: 0.72, green: 0.76, blue: 0.88).opacity(0.82)
+    static let cosmicGreen = Color(red: 0.20, green: 0.82, blue: 0.68)
+    static let profileWidgetBase = Color(red: 0.03, green: 0.05, blue: 0.11)
+    static let profileWidgetMid = Color(red: 0.12, green: 0.06, blue: 0.25)
+    static let profileWidgetEdge = Color(red: 0.03, green: 0.25, blue: 0.35)
+    static let profileWidgetHighlight = Color(red: 0.57, green: 0.91, blue: 0.95)
+    static let profileWidgetGlow = Color(red: 0.55, green: 0.34, blue: 0.96)
+#else
+    static let cosmicBackground = Color(red: 0.09, green: 0.20, blue: 0.12)
+    static let cosmicPurple = Color(red: 0.45, green: 0.65, blue: 0.46)
+    static let cosmicGold = Color(red: 0.84, green: 0.70, blue: 0.36)
+    static let cosmicText = Color(red: 0.98, green: 0.97, blue: 0.92)
+    static let cosmicSecondary = Color(red: 0.90, green: 0.92, blue: 0.86).opacity(0.78)
+    static let cosmicGreen = Color(red: 0.58, green: 0.75, blue: 0.57)
+    static let profileWidgetBase = Color(red: 0.08, green: 0.18, blue: 0.11)
+    static let profileWidgetMid = Color(red: 0.12, green: 0.28, blue: 0.16)
+    static let profileWidgetEdge = Color(red: 0.21, green: 0.39, blue: 0.23)
+    static let profileWidgetHighlight = Color(red: 0.93, green: 0.84, blue: 0.58)
+    static let profileWidgetGlow = Color(red: 0.46, green: 0.66, blue: 0.46)
+#endif
 }
 
 // MARK: - Widget Background
@@ -63,13 +78,7 @@ struct ProfileWidgetBackground: View {
 
     var body: some View {
         ZStack {
-            if let wallpaperImage {
-                Image(uiImage: wallpaperImage)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                ProfileWidgetFallbackBackground()
-            }
+            ProfileWidgetFallbackBackground()
 
             LinearGradient(
                 colors: [
@@ -104,17 +113,6 @@ struct ProfileWidgetBackground: View {
         .clipped()
     }
 
-    private var wallpaperImage: UIImage? {
-        guard
-            let fileURL = WidgetDataManager.shared.profileWallpaperFileURL(
-                for: entry.data?.profileWallpaperRelativePath
-            )
-        else {
-            return nil
-        }
-
-        return UIImage(contentsOfFile: fileURL.path)
-    }
 }
 
 /// Timeline entry containing task data for a specific point in time
@@ -164,8 +162,8 @@ struct CosmiqWidget: Widget {
                     .background(ProfileWidgetBackground(entry: entry))
             }
         }
-        .configurationDisplayName("Cosmiq Today")
-        .description("View your daily quests, rituals, and progress.")
+        .configurationDisplayName(NativeProduct.widgetDisplayName)
+        .description(NativeProduct.widgetDescription)
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }

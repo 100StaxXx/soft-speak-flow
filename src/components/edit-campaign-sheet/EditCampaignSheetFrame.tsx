@@ -290,12 +290,12 @@ export function EditCampaignSheetFrame({
     try {
       const didDelete = await dependencies.deleteRitual(habitId);
       if (didDelete) {
-        toast.success("Ritual deleted");
+        toast.success("Rhythm deleted");
       }
     } catch (error) {
       console.error("Error deleting ritual:", error);
       const description = formatRitualDeleteError(error);
-      toast.error("Failed to delete ritual", description ? { description } : undefined);
+      toast.error("Failed to delete rhythm", description ? { description } : undefined);
     } finally {
       setIsDeletingRitual(false);
       setEditingRitual(null);
@@ -350,10 +350,10 @@ export function EditCampaignSheetFrame({
               </div>
               <div className="min-w-0 text-left">
                 <SheetTitle className="text-xl text-foreground">
-                  Edit Campaign
+                  Edit commitment
                 </SheetTitle>
                 <SheetDescription className="text-sm text-muted-foreground">
-                  Update campaign details, manage linked rituals, or permanently delete this campaign.
+                  Update commitment details, manage linked rhythms, or permanently delete this commitment.
                 </SheetDescription>
               </div>
             </div>
@@ -363,12 +363,12 @@ export function EditCampaignSheetFrame({
             <div className="space-y-5 px-4 py-4 text-foreground sm:px-5" data-vaul-no-drag>
               <section className={cn(plannerPathfinderTheme.raisedPanel, "space-y-4 p-4")}>
                 <div className="space-y-2">
-                  <Label htmlFor="campaign-title" className="text-foreground">Campaign name</Label>
+                  <Label htmlFor="campaign-title" className="text-foreground">Commitment name</Label>
                   <Input
                     id="campaign-title"
                     value={title}
                     onChange={(event) => setTitle(event.target.value)}
-                    placeholder="Name your campaign"
+                    placeholder="Name your commitment"
                     className={plannerPathfinderTheme.textField}
                   />
                 </div>
@@ -378,7 +378,7 @@ export function EditCampaignSheetFrame({
                     id="campaign-description"
                     value={description}
                     onChange={(event) => setDescription(event.target.value)}
-                    placeholder="What is this campaign about?"
+                    placeholder="What is this commitment about?"
                     rows={4}
                     className={plannerPathfinderTheme.textField}
                   />
@@ -393,7 +393,7 @@ export function EditCampaignSheetFrame({
                 <p className="text-sm text-muted-foreground">
                   {resolvedEndDate
                     ? `Deadline: ${new Date(resolvedEndDate).toLocaleDateString()}`
-                    : "No deadline is set for this campaign yet."}
+                    : "No deadline is set for this commitment yet."}
                 </p>
                 {currentEpic && resolvedEndDate ? (
                   visualPreview ? (
@@ -423,7 +423,7 @@ export function EditCampaignSheetFrame({
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <Repeat className="h-4 w-4 text-epic-nature" />
-                    <h3 className="text-sm font-semibold">Rituals</h3>
+                    <h3 className="text-sm font-semibold">Rhythms</h3>
                   </div>
                   <Button
                     type="button"
@@ -433,19 +433,19 @@ export function EditCampaignSheetFrame({
                     onClick={() => setShowAddRitual((current) => !current)}
                   >
                     <Plus className="h-4 w-4" />
-                    Add ritual
+                    Add rhythm
                   </Button>
                 </div>
 
                 {showAddRitual ? (
                   <div className={cn(plannerPathfinderTheme.mutedPanel, "space-y-4 border-dashed p-4")}>
                     <div className="space-y-2">
-                      <Label htmlFor="new-ritual-title" className="text-foreground">Ritual name</Label>
+                      <Label htmlFor="new-ritual-title" className="text-foreground">Rhythm name</Label>
                       <Input
                         id="new-ritual-title"
                         value={newRitualTitle}
                         onChange={(event) => setNewRitualTitle(event.target.value)}
-                        placeholder="Add a campaign ritual"
+                        placeholder="Add a commitment rhythm"
                         className={plannerPathfinderTheme.textField}
                       />
                     </div>
@@ -463,9 +463,9 @@ export function EditCampaignSheetFrame({
                       <TimePickerField
                         value={newRitualPreferredTime}
                         onChange={setNewRitualPreferredTime}
-                        label="Ritual time"
+                        label="Rhythm time"
                         placeholder="No time"
-                        ariaLabel="New ritual time"
+                        ariaLabel="New rhythm time"
                         variant="quest-soft"
                         seedValueOnOpen={() => getNextTimeForStep(30)}
                       />
@@ -484,7 +484,7 @@ export function EditCampaignSheetFrame({
                         onClick={handleAddRitual}
                       >
                         {isAddingRitual ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                        Save ritual
+                        Save rhythm
                       </Button>
                       <Button
                         type="button"
@@ -545,7 +545,7 @@ export function EditCampaignSheetFrame({
                   </div>
                 ) : (
                   <div className="rounded-[1.5rem] border-[3px] border-dashed border-border/70 bg-card/45 px-4 py-6 text-center text-sm text-muted-foreground">
-                    No rituals are linked to this campaign yet.
+                    No rhythms are linked to this commitment yet.
                   </div>
                 )}
               </section>
@@ -556,7 +556,7 @@ export function EditCampaignSheetFrame({
                   <h3 className="text-sm font-semibold">Danger zone</h3>
                 </div>
                 <p className="text-sm text-destructive/80">
-                  Permanently delete this campaign, its linked rituals, and any incomplete ritual tasks.
+                  Permanently delete this commitment, its linked rhythms, and any incomplete rhythm actions.
                 </p>
                 <Button
                   type="button"
@@ -566,7 +566,7 @@ export function EditCampaignSheetFrame({
                   onClick={() => setShowDeleteConfirm(true)}
                 >
                   {isDeletingCampaign ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                  Delete campaign
+                  Delete commitment
                 </Button>
               </section>
             </div>
@@ -613,9 +613,9 @@ export function EditCampaignSheetFrame({
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this campaign?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this commitment?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently removes the campaign, its rituals, and incomplete linked tasks. Completed history will stay in your timeline.
+              This permanently removes the commitment, its rhythms, and incomplete linked actions. Completed history will stay in your timeline.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -629,7 +629,7 @@ export function EditCampaignSheetFrame({
               disabled={isDeletingCampaign}
             >
               {isDeletingCampaign ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Delete campaign
+              Delete commitment
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { safeLocalStorage } from "@/utils/storage";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
 export type ViewMode = "focus" | "quest";
 
@@ -11,7 +12,7 @@ interface ViewModeContextType {
 
 const ViewModeContext = createContext<ViewModeContextType | undefined>(undefined);
 
-const VIEW_MODE_KEY = "cosmiq_view_mode";
+const VIEW_MODE_KEY = productScopedStorageKey("view-mode");
 
 export function ViewModeProvider({ children }: { children: ReactNode }) {
   const [viewMode, setViewModeState] = useState<ViewMode>(() => {

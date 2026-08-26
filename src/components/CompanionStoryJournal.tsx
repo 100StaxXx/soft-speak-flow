@@ -29,7 +29,7 @@ import {
 } from "@/lib/companionAssetResolver";
 import {
   PROGRESSION_STORY_CHECKPOINT_LEVELS,
-  getProgressionLevelDisplay,
+  getVisualStageDisplay,
 } from "@/config/progression";
 import { StoryJournalInfoTooltip } from "./StoryJournalInfoTooltip";
 import { CompanionImage } from "./CompanionImage";
@@ -128,7 +128,7 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
     ? checkpointLevels[currentIndex + 1]
     : null;
   const hasStory = allStories?.some((entry) => entry.stage === debouncedLevel) ?? false;
-  const chapterLabel = debouncedLevel === 0 ? "Prologue" : getProgressionLevelDisplay(debouncedLevel);
+  const chapterLabel = debouncedLevel === 0 ? "Prologue" : getVisualStageDisplay(debouncedLevel);
   const chapterImageFocal = useMemo(() => {
     if (!companion) return { x: null, y: null };
     if (debouncedLevel === 0) {
@@ -240,7 +240,7 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
           <StoryJournalInfoTooltip />
         </div>
         <p className="text-muted-foreground">
-          New chapters unlock at key companion tiers, from the first hatch through Ascended.
+          New chapters unlock as your companion grows, from the first hatch through Grand.
         </p>
       </div>
 
@@ -340,7 +340,7 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
             <p className="text-muted-foreground">
               {debouncedLevel === 0
                 ? "Complete companion creation to unlock the Prologue"
-                : `This chapter unlocks when your companion reaches ${getProgressionLevelDisplay(debouncedLevel)}`}
+                : `This chapter unlocks when your companion reaches ${getVisualStageDisplay(debouncedLevel)}`}
             </p>
           </Card>
         )}

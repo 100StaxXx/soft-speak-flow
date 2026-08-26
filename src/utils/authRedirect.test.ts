@@ -11,7 +11,8 @@ const mocks = vi.hoisted(() => {
 
   const companionLimitMock = vi.fn(() => ({ maybeSingle: companionMaybeSingleMock }));
   const companionOrderMock = vi.fn(() => ({ limit: companionLimitMock }));
-  const companionEqMock = vi.fn(() => ({ order: companionOrderMock }));
+  const companionProductEqMock = vi.fn(() => ({ order: companionOrderMock }));
+  const companionEqMock = vi.fn(() => ({ eq: companionProductEqMock }));
   const companionSelectMock = vi.fn(() => ({ eq: companionEqMock }));
 
   const fromMock = vi.fn((table: string) => {
@@ -42,6 +43,7 @@ const mocks = vi.hoisted(() => {
     profilesSelectMock,
     companionLimitMock,
     companionOrderMock,
+    companionProductEqMock,
     companionEqMock,
     companionSelectMock,
     fromMock,
@@ -142,7 +144,7 @@ describe("getAuthRedirectPath", () => {
       error: null,
     });
 
-    await expect(getAuthRedirectPath("12345678-user")).resolves.toBe("/tasks");
+    await expect(getAuthRedirectPath("12345678-user")).resolves.toBe("/mentor");
   });
 
   it("routes existing users to /tasks even without mentor when onboarding is complete", async () => {
@@ -155,7 +157,7 @@ describe("getAuthRedirectPath", () => {
       error: null,
     });
 
-    await expect(getAuthRedirectPath("existing-user-no-mentor")).resolves.toBe("/tasks");
+    await expect(getAuthRedirectPath("existing-user-no-mentor")).resolves.toBe("/mentor");
   });
 
   it("routes to /tasks when walkthrough is completed even if onboarding is false", async () => {
@@ -168,7 +170,7 @@ describe("getAuthRedirectPath", () => {
       error: null,
     });
 
-    await expect(getAuthRedirectPath("walkthrough-complete-user")).resolves.toBe("/tasks");
+    await expect(getAuthRedirectPath("walkthrough-complete-user")).resolves.toBe("/mentor");
   });
 
   it("routes companion-backed stale profiles to /tasks and self-heals the flags", async () => {
@@ -182,7 +184,7 @@ describe("getAuthRedirectPath", () => {
     });
     mocks.companionMaybeSingleMock.mockResolvedValueOnce(existingCompanion);
 
-    await expect(getAuthRedirectPath("companion-backed-user")).resolves.toBe("/tasks");
+    await expect(getAuthRedirectPath("companion-backed-user")).resolves.toBe("/mentor");
     await flushMicrotasks();
 
     expect(mocks.profilesUpdateEqMock).toHaveBeenCalledWith("id", "companion-backed-user");
@@ -206,7 +208,7 @@ describe("getAuthRedirectPath", () => {
     });
     mocks.companionMaybeSingleMock.mockResolvedValueOnce(existingAiCompanion);
 
-    await expect(getAuthRedirectPath("ai-companion-user")).resolves.toBe("/tasks");
+    await expect(getAuthRedirectPath("ai-companion-user")).resolves.toBe("/mentor");
     await flushMicrotasks();
 
     expect(mocks.profilesUpdateEqMock).toHaveBeenCalledWith("id", "ai-companion-user");
@@ -229,7 +231,7 @@ describe("getAuthRedirectPath", () => {
     });
     mocks.companionMaybeSingleMock.mockResolvedValueOnce(presetCompanionWithoutStoredImages);
 
-    await expect(getAuthRedirectPath("preset-no-image-user")).resolves.toBe("/tasks");
+    await expect(getAuthRedirectPath("preset-no-image-user")).resolves.toBe("/mentor");
   });
 
   it("routes to /onboarding when onboarding is explicitly incomplete, even with mentor", async () => {
@@ -302,7 +304,7 @@ describe("getAuthRedirectPath", () => {
     });
     mocks.companionMaybeSingleMock.mockResolvedValueOnce(stageZeroEggCompanion);
 
-    await expect(getAuthRedirectPath("egg-complete-user")).resolves.toBe("/tasks");
+    await expect(getAuthRedirectPath("egg-complete-user")).resolves.toBe("/mentor");
     await flushMicrotasks();
 
     expect(mocks.profilesUpdateEqMock).toHaveBeenCalledWith("id", "egg-complete-user");
@@ -340,7 +342,7 @@ describe("getAuthRedirectPath", () => {
       error: null,
     });
 
-    await expect(getAuthRedirectPath("12345678-user")).resolves.toBe("/tasks");
+    await expect(getAuthRedirectPath("12345678-user")).resolves.toBe("/mentor");
   });
 
   it("routes to /onboarding when profile is missing and bootstraps a minimal profile in the background", async () => {
@@ -420,7 +422,7 @@ describe("getAuthRedirectPath", () => {
     const pathPromise = getAuthRedirectPath("timeout-returning-user");
     await vi.advanceTimersByTimeAsync(5001);
 
-    await expect(pathPromise).resolves.toBe("/tasks");
+    await expect(pathPromise).resolves.toBe("/mentor");
   });
 
   it("falls back to /tasks on timeout when the returning-user check finds a companion-backed stale profile", async () => {
@@ -443,7 +445,7 @@ describe("getAuthRedirectPath", () => {
     const pathPromise = getAuthRedirectPath("timeout-companion-user");
     await vi.advanceTimersByTimeAsync(5001);
 
-    await expect(pathPromise).resolves.toBe("/tasks");
+    await expect(pathPromise).resolves.toBe("/mentor");
   });
 
   it("returns /onboarding when profile and returning-user checks both timeout", async () => {
@@ -492,7 +494,7 @@ describe("getProfileAwareAuthFallbackPath", () => {
       error: null,
     });
 
-    await expect(getProfileAwareAuthFallbackPath("returning-user")).resolves.toBe("/tasks");
+    await expect(getProfileAwareAuthFallbackPath("returning-user")).resolves.toBe("/mentor");
   });
 
   it("returns /tasks for legacy existing users with a mentor and null onboarding_completed", async () => {
@@ -505,7 +507,7 @@ describe("getProfileAwareAuthFallbackPath", () => {
       error: null,
     });
 
-    await expect(getProfileAwareAuthFallbackPath("legacy-returning-user")).resolves.toBe("/tasks");
+    await expect(getProfileAwareAuthFallbackPath("legacy-returning-user")).resolves.toBe("/mentor");
   });
 
   it("returns /tasks when walkthrough is completed even if onboarding is false", async () => {
@@ -518,7 +520,7 @@ describe("getProfileAwareAuthFallbackPath", () => {
       error: null,
     });
 
-    await expect(getProfileAwareAuthFallbackPath("walkthrough-fallback-user")).resolves.toBe("/tasks");
+    await expect(getProfileAwareAuthFallbackPath("walkthrough-fallback-user")).resolves.toBe("/mentor");
   });
 
   it("returns /tasks for companion-backed stale profiles", async () => {
@@ -532,7 +534,7 @@ describe("getProfileAwareAuthFallbackPath", () => {
     });
     mocks.companionMaybeSingleMock.mockResolvedValueOnce(existingCompanion);
 
-    await expect(getProfileAwareAuthFallbackPath("companion-fallback-user")).resolves.toBe("/tasks");
+    await expect(getProfileAwareAuthFallbackPath("companion-fallback-user")).resolves.toBe("/mentor");
   });
 
   it("returns /onboarding for stage 0 egg accounts without guided tutorial progress", async () => {

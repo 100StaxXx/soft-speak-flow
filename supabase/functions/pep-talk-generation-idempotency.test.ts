@@ -68,8 +68,8 @@ Deno.test("single daily pep talk generation uses idempotency and uniqueness conf
   );
   assert(
     source.includes("buildPepTalkRequestKey") &&
-      source.includes("daily:${mentorSlug}:${forDate}"),
-    "Expected request keys to be based on the shared mentor/date daily pep talk",
+      source.includes("daily:${productMode}:${mentorSlug}:${forDate}"),
+    "Expected request keys to isolate each product's mentor/date daily pep talk",
   );
   assert(
     source.includes("PEP_TALK_REQUEST_IN_PROGRESS") &&
@@ -177,14 +177,14 @@ Deno.test("mentor script prompt forbids mentor-name intros and retries once", as
   );
 
   assert(
-    scriptSource.includes("Does NOT say, introduce, label, or mention the mentor's name") &&
-      scriptSource.includes("Do NOT start with phrases like"),
-    "Expected script prompt to explicitly forbid mentor-name intros",
+    scriptSource.includes("Does NOT say, introduce, label, or mention the Guide's name") &&
+      scriptSource.includes("The mentor's name or third-person mentor references"),
+    "Expected script prompt to explicitly forbid Guide-name intros",
   );
   assert(
     scriptSource.includes("scriptMentionsMentorName") &&
       scriptSource.includes("Regenerate the script") &&
-      scriptSource.includes("AI response included mentor name"),
-    "Expected generated scripts that mention mentor names to retry once and then fail",
+      scriptSource.includes("buildAuthoredFallback"),
+    "Expected generated scripts that mention Guide names to retry once and then use the reviewed fallback",
   );
 });

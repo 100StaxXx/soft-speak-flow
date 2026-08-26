@@ -3,6 +3,10 @@ import { safeLocalStorage } from '@/utils/storage';
 import { Button } from '@/components/ui/button';
 import { Download, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { PRODUCT } from '@/config/product';
+import { productScopedStorageKey } from '@/config/productRuntime';
+
+const INSTALL_DISMISSED_KEY = productScopedStorageKey('pwa-install-dismissed');
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -39,11 +43,11 @@ export const InstallPWA = () => {
 
   const handleDismiss = () => {
     setShowInstallPrompt(false);
-    safeLocalStorage.setItem('pwa-install-dismissed', 'true');
+    safeLocalStorage.setItem(INSTALL_DISMISSED_KEY, 'true');
   };
 
   // Don't show if already dismissed or installed
-  if (!showInstallPrompt || safeLocalStorage.getItem('pwa-install-dismissed')) {
+  if (!showInstallPrompt || safeLocalStorage.getItem(INSTALL_DISMISSED_KEY)) {
     return null;
   }
 
@@ -61,7 +65,7 @@ export const InstallPWA = () => {
           <Download className="h-5 w-5 text-primary" />
         </div>
         <div className="flex-1">
-          <h3 className="font-semibold text-sm mb-1">Install Cosmiq</h3>
+          <h3 className="font-semibold text-sm mb-1">Install {PRODUCT.name}</h3>
           <p className="text-xs text-muted-foreground mb-3">
             Add to your home screen for quick access and offline support
           </p>

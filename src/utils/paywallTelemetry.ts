@@ -16,6 +16,7 @@ type PaywallEventName =
   | "purchase_verification_completed"
   | "purchase_verification_failed"
   | "purchase_verification_deferred"
+  | "purchase_recovery_started"
   | "restore_started"
   | "restore_completed"
   | "restore_failed";

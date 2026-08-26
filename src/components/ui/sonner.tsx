@@ -42,7 +42,11 @@ const scheduleDismiss = (toastId: string | number, duration = MAX_TOAST_DURATION
 
   const timeout = globalThis.setTimeout(() => {
     dismissTimeouts.delete(toastId);
-    sonnerToast.dismiss(toastId);
+    // Some embedded/test environments expose a partial Sonner implementation.
+    // A missing dismiss method should never surface as an uncaught timer error.
+    if (typeof sonnerToast.dismiss === "function") {
+      sonnerToast.dismiss(toastId);
+    }
   }, duration);
 
   dismissTimeouts.set(toastId, timeout);
@@ -82,7 +86,9 @@ const toast = Object.assign(
       sonnerToast.promise(promise, capPromiseData(data)),
     dismiss: (toastId) => {
       clearScheduledDismiss(toastId);
-      return sonnerToast.dismiss(toastId);
+      return typeof sonnerToast.dismiss === "function"
+        ? sonnerToast.dismiss(toastId)
+        : undefined;
     },
     loading: (message, data) => createTimedToast(sonnerToast.loading, message, data),
     getHistory: sonnerToast.getHistory,

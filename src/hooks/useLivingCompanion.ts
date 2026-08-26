@@ -16,6 +16,7 @@ import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
    DEFAULT_MOMENT_TYPE 
  } from "@/config/reactionPools";
 import type { CompanionMotionEventType } from "@/config/companionMotion";
+import { announceCompanionPresenceSpeech } from "@/lib/companionPresenceEvents";
 
 const resolveMotionEventType = (
   source: SourceSystem,
@@ -78,6 +79,7 @@ const resolveMotionEventType = (
  
      // 3. Show the popup
      await show({ message: reaction.text });
+     announceCompanionPresenceSpeech("living-reaction");
      triggerEvent({
        type: resolveMotionEventType(source, momentType),
        intensity: momentType === 'breakthrough' ? 'heroic' : 'medium',
@@ -184,6 +186,7 @@ export const useLivingCompanionSafe = () => {
     }
 
     await talkPopup.show({ message: reaction.text });
+    announceCompanionPresenceSpeech("living-reaction");
     triggerEvent({
       type: resolveMotionEventType(source, momentType),
       intensity: momentType === 'breakthrough' ? 'heroic' : 'medium',

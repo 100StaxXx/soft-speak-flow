@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/sonner";
+import { PRODUCT } from "@/config/product";
 
 type AppleBinding = {
   original_transaction_id: string;
@@ -161,7 +162,7 @@ export function AdminAppleSubscriptionRecovery() {
               Apple Subscription Recovery
             </CardTitle>
             <CardDescription>
-              Move a verified App Store transaction to the correct Cosmiq account after support confirms ownership.
+              Move a verified App Store transaction to the correct {PRODUCT.name} account after support confirms ownership.
             </CardDescription>
           </div>
           <Badge variant="outline">Admin only</Badge>
@@ -179,7 +180,7 @@ export function AdminAppleSubscriptionRecovery() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="apple-target-user-id">Target Cosmiq user ID</Label>
+            <Label htmlFor="apple-target-user-id">Target {PRODUCT.name} user ID</Label>
             <Input
               id="apple-target-user-id"
               value={targetUserId}

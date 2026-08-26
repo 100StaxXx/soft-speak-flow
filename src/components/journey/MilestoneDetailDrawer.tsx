@@ -191,7 +191,7 @@ export const MilestoneDetailDrawer = ({
               </motion.div>
             )}
 
-            {/* Cosmiq Story Section */}
+            {/* Companion story section */}
             {isPostcardMilestone && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -201,7 +201,7 @@ export const MilestoneDetailDrawer = ({
               >
                 <div className="flex items-center gap-2">
                   <BookOpen className="w-4 h-4 text-primary" />
-                  <h4 className="text-sm font-semibold">Cosmiq Story</h4>
+                  <h4 className="text-sm font-semibold">Companion Story</h4>
                 </div>
 
                 {postcard ? (

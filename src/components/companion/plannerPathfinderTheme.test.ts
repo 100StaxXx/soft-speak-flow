@@ -22,7 +22,7 @@ describe("plannerPathfinderTheme", () => {
   });
 
   it("uses companion-token color mixes instead of fixed blue CTA gradient stops", () => {
-    expect(plannerPathfinderTheme.primaryButton).toContain("color-mix(in_srgb,hsl(var(--celestial-blue))");
+    expect(plannerPathfinderTheme.primaryButton).toContain("border-primary bg-primary");
     expect(plannerPathfinderTheme.primaryButton).not.toContain("#eaf8ff");
     expect(plannerPathfinderTheme.primaryButton).not.toContain("#f4fbff");
   });

@@ -3,7 +3,11 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireInternalRequest, type InternalRequestAuth } from "../_shared/auth.ts";
-import { buildTranscriptionFormData } from "./request.ts";
+import {
+  buildForcedAlignmentFormData,
+  buildTranscriptionFormData,
+} from "./request.ts";
+import { forcedAlignmentToWords } from "../_shared/elevenLabsAlignment.ts";
 import {
   buildCostGuardrailBlockedResponse,
   createCostGuardrailSession,
@@ -47,15 +51,18 @@ export async function handleTranscribeAudio(
       return internalAuth;
     }
 
-    const { audioUrl, pepTalkId } = await req.json();
+    const { audioUrl, pepTalkId, text } = await req.json();
 
     if (!audioUrl) {
       throw new Error('Audio URL is required');
     }
 
+    const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) {
-      throw new Error('OpenAI API key not configured');
+    const providedText = typeof text === "string" ? text.trim() : "";
+    const useElevenLabsAlignment = Boolean(ELEVENLABS_API_KEY && providedText);
+    if (!useElevenLabsAlignment && !OPENAI_API_KEY) {
+      throw new Error('No transcription provider configured');
     }
 
     const supabaseAdmin = deps.createSupabaseClient();
@@ -67,7 +74,7 @@ export async function handleTranscribeAudio(
     const guardedFetch = costGuardrails.wrapFetch(deps.fetchImpl);
     await costGuardrails.enforceAccess({
       capabilities: ["transcription"],
-      providers: ["openai"],
+      providers: [useElevenLabsAlignment ? "elevenlabs" : "openai"],
     });
 
     console.log('Fetching audio from URL:', audioUrl);
@@ -81,38 +88,50 @@ export async function handleTranscribeAudio(
     const audioBlob = await audioResponse.blob();
     console.log('Audio fetched, size:', audioBlob.size, 'bytes');
 
-    // Prepare form data for OpenAI Whisper API
-    const formData = buildTranscriptionFormData(audioBlob);
+    const formData = useElevenLabsAlignment
+      ? buildForcedAlignmentFormData(audioBlob, providedText)
+      : buildTranscriptionFormData(audioBlob);
+    const transcriptionUrl = useElevenLabsAlignment
+      ? "https://api.elevenlabs.io/v1/forced-alignment"
+      : "https://api.openai.com/v1/audio/transcriptions";
+    const transcriptionHeaders: Record<string, string> = useElevenLabsAlignment
+      ? { "xi-api-key": ELEVENLABS_API_KEY! }
+      : { "Authorization": `Bearer ${OPENAI_API_KEY}` };
 
-    console.log('Sending to OpenAI Whisper API...');
+    console.log(
+      useElevenLabsAlignment
+        ? "Sending audio and script to ElevenLabs Forced Alignment..."
+        : "Sending audio to OpenAI Whisper API...",
+    );
 
-    // Call OpenAI Whisper API
-    const transcriptionResponse = await guardedFetch('https://api.openai.com/v1/audio/transcriptions', {
+    const transcriptionResponse = await guardedFetch(transcriptionUrl, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-      },
+      headers: transcriptionHeaders,
       body: formData,
     });
 
     if (!transcriptionResponse.ok) {
       const errorText = await transcriptionResponse.text();
-      console.error('OpenAI API error:', errorText);
-      throw new Error(`OpenAI API error: ${transcriptionResponse.status} - ${errorText}`);
+      const provider = useElevenLabsAlignment ? "ElevenLabs" : "OpenAI";
+      console.error(`${provider} transcription error:`, errorText);
+      throw new Error(`${provider} transcription error: ${transcriptionResponse.status} - ${errorText}`);
     }
 
     const transcriptionData = await transcriptionResponse.json();
     console.log('Transcription received');
 
     // Extract word-level timestamps
-    const words = transcriptionData.words || [];
-    
-    // Format the transcript for our database
-    const transcript = words.map((wordData: any) => ({
-      word: wordData.word,
-      start: wordData.start,
-      end: wordData.end,
-    }));
+    const transcript = useElevenLabsAlignment
+      ? forcedAlignmentToWords(transcriptionData)
+      : (transcriptionData.words || []).map((wordData: any) => ({
+        word: wordData.word,
+        start: wordData.start,
+        end: wordData.end,
+      }));
+
+    if (transcript.length === 0) {
+      throw new Error("Transcription provider returned no word timestamps");
+    }
 
     console.log(`Successfully transcribed ${transcript.length} words`);
 
@@ -134,8 +153,11 @@ export async function handleTranscribeAudio(
     return new Response(
       JSON.stringify({
         transcript,
-        text: transcriptionData.text,
-        duration: transcriptionData.duration,
+        text: useElevenLabsAlignment ? providedText : transcriptionData.text,
+        duration: useElevenLabsAlignment
+          ? transcript.reduce((latest: number, word: { end: number }) => Math.max(latest, word.end), 0)
+          : transcriptionData.duration,
+        provider: useElevenLabsAlignment ? "elevenlabs" : "openai",
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

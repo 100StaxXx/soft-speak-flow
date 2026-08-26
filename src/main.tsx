@@ -5,7 +5,17 @@ import "./index.css";
 import { initializeCapacitor } from "./utils/capacitor";
 import { logger } from "./utils/logger";
 import { isMacDesignedForIPadIOSApp } from "./utils/platformTargets";
+import { applyProductDocumentIdentity } from "./config/productDocumentIdentity";
+import { PRODUCT } from "./config/product";
 import App from "./App";
+
+applyProductDocumentIdentity();
+
+const productClassName = PRODUCT.mode === "cosmiq" ? "product-cosmiq" : "product-graceward";
+document.documentElement.classList.remove("product-cosmiq", "product-graceward");
+document.documentElement.classList.add(productClassName);
+document.body.classList.remove("product-cosmiq", "product-graceward");
+document.body.classList.add(productClassName);
 
 // Initialize Sentry error tracking (only in production with valid DSN)
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
@@ -48,6 +58,13 @@ document.getElementById('debug-indicator')?.remove();
 if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios") {
   document.documentElement.classList.add("platform-native-ios");
   document.body.classList.add("platform-native-ios");
+  document.addEventListener("contextmenu", (event) => {
+    const target = event.target;
+    if (target instanceof Element && target.closest('[data-native-text-selection="allow"], .allow-text-select')) {
+      return;
+    }
+    event.preventDefault();
+  }, { capture: true });
 
   if (isMacDesignedForIPadIOSApp()) {
     document.documentElement.classList.add("platform-mac-hosted-ios");

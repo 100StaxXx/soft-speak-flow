@@ -1,13 +1,13 @@
 {
-	"appId": "com.darrylgraham.revolution",
-	"appName": "Cosmiq",
+	"appId": "com.darrylgraham.graceward",
+	"appName": "Graceward",
 	"webDir": "dist",
 	"loggingBehavior": "none",
 	"plugins": {
 		"SplashScreen": {
 			"launchShowDuration": 2000,
 			"launchAutoHide": false,
-			"backgroundColor": "#1a1a1a",
+			"backgroundColor": "#eef0e6",
 			"androidSplashResourceName": "splash",
 			"androidScaleType": "CENTER_CROP",
 			"showSpinner": false,
@@ -41,8 +41,6 @@
 		"SharePlugin",
 		"SplashScreenPlugin",
 		"FilePickerPlugin",
-		"SocialLoginPlugin",
-		"PurchasesPlugin",
-		"RevenueCatUIPlugin"
+		"SocialLoginPlugin"
 	]
 }

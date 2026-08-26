@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { useAuth } from "@/hooks/useAuth";
 import { resolvePushNotificationDestination } from "@/utils/pushNotificationNavigation";
+import { PRODUCT, type ProductMode } from "@/config/product";
 
 export const PUSH_NOTIFICATIONS_INBOX_QUERY_KEY = "push-notifications-inbox";
 export const PUSH_NOTIFICATIONS_UNREAD_COUNT_QUERY_KEY = "push-notifications-unread-count";
@@ -95,33 +96,34 @@ function isRitualTaskNotificationRow(
 export function getPushNotificationSourceLabel(
   type: string,
   payloadInput?: unknown,
-  options: { isRitualTask?: boolean } = {},
+  options: { isRitualTask?: boolean; productMode?: ProductMode } = {},
 ): string {
   const isRitualTask = options.isRitualTask === true || hasRitualPayloadHint(payloadInput);
+  const productMode = options.productMode ?? PRODUCT.mode;
 
   switch (type) {
     case "daily_pep":
-      return "Daily pep talk";
+      return productMode === "christian" ? "Daily Grace" : "Daily encouragement";
     case "daily_quote":
       return "Daily quote";
     case "task_start":
-      return isRitualTask ? "Ritual start" : "Quest start";
+      return isRitualTask ? "Rhythm ready" : "Action ready";
     case "task_reminder":
-      return isRitualTask ? "Ritual reminder" : "Quest reminder";
+      return isRitualTask ? "Rhythm reminder" : "Action reminder";
     case "habit_reminder":
-      return "Ritual reminder";
+      return "Rhythm reminder";
     case "contact_reminder":
       return "Contact reminder";
     case "mentor_nudge":
-      return "Companion nudge";
+      return "Guide note";
     case "checkin_morning_reminder":
       return "Morning check-in";
     case "checkin_evening_reminder":
-      return "Evening reflection";
+      return "Evening Reflection";
     case "plan_day_overdue":
       return "Planner alert";
     default:
-      return "Cosmiq";
+      return PRODUCT.name;
   }
 }
 

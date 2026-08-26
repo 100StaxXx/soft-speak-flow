@@ -70,6 +70,7 @@ Deno.test("oauthState creates and verifies signed state payloads", async () => {
     userId: "user-1",
     syncMode: "send_only",
     source: "native",
+    productMode: "cosmiq",
     secret: "test-secret",
   });
 
@@ -83,6 +84,7 @@ Deno.test("oauthState creates and verifies signed state payloads", async () => {
   assertEquals(payload.userId, "user-1");
   assertEquals(payload.syncMode, "send_only");
   assertEquals(payload.source, "native");
+  assertEquals(payload.productMode, "cosmiq");
   assert(payload.exp > Math.floor(Date.now() / 1000));
 });
 
@@ -120,6 +122,7 @@ Deno.test("oauthState defaults source to web for legacy payloads", async () => {
   });
 
   assertEquals(payload.source, "web");
+  assertEquals(payload.productMode, "graceward");
 });
 
 Deno.test("oauthState rejects tampered signatures", async () => {

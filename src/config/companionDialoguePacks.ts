@@ -84,25 +84,18 @@ const SOFT_RAW: RawTonePack = {
       "Could we",
       "Would you like to",
       "Let's",
-      "Maybe we can",
-      "I would love to",
-      "Want to",
+      "We can",
+      "Take a moment to",
+      "When you're ready, let's",
     ],
     [
-      "take one small step together",
-      "start with a tiny win",
-      "give today a gentle beginning",
-      "complete one quick focus block",
-      "reconnect with a short reset",
-      "do one focused task",
+      "notice what your heart needs",
+      "reflect on what you are carrying",
+      "make room for gratitude and honesty",
+      "choose one clear next step",
+      "bring one concern into the light",
     ],
-    [
-      " right now?",
-      " before the day drifts?",
-      " and see how it feels?",
-      " while the energy is here?",
-      " in just a few minutes?",
-    ],
+    [" today?"],
     COMPANION_DIALOGUE_BUCKET_COUNTS.base_greetings,
   ),
   growth_moments: buildLinesFromParts(
@@ -189,7 +182,7 @@ const SOFT_RAW: RawTonePack = {
   critical_gentle_moments: [
     "I am still here when you are ready for one small step.",
     "We can turn this day with one tiny action.",
-    "I saved your place. Let's begin gently.",
+    "I saved your place. Let's begin from here.",
     "No pressure. One focused minute is enough.",
     "We can steady this together right now.",
     "A single completed task would help us breathe.",
@@ -203,28 +196,23 @@ const SOFT_RAW: RawTonePack = {
 const PLAYFUL_RAW: RawTonePack = {
   base_greetings: buildLinesFromParts(
     [
-      "Quick mission",
-      "Check-in ping",
-      "Let's go",
-      "Tiny challenge",
-      "Momentum ping",
-      "Game plan",
+      "A quick check-in:",
+      "A hopeful question:",
+      "Here's a simple invitation:",
+      "Let's keep this light:",
+      "A small moment of honesty:",
+      "For right now,",
     ],
     [
-      "grab one fast win together",
-      "clear a quick priority before we wander",
-      "stack one easy point right now",
-      "run a short focus sprint",
-      "turn this minute into progress",
-      "start with a mini victory lap",
+      "what would help you feel grounded",
+      "where could you use encouragement",
+      "what are you grateful for",
+      PRODUCT.mode === "christian"
+        ? "would reflection, prayer, or action help most"
+        : "would reflection, planning, or action help most",
+      "what is one kind step you can take",
     ],
-    [
-      " right now?",
-      " before the vibe changes?",
-      " in under five minutes?",
-      " and call it momentum?",
-      " so we can celebrate?",
-    ],
+    [" today?"],
     COMPANION_DIALOGUE_BUCKET_COUNTS.base_greetings,
   ),
   growth_moments: buildLinesFromParts(
@@ -253,7 +241,7 @@ const PLAYFUL_RAW: RawTonePack = {
   mystery_moments: [
     "Okay wait, I found something weird and shiny.",
     "I have a little surprise with your name on it.",
-    "Rare vibe detected. Tap in?",
+    "A surprising insight may be waiting here. Want to explore it?",
     "I pulled a mystery thread from the void.",
     "I remembered a secret detail. Want it?",
     "This moment has surprise loot energy.",
@@ -268,7 +256,7 @@ const PLAYFUL_RAW: RawTonePack = {
     ["Reset mode", "Comeback mode", "No guilt", "Team plan", "Quick rescue"],
     [
       "let's save today with one tiny win",
-      "one easy task can flip this whole vibe",
+      "one easy task can shift the day",
       "we can restart momentum in two minutes",
       "pick the easiest task and we bounce back",
       "I can carry the hype while you hit start",
@@ -285,7 +273,7 @@ const PLAYFUL_RAW: RawTonePack = {
     "The next action could be history.",
     "Something important is waking up.",
     "This is not ordinary progress.",
-    "The vibe says: big moment, small action.",
+    "This is a meaningful moment that may begin with one small action.",
     "You are standing on a rare threshold.",
   ],
   recovery_moments: [
@@ -303,13 +291,13 @@ const PLAYFUL_RAW: RawTonePack = {
     "Welcome back. Let's keep the run alive.",
   ],
   critical_gentle_moments: [
-    "Hey, we can do this gently. One small move.",
+    "Hey, one small move is enough to begin.",
     "No panic. Pick one easy task and we reset.",
     "I am here. Let's take one tiny step.",
     "This can still be a comeback day.",
     "One completed action would stabilize everything.",
     "We are not stuck. We are one tap away.",
-    "Let's keep it soft and start anyway.",
+    "Let's lower the pressure and start anyway.",
     "You do not need perfect. You need started.",
     "I can hold the hype while you take one step.",
     "We can turn the day with one quick win.",
@@ -318,22 +306,26 @@ const PLAYFUL_RAW: RawTonePack = {
 
 const WITTY_RAW: RawTonePack = {
   base_greetings: buildLinesFromParts(
-    ["Reality check", "Chaos report", "Hot take", "Tiny intervention", "Field note", "Plot twist"],
     [
-      "one finished task would instantly improve this timeline and your reputation inside it",
-      "we should steal a quick win before your brain turns this into a wandering side quest",
-      "a five-minute move beats another grand speech from the Department of Very Reasonable Delays",
-      "one clean action would quiet half the noise immediately",
-      "we can grab momentum before the day gets weird again on its own",
-      "your future self is campaigning for one crisp move from this whole production",
+      "A clear question:",
+      "Let's be honest:",
+      "A grounded thought:",
+      "One simple truth:",
+      "A steady reminder:",
+      "For right now,",
     ],
     [
-      " right now.",
-      " before the spiral files paperwork.",
-      " and call it suspiciously responsible.",
-      " while the window is still open.",
-      " with style, not drama.",
+      "what deserves your attention most",
+      "what can you release without guilt",
+      PRODUCT.mode === "christian"
+        ? "would prayer, reflection, or action help"
+        : "would planning, reflection, or action help",
+      PRODUCT.mode === "christian"
+        ? "what is the next faithful step"
+        : "what is the next useful step",
+      "where do you need courage today",
     ],
+    ["?"],
     COMPANION_DIALOGUE_BUCKET_COUNTS.base_greetings,
   ),
   growth_moments: buildLinesFromParts(
@@ -369,7 +361,7 @@ const WITTY_RAW: RawTonePack = {
     "A useful anomaly is asking for attention.",
     "I pulled a strange thread and now we have options.",
     "Hidden bonus scene. Very illegal. Very helpful.",
-    "I have a reveal and it is delightfully unhinged.",
+    "I have a fresh perspective that may help.",
     "Something uncommon just winked at us.",
     "Want the weirdly excellent version of this moment?",
   ],
@@ -408,7 +400,7 @@ const WITTY_RAW: RawTonePack = {
     "You showed up at exactly the moment that mattered.",
     "We are not restarting. We are reclaiming momentum.",
     "Your return put signal back into the system.",
-    "This rebound has teeth, not just vibes.",
+    "This return has substance, not just motivation.",
     "Welcome back. Let's make it hard to doubt again.",
   ],
   critical_gentle_moments: [
@@ -420,7 +412,7 @@ const WITTY_RAW: RawTonePack = {
     "One completed task would steady this whole situation.",
     "Start small. I will not let small mean pointless.",
     "This is recoverable, and I am staying with you.",
-    "A gentle reset now beats a dramatic collapse later.",
+    "A timely reset now beats a dramatic collapse later.",
     "Let's choose one move we can actually land and breathe.",
   ],
 };
@@ -468,3 +460,4 @@ export const getLinesForToneAndBucket = (
 
 export const getAllLinesForBucket = (bucketKey: CompanionDialogueBucketKey): CompanionDialogueLine[] =>
   COMPANION_DIALOGUE_TONE_PACKS.flatMap((tonePack) => COMPANION_DIALOGUE_PACKS[tonePack][bucketKey]);
+import { PRODUCT } from "./product.ts";

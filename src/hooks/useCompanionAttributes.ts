@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 import { ECHO_MAP, AttributeType } from "@/config/attributeDescriptions";
 import { useAchievements } from "./useAchievements";
 import {
@@ -173,6 +174,7 @@ export const useCompanionAttributes = () => {
       .select("vitality, wisdom, discipline, resolve, creativity, alignment")
       .eq("id", companionId)
       .eq("user_id", user.id)
+      .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
       .maybeSingle();
 
     if (error) {
@@ -201,6 +203,7 @@ export const useCompanionAttributes = () => {
         .select("vitality, wisdom, discipline, resolve, creativity, alignment")
         .eq("id", companionId)
         .eq("user_id", user.id)
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
         .maybeSingle();
 
       if (fetchError) throw fetchError;
@@ -230,7 +233,8 @@ export const useCompanionAttributes = () => {
         .from("user_companion")
         .update(updates)
         .eq("id", companionId)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode);
 
       if (updateError) throw updateError;
 
@@ -657,6 +661,7 @@ export const useCompanionAttributes = () => {
         .select("vitality, wisdom, discipline, resolve, creativity, alignment")
         .eq("id", companionId)
         .eq("user_id", user.id)
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
         .maybeSingle();
 
       if (fetchError) throw fetchError;
@@ -684,7 +689,8 @@ export const useCompanionAttributes = () => {
         .from("user_companion")
         .update(updates)
         .eq("id", companionId)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode);
 
       if (updateError) throw updateError;
     },

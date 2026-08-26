@@ -11,6 +11,7 @@ import type { IntentClassification } from "@/hooks/useIntentClassifier";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { useTasksQuery } from "@/hooks/useTasksQuery";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
+import { useExternalCalendarEvents } from "@/hooks/useExternalCalendarEvents";
 import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { useEpics } from "@/hooks/useEpics";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
@@ -26,6 +27,7 @@ import { useSchedulingLearner } from "@/hooks/useSchedulingLearner";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionCareSignals } from "@/hooks/useCompanionCareSignals";
+import { productScopedStorageKey } from "@/config/productRuntime";
 import { parseNaturalLanguage } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import { normalizePlannerDurationBucket } from "@/shared/plannerDurationBuckets";
 import { buildPlannerAISignals } from "@/utils/companionPlannerAiSignals";
@@ -104,7 +106,7 @@ import type {
   PlannerTonePack,
 } from "@/types/companionPlanner";
 
-const STORAGE_KEY = "companion-planner-preferences-v1";
+const STORAGE_KEY = productScopedStorageKey("companion-planner-preferences-v1");
 const MAX_CONTEXT_TASKS = 18;
 const PLANNER_PREFLIGHT_TIMEOUT_MS = 3_000;
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -171,8 +173,6 @@ const DEFAULT_SESSION_STATE: CompanionPlannerSessionState = {
 };
 
 const DEFAULT_TONE_PACK: PlannerTonePack = LOCKED_COMPANION_TONE_PACK;
-const EMPTY_CALENDAR_EVENTS: PlannerContextCalendarEvent[] = [];
-
 const generateId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -633,7 +633,7 @@ const deriveStarterIntentFromMessage = (
     return "upcoming_start";
   }
   if (
-    /\b(advance my campaign|move my campaign forward|progress my campaign|unstick my campaign|help me progress (?:this|my) campaign)\b/
+    /\b(continue my journey|move my journey forward|advance my campaign|move my campaign forward|progress my campaign|unstick my campaign|help me progress (?:this|my) campaign)\b/
       .test(normalizedMessage)
   ) {
     return "advance_campaign_start";
@@ -739,7 +739,7 @@ const sanitizeCreateQuestProposalPayload = (
       : 15;
 
   return {
-    taskText: typeof payload.taskText === "string" ? payload.taskText : "Quest",
+    taskText: typeof payload.taskText === "string" ? payload.taskText : "Action",
     difficulty: payload.difficulty === "easy" || payload.difficulty === "hard"
       ? payload.difficulty
       : "medium",
@@ -1929,6 +1929,12 @@ export function useCompanionPlanner({
   const todayTasksQuery = useTasksQuery(today, { enabled });
   const weekTasksQuery = useCalendarTasks(today, "week", { enabled });
   const monthTasksQuery = useCalendarTasks(today, "month", { enabled });
+  const activeEventsQuery = useExternalCalendarEvents(today, horizon, { enabled });
+  const contextEventsQuery = useExternalCalendarEvents(
+    today,
+    horizon === "month" ? "month" : "week",
+    { enabled },
+  );
   const { inboxTasks } = useInboxTasks({ enabled });
   const habitsQuery = useQuery({
     queryKey: ["habits", user?.id],
@@ -2584,7 +2590,7 @@ export function useCompanionPlanner({
     () =>
       buildCompanionPlannerScheduleInsights({
         tasks: activePlannerTasks,
-        calendarEvents: EMPTY_CALENDAR_EVENTS,
+        calendarEvents: activeEventsQuery.events,
         horizon,
         selectedDate: todayIso,
         currentDateTime: formatCurrentDateTimeWithOffset(today),
@@ -2592,6 +2598,7 @@ export function useCompanionPlanner({
       }, deletedPlannerEntitiesQuery.data ?? []),
     [
       activePlannerTasks,
+      activeEventsQuery.events,
       horizon,
       plannerMemory,
       today,
@@ -2716,7 +2723,7 @@ export function useCompanionPlanner({
         inboxTasks: inboxPlannerTasks,
         activeEpics: mapEpicsToContext(activeEpics, todayIso),
         rituals: baseRituals,
-        calendarEvents: EMPTY_CALENDAR_EVENTS,
+        calendarEvents: contextEventsQuery.events,
         contactsNeedingAttention: contactsAttentionQuery.data ?? [],
         reflectionSignals: reflectionSignalsQuery.data ?? [],
         careSignals,
@@ -2735,6 +2742,7 @@ export function useCompanionPlanner({
       baseRituals,
       careSignals,
       contactsAttentionQuery.data,
+      contextEventsQuery.events,
       contextPlannerTasks,
       effectivePlannerMemory,
       inboxPlannerTasks,
@@ -2765,7 +2773,7 @@ export function useCompanionPlanner({
           ? { pendingLocalHabitIds: pendingPlannerCreateIds.habitIds }
           : {}),
         rituals: ritualsQuery.data ?? baseRituals,
-        calendarEvents: EMPTY_CALENDAR_EVENTS,
+        calendarEvents: contextEventsQuery.events,
         contactsNeedingAttention: contactsAttentionQuery.data ?? [],
         reflectionSignals: reflectionSignalsQuery.data ?? [],
         careSignals,
@@ -2782,6 +2790,7 @@ export function useCompanionPlanner({
       careSignals,
       contactsAttentionQuery.data,
       contextPlannerTasks,
+      contextEventsQuery.events,
       effectivePlannerMemory,
       inboxPlannerTasks,
       habitsQuery.data,
@@ -3671,7 +3680,7 @@ export function useCompanionPlanner({
               confirmationContent =
                 `Saved: ${proposal.title}. I couldn't finish the step breakdown yet.`;
               toast(
-                "Quest updated, but I couldn't finish the step breakdown yet.",
+                "Action updated, but I couldn't finish the step breakdown yet.",
               );
             }
           }

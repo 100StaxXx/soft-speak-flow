@@ -7,7 +7,6 @@ import { PromptBuilder } from "../_shared/promptBuilder.ts";
 import { OutputValidator } from "../_shared/outputValidator.ts";
 import {
   checkRateLimit,
-  createRateLimitResponse,
   logRateLimitedInvocation,
   RATE_LIMITS,
 } from "../_shared/rateLimiter.ts";
@@ -19,6 +18,11 @@ import {
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
 import { resolveSupportedMentorSlug } from "../_shared/mentorRoster.ts";
+import {
+  CHRISTIAN_GUIDANCE_POLICY,
+  enforceChristianGuidanceOutput,
+} from "../_shared/christianGuidancePolicy.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const ChatSchema = z.object({
   message: z.string().min(1).max(1000),
@@ -34,6 +38,40 @@ const ChatSchema = z.object({
 });
 
 const DAILY_MESSAGE_LIMIT = 20;
+
+function secondsUntilNextUtcDay(now = new Date()): number {
+  const nextDay = new Date(now);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  nextDay.setUTCHours(0, 0, 0, 0);
+  return Math.max(1, Math.ceil((nextDay.getTime() - now.getTime()) / 1000));
+}
+
+function parseRetryAfterSeconds(response: Response): number {
+  const raw = response.headers.get("Retry-After")?.trim();
+  if (!raw) return 60;
+
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return Math.min(300, Math.ceil(seconds));
+  }
+
+  const retryAt = Date.parse(raw);
+  if (Number.isFinite(retryAt)) {
+    return Math.min(300, Math.max(1, Math.ceil((retryAt - Date.now()) / 1000)));
+  }
+
+  return 60;
+}
+
+async function getProviderErrorCode(response: Response): Promise<string | null> {
+  try {
+    const payload = await response.clone().json();
+    const code = payload?.error?.code ?? payload?.error?.type ?? payload?.code;
+    return typeof code === "string" && code.trim() ? code.trim() : null;
+  } catch {
+    return null;
+  }
+}
 
 // Analyze user communication patterns for adaptive learning
 interface CommunicationAnalysis {
@@ -233,19 +271,19 @@ function getMentorPersonalityAdjustments(mentorSlug?: string | null): string {
 
   switch (resolved) {
     case "sage":
-      return "Response shape: calm reframe -> one clear next step. Keep the response calm, concise, and lightly metaphorical. Prioritize perspective over pressure. Never hype or scold.";
+      return "Response shape: calm reframe -> one clear next step. Keep the response calm, concise, and grounded. Prioritize patient perspective over pressure. Never hype or scold.";
     case "lyra":
-      return "Response shape: pattern diagnosis -> strategic signal -> elegant next move. Keep the response futuristic, poised, precise, and clarifying. Turn noise into signal without sounding mystical, vague, or emotionally distant.";
+      return "Response shape: pattern diagnosis -> discerning question -> clear next move. Keep the response poised, perceptive, precise, and clarifying. Separate noise from what matters without claiming supernatural insight or certainty.";
     case "icon":
       return "Response shape: identity check -> standard -> aligned action. Keep the response composed, standards-driven, and elegant. Frame advice around alignment, identity, discernment, and boundaries. Avoid generic confidence hype.";
     case "charles":
       return "Response shape: useful callout -> tiny task -> no-drama exit. Keep the response short, blunt, and lightly snarky. Accountability should sting a little, but stay useful. Never mock pain, fear, grief, or vulnerability; only mock avoidance and excuses.";
     case "princess":
-      return "Response shape: validation -> soft structure -> encouraging close. Keep the response warm, gentle, and encouraging. Make discipline feel soft, aesthetic, and kind while still giving a real next step.";
+      return "Response shape: validation -> clear direction -> encouraging close. Keep the response warm, steady, and kind while still giving a real next step. Make room for rest and limits without turning consistency into spiritual worth.";
     case "operator":
-      return "Response shape: objective -> plan -> execution order. Keep the response precise, controlled, and execution-focused. Emphasize structure, blocks, and systems. Avoid emotional speeches, jokes, and competitive taunts.";
+      return "Response shape: objective -> realistic plan -> execution order. Keep the response precise, controlled, and practical. Emphasize wise stewardship, structure, and sustainable systems without equating productivity with worth.";
     case "rival":
-      return "Response shape: challenge -> stakes -> prove-it action. Keep the response direct, competitive, and challenging. Use pride and standards to drive action. Avoid detailed planning language; this mentor creates fire, not systems.";
+      return "Response shape: challenge -> stakes -> courageous action. Keep the response direct, energetic, and demanding without contempt or shame. Use endurance and honest follow-through to drive action; challenge avoidance, never the user's dignity.";
     case "reign":
       return "Keep the response commanding, ambitious, and performance-focused.";
     default:
@@ -292,6 +330,8 @@ export async function handleMentorChat(req: Request) {
     );
     const userId = protectedRequest.auth.userId;
     const supabaseAdmin = protectedRequest.supabase;
+    const productMode = await resolveUserProductMode(supabaseAdmin, userId);
+    const productName = productMode === "graceward" ? "Graceward" : "Cosmiq";
 
     const costGuardrails = createCostGuardrailSession({
       supabase: supabaseAdmin,
@@ -336,7 +376,7 @@ export async function handleMentorChat(req: Request) {
     // Build additional context for comprehensive mode
     let additionalContext = '';
     if (briefingContext) {
-      additionalContext += `\n\nTODAY'S MORNING BRIEFING (you gave the user this earlier):\n${briefingContext}\n`;
+      additionalContext += `\n\nCONNECTED DAILY CONTEXT FROM ${productName.toUpperCase()}:\n${briefingContext}\nUse this only when it helps the current request. Refer to remembered choices naturally, without claiming human memory.\n`;
     }
     if (comprehensiveMode) {
       additionalContext += '\nThe user wants comprehensive, data-aware guidance. Reference their activities and goals.';
@@ -356,13 +396,25 @@ export async function handleMentorChat(req: Request) {
     }
 
     if ((messagesToday || 0) >= DAILY_MESSAGE_LIMIT) {
+      const retryAfterSeconds = secondsUntilNextUtcDay();
       return new Response(
         JSON.stringify({
           error: "Daily limit reached",
-          message: `You've reached today's mentor chat limit (${DAILY_MESSAGE_LIMIT} messages). Come back tomorrow for more guidance!`,
-          limit: DAILY_MESSAGE_LIMIT
+          code: "DAILY_GUIDE_LIMIT_REACHED",
+          message: `You've reached today's Guide conversation limit (${DAILY_MESSAGE_LIMIT} messages). Come back tomorrow for more reflection and planning.`,
+          limit: DAILY_MESSAGE_LIMIT,
+          messagesUsed: DAILY_MESSAGE_LIMIT,
+          retryable: false,
+          retryAfterSeconds,
         }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "Retry-After": String(retryAfterSeconds),
+          },
+        }
       );
     }
 
@@ -373,7 +425,27 @@ export async function handleMentorChat(req: Request) {
       RATE_LIMITS["mentor-chat"],
     );
     if (!rateLimit.allowed) {
-      return createRateLimitResponse(rateLimit, corsHeaders);
+      const retryAfterSeconds = Math.min(
+        3600,
+        Math.max(60, Math.ceil((rateLimit.resetAt.getTime() - Date.now()) / 1000)),
+      );
+      return new Response(
+        JSON.stringify({
+          error: "Guide temporarily unavailable",
+          code: "GUIDE_REQUEST_LIMITED",
+          message: "Live Guide replies are temporarily busy. Please try again shortly.",
+          retryable: true,
+          retryAfterSeconds,
+        }),
+        {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "Retry-After": String(retryAfterSeconds),
+          },
+        },
+      );
     }
 
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
@@ -405,7 +477,19 @@ export async function handleMentorChat(req: Request) {
       }
     });
 
-    const systemPrompt = baseSystemPrompt;
+    const guideRoleContext = productMode === "graceward"
+      ? `DAILY WAY GUIDE ROLE:
+- ${mentorName} is an original fictional Guide profile inside Graceward, not a historical person, pastor, clergy member, or spiritual authority.
+- You are Graceward's AI reflection and planning assistant using ${mentorName}'s communication style. Never claim to literally be ${mentorName}.
+- Preserve the Guide's tone while keeping Scripture central and presenting every suggested practice as optional.`
+      : `COSMIQ GUIDE ROLE:
+- ${mentorName} is an original fictional Guide profile inside Cosmiq, not a real person or professional authority.
+- You are Cosmiq's AI planning, reflection, and personal-growth assistant using ${mentorName}'s communication style. Never claim to literally be ${mentorName}.
+- Keep guidance practical and optional. Never import Graceward branding, Scripture, prayer, theology, or claims about spiritual standing unless the user explicitly raises their own beliefs.`;
+
+    const systemPrompt = `${baseSystemPrompt}\n\n${guideRoleContext}${
+      productMode === "graceward" ? `\n\n${CHRISTIAN_GUIDANCE_POLICY}` : ""
+    }`;
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -427,27 +511,66 @@ export async function handleMentorChat(req: Request) {
 
     if (!response.ok) {
       if (response.status === 429) {
+        const retryAfterSeconds = parseRetryAfterSeconds(response);
+        const providerCode = await getProviderErrorCode(response);
+        console.warn("Guide provider rate limited", {
+          requestId: protectedRequest.requestId,
+          providerCode,
+          retryAfterSeconds,
+        });
         return new Response(
-          JSON.stringify({ error: "Rate limit exceeded, please try again later." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({
+            error: "Guide temporarily unavailable",
+            code: "GUIDE_PROVIDER_RATE_LIMITED",
+            message: "Live Guide replies are temporarily busy. Please try again in a moment.",
+            retryable: true,
+            retryAfterSeconds,
+            upstreamStatus: 429,
+          }),
+          {
+            status: 503,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+              "Retry-After": String(retryAfterSeconds),
+            },
+          }
         );
       }
       if (response.status === 402) {
+        console.error("Guide provider billing unavailable", {
+          requestId: protectedRequest.requestId,
+        });
         return new Response(
-          JSON.stringify({ error: "Payment required, please add credits." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({
+            error: "Guide temporarily unavailable",
+            code: "GUIDE_PROVIDER_UNAVAILABLE",
+            message: "Live Guide replies are temporarily unavailable. Please try again later.",
+            retryable: true,
+            upstreamStatus: 402,
+          }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       const errorText = await response.text();
       console.error("AI gateway error:", response.status, errorText);
       return new Response(
-        JSON.stringify({ error: "AI gateway error" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          error: "Guide temporarily unavailable",
+          code: "GUIDE_PROVIDER_UNAVAILABLE",
+          message: "Live Guide replies are temporarily unavailable. Please try again later.",
+          retryable: true,
+          upstreamStatus: response.status,
+        }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const data = await response.json();
-    const assistantMessage = data.choices[0].message.content;
+    const rawAssistantMessage = data.choices[0].message.content;
+    const assistantMessage = productMode === "graceward"
+      ? enforceChristianGuidanceOutput(rawAssistantMessage)
+      : rawAssistantMessage;
 
     // Validate output
     const validator = new OutputValidator(validationRules, outputConstraints);

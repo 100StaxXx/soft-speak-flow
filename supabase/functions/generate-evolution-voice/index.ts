@@ -13,6 +13,7 @@ import {
   ELEVENLABS_MENTOR_TTS_MODEL,
   resolveMentorVoiceConfig,
 } from "../_shared/mentorVoiceConfig.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -104,9 +105,11 @@ serve(async (req) => {
       providers: ["openai", "elevenlabs"],
     });
 
-    // Get mentor personality details
+    const productMode = await resolveUserProductMode(supabaseClient, effectiveUserId);
+
+    // Get the product-specific mentor/Guide presentation without crossing copy.
     const { data: mentor, error: mentorError } = await supabaseClient
-      .from('mentors')
+      .from(productMode === "graceward" ? "graceward_guides" : "mentors")
       .select('name, tone_description, style_description')
       .eq('slug', mentorSlug)
       .single();
@@ -141,9 +144,9 @@ Generate a SHORT, powerful one-liner (10-15 words MAX) celebrating that the user
 Focus on DISCIPLINE and CONSISTENCY.
 
 Examples for different mentors:
-- The Sage: "Steady effort becomes visible all at once."
-- The Operator: "This is what disciplined execution produces."
-- Charles: "See? Progress. Try acting shocked."
+- Micah: "Steady effort becomes visible all at once."
+- Ezra: "This is what disciplined execution produces."
+- Jude: "See? Progress. Try acting shocked."
 
 Make it personal to ${mentor.name}'s voice. Keep it SHORT and IMPACTFUL.`
           },

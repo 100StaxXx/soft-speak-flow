@@ -3,6 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { supabase } from "@/integrations/supabase/client";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
+import { fetchProductMentorById } from "@/services/productMentorCatalog";
 import { useAuth } from "@/hooks/useAuth";
 import { useAchievements } from "@/hooks/useAchievements";
 import {
@@ -1050,13 +1052,7 @@ export const GlobalEvolutionListener = () => {
 
   const resolveMentorSlug = useCallback(async () => {
     if (!resolvedMentorId) return undefined;
-
-    const { data: mentor } = await supabase
-      .from("mentors")
-      .select("slug")
-      .eq("id", resolvedMentorId)
-      .maybeSingle();
-
+    const mentor = await fetchProductMentorById(resolvedMentorId);
     return mentor?.slug;
   }, [resolvedMentorId]);
 
@@ -1796,6 +1792,7 @@ export const GlobalEvolutionListener = () => {
           "id, current_stage, current_image_url, initial_image_url, preset_id, core_element, dormant_image_url, neglected_image_url",
         )
         .eq("user_id", user.id)
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
         .maybeSingle();
 
       if (!mountedRef.current) return;
@@ -2028,6 +2025,7 @@ export const GlobalEvolutionListener = () => {
           "id, current_stage, current_image_url, initial_image_url, preset_id, core_element, dormant_image_url, neglected_image_url",
         )
         .eq("id", job.companionId)
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
         .maybeSingle();
 
       if (error) {
@@ -2148,6 +2146,8 @@ export const GlobalEvolutionListener = () => {
           ? "Your companion is not ready to evolve yet."
           : normalizedCode === "rate_limited"
             ? "Evolution is on cooldown. Please try again in a little while."
+            : normalizedCode === "premade_asset_unavailable"
+              ? "This companion form is still being prepared. Its premade art or video has not been published yet."
             : "Unable to evolve your companion. Please try again.";
 
       toast.error(message);

@@ -134,11 +134,11 @@ describe("EditCampaignSheet", () => {
   it("prefills campaign fields and disables save until changes are made", () => {
     renderSheet();
 
-    expect(screen.getByLabelText("Campaign name")).toHaveValue("Campaign Aurora");
+    expect(screen.getByLabelText("Commitment name")).toHaveValue("Campaign Aurora");
     expect(screen.getByLabelText("Description")).toHaveValue("A focused campaign");
     expectElementToIncludeClasses(
       screen.getByTestId("edit-campaign-sheet-shell"),
-      "fixed border-[hsl(var(--celestial-blue)_/_0.58)] text-foreground",
+      "fixed border-input text-foreground",
     );
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
   });
@@ -156,7 +156,7 @@ describe("EditCampaignSheet", () => {
   it("saves title and description changes through updateEpic", async () => {
     renderSheet();
 
-    fireEvent.change(screen.getByLabelText("Campaign name"), {
+    fireEvent.change(screen.getByLabelText("Commitment name"), {
       target: { value: "Campaign Nova" },
     });
     fireEvent.change(screen.getByLabelText("Description"), {
@@ -220,16 +220,16 @@ describe("EditCampaignSheet", () => {
   it("adds a new ritual through createCampaignRitual", async () => {
     renderSheet();
 
-    fireEvent.click(screen.getByRole("button", { name: "Add ritual" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add rhythm" }));
     expectElementToIncludeClasses(
       screen.getByText("Medium").closest("label") as HTMLElement,
       DIFFICULTY_COLORS.medium.difficultyActive,
     );
-    fireEvent.change(screen.getByLabelText("Ritual name"), {
+    fireEvent.change(screen.getByLabelText("Rhythm name"), {
       target: { value: "Evening review" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Save ritual" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save rhythm" }));
 
     await waitFor(() => {
       expect(mocks.createCampaignRitualMock).toHaveBeenCalledWith({
@@ -247,19 +247,19 @@ describe("EditCampaignSheet", () => {
   it("passes time and duration when adding a new ritual", async () => {
     renderSheet();
 
-    fireEvent.click(screen.getByRole("button", { name: "Add ritual" }));
-    fireEvent.change(screen.getByLabelText("Ritual name"), {
+    fireEvent.click(screen.getByRole("button", { name: "Add rhythm" }));
+    fireEvent.change(screen.getByLabelText("Rhythm name"), {
       target: { value: "Evening review" },
     });
 
     fireEvent.click(screen.getByRole("button", { name: "No time" }));
-    fireEvent.change(screen.getByLabelText("New ritual time"), {
+    fireEvent.change(screen.getByLabelText("New rhythm time"), {
       target: { value: "19:00" },
     });
     fireEvent.click(screen.getByRole("button", { name: "No duration" }));
     fireEvent.click(screen.getByRole("button", { name: "45m" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Save ritual" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save rhythm" }));
 
     await waitFor(() => {
       expect(mocks.createCampaignRitualMock).toHaveBeenCalledWith({
@@ -277,9 +277,9 @@ describe("EditCampaignSheet", () => {
   it("confirms and deletes the campaign through deleteEpic", async () => {
     renderSheet();
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Delete campaign" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Delete commitment" })[0]);
     const dialog = await screen.findByRole("alertdialog");
-    fireEvent.click(within(dialog).getByRole("button", { name: "Delete campaign" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete commitment" }));
 
     await waitFor(() => {
       expect(mocks.deleteEpicMock).toHaveBeenCalledWith({ epicId: "epic-1" });

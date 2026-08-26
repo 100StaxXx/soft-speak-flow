@@ -47,7 +47,12 @@ export async function handleSyncDailyPepTalkTranscript(
     }
 
     const body = await req.json().catch(() => ({}));
-    const { id, mentor_slug, for_date } = body as { id?: string; mentor_slug?: string; for_date?: string };
+    const { id, mentor_slug, for_date, product_mode } = body as {
+      id?: string;
+      mentor_slug?: string;
+      for_date?: string;
+      product_mode?: "graceward" | "cosmiq";
+    };
     const supabase = deps.createSupabaseClient();
 
     // Fetch the daily pep talk row
@@ -55,15 +60,20 @@ export async function handleSyncDailyPepTalkTranscript(
     if (id) {
       const { data, error } = await supabase
         .from("daily_pep_talks")
-        .select("id, mentor_slug, script, transcript, audio_url, for_date")
+        .select("id, mentor_slug, script, transcript, audio_url, for_date, product_mode")
         .eq("id", id)
         .maybeSingle();
       if (error) throw error;
       pepTalk = data;
-    } else if (mentor_slug && for_date) {
+    } else if (
+      mentor_slug &&
+      for_date &&
+      (product_mode === "graceward" || product_mode === "cosmiq")
+    ) {
       const { data, error } = await supabase
         .from("daily_pep_talks")
-        .select("id, mentor_slug, script, transcript, audio_url, for_date")
+        .select("id, mentor_slug, script, transcript, audio_url, for_date, product_mode")
+        .eq("product_mode", product_mode)
         .eq("mentor_slug", mentor_slug)
         .eq("for_date", for_date)
         .maybeSingle();
@@ -71,7 +81,7 @@ export async function handleSyncDailyPepTalkTranscript(
       pepTalk = data;
     } else {
       return new Response(
-        JSON.stringify({ error: "Provide either id or {mentor_slug, for_date}" }),
+        JSON.stringify({ error: "Provide either id or {product_mode, mentor_slug, for_date}" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -93,6 +103,7 @@ export async function handleSyncDailyPepTalkTranscript(
     // Call existing transcribe-audio function to get authoritative text + timestamps
     const transcribeResp = await deps.invokeTranscribeAudio({
       audioUrl: pepTalk.audio_url,
+      text: pepTalk.script,
     });
 
     if (!transcribeResp.ok) {
@@ -137,6 +148,7 @@ export async function handleSyncDailyPepTalkTranscript(
       const { data: candidateRows, error: libraryLookupError } = await supabase
         .from("pep_talks")
         .select("id, transcript")
+        .eq("product_mode", pepTalk.product_mode)
         .eq("mentor_slug", pepTalk.mentor_slug)
         .eq("for_date", pepTalk.for_date)
         .eq("audio_url", pepTalk.audio_url);

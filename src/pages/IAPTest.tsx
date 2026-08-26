@@ -278,7 +278,7 @@ const IAPTest = () => {
     const originalError = console.error;
 
     const shouldCapture = (message: string) => {
-      const keywords = ['[IAP', '[HOOK', '[Apple', '[RevenueCat', '[StoreKit', 'product', 'purchase', 'subscription', 'receipt', 'transaction', 'entitlement'];
+      const keywords = ['[IAP', '[HOOK', '[Apple', '[StoreKit', 'product', 'purchase', 'subscription', 'receipt', 'transaction', 'entitlement'];
       return keywords.some(k => message.toLowerCase().includes(k.toLowerCase()));
     };
 
@@ -381,19 +381,19 @@ const IAPTest = () => {
     }
   };
 
-  // Refresh RevenueCat entitlement
+  // Refresh Apple StoreKit entitlement
   const handleRefreshEntitlement = async () => {
     setIsRefreshingEntitlement(true);
     setEntitlementResult(null);
-    addLog("[RevenueCat] Refreshing entitlement...", 'info');
+    addLog("[StoreKit] Refreshing entitlement...", 'info');
 
     try {
       await refreshEntitlement();
-      addLog("[RevenueCat] Entitlement refreshed", "success");
+      addLog("[StoreKit] Entitlement refreshed", "success");
       setEntitlementResult(currentEntitlement);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      addLog(`[RevenueCat] Entitlement refresh failed: ${message}`, 'error');
+      addLog(`[StoreKit] Entitlement refresh failed: ${message}`, 'error');
       setEntitlementResult({ error: message });
     } finally {
       setIsRefreshingEntitlement(false);
@@ -430,7 +430,7 @@ const IAPTest = () => {
           </Button>
           <div>
             <h1 className="text-lg font-bold">IAP Test Page</h1>
-            <p className="text-xs text-muted-foreground">RevenueCat Development & Debug Tools</p>
+            <p className="text-xs text-muted-foreground">Apple StoreKit Development &amp; Debug Tools</p>
           </div>
         </div>
       </div>
@@ -703,10 +703,10 @@ const IAPTest = () => {
           </Card>
         )}
 
-        {/* RevenueCat Entitlement */}
+        {/* Apple StoreKit Entitlement */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">RevenueCat Entitlement</CardTitle>
+            <CardTitle className="text-sm">Apple StoreKit Entitlement</CardTitle>
           </CardHeader>
           <CardContent className="pt-0 space-y-3">
             <Button

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CALCULATING_STAGE_DURATION_MS,
   deriveOnboardingMentorCandidates,
+  getOnboardingShellPresentation,
   mapGuidanceToneToIntensity,
   QUESTIONNAIRE_PIPELINE_TIMEOUT_MS,
   resolveQuestionnaireCompletionStage,
@@ -9,6 +10,23 @@ import {
   runWithTimeout,
   scheduleMentorRevealTransition,
 } from "./StoryOnboarding";
+
+describe("product onboarding shell", () => {
+  it("keeps Cosmiq on its cosmic palette", () => {
+    const presentation = getOnboardingShellPresentation("cosmiq");
+
+    expect(presentation.rootClassName).toContain("bg-background");
+    expect(presentation.backdropClassName).toContain("--onb-nebula-1");
+    expect(presentation.backdropClassName).not.toContain("rgba(196,168,92");
+  });
+
+  it("gives Graceward a warm parchment and garden palette", () => {
+    const presentation = getOnboardingShellPresentation("christian");
+
+    expect(presentation.rootClassName).toContain("#f2ead8");
+    expect(presentation.backdropClassName).toContain("#f8f2e5");
+  });
+});
 
 describe("mapGuidanceToneToIntensity", () => {
   it("maps plain-text guidance tones to the expected intensity", () => {

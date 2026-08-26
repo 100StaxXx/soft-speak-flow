@@ -14,6 +14,7 @@ import {
   DEFAULT_COMPANION_MODE,
   getCompanionModeVoiceTemplate,
 } from "@/shared/companionModes";
+import { PRODUCT } from "@/config/product";
 import { useAuth } from "./useAuth";
 import { useCompanion } from "./useCompanion";
 import { useCompanionCareSignals } from "./useCompanionCareSignals";
@@ -21,7 +22,9 @@ import { useCompanionModeSettings } from "./useCompanionModeSettings";
 
 const MIN_DIALOGUE_REFRESH_INTERVAL_MS = 90 * 1000;
 const PASSIVE_DIALOGUE_REFRESH_MS = 35 * 60 * 1000;
-const DEFAULT_GREETING = "Hot take from the voice in your ear: one focused move fixes half this mess, you beautiful little disaster.";
+const DEFAULT_GREETING = PRODUCT.mode === "christian"
+  ? "I'm here. What's on your heart today?"
+  : "I'm here. What's on your mind today?";
 
 type DialogueEventState = {
   greeting: string;

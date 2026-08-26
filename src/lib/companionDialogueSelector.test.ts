@@ -104,9 +104,9 @@ describe("companionDialogueSelector", () => {
     expect(getLinesForToneAndBucket("soft", "base_greetings")[0].text)
       .toMatch(/^Could we/);
     expect(getLinesForToneAndBucket("playful", "base_greetings")[0].text)
-      .toMatch(/^Quick mission/);
+      .toMatch(/^A quick check-in:/);
     expect(getLinesForToneAndBucket("witty_sassy", "base_greetings")[0].text)
-      .toMatch(/^Reality check/);
+      .toMatch(/^A clear question:/);
 
     const hostilePattern =
       /\b(amateur nonsense|clown production|because of you|underqualified|less embarrassing|shut down half|nonsense calcifies|train wreck)\b/i;

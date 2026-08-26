@@ -20,6 +20,8 @@ Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
 Deno.env.set("SUPABASE_ANON_KEY", "anon-key");
 Deno.env.set("INTERNAL_FUNCTION_SECRET", "internal-secret");
 Deno.env.set("OPENAI_API_KEY", "openai-key");
+Deno.env.set("COSMIQ_CINEMA_ENABLED", "true");
+Deno.env.set("COSMIQ_CINEMA_ROLLOUT_PERCENT", "100");
 
 const module = await import("./index.ts");
 const costGuardrailsModule = await import("../_shared/costGuardrails.ts");
@@ -54,6 +56,7 @@ type CompanionRecord = {
   current_stage: number;
   current_xp: number;
   preset_id: string | null;
+  product_mode?: "graceward" | "cosmiq";
   current_image_url: string | null;
   initial_image_url: string | null;
   current_image_focal_x?: number | null;
@@ -111,6 +114,7 @@ const createPassingScores = (difference = 7) => ({
   continuity: 8,
   difference,
   anatomy: 8,
+  stageMaturity: 9,
   centering: 8,
   backgroundCutout: 8,
   overall: 8,
@@ -125,6 +129,7 @@ const createFailingScores = () => ({
   continuity: 4,
   difference: 1,
   anatomy: 4,
+  stageMaturity: 9,
   centering: 4,
   backgroundCutout: 4,
   overall: 4,
@@ -143,14 +148,27 @@ const createSupabaseHarness = ({
   companion,
   thresholds,
   previousGenerationMetadata = null,
+  cinemaEvent = null,
 }: {
   companion: CompanionRecord;
   thresholds: EvolutionThreshold[];
   previousGenerationMetadata?: unknown;
+  cinemaEvent?: Record<string, unknown> | null;
 }) => {
   const updatedCompanions: Array<Record<string, unknown>> = [];
+  const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
 
   const supabase = {
+    storage: {
+      from: (bucket: string) => ({
+        getPublicUrl: (path: string) => ({
+          data: {
+            publicUrl:
+              `https://example.supabase.co/storage/v1/object/public/${bucket}/${path}`,
+          },
+        }),
+      }),
+    },
     from: (table: string) => {
       if (table === "user_companion") {
         return {
@@ -194,13 +212,29 @@ const createSupabaseHarness = ({
         };
       }
 
+      if (table === "companion_cinema_events") {
+        const query = {
+          select: () => query,
+          eq: () => query,
+          order: () => query,
+          limit: () => query,
+          maybeSingle: async () => ({ data: cinemaEvent, error: null }),
+        };
+        return query;
+      }
+
       throw new Error(`Unexpected table: ${table}`);
+    },
+    rpc: async (name: string, args: Record<string, unknown>) => {
+      rpcCalls.push({ name, args });
+      return { data: "cinema-event-queued", error: null };
     },
   };
 
   return {
     supabase,
     updatedCompanions,
+    rpcCalls,
   };
 };
 
@@ -211,6 +245,7 @@ const createDeps = ({
     CompanionImageJudgeScoreFixture | null
   >,
   previousGenerationMetadata = null,
+  cinemaEvent = null,
   visualAnchors = [{
     schemaVersion: 1,
     level: companion.current_stage,
@@ -234,12 +269,14 @@ const createDeps = ({
   thresholds: EvolutionThreshold[];
   judgeScores?: Array<CompanionImageJudgeScoreFixture | null>;
   previousGenerationMetadata?: unknown;
+  cinemaEvent?: Record<string, unknown> | null;
   visualAnchors?: Array<Record<string, unknown> | null>;
 }) => {
-  const { supabase, updatedCompanions } = createSupabaseHarness({
+  const { supabase, updatedCompanions, rpcCalls } = createSupabaseHarness({
     companion,
     thresholds,
     previousGenerationMetadata,
+    cinemaEvent,
   });
   const generateCalls: Array<Record<string, unknown>> = [];
   const judgeCalls: Array<Record<string, unknown>> = [];
@@ -247,6 +284,7 @@ const createDeps = ({
   const upsertCalls: Array<Record<string, unknown>> = [];
   const uploadCalls: Array<Record<string, unknown>> = [];
   const animationEnqueueCalls: Array<Record<string, unknown>> = [];
+  const premadeAssetVerificationCalls: Array<Record<string, unknown>> = [];
   const infoLogs: Array<unknown[]> = [];
   let judgeIndex = 0;
   let visualAnchorIndex = 0;
@@ -301,6 +339,10 @@ const createDeps = ({
       upsertCalls.push(args as unknown as Record<string, unknown>);
       return { id: `evo-${upsertCalls.length}` } as never;
     },
+    verifyPremadeCompanionAsset: async (args: Record<string, unknown>) => {
+      premadeAssetVerificationCalls.push(args);
+      return true;
+    },
     enqueueCompanionAnimationJob: async (args: Record<string, unknown>) => {
       animationEnqueueCalls.push(args as unknown as Record<string, unknown>);
       return { status: "queued", jobId: "animation-job-1" } as never;
@@ -314,15 +356,423 @@ const createDeps = ({
   return {
     deps,
     updatedCompanions,
+    rpcCalls,
     generateCalls,
     judgeCalls,
     extractAnchorCalls,
     upsertCalls,
     uploadCalls,
     animationEnqueueCalls,
+    premadeAssetVerificationCalls,
     infoLogs,
   };
 };
+
+Deno.test("explicit Graceward companions claim premade portraits and videos without generation", async () => {
+  const companion = createCompanion({
+    product_mode: "graceward",
+    spirit_animal: "Lion",
+    core_element: "light",
+    image_lineage_metadata: null,
+  });
+  const harness = createDeps({
+    companion,
+    thresholds: [
+      { stage: 1, xp_required: 10 },
+      { stage: 2, xp_required: 30 },
+    ],
+  });
+
+  const response = await module.handleGenerateCompanionEvolution(
+    createInternalRequest(),
+    harness.deps,
+  );
+  const payload = await response.json();
+
+  assertEquals(response.status, 200, "Expected premade hatch to succeed");
+  assertEquals(
+    payload.image_url,
+    "https://example.supabase.co/storage/v1/object/public/companion-presets/premade/v1/graceward/lion/light/portraits/level-1.webp",
+    "Expected the exact premade portrait URL",
+  );
+  assertEquals(
+    payload.animation_video_url,
+    "https://example.supabase.co/storage/v1/object/public/companion-animation-videos/premade/v1/graceward/lion/light/videos/level-0-to-1.mp4",
+    "Expected the exact premade transition video URL",
+  );
+  assertEquals(harness.generateCalls.length, 0, "Expected no image generation");
+  assertEquals(harness.judgeCalls.length, 0, "Expected no runtime judging");
+  assertEquals(
+    harness.animationEnqueueCalls.length,
+    0,
+    "Expected no runtime animation job",
+  );
+  assertEquals(
+    harness.premadeAssetVerificationCalls.length,
+    2,
+    "Expected both published assets to be verified before claiming",
+  );
+  assertEquals(
+    (harness.upsertCalls[0]?.generationMetadata as Record<string, unknown>)
+      .sourceType,
+    "premade",
+    "Expected premade provenance",
+  );
+  assertEquals(
+    (harness.upsertCalls[0]?.premadeAnimation as Record<string, unknown>)
+      .storagePath,
+    "premade/v1/graceward/lion/light/videos/level-0-to-1.mp4",
+    "Expected the premade video to be persisted with the evolution",
+  );
+});
+
+Deno.test("explicit Graceward companions fail clearly when a premade asset is missing", async () => {
+  const companion = createCompanion({
+    product_mode: "graceward",
+    spirit_animal: "Lion",
+    core_element: "light",
+  });
+  const harness = createDeps({
+    companion,
+    thresholds: [
+      { stage: 1, xp_required: 10 },
+      { stage: 2, xp_required: 30 },
+    ],
+  });
+  let verificationCount = 0;
+  harness.deps.verifyPremadeCompanionAsset = async () => {
+    verificationCount += 1;
+    return verificationCount === 1;
+  };
+
+  const response = await module.handleGenerateCompanionEvolution(
+    createInternalRequest(),
+    harness.deps,
+  );
+  const payload = await response.json();
+
+  assertEquals(response.status, 409, "Expected missing asset conflict status");
+  assertEquals(
+    payload.code,
+    "premade_asset_unavailable",
+    "Expected a terminal asset error code",
+  );
+  assertEquals(harness.upsertCalls.length, 0, "Expected no evolution claim");
+  assertEquals(
+    harness.generateCalls.length,
+    0,
+    "Expected no generation fallback",
+  );
+});
+
+Deno.test("Graceward defers visual boundaries above the Level 5 launch scope", async () => {
+  const companion = createCompanion({
+    product_mode: "graceward",
+    current_stage: 5,
+    current_xp: 1_300,
+    spirit_animal: "Lion",
+    core_element: "light",
+  });
+  const harness = createDeps({
+    companion,
+    thresholds: [
+      { stage: 13, xp_required: 1_200 },
+      { stage: 14, xp_required: 1_550 },
+    ],
+  });
+
+  const response = await module.handleGenerateCompanionEvolution(
+    createInternalRequest(),
+    harness.deps,
+  );
+  const payload = await response.json();
+
+  assertEquals(response.status, 200, "Expected a clean deferred response");
+  assertEquals(
+    payload.evolved,
+    false,
+    "Expected no unsupported evolution claim",
+  );
+  assertEquals(
+    payload.release_max_stage,
+    5,
+    "Expected the Graceward release ceiling",
+  );
+  assertEquals(harness.upsertCalls.length, 0, "Expected no evolution record");
+  assertEquals(
+    harness.premadeAssetVerificationCalls.length,
+    0,
+    "Expected no storage checks beyond the release scope",
+  );
+});
+
+Deno.test("explicit Cosmiq companions requeue personalized cinema instead of falling back to premade art", async () => {
+  const companion = createCompanion({
+    product_mode: "cosmiq",
+    current_stage: 5,
+    current_xp: 1_300,
+    preset_id: "phoenix",
+    spirit_animal: "Phoenix",
+    core_element: "nature",
+    current_image_url: "https://example.com/phoenix-stage-5.png",
+  });
+  const harness = createDeps({
+    companion,
+    thresholds: [
+      { stage: 13, xp_required: 1_200 },
+      { stage: 14, xp_required: 1_550 },
+    ],
+  });
+
+  const response = await module.handleGenerateCompanionEvolution(
+    createInternalRequest(),
+    harness.deps,
+  );
+  const payload = await response.json();
+
+  assertEquals(
+    response.status,
+    503,
+    "Expected Cosmiq to wait for generated cinema",
+  );
+  assertEquals(payload.evolved, false, "Expected no premade evolution claim");
+  assertEquals(
+    payload.code,
+    "cinema_event_preparing",
+    "Expected a retryable cinema response",
+  );
+  assertEquals(
+    payload.cinema_event_id,
+    "cinema-event-queued",
+    "Expected the queued event id",
+  );
+  assertEquals(
+    harness.rpcCalls.length,
+    1,
+    "Expected one idempotent cinema enqueue",
+  );
+  assertEquals(
+    harness.rpcCalls[0]?.name,
+    "enqueue_cosmiq_cinema_event_internal",
+    "Expected the Cosmiq-only enqueue RPC",
+  );
+  assertEquals(
+    harness.premadeAssetVerificationCalls.length,
+    0,
+    "Expected no premade storage reads",
+  );
+  assertEquals(
+    harness.generateCalls.length,
+    0,
+    "Expected no synchronous image generation",
+  );
+  assertEquals(
+    harness.upsertCalls.length,
+    0,
+    "Expected no evolution record before cinema is ready",
+  );
+});
+
+Deno.test("Cosmiq can promote cinema both before and after the user reveals it", () => {
+  assertEquals(
+    module.isPromotableCinemaEventStatus("ready"),
+    true,
+    "Expected a newly ready film to promote",
+  );
+  assertEquals(
+    module.isPromotableCinemaEventStatus("revealed"),
+    true,
+    "Expected a film the user already watched to remain promotable",
+  );
+  assertEquals(
+    module.isPromotableCinemaEventStatus("rendering_video"),
+    false,
+    "Expected an incomplete film to remain blocked",
+  );
+  assertEquals(
+    module.isPromotableCinemaEventStatus("failed"),
+    false,
+    "Expected a failed film to remain blocked",
+  );
+});
+
+Deno.test("explicit Cosmiq companions wait instead of falling back when cinema is disabled", async () => {
+  const companion = createCompanion({
+    product_mode: "cosmiq",
+    current_stage: 5,
+    current_xp: 1_300,
+    preset_id: "phoenix",
+    spirit_animal: "Phoenix",
+    core_element: "nature",
+  });
+  const harness = createDeps({
+    companion,
+    thresholds: [
+      { stage: 13, xp_required: 1_200 },
+      { stage: 14, xp_required: 1_550 },
+    ],
+  });
+
+  const response = await withEnvValue(
+    "COSMIQ_CINEMA_ENABLED",
+    "false",
+    () =>
+      module.handleGenerateCompanionEvolution(
+        createInternalRequest(),
+        harness.deps,
+      ),
+  );
+  const payload = await response.json();
+
+  assertEquals(
+    response.status,
+    503,
+    "Expected the personalized claim to pause",
+  );
+  assertEquals(
+    payload.evolved,
+    false,
+    "Expected the companion to stay on its approved form",
+  );
+  assertEquals(
+    payload.code,
+    "cosmiq_cinema_disabled",
+    "Expected an explicit paused-generation error",
+  );
+  assertEquals(
+    harness.rpcCalls.length,
+    0,
+    "Expected no cinema enqueue while the global switch is disabled",
+  );
+  assertEquals(
+    harness.premadeAssetVerificationCalls.length,
+    0,
+    "Expected no Graceward premade verification",
+  );
+  assertEquals(
+    harness.upsertCalls.length,
+    0,
+    "Expected no fallback evolution mutation",
+  );
+});
+
+Deno.test("legacy companions without an explicit product mode keep their canonical compatibility path", async () => {
+  const companion = createCompanion({
+    current_stage: 5,
+    current_xp: 1_300,
+    preset_id: "phoenix",
+    spirit_animal: "Phoenix",
+    core_element: "nature",
+    current_image_url: "https://example.com/phoenix-stage-5.png",
+  });
+  const harness = createDeps({
+    companion,
+    thresholds: [
+      { stage: 13, xp_required: 1_200 },
+      { stage: 14, xp_required: 1_550 },
+    ],
+  });
+
+  const response = await module.handleGenerateCompanionEvolution(
+    createInternalRequest(),
+    harness.deps,
+  );
+  const payload = await response.json();
+  const expectedUrl =
+    "/companion-presets/phoenix/t3_awakened/normal/phoenix__t3_awakened__normal__nature.png";
+
+  assertEquals(
+    response.status,
+    200,
+    "Expected canonical Cosmiq evolution to succeed",
+  );
+  assertEquals(
+    payload.image_url,
+    expectedUrl,
+    "Expected exact stage-13 canonical art",
+  );
+  assertEquals(
+    payload.portrait_regenerated,
+    true,
+    "Expected a changed preset portrait",
+  );
+  assertEquals(
+    harness.generateCalls.length,
+    0,
+    "Expected no AI portrait generation for presets",
+  );
+  assertEquals(
+    harness.upsertCalls[0]?.generationMetadata &&
+      (harness.upsertCalls[0].generationMetadata as Record<string, unknown>)
+        .presetAssetSource,
+    "canonical_cosmiq_bundled",
+    "Expected canonical bundled provenance",
+  );
+  assertEquals(
+    harness.animationEnqueueCalls[0]?.previousImageUrl,
+    "https://example.com/phoenix-stage-5.png",
+    "Expected animation to start from the prior approved portrait",
+  );
+  assertEquals(
+    harness.animationEnqueueCalls[0]?.imageUrl,
+    expectedUrl,
+    "Expected animation to end on the exact canonical portrait",
+  );
+});
+
+Deno.test("unsupported legacy companions retain their last approved later-stage portrait", async () => {
+  const companion = createCompanion({
+    current_stage: 5,
+    current_xp: 1_300,
+    preset_id: "dragon",
+    spirit_animal: "Dragon",
+    core_element: "storm",
+    current_image_url: "https://example.com/approved-dragon-stage-5.png",
+  });
+  const harness = createDeps({
+    companion,
+    thresholds: [
+      { stage: 13, xp_required: 1_200 },
+      { stage: 14, xp_required: 1_550 },
+    ],
+  });
+
+  const response = await module.handleGenerateCompanionEvolution(
+    createInternalRequest(),
+    harness.deps,
+  );
+  const payload = await response.json();
+  const metadata = harness.upsertCalls[0]?.generationMetadata as Record<
+    string,
+    unknown
+  >;
+
+  assertEquals(
+    response.status,
+    200,
+    "Expected legacy companion progression to remain usable",
+  );
+  assertEquals(
+    payload.image_url,
+    "https://example.com/approved-dragon-stage-5.png",
+    "Expected no fabricated later-stage URL",
+  );
+  assertEquals(
+    payload.portrait_regenerated,
+    false,
+    "Expected portrait reuse to be explicit",
+  );
+  assertEquals(
+    metadata.sourceType,
+    "reuse",
+    "Expected reuse provenance to skip animation",
+  );
+  assertEquals(
+    metadata.presetAssetSource,
+    "legacy_reuse",
+    "Expected legacy fallback provenance",
+  );
+});
 
 Deno.test("reveal path uses hidden stage-1 anchor without invoking image generation", async () => {
   const companion = createCompanion({
@@ -334,6 +784,7 @@ Deno.test("reveal path uses hidden stage-1 anchor without invoking image generat
           focalY: 0.66,
           sourceType: "bootstrap_generation",
           visibility: "hidden_until_reached",
+          approvedForReveal: true,
         },
       },
     },
@@ -409,7 +860,7 @@ Deno.test("reveal path uses hidden stage-1 anchor without invoking image generat
   );
 });
 
-Deno.test("legacy stage-1 backfill generates a fresh starter and marks provenance explicitly", async () => {
+Deno.test("Graceward stage-1 hatch generates and validates an infant when its hidden anchor is missing", async () => {
   const companion = createCompanion({
     image_lineage_metadata: null,
     current_image_url: "https://example.com/legacy-ai-egg.png",
@@ -432,36 +883,31 @@ Deno.test("legacy stage-1 backfill generates a fresh starter and marks provenanc
   assertEquals(
     response.status,
     200,
-    "Expected legacy backfill response to succeed",
+    "Expected infant backfill hatch response to succeed",
   );
   assertEquals(
     payload.portrait_regenerated,
     true,
-    "Expected legacy backfill to render a new stage-1 portrait",
+    "Expected missing hidden art to be replaced with a validated infant render",
   );
   assertEquals(
     harness.generateCalls.length,
     1,
-    "Expected legacy backfill to generate a starter form once",
+    "Expected one infant render for a passing first attempt",
   );
   assertEquals(
-    harness.generateCalls[0]?.background,
-    "transparent",
-    "Expected stage-1 generation to request a transparent background",
+    harness.judgeCalls.length,
+    1,
+    "Expected the infant render to be quality gated before reveal",
   );
   assertEquals(
-    harness.generateCalls[0]?.outputFormat,
-    "png",
-    "Expected stage-1 generation to request PNG output",
-  );
-  assert(
-    typeof harness.generateCalls[0]?.prompt === "string" &&
-      harness.generateCalls[0].prompt.includes("transparent background"),
-    "Expected stage-1 generation prompt to request transparent background output",
+    payload.image_url,
+    "https://example.com/generated-stage-1.png",
+    "Expected the approved generated infant portrait",
   );
 
   const upsertCall = harness.upsertCalls[0];
-  assert(upsertCall, "Expected legacy backfill to upsert an evolution record");
+  assert(upsertCall, "Expected canonical hatch to upsert an evolution record");
   const generationMetadata = upsertCall.generationMetadata as Record<
     string,
     unknown
@@ -469,7 +915,7 @@ Deno.test("legacy stage-1 backfill generates a fresh starter and marks provenanc
   assertEquals(
     generationMetadata.sourceType,
     "legacy_backfill",
-    "Expected explicit legacy backfill provenance",
+    "Expected backfill provenance for a missing legacy anchor",
   );
 
   const updatedCompanion = harness.updatedCompanions[0];
@@ -485,20 +931,18 @@ Deno.test("legacy stage-1 backfill generates a fresh starter and marks provenanc
   assertEquals(
     hiddenAnchors["1"]?.visibility,
     "visible",
-    "Expected backfilled stage-1 anchor to be visible after hatch",
+    "Expected canonical stage-1 anchor to be visible after hatch",
   );
-  assert(
-    harness.infoLogs.some(([message]) =>
-      typeof message === "string" &&
-      message.includes("Missing hidden stage-1 anchor for AI companion")
-    ),
-    "Expected legacy backfill to emit an explicit info log",
+  assertEquals(
+    hiddenAnchors["1"]?.sourceType,
+    "legacy_backfill",
+    "Expected generated backfill lineage provenance",
   );
 
   const animationEnqueueCall = harness.animationEnqueueCalls[0];
   assert(
     animationEnqueueCall,
-    "Expected legacy stage-1 backfill to enqueue an animation job",
+    "Expected canonical hatch to enqueue an animation job",
   );
   assertEquals(
     animationEnqueueCall.evolutionId,
@@ -513,7 +957,7 @@ Deno.test("legacy stage-1 backfill generates a fresh starter and marks provenanc
   assertEquals(
     animationEnqueueCall.imageUrl,
     "https://example.com/generated-stage-1.png",
-    "Expected animation enqueue to use the generated stage-1 image",
+    "Expected animation enqueue to end on the validated infant portrait",
   );
   assertEquals(
     animationEnqueueCall.previousImageUrl,
@@ -533,6 +977,7 @@ Deno.test("legacy stage-1 backfill rejects generated starters that fail the back
     image_lineage_metadata: null,
     current_image_url: "https://example.com/legacy-ai-egg.png",
     initial_image_url: "https://example.com/legacy-ai-egg.png",
+    spirit_animal: "Sphinx",
   });
   const harness = createDeps({
     companion,
@@ -585,11 +1030,50 @@ Deno.test("legacy stage-1 backfill rejects generated starters that fail the back
   );
 });
 
+Deno.test("legacy stage-1 backfill rejects an adult-looking hatch endpoint", async () => {
+  const companion = createCompanion({
+    image_lineage_metadata: null,
+    current_image_url: "https://example.com/legacy-ai-egg.png",
+    initial_image_url: "https://example.com/legacy-ai-egg.png",
+    spirit_animal: "Lion",
+  });
+  const adultScores = {
+    ...createPassingScores(),
+    stageMaturity: 2,
+    notes: "Adult mane and mature body proportions are visible.",
+  };
+  const harness = createDeps({
+    companion,
+    thresholds: [
+      { stage: 1, xp_required: 10 },
+      { stage: 2, xp_required: 30 },
+    ],
+    judgeScores: [adultScores],
+  });
+
+  const response = await module.handleGenerateCompanionEvolution(
+    createInternalRequest(),
+    harness.deps,
+  );
+  const payload = await response.json();
+
+  assertEquals(response.status, 422, "Expected adult endpoint rejection");
+  assertEquals(
+    payload.code,
+    "evolution_quality_gate_failed",
+    "Expected stage-one quality gate code",
+  );
+  assertEquals(harness.generateCalls.length, 2, "Expected the retry budget");
+  assertEquals(harness.uploadCalls.length, 0, "Expected no adult upload");
+  assertEquals(harness.upsertCalls.length, 0, "Expected no evolution row");
+});
+
 Deno.test("legacy stage-1 backfill does not persist when the judge is unavailable", async () => {
   const companion = createCompanion({
     image_lineage_metadata: null,
     current_image_url: "https://example.com/legacy-ai-egg.png",
     initial_image_url: "https://example.com/legacy-ai-egg.png",
+    spirit_animal: "Sphinx",
   });
   const harness = createDeps({
     companion,
@@ -747,6 +1231,71 @@ Deno.test("intermediate earned levels skip directly to the next visual boundary"
     harness.updatedCompanions[0]?.current_stage,
     5,
     "Expected companion row to claim Level 5",
+  );
+});
+
+Deno.test("boundary evolutions use the previous approved portrait as the edit reference", async () => {
+  const companion = createCompanion({
+    current_stage: 1,
+    current_xp: 100,
+    current_image_url: "https://example.com/approved-stage-1.png",
+    initial_image_url: "https://example.com/stage-0.png",
+  });
+  const harness = createDeps({
+    companion,
+    thresholds: [
+      { stage: 2, xp_required: 30 },
+      { stage: 3, xp_required: 60 },
+      { stage: 4, xp_required: 80 },
+      { stage: 5, xp_required: 100 },
+      { stage: 6, xp_required: 240 },
+    ],
+  });
+  const editCalls: Array<Record<string, unknown>> = [];
+  harness.deps.editCompanionImage = async (args) => {
+    editCalls.push(args as unknown as Record<string, unknown>);
+    return {
+      imageDataUrl: `data:image/png;base64,${btoa("reference-evolution")}`,
+      revisedPrompt: null,
+      size: String(args.size),
+      model: "test-image-model",
+    };
+  };
+
+  const response = await module.handleGenerateCompanionEvolution(
+    createInternalRequest(),
+    harness.deps,
+  );
+
+  assertEquals(
+    response.status,
+    200,
+    "Expected reference-driven evolution to succeed",
+  );
+  assertEquals(
+    editCalls.length,
+    1,
+    "Expected one previous-portrait image edit",
+  );
+  assertEquals(
+    harness.generateCalls.length,
+    0,
+    "Expected no text-only render when the reference edit succeeds",
+  );
+  const referenceImages = editCalls[0]?.referenceImages as Array<
+    { imageUrl: string }
+  >;
+  assertEquals(
+    referenceImages[0]?.imageUrl,
+    "https://example.com/approved-stage-1.png",
+    "Expected the last approved portrait to seed the new boundary image",
+  );
+  const generationMetadata = harness.upsertCalls[0]
+    ?.generationMetadata as Record<string, unknown>;
+  assertEquals(
+    generationMetadata.renderSourceType,
+    "previous_portrait_reference_edit",
+    "Expected persisted provenance to identify reference-image evolution",
   );
 });
 
@@ -1327,6 +1876,7 @@ Deno.test("maybeEnqueueCompanionAnimationJob enqueues only when enabled, credent
     evolutionId: "evo-1",
     stage: 5,
     imageUrl: "https://example.com/stage-5.png",
+    previousImageUrl: "https://example.com/stage-1.png",
     element: "water",
     env: {
       get: (name: string) => {
@@ -1364,6 +1914,11 @@ Deno.test("maybeEnqueueCompanionAnimationJob enqueues only when enabled, credent
     "Expected public source image",
   );
   assertEquals(
+    harness.upserts[0]?.payload.start_image_url,
+    "https://example.com/stage-1.png",
+    "Expected the prior approved portrait to persist as the first frame",
+  );
+  assertEquals(
     harness.upserts[0]?.payload.provider,
     "fal",
     "Expected fal provider",
@@ -1373,6 +1928,83 @@ Deno.test("maybeEnqueueCompanionAnimationJob enqueues only when enabled, credent
     "queued",
     "Expected evolution metadata to be queued",
   );
+});
+
+Deno.test("maybeEnqueueCompanionAnimationJob persists egg and infant endpoints for hatching", async () => {
+  const harness = createAnimationEnqueueHarness();
+
+  const result = await module.maybeEnqueueCompanionAnimationJob({
+    supabase: harness.supabase,
+    createCostGuardrailSession: harness.createCostGuardrailSession as never,
+    userId: USER_ID,
+    companionId: "companion-1",
+    evolutionId: "evo-1",
+    stage: 1,
+    imageUrl: "https://example.com/infant.png",
+    previousImageUrl: "/companion-eggs/v2/egg__t0_egg__normal__light.webp",
+    element: "light",
+    env: {
+      get: (name: string) => {
+        if (name === "COMPANION_ANIMATION_ENABLED") return "true";
+        if (name === "FAL_KEY") return "fal-key";
+        return undefined;
+      },
+    },
+    now: () => new Date("2026-05-02T12:00:00.000Z"),
+  });
+
+  assertEquals(result.status, "queued", "Expected hatch video job to queue");
+  assertEquals(
+    harness.upserts[0]?.payload.start_image_url,
+    "/companion-eggs/v2/egg__t0_egg__normal__light.webp",
+    "Expected the bundled Graceward egg to persist as the first frame",
+  );
+  assertEquals(
+    harness.upserts[0]?.payload.source_image_url,
+    "https://example.com/infant.png",
+    "Expected the infant portrait to persist as the final frame",
+  );
+  assertEquals(
+    String(harness.upserts[0]?.payload.prompt).includes("exact companion egg"),
+    true,
+    "Expected an egg-to-infant hatch prompt",
+  );
+});
+
+Deno.test("maybeEnqueueCompanionAnimationJob skips hatch video generation without a public egg image", async () => {
+  const harness = createAnimationEnqueueHarness();
+
+  const result = await module.maybeEnqueueCompanionAnimationJob({
+    supabase: harness.supabase,
+    createCostGuardrailSession: harness.createCostGuardrailSession as never,
+    userId: USER_ID,
+    companionId: "companion-1",
+    evolutionId: "evo-1",
+    stage: 1,
+    imageUrl: "https://example.com/infant.png",
+    previousImageUrl: "/not-a-real-egg/light.png",
+    element: "light",
+    env: {
+      get: (name: string) => {
+        if (name === "COMPANION_ANIMATION_ENABLED") return "true";
+        if (name === "FAL_KEY") return "fal-key";
+        return undefined;
+      },
+    },
+    now: () => new Date("2026-05-02T12:00:00.000Z"),
+  });
+
+  assertEquals(
+    result.status,
+    "skipped",
+    "Expected invalid hatch input to skip",
+  );
+  assertEquals(
+    result.reason,
+    "hatch_start_image_url_unavailable",
+    "Expected the missing egg endpoint reason",
+  );
+  assertEquals(harness.upserts.length, 0, "Expected no malformed hatch job");
 });
 
 Deno.test("maybeEnqueueCompanionAnimationJob records skipped when video cost guardrails block", async () => {
@@ -1394,6 +2026,7 @@ Deno.test("maybeEnqueueCompanionAnimationJob records skipped when video cost gua
     evolutionId: "evo-1",
     stage: 5,
     imageUrl: "https://example.com/stage-5.png",
+    previousImageUrl: "https://example.com/stage-1.png",
     env: {
       get: (name: string) => {
         if (name === "COMPANION_ANIMATION_ENABLED") return "true";

@@ -1,6 +1,9 @@
 import { safeLocalStorage } from "@/utils/storage";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
-export const PENDING_REFERRAL_CODE_STORAGE_KEY = "pending_referral_code";
+export const PENDING_REFERRAL_CODE_STORAGE_KEY = productScopedStorageKey(
+  "pending-referral-code",
+);
 
 const REFERRAL_CODE_PATTERN = /^[A-Z0-9-]{1,20}$/;
 

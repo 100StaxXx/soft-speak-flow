@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { logger } from "@/utils/logger";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 
 export interface GuildMemberPresence {
   userId: string;
@@ -42,7 +43,7 @@ export const useGuildPresence = ({ epicId, communityId }: UseGuildPresenceOption
   const fetchUserInfo = useCallback(async (userId: string) => {
     const [profileRes, companionRes] = await Promise.all([
       supabase.from("profiles").select("email, onboarding_data").eq("id", userId).maybeSingle(),
-      supabase.from("user_companion").select("current_image_url, current_image_focal_x, current_image_focal_y").eq("user_id", userId).maybeSingle(),
+      supabase.from("user_companion").select("current_image_url, current_image_focal_x, current_image_focal_y").eq("user_id", userId).eq("product_mode", PRODUCT_RUNTIME.authProductMode).maybeSingle(),
     ]);
 
     const profile = profileRes.data;

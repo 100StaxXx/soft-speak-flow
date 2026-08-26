@@ -170,6 +170,7 @@ Remember: NO em-dashes, use regular hyphens only.`;
         const { data: insertedQuote, error: insertError } = await supabase
           .from("quotes")
           .insert({
+            product_mode: "cosmiq",
             text: quoteText,
             mentor_id: mentorId,
             category: mentor.themes?.[0] || "motivation",

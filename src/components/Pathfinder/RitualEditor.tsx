@@ -84,7 +84,7 @@ export function RitualEditor({
         <div className="flex items-center gap-3">
           <Badge variant="outline" className={cn(plannerPathfinderTheme.chip, "gap-1")}>
             <Sparkles className="w-3 h-3" />
-            {rituals.length} Rituals
+            {rituals.length} Rhythms
           </Badge>
           <Badge variant="outline" className={cn(plannerPathfinderTheme.chip, "gap-1")}>
             <Clock className="w-3 h-3" />
@@ -138,7 +138,7 @@ export function RitualEditor({
                 <Input
                   value={newRitualTitle}
                   onChange={(e) => setNewRitualTitle(e.target.value)}
-                  placeholder="New ritual name..."
+                  placeholder="New rhythm name…"
                   className={cn(plannerPathfinderTheme.textField, "flex-1")}
                   autoFocus
                   onKeyDown={(e) => {
@@ -172,7 +172,7 @@ export function RitualEditor({
                   onClick={() => setIsAddingNew(true)}
                 >
                   <Plus className="w-4 h-4" />
-                  Add Custom Ritual
+                  Add custom rhythm
                 </Button>
               </motion.div>
             )}

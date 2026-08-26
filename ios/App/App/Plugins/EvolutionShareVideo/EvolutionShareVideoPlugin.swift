@@ -106,7 +106,9 @@ private final class EvolutionShareVideoRenderer {
             compositionVideoTrack: compositionVideoTrack,
             duration: duration
         )
-        let filename = "cosmiq-evolution-stage-\(stage)-\(Int(Date().timeIntervalSince1970)).mp4"
+        let bundleIdentifier = Bundle.main.bundleIdentifier ?? ""
+        let productSlug = bundleIdentifier == "com.darrylgraham.revolution" ? "cosmiq" : "graceward"
+        let filename = "\(productSlug)-evolution-stage-\(stage)-\(Int(Date().timeIntervalSince1970)).mp4"
         let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
 
         if FileManager.default.fileExists(atPath: outputURL.path) {

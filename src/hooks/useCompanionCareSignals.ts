@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useMemo } from "react";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 import { logger } from "@/utils/logger";
 import {
   extractErrorMessage,
@@ -97,6 +98,7 @@ export const useCompanionCareSignals = (
           last_interaction_at
         `)
         .eq('user_id', user.id)
+        .eq('product_mode', PRODUCT_RUNTIME.authProductMode)
         .maybeSingle();
 
       if (error) {

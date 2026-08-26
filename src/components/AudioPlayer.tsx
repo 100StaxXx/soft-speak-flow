@@ -12,10 +12,14 @@ interface AudioPlayerProps {
   audioUrl: string;
   title: string;
   onTimeUpdate?: (currentTime: number) => void;
+  onDurationChange?: (duration: number) => void;
+  onPlay?: () => void;
+  onEnded?: () => void;
 }
 
-export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps) => {
+export const AudioPlayer = ({ audioUrl, title, onTimeUpdate, onDurationChange, onPlay, onEnded }: AudioPlayerProps) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playbackRafRef = useRef<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -36,7 +40,10 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
       onPlay: () => {
         if (audio && !globalAudio.getMuted()) {
           safePlay(audio).then((success) => {
-            if (success) setIsPlaying(true);
+            if (success) {
+              setIsPlaying(true);
+              onPlay?.();
+            }
           });
         }
       },
@@ -60,7 +67,7 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
       }
       clearMediaSession();
     };
-  }, [audioUrl, title]);
+  }, [audioUrl, onPlay, title]);
 
 
   // Listen for global mute changes
@@ -98,6 +105,7 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
     };
     const updateDuration = () => {
       setDuration(audio.duration);
+      onDurationChange?.(audio.duration);
       updateMediaSession({
         duration: audio.duration,
       });
@@ -115,6 +123,7 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
     const handleEnded = () => {
       setIsPlaying(false);
       updateMediaSession({ playbackState: 'none' });
+      onEnded?.();
     };
 
     audio.addEventListener("timeupdate", updateTime);
@@ -128,7 +137,29 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
       audio.removeEventListener("seeked", handleSeeked);
       audio.removeEventListener("ended", handleEnded);
     };
-  }, [audioUrl, onTimeUpdate]);
+  }, [audioUrl, onDurationChange, onEnded, onTimeUpdate]);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const updatePlaybackClock = () => {
+      const audio = audioRef.current;
+      if (audio && !audio.paused) {
+        const time = audio.currentTime;
+        setCurrentTime(time);
+        onTimeUpdate?.(time);
+        playbackRafRef.current = window.requestAnimationFrame(updatePlaybackClock);
+      }
+    };
+
+    playbackRafRef.current = window.requestAnimationFrame(updatePlaybackClock);
+    return () => {
+      if (playbackRafRef.current !== null) {
+        window.cancelAnimationFrame(playbackRafRef.current);
+        playbackRafRef.current = null;
+      }
+    };
+  }, [isPlaying, onTimeUpdate]);
 
   const togglePlayPause = async () => {
     const audio = audioRef.current;
@@ -152,6 +183,7 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
       if (success) {
         setIsPlaying(true);
         updateMediaSession({ playbackState: 'playing' });
+        onPlay?.();
       }
     }
   };

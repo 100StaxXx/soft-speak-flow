@@ -300,8 +300,8 @@ export function useHabits() {
     }) => {
       if (!user?.id) throw new Error("User not authenticated");
 
-      if (habits.length >= 2) {
-        throw new Error("Maximum 2 habits allowed");
+      if (habits.length >= 3) {
+        throw new Error("Maximum 3 rhythms allowed");
       }
 
       const habitId = createOfflinePlannerId("habit");
@@ -761,6 +761,7 @@ export function useHabits() {
     habitsLoading: habitsQuery.isLoading,
     habitProgress,
     addHabit: addHabitMutation.mutate,
+    addHabitAsync: addHabitMutation.mutateAsync,
     isAddingHabit: addHabitMutation.isPending,
     toggleHabit: toggleHabitMutation.mutate,
     isTogglingHabit: toggleHabitMutation.isPending,

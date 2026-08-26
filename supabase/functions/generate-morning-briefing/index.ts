@@ -13,6 +13,12 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import {
+  CHRISTIAN_GUIDANCE_POLICY,
+  enforceChristianGuidanceOutput,
+  validateChristianGuidanceOutput,
+} from "../_shared/christianGuidancePolicy.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
@@ -93,6 +99,7 @@ Deno.serve(async (req) => {
     const { auth, supabase, requestId: protectedRequestId } = protectedRequest;
     requestId = protectedRequestId;
     const user = { id: auth.userId };
+    const productMode = await resolveUserProductMode(supabase, user.id);
     const costGuardrails = createCostGuardrailSession({
       supabase,
       endpointKey: "generate-morning-briefing",
@@ -166,7 +173,7 @@ Deno.serve(async (req) => {
     let mentor = null;
     if (profile?.selected_mentor_id) {
       const { data: mentorData, error: mentorError } = await supabase
-        .from('mentors')
+        .from(productMode === "graceward" ? "graceward_guides" : "mentors")
         .select('id, name, tone_description, personality_traits')
         .eq('id', profile.selected_mentor_id)
         .maybeSingle();
@@ -179,7 +186,7 @@ Deno.serve(async (req) => {
     // If no mentor selected, get a default mentor
     if (!mentor) {
       const { data: defaultMentor, error: defaultMentorError } = await supabase
-        .from('mentors')
+        .from(productMode === "graceward" ? "graceward_guides" : "mentors")
         .select('id, name, tone_description, personality_traits')
         .limit(1)
         .maybeSingle();
@@ -369,34 +376,32 @@ const challenges: ChallengeData[] = (challengesResult.data || []).map(c => ({
       return `Yesterday: ${yesterdayXP} XP earned. Last 30 days: ${weekXP} XP total.`;
     };
 
-    // Build the system prompt
-    const systemPrompt = `You are ${mentorInfo.name}, a personal life coach and mentor with the following personality: ${mentorInfo.tone_description}
+    // Build a product-specific system prompt. Guide copy and faith policy must
+    // never cross into Cosmiq's planning experience.
+    const productPolicy = productMode === "graceward"
+      ? `You are Graceward's AI morning reflection assistant. You are software, not a pastor, human mentor, or spiritual authority.\n\n${CHRISTIAN_GUIDANCE_POLICY}`
+      : `You are Cosmiq's clearly identified AI planning and reflection guide. You are software, not a human mentor or professional adviser. Do not introduce Scripture, prayer, theology, or Graceward's faith framing. Do not make medical, mental-health, legal, or financial claims.`;
+    const systemPrompt = `${productPolicy}
 
-Your traits: ${JSON.stringify(mentorInfo.personality_traits || [])}
+Communication style: ${mentorInfo.tone_description}
 
-You have COMPLETE access to this user's activity data. Your job is to:
-1. ANALYZE their patterns deeply to infer what major life goals they're working toward
-2. CELEBRATE their wins and streaks - be specific with numbers
-3. IDENTIFY what's working vs what needs attention
-4. Give them ONE clear focus for TODAY
-5. Create a follow-up question they might want to ask you
+Use only the activity data supplied below. Your job is to:
+1. Summarize observable patterns without claiming hidden knowledge or sensitive traits
+2. Notice effort, rest, and returns without treating streaks or output as ${productMode === "graceward" ? "spiritual worth" : "personal worth"}
+3. Name what appears workable and what may need gentler scope
+4. Offer ONE optional, concrete focus for today
+5. Create a follow-up reflection question
 
-INFERENCE EXAMPLES (be creative and specific):
-- Daily running + increasing distances + "5K race" in goals → "Training for a 5K or marathon"
-- Law study habits + case readings + legal challenges → "Preparing for the bar exam or law career"
-- Meditation + journaling + evening reflections focused on stress → "Working on mental wellness and stress management"
-- Coding habits + project milestones + tech epics → "Building skills for a career change or side project"
-- Early morning habits + productivity focus → "Becoming a morning person / optimizing energy"
-- Reading habits + specific topics → "Deep learning about [topic]"
+Any suggested goal must be framed as a possibility grounded in explicit activity names, not as a fact about the user's identity, faith, health, calling, or private motives.
 
-BE PERSONAL. Reference THEIR actual habit names, streak numbers, and specific wins. Don't be generic.
+Be specific where helpful, but do not shame missed work or make certainty claims.
 
 Your response MUST be valid JSON with this exact structure:
 {
-  "briefing": "Your personalized morning message (2-4 paragraphs, conversational, in your voice)",
-  "inferredGoals": ["Goal 1", "Goal 2"],
-  "todaysFocus": "One specific actionable thing to focus on today",
-  "actionPrompt": "A follow-up question they might want to ask you (start with 'Tell me more about...' or similar)"
+  "briefing": "A grounded morning reflection (2-3 short paragraphs)",
+  "inferredGoals": ["Possible goal grounded in explicit activity"],
+  "todaysFocus": "One small optional action for today",
+  "actionPrompt": "One open reflection question"
 }`;
 
     const userPrompt = `
@@ -422,7 +427,7 @@ ${calculateXPSummary()}
 
 ---
 
-Based on this data, generate a personalized morning briefing. Infer their life goals, celebrate their progress, and give them actionable guidance for today.`;
+Based only on this data, generate a grounded morning reflection. Describe possible goals cautiously, notice progress without scoring the person's worth, and offer one humane focus for today.`;
 
     // Call OpenAI GPT-5
     const openaiResponse = await guardedFetch("https://api.openai.com/v1/chat/completions", {
@@ -503,10 +508,28 @@ Based on this data, generate a personalized morning briefing. Infer their life g
       });
     }
 
-    const sanitizedBriefing = parsedResponse.briefing.trim();
-    const sanitizedInferredGoals = toStringArray(parsedResponse.inferredGoals);
-    const sanitizedTodaysFocus = toTrimmedStringOrNull(parsedResponse.todaysFocus);
-    const sanitizedActionPrompt = toTrimmedStringOrNull(parsedResponse.actionPrompt);
+    const sanitizedBriefing = productMode === "graceward"
+      ? enforceChristianGuidanceOutput(parsedResponse.briefing.trim())
+      : parsedResponse.briefing.trim();
+    const sanitizedInferredGoals = toStringArray(parsedResponse.inferredGoals)
+      .filter((goal) => productMode !== "graceward" || validateChristianGuidanceOutput(goal).safe)
+      .slice(0, 3);
+    const rawTodaysFocus = toTrimmedStringOrNull(parsedResponse.todaysFocus);
+    const sanitizedTodaysFocus = rawTodaysFocus
+      ? (productMode === "graceward"
+        ? enforceChristianGuidanceOutput(rawTodaysFocus, {
+          fallback: "Choose one small action that serves what matters most today.",
+        })
+        : rawTodaysFocus)
+      : null;
+    const rawActionPrompt = toTrimmedStringOrNull(parsedResponse.actionPrompt);
+    const sanitizedActionPrompt = rawActionPrompt
+      ? (productMode === "graceward"
+        ? enforceChristianGuidanceOutput(rawActionPrompt, {
+          fallback: "What is one small, honest step I can take today?",
+        })
+        : rawActionPrompt)
+      : null;
 
     // Store the data snapshot for debugging/context
     const dataSnapshot = {

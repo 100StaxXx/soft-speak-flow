@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { MentorAvatar } from "@/components/MentorAvatar";
 import { Button } from "@/components/ui/button";
@@ -387,7 +395,7 @@ export const resolveMentorGuidancePlacement = ({
       heightPx: compactHeight,
       compact: true,
     },
-  ].map(normalizePlacement);
+  ].map((placement) => normalizePlacement(placement as PanelPlacement));
 
   const clearCompact = compactCandidates.find((candidate) =>
     rectIsClear(getRectForPlacement(panelRect, candidate, viewportHeight, viewportTopPx))
@@ -435,10 +443,30 @@ export const MentorGuidanceCard = () => {
 
   const wrapperRef = useRef<HTMLElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const [placement, setPlacement] = useState<PanelPlacement>({
-    anchor: "bottom",
-    bottomPx: PANEL_BASE_BOTTOM_PX,
+  const presentationKey = useMemo(
+    () => [
+      currentStep ?? "no-step",
+      activeTargetSelector ?? "no-target",
+      dialogueText,
+      dialogueSupportText ?? "",
+      dialogueActionLabel ?? "",
+    ].join("|"),
+    [
+      activeTargetSelector,
+      currentStep,
+      dialogueActionLabel,
+      dialogueSupportText,
+      dialogueText,
+    ],
+  );
+  const [positionedPanel, setPositionedPanel] = useState<{
+    presentationKey: string | null;
+    placement: PanelPlacement;
+  }>({
+    presentationKey: null,
+    placement: { anchor: "bottom", bottomPx: PANEL_BASE_BOTTOM_PX },
   });
+  const [enteredPresentationKey, setEnteredPresentationKey] = useState<string | null>(null);
 
   const updatePlacement = useCallback(() => {
     if (!isActive) return;
@@ -452,6 +480,15 @@ export const MentorGuidanceCard = () => {
       ? resolveTutorialTarget(activeTargetSelector)?.element ?? null
       : null;
     const targetRect = targetElement ? rectFromElement(targetElement) : null;
+    const isWaitingForTarget = activeTargetSelectors.length > 0 && !targetRect;
+    if (isWaitingForTarget) {
+      clearBottomInsetVar();
+      setPositionedPanel((prev) =>
+        prev.presentationKey === null ? prev : { ...prev, presentationKey: null }
+      );
+      setEnteredPresentationKey(null);
+      return;
+    }
     const safeAreaInsetTopPx = readSafeAreaInsetTopPx();
     const minTopPx = resolveMentorGuidanceMinTopPx({ safeAreaInsetTopPx });
     const visualViewport = window.visualViewport;
@@ -485,15 +522,32 @@ export const MentorGuidanceCard = () => {
       })
     );
 
-    setPlacement((prev) => (arePlacementsEqual(prev, next) ? prev : next));
-  }, [activeTargetSelector, activeTargetSelectors, currentStep, isActive]);
+    setPositionedPanel((prev) =>
+      prev.presentationKey === presentationKey && arePlacementsEqual(prev.placement, next)
+        ? prev
+        : { presentationKey, placement: next }
+    );
+  }, [
+    activeTargetSelector,
+    activeTargetSelectors,
+    currentStep,
+    isActive,
+    presentationKey,
+  ]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isActive) {
-      setPlacement({ anchor: "bottom", bottomPx: PANEL_BASE_BOTTOM_PX });
+      setPositionedPanel({
+        presentationKey: null,
+        placement: { anchor: "bottom", bottomPx: PANEL_BASE_BOTTOM_PX },
+      });
+      setEnteredPresentationKey(null);
       return;
     }
 
+    // Measure synchronously while the panel is hidden. This prevents the default
+    // bottom placement from painting before an anchored tutorial card is ready.
+    updatePlacement();
     const raf = window.requestAnimationFrame(updatePlacement);
     const handleRelayout = () => updatePlacement();
     const isHatchCompanionStep = currentStep === "hatch_companion";
@@ -533,6 +587,21 @@ export const MentorGuidanceCard = () => {
   }, [currentStep, isActive, updatePlacement]);
 
   const isPanelVisible = Boolean(isActive && dialogueText);
+  const isPlacementReady =
+    isPanelVisible && positionedPanel.presentationKey === presentationKey;
+
+  useEffect(() => {
+    if (!isPlacementReady) return;
+
+    const raf = window.requestAnimationFrame(() => {
+      setEnteredPresentationKey(presentationKey);
+    });
+
+    return () => window.cancelAnimationFrame(raf);
+  }, [isPlacementReady, presentationKey]);
+
+  const hasEntered =
+    isPlacementReady && enteredPresentationKey === presentationKey;
 
   useEffect(() => {
     if (!isPanelVisible) {
@@ -544,6 +613,7 @@ export const MentorGuidanceCard = () => {
 
   const placementStyle = useMemo(
     (): CSSProperties => {
+      const placement = positionedPanel.placement;
       if (placement.anchor === "bottom") {
         return {
           top: undefined,
@@ -571,8 +641,9 @@ export const MentorGuidanceCard = () => {
         height: placement.heightPx ? `${placement.heightPx}px` : undefined,
       };
     },
-    [placement]
+    [positionedPanel.placement]
   );
+  const placement = positionedPanel.placement;
   const isCompact = placement.anchor === "floating" && placement.compact;
 
   if (!isActive || !dialogueText) {
@@ -585,20 +656,25 @@ export const MentorGuidanceCard = () => {
       data-tutorial="mentor-dialogue-panel"
       data-placement={placement.anchor}
       data-compact={isCompact ? "true" : undefined}
+      data-placement-ready={isPlacementReady ? "true" : "false"}
+      data-entered={hasEntered ? "true" : "false"}
       className={cn(
         "pointer-events-none fixed z-[105] transition-[top,bottom,left,width] duration-200",
+        isPlacementReady ? "visible" : "invisible",
         placement.anchor === "floating"
           ? "px-0 pb-0"
           : "px-3 pb-[calc(env(safe-area-inset-bottom,0px)+10px)]",
       )}
       style={placementStyle}
       aria-live="polite"
+      aria-hidden={!hasEntered}
     >
       <div
         ref={panelRef}
         data-testid="mentor-guidance-card-panel"
         className={cn(
-          "pointer-events-none rounded-2xl border border-white/20 bg-black/65 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-md",
+          "pointer-events-none rounded-2xl border border-white/20 bg-black/65 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-md transition-[opacity,transform] duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none",
+          hasEntered ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0",
           isCompact
             ? "h-full w-full overflow-hidden rounded-xl"
             : "mx-auto w-full max-w-[22rem] sm:max-w-4xl",

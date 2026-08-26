@@ -32,7 +32,7 @@ describe("epicInviteShare", () => {
     capacitorMocks.isNativePlatform.mockReturnValue(true);
 
     expect(buildEpicInviteLink("EPIC-QUEST-1234")).toBe(
-      "cosmiq://join/EPIC-QUEST-1234",
+      "graceward://join/EPIC-QUEST-1234",
     );
   });
 
@@ -40,7 +40,7 @@ describe("epicInviteShare", () => {
     capacitorMocks.isNativePlatform.mockReturnValue(true);
 
     expect(buildEpicInviteLink(" EPIC QUEST/1234 ")).toBe(
-      "cosmiq://join/EPIC%20QUEST%2F1234",
+      "graceward://join/EPIC%20QUEST%2F1234",
     );
   });
 
@@ -52,7 +52,7 @@ describe("epicInviteShare", () => {
 
   it("builds readable invite share text", () => {
     expect(buildEpicInviteShareText("Campaign Alpha", "EPIC-QUEST-1234")).toBe(
-      'Join my Cosmiq epic "Campaign Alpha" with invite code EPIC-QUEST-1234.',
+      'Join my Graceward commitment "Campaign Alpha" with invite code EPIC-QUEST-1234.',
     );
   });
 });

@@ -109,7 +109,7 @@ describe("DesktopWeekPlanner", () => {
     expect(screen.getByTestId("desktop-week-hour-6")).toBeInTheDocument();
     expect(screen.getByRole("group", { name: /desktop planner mode/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Today" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add quest" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add action" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start voice capture" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Day" }));
@@ -194,7 +194,7 @@ describe("DesktopWeekPlanner", () => {
       />,
     );
 
-    const addButton = screen.getByRole("button", { name: "Add quest" });
+    const addButton = screen.getByRole("button", { name: "Add action" });
     const voiceButton = screen.getByRole("button", { name: "Start voice capture" });
 
     fireEvent.click(addButton);
@@ -305,7 +305,7 @@ describe("DesktopWeekPlanner", () => {
       "bg-primary/[0.08]",
     );
     expect(within(ritualCard).getByText("Portfolio work")).toBeInTheDocument();
-    expect(within(ritualCard).getByText("Campaign Ritual - Build Portfolio Website")).toBeInTheDocument();
+    expect(within(ritualCard).getByText("Commitment rhythm · Build Portfolio Website")).toBeInTheDocument();
   });
 
   it("keeps readable campaign rituals on the readable shell treatment when active", async () => {
@@ -479,16 +479,16 @@ describe("DesktopWeekPlanner", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Open campaigns page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open commitments page" }));
     expect(onOpenCampaigns).toHaveBeenCalledTimes(1);
 
-    const campaignButton = screen.getByRole("button", { name: "Open Summer Gains campaign" });
+    const campaignButton = screen.getByRole("button", { name: "Open Summer Gains commitment" });
 
     expect(campaignButton).toBeInTheDocument();
     expect(campaignButton).toHaveAttribute("type", "button");
     expect(screen.getByTestId("mock-journey-path-drawer")).toContainElement(campaignButton);
     expect(within(campaignButton).getByText("Summer Gains")).toBeInTheDocument();
-    expect(within(campaignButton).getByText("1/2 rituals completed this week")).toBeInTheDocument();
+    expect(within(campaignButton).getByText("1/2 rhythms completed this week")).toBeInTheDocument();
     expect(within(campaignButton).getByText("25%")).toBeInTheDocument();
 
     fireEvent.click(campaignButton);

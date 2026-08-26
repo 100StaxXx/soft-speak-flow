@@ -10,19 +10,21 @@ import { Capacitor } from "@capacitor/core";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ViewModeProvider } from "@/contexts/ViewModeContext";
 import { TimeProvider } from "@/contexts/TimeContext";
-import { XPProvider } from "@/contexts/XPContext";
 import { EvolutionProvider } from "@/contexts/EvolutionContext";
+import { XPProvider } from "@/contexts/XPContext";
 import { CelebrationProvider } from "@/contexts/CelebrationContext";
 import { CompanionPresenceProvider } from "@/contexts/CompanionPresenceContext";
 import { CompanionMotionProvider } from "@/contexts/CompanionMotionContext";
 import { DeepLinkProvider } from "@/contexts/DeepLinkContext";
+import { WallpaperManifestProvider } from "@/contexts/WallpaperManifestContext";
 
 import { useProfile } from "@/hooks/useProfile";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { GlobalEvolutionListener } from "@/components/GlobalEvolutionListener";
 import { RealtimeSyncProvider } from "@/components/RealtimeSyncProvider";
+import { GlobalEvolutionListener } from "@/components/GlobalEvolutionListener";
+import { GlobalCompanionAgendaListener } from "@/components/GlobalCompanionAgendaListener";
 import { InstallPWA } from "@/components/InstallPWA";
 import { lockToPortrait } from "@/utils/orientationLock";
 import { UpdateAvailablePrompt } from "@/components/UpdateAvailablePrompt";
@@ -36,71 +38,61 @@ import {
   unregisterNativePush,
 } from "@/utils/nativePushNotifications";
 import { logger } from "@/utils/logger";
-import { AstralEncounterProvider } from "@/components/astral-encounters/AstralEncounterProvider";
-import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
 import { WeeklyRecapProvider } from "@/contexts/WeeklyRecapContext";
 import { useAppResumeRefresh } from "@/hooks/useAppResumeRefresh";
-import { TalkPopupProvider } from "@/contexts/TalkPopupContext";
 import { MainTabsKeepAlive, isMainTabPath } from "@/components/MainTabsKeepAlive";
 import { BottomNav } from "@/components/BottomNav";
 import { shouldShowBottomNav } from "@/utils/bottomNavVisibility";
-import { PostOnboardingMentorGuidanceProvider } from "@/hooks/usePostOnboardingMentorGuidance";
-import { MentorGuidanceCard } from "@/components/MentorGuidanceCard";
-import { MentorSpotlightGuard } from "@/components/tutorial/MentorSpotlightGuard";
-import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { ResilienceProvider } from "@/contexts/ResilienceContext";
 import { ResilienceStatusBanner } from "@/components/resilience/ResilienceStatusBanner";
-import { MentorConnectionProvider, useMentorConnection } from "@/contexts/MentorConnectionContext";
-import { WallpaperManifestProvider } from "@/contexts/WallpaperManifestContext";
 import { GlobalWidgetSyncBridge } from "@/components/GlobalWidgetSyncBridge";
+import { GlobalCalendarSyncBridge } from "@/components/GlobalCalendarSyncBridge";
 import { StoreKitProvider } from "@/providers/StoreKitProvider";
 import { EVENING_REFLECTION_CANONICAL_PATH } from "@/utils/eveningReflectionNavigation";
 import { useReferralSync } from "@/hooks/useReferralSync";
-import { useCreationPopupResume } from "@/hooks/useCreationPopupResume";
-import {
-  REMAINING_TODAY_BADGE_COUNT_QUERY_KEY,
-  useDailyTaskBadgeSync,
-} from "@/hooks/useDailyTaskBadgeSync";
 import { supabase } from "@/integrations/supabase/client";
 import {
   PUSH_NOTIFICATIONS_INBOX_QUERY_KEY,
   PUSH_NOTIFICATIONS_UNREAD_COUNT_QUERY_KEY,
 } from "@/hooks/usePushNotificationsInbox";
 import { normalizePushNotificationNavigationDetail } from "@/utils/pushNotificationNavigation";
+import { MentorConnectionProvider } from "@/contexts/MentorConnectionContext";
+import { TalkPopupProvider } from "@/contexts/TalkPopupContext";
+import { ProductExperienceAnalyticsBridge } from "@/hooks/useProductExperienceAnalytics";
+import {
+  PostOnboardingMentorGuidanceProvider,
+  usePostOnboardingMentorGuidance,
+} from "@/hooks/usePostOnboardingMentorGuidance";
+import { MentorGuidanceCard } from "@/components/MentorGuidanceCard";
+import { MentorSpotlightGuard } from "@/components/tutorial/MentorSpotlightGuard";
+import { OnboardingExperienceGate } from "@/components/OnboardingExperienceGate";
+import { PRODUCT } from "@/config/product";
 
 // Lazy load pages for code splitting
-const Home = lazy(() => import("./pages/Home"));
 const Auth = lazy(() => import("./pages/Auth"));
 const CalendarOAuthCallback = lazy(() => import("./pages/CalendarOAuthCallback"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Welcome = lazy(() => import("./pages/Welcome"));
 
-const Profile = lazy(() => import("./pages/Profile"));
-const PepTalkDetail = lazy(() => import("./pages/PepTalkDetail"));
-const Admin = lazy(() => import("./pages/Admin"));
-const MentorSelection = lazy(() => import("./pages/MentorSelection"));
+const Profile = PRODUCT.mode === "cosmiq"
+  ? lazy(() => import("./pages/Profile"))
+  : lazy(() => import("./pages/ChristianProfile"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const MentorChat = lazy(() => import("./pages/MentorChat"));
-const Library = lazy(() => import("./pages/Library"));
-const Challenges = lazy(() => import("./pages/Challenges"));
-const Search = lazy(() => import("./pages/Search"));
-const PepTalks = lazy(() => import("./pages/PepTalks"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const PremiumSuccess = lazy(() => import("./pages/PremiumSuccess"));
-const SharedEpics = lazy(() => import("./pages/SharedEpics"));
-const Partners = lazy(() => import("./pages/Partners"));
-const JoinEpic = lazy(() => import("./pages/JoinEpic"));
-const Creator = lazy(() => import("./pages/Creator"));
-const InfluencerDashboard = lazy(() => import("./pages/InfluencerDashboard"));
 const AccountDeletionHelp = lazy(() => import("./pages/AccountDeletionHelp"));
 const Recaps = lazy(() => import("./pages/Recaps"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
-const TestDayPlanner = lazy(() => import("./pages/TestDayPlanner"));
-const TestScroll = lazy(() => import("./pages/TestScroll"));
-const IAPTest = lazy(() => import("./pages/IAPTest"));
 const SupportReport = lazy(() => import("./pages/SupportReport"));
+const MentorSelection = lazy(() => import("./pages/MentorSelection"));
+const MentorChat = lazy(() => import("./pages/MentorChat"));
+const PepTalkDetail = lazy(() => import("./pages/PepTalkDetail"));
+const EncouragementHistory = lazy(() => import("./pages/EncouragementHistory"));
+const AccessibilityPreview = import.meta.env.DEV
+  ? lazy(() => import("./pages/AccessibilityPreview"))
+  : null;
 
 
 // Create query client outside component for better performance and stability
@@ -124,8 +116,10 @@ const queryClient = new QueryClient({
 // Prefetch critical routes during idle time for instant navigation
 const prefetchCriticalRoutes = () => {
   const routes = [
-    () => import('./pages/Profile'),
-    () => import('./pages/MentorChat'),
+    PRODUCT.mode === "cosmiq"
+      ? () => import('./pages/Profile')
+      : () => import('./pages/ChristianProfile'),
+    () => import('./pages/Today'),
   ];
   routes.forEach(route => route());
 };
@@ -172,11 +166,7 @@ const RootRoute = memo(() => {
     return <Welcome />;
   }
 
-  return (
-    <ProtectedRoute>
-      <Home />
-    </ProtectedRoute>
-  );
+  return <Navigate to={PRODUCT.mode === "cosmiq" ? "/journeys" : "/companion"} replace />;
 });
 
 RootRoute.displayName = "RootRoute";
@@ -196,19 +186,6 @@ const ScrollToTop = memo(() => {
 });
 
 ScrollToTop.displayName = 'ScrollToTop';
-
-// Separate component for evolution-aware features
-const EvolutionAwareContent = memo(() => {
-  return (
-    <>
-      <GlobalEvolutionListener />
-      {/* SubscriptionGate removed - monetization disabled */}
-      <WeeklyRecapModal />
-    </>
-  );
-});
-
-EvolutionAwareContent.displayName = 'EvolutionAwareContent';
 
 const MentorTutorialLayer = memo(() => {
   const { isActive, activeTargetSelector, activeTargetSelectors = [], isStrictLockActive } =
@@ -236,17 +213,15 @@ const BOTTOM_NAV_SONNER_BOTTOM_OFFSET = "calc(var(--bottom-nav-runtime-offset, v
 const SPLASH_HIDE_READY_DELAY_MS = 100;
 const SPLASH_HIDE_WATCHDOG_MS = 3500;
 
-const MentorConnectedThemeProvider = memo(({ children }: { children: ReactNode }) => {
-  const { mentorId } = useMentorConnection();
-
+const DailyWayThemeProvider = memo(({ children }: { children: ReactNode }) => {
   return (
-    <ThemeProvider mentorId={mentorId}>
+    <ThemeProvider mentorId={null}>
       {children}
     </ThemeProvider>
   );
 });
 
-MentorConnectedThemeProvider.displayName = "MentorConnectedThemeProvider";
+DailyWayThemeProvider.displayName = "DailyWayThemeProvider";
 
 const AppContent = memo(() => {
   const { profile, loading: profileLoading } = useProfile();
@@ -262,8 +237,6 @@ const AppContent = memo(() => {
   
   // Refresh critical data on app resume (iOS/Android) or tab visibility (web)
   useAppResumeRefresh({ enabled: status === "authenticated" && Boolean(session?.user) });
-  useCreationPopupResume();
-  useDailyTaskBadgeSync();
 
   const hideNativeSplashOnce = useCallback(() => {
     if (splashHidden) return;
@@ -289,16 +262,19 @@ const AppContent = memo(() => {
       if (!detail) return;
 
       if (detail.queueId) {
-        void supabase.rpc("mark_push_notification_opened", {
-          p_queue_id: detail.queueId,
-        }).then(({ error }) => {
-          if (error) {
-            logger.warn("Failed to mark native push notification opened", { error: error.message });
+        void (async () => {
+          try {
+            const { error } = await supabase.rpc("mark_push_notification_opened", {
+              p_queue_id: detail.queueId,
+            });
+            if (error) {
+              logger.warn("Failed to mark native push notification opened", { error: error.message });
+            }
+          } finally {
+            void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_INBOX_QUERY_KEY] });
+            void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_UNREAD_COUNT_QUERY_KEY] });
           }
-        }).finally(() => {
-          void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_INBOX_QUERY_KEY] });
-          void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_UNREAD_COUNT_QUERY_KEY] });
-        });
+        })();
       }
 
       navigate(detail.url);
@@ -311,7 +287,6 @@ const AppContent = memo(() => {
     const handler = () => {
       void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_INBOX_QUERY_KEY] });
       void queryClient.invalidateQueries({ queryKey: [PUSH_NOTIFICATIONS_UNREAD_COUNT_QUERY_KEY] });
-      void queryClient.invalidateQueries({ queryKey: [REMAINING_TODAY_BADGE_COUNT_QUERY_KEY] });
     };
 
     window.addEventListener(NATIVE_PUSH_RECEIVED_EVENT, handler);
@@ -430,25 +405,27 @@ const AppContent = memo(() => {
 
   return (
     <ResilienceProvider>
-      <MentorConnectionProvider>
-        <MentorConnectedThemeProvider>
+        <DailyWayThemeProvider>
           <WallpaperManifestProvider
-            enabled={Boolean(session?.user)}
+            enabled={Boolean(session?.user) && PRODUCT.mode === "christian"}
             userTimezone={profile?.timezone ?? null}
           >
-            <GlobalWidgetSyncBridge enabled={Boolean(session?.user)} />
             <ResilienceStatusBanner />
             <ViewModeProvider>
               <CompanionMotionProvider>
-                <XPProvider>
-                  <PostOnboardingMentorGuidanceProvider>
-                    <WeeklyRecapProvider>
-                      <CompanionPresenceProvider>
-                        <TalkPopupProvider>
+                <TalkPopupProvider>
+                  <XPProvider>
+                    <GlobalWidgetSyncBridge enabled={Boolean(session?.user)} />
+                    <GlobalCalendarSyncBridge enabled={Boolean(session?.user)} />
+                    {session?.user ? <ProductExperienceAnalyticsBridge /> : null}
+                    <PostOnboardingMentorGuidanceProvider>
+                      <WeeklyRecapProvider>
+                        <CompanionPresenceProvider>
                           <RealtimeSyncProvider>
-                          <AstralEncounterProvider>
-                          <Suspense fallback={<LoadingFallback />}>
-                          <EvolutionAwareContent />
+                            <OnboardingExperienceGate>
+                            <Suspense fallback={<LoadingFallback />}>
+                          <GlobalEvolutionListener />
+                          <GlobalCompanionAgendaListener />
                           {activeMainTabPath ? (
                             <ProtectedRoute>
                               <MainTabsKeepAlive activePath={activeMainTabPath} />
@@ -460,43 +437,54 @@ const AppContent = memo(() => {
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/calendar/oauth/callback" element={<CalendarOAuthCallback />} />
                   <Route path="/auth/reset-password" element={<ResetPassword />} />
-                  <Route path="/creator" element={<Creator />} />
-                  <Route path="/creator/dashboard" element={<InfluencerDashboard />} />
+                  <Route path="/creator" element={<Navigate to="/welcome" replace />} />
+                  <Route path="/creator/dashboard" element={<Navigate to="/welcome" replace />} />
                   <Route path="/onboarding" element={<Onboarding />} />
                   <Route path="/" element={<RootRoute />} />
+                  <Route path="/today" element={<Navigate to="/mentor" replace />} />
+                  <Route path="/plan" element={<Navigate to="/mentor" replace />} />
+                  <Route path="/grow" element={<Navigate to="/companion" replace />} />
+                  <Route path="/garden" element={<Navigate to="/companion" replace />} />
+                  <Route path="/journeys" element={<Navigate to={PRODUCT.mode === "cosmiq" ? "/journeys" : "/companion"} replace />} />
+                  <Route path="/campaigns" element={<Navigate to="/mentor" replace />} />
+                  <Route path="/advanced-planner" element={<Navigate to="/mentor" replace />} />
                   
                   <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                   <Route path="/premium" element={<Navigate to="/" replace />} />
                   <Route path="/premium/success" element={<ProtectedRoute requireAccess={false}><PremiumSuccess /></ProtectedRoute>} />
                   <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
+                  <Route path="/encouragements" element={<ProtectedRoute><EncouragementHistory /></ProtectedRoute>} />
                   <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
-                  <Route path="/admin" element={<ProtectedRoute requireMentor={false} requireAccess={false}><Admin /></ProtectedRoute>} />
-                  <Route path="/tasks" element={<Navigate to="/journeys" replace />} />
-                  <Route path="/epics" element={<Navigate to="/campaigns" replace />} />
-                  <Route path="/join/:code" element={<JoinEpic />} />
-                  <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
-                  <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
-                  <Route path="/horoscope" element={<Navigate to="/journeys" replace />} />
-                  <Route path="/cosmic/:placement/:sign" element={<Navigate to="/journeys" replace />} />
-                  <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
+                  <Route path="/admin" element={<Navigate to="/profile" replace />} />
+                  <Route path="/tasks" element={<Navigate to="/mentor" replace />} />
+                  <Route path="/epics" element={<Navigate to="/mentor" replace />} />
+                  <Route path="/join/:code" element={<Navigate to="/mentor" replace />} />
+                  <Route path="/shared-epics" element={<Navigate to="/mentor" replace />} />
+                  <Route path="/mentor-chat" element={<ProtectedRoute><MentorConnectionProvider><MentorChat /></MentorConnectionProvider></ProtectedRoute>} />
+                  <Route path="/horoscope" element={<Navigate to="/mentor" replace />} />
+                  <Route path="/cosmic/:placement/:sign" element={<Navigate to="/mentor" replace />} />
+                  <Route path="/challenges" element={<Navigate to="/companion" replace />} />
                   <Route path="/reflection" element={<Navigate to={EVENING_REFLECTION_CANONICAL_PATH} replace />} />
-                  <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-                  <Route path="/pep-talks" element={<ProtectedRoute><PepTalks /></ProtectedRoute>} />
-                  <Route path="/inspire" element={<Navigate to="/pep-talks" replace />} />
-                  <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
-                  <Route path="/partners" element={<Partners />} />
+                  <Route path="/library" element={<Navigate to="/mentor" replace />} />
+                  <Route path="/pep-talks" element={<Navigate to="/guide#daily-encouragement" replace />} />
+                  <Route path="/inspire" element={<Navigate to="/guide#daily-encouragement" replace />} />
+                  <Route path="/search" element={<Navigate to="/mentor" replace />} />
+                  <Route path="/partners" element={<Navigate to="/welcome" replace />} />
                   <Route path="/account-deletion" element={<AccountDeletionHelp />} />
                   <Route path="/recaps" element={<ProtectedRoute><Recaps /></ProtectedRoute>} />
                   <Route path="/help" element={<ProtectedRoute><HelpCenter /></ProtectedRoute>} />
-                  <Route path="/inbox" element={<Navigate to="/journeys?section=inbox" replace />} />
+                  <Route path="/inbox" element={<Navigate to="/mentor" replace />} />
                   <Route path="/contacts" element={<Navigate to="/profile" replace />} />
-                  <Route path="/iap-test" element={<IAPTest />} />
+                  <Route path="/iap-test" element={<Navigate to="/profile" replace />} />
                   <Route path="/support/report" element={<ProtectedRoute requireAccess={false}><SupportReport /></ProtectedRoute>} />
-                  <Route path="/guilds" element={<Navigate to="/campaigns" replace />} />
+                  <Route path="/guilds" element={<Navigate to="/companion" replace />} />
                   <Route path="/terms" element={<TermsOfService />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
-                  <Route path="/test-scroll" element={<TestScroll />} />
-                  <Route path="/test-day-planner" element={<TestDayPlanner />} />
+                  {AccessibilityPreview ? (
+                    <Route path="/accessibility-preview/:screen" element={<AccessibilityPreview />} />
+                  ) : null}
+                  <Route path="/test-scroll" element={<Navigate to="/mentor" replace />} />
+                  <Route path="/test-day-planner" element={<Navigate to="/mentor" replace />} />
                   <Route path="*" element={<NotFound />} />
                             </Routes>
                             </AnimatePresence>
@@ -504,18 +492,17 @@ const AppContent = memo(() => {
                           {showBottomNav && <BottomNav />}
                           <MentorTutorialLayer />
                           </Suspense>
-                          </AstralEncounterProvider>
+                            </OnboardingExperienceGate>
                           </RealtimeSyncProvider>
-                        </TalkPopupProvider>
-                      </CompanionPresenceProvider>
-                    </WeeklyRecapProvider>
-                  </PostOnboardingMentorGuidanceProvider>
-                </XPProvider>
+                        </CompanionPresenceProvider>
+                      </WeeklyRecapProvider>
+                    </PostOnboardingMentorGuidanceProvider>
+                  </XPProvider>
+                </TalkPopupProvider>
               </CompanionMotionProvider>
             </ViewModeProvider>
           </WallpaperManifestProvider>
-        </MentorConnectedThemeProvider>
-      </MentorConnectionProvider>
+        </DailyWayThemeProvider>
     </ResilienceProvider>
   );
 });
@@ -541,11 +528,13 @@ const App = () => {
                     <Sonner />
                     <InstallPWA />
                     <UpdateAvailablePrompt />
-                    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                      <DeepLinkProvider>
-                        <ScrollToTop />
-                        <AppContent />
-                      </DeepLinkProvider>
+                    <BrowserRouter>
+                      <MentorConnectionProvider>
+                        <DeepLinkProvider>
+                          <ScrollToTop />
+                          <AppContent />
+                        </DeepLinkProvider>
+                      </MentorConnectionProvider>
                     </BrowserRouter>
                   </TooltipProvider>
                 </CelebrationProvider>

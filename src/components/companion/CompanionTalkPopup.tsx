@@ -59,38 +59,38 @@ const toneClassName: Record<CompletionCompanionTone, {
 }> = {
   proud: {
     shell: "border-primary/35 shadow-[0_18px_46px_hsl(var(--primary)/0.18)]",
-    wash: "from-primary/16 via-transparent to-accent/12",
+    wash: "from-primary/[0.16] via-transparent to-accent/[0.12]",
     icon: "bg-primary/15 text-primary ring-primary/25",
     portrait: "from-primary/80 via-primary/25 to-accent/70",
-    action: "border-primary/35 bg-primary/12 text-primary hover:bg-primary/18",
+    action: "border-primary/35 bg-primary/[0.12] text-primary hover:bg-primary/[0.18]",
   },
   locked_in: {
     shell: "border-emerald-300/35 shadow-[0_18px_46px_rgba(16,185,129,0.16)]",
-    wash: "from-emerald-400/14 via-transparent to-cyan-300/10",
-    icon: "bg-emerald-400/12 text-emerald-400 ring-emerald-300/25",
+    wash: "from-emerald-400/[0.14] via-transparent to-cyan-300/10",
+    icon: "bg-emerald-400/[0.12] text-emerald-400 ring-emerald-300/25",
     portrait: "from-emerald-300/80 via-cyan-300/25 to-primary/60",
-    action: "border-emerald-300/35 bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400/16",
+    action: "border-emerald-300/35 bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400/[0.16]",
   },
   recovery: {
     shell: "border-amber-300/40 shadow-[0_18px_46px_rgba(245,158,11,0.16)]",
-    wash: "from-amber-300/14 via-transparent to-primary/10",
-    icon: "bg-amber-300/14 text-amber-400 ring-amber-300/30",
+    wash: "from-amber-300/[0.14] via-transparent to-primary/10",
+    icon: "bg-amber-300/[0.14] text-amber-400 ring-amber-300/30",
     portrait: "from-amber-300/85 via-primary/20 to-accent/55",
-    action: "border-amber-300/35 bg-amber-300/10 text-amber-400 hover:bg-amber-300/16",
+    action: "border-amber-300/35 bg-amber-300/10 text-amber-400 hover:bg-amber-300/[0.16]",
   },
   calm: {
     shell: "border-sky-300/35 shadow-[0_18px_46px_rgba(56,189,248,0.16)]",
-    wash: "from-sky-300/14 via-transparent to-primary/10",
-    icon: "bg-sky-300/12 text-sky-400 ring-sky-300/25",
+    wash: "from-sky-300/[0.14] via-transparent to-primary/10",
+    icon: "bg-sky-300/[0.12] text-sky-400 ring-sky-300/25",
     portrait: "from-sky-300/80 via-primary/25 to-accent/60",
-    action: "border-sky-300/35 bg-sky-300/10 text-sky-400 hover:bg-sky-300/16",
+    action: "border-sky-300/35 bg-sky-300/10 text-sky-400 hover:bg-sky-300/[0.16]",
   },
   hype: {
     shell: "border-fuchsia-300/40 shadow-[0_18px_46px_rgba(217,70,239,0.18)]",
-    wash: "from-fuchsia-300/16 via-transparent to-primary/12",
-    icon: "bg-fuchsia-300/14 text-fuchsia-400 ring-fuchsia-300/28",
+    wash: "from-fuchsia-300/[0.16] via-transparent to-primary/[0.12]",
+    icon: "bg-fuchsia-300/[0.14] text-fuchsia-400 ring-fuchsia-300/[0.28]",
     portrait: "from-fuchsia-300/85 via-primary/30 to-accent/70",
-    action: "border-fuchsia-300/35 bg-fuchsia-300/10 text-fuchsia-400 hover:bg-fuchsia-300/16",
+    action: "border-fuchsia-300/35 bg-fuchsia-300/10 text-fuchsia-400 hover:bg-fuchsia-300/[0.16]",
   },
 };
  
@@ -262,7 +262,7 @@ export const CompanionTalkPopup = memo(({
         >
            <div className={cn(
              "relative overflow-hidden rounded-2xl border",
-             "bg-card/82 text-card-foreground backdrop-blur-2xl",
+             "bg-card/[0.82] text-card-foreground backdrop-blur-2xl",
              "shadow-lg",
              resolvedToneClassName.shell
            )}>
@@ -289,7 +289,7 @@ export const CompanionTalkPopup = memo(({
                    <Avatar
                      className={cn(
                        usesGeneratedSceneAvatar ? "h-12 w-16" : "h-16 w-16",
-                       "rounded-[0.9rem] ring-1 ring-white/18",
+                       "rounded-[0.9rem] ring-1 ring-white/[0.18]",
                        usesGeneratedSceneAvatar ? "bg-black" : usesPortraitAvatar(companionImageUrl) && "bg-transparent",
                      )}
                    >
@@ -416,7 +416,7 @@ export const CompanionTalkPopup = memo(({
              <div className="relative px-4 pb-3">
                <Progress 
                  value={progress} 
-                 className="h-1 bg-foreground/8 shadow-inner"
+                 className="h-1 bg-foreground/[0.08] shadow-inner"
                />
              </div>
            </div>

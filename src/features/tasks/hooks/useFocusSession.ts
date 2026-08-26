@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useXPRewards } from '@/hooks/useXPRewards';
 import { FOCUS_XP_REWARDS } from '@/config/xpRewards';
 import { useLivingCompanionSafe } from '@/hooks/useLivingCompanion';
+import { dispatchCompanionAgendaEvent } from '@/lib/companionAgendaEvents';
 
 export interface FocusSession {
   id: string;
@@ -44,13 +45,24 @@ const DURATION_PRESETS = {
 
 const COOLDOWN_DURATION = 5 * 60; // 5 minutes in seconds
 
-export function useFocusSession() {
+export interface UseFocusSessionOptions {
+  onSessionStarted?: (session: FocusSession) => void;
+  onSessionCompleted?: (session: FocusSession) => void;
+  onSessionCancelled?: (session: FocusSession) => void;
+}
+
+export function useFocusSession(options: UseFocusSessionOptions = {}) {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { awardFocusSessionComplete } = useXPRewards();
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const activeTaskContextRef = useRef<{
+    taskId: string;
+    taskTitle?: string;
+    taskCategory?: string;
+  } | null>(null);
 
   // Living companion reaction system - safe hook returns no-op when outside provider
   const { triggerPomodoroComplete } = useLivingCompanionSafe();
@@ -92,11 +104,15 @@ export function useFocusSession() {
     mutationFn: async ({ 
       taskId, 
       durationType, 
-      customDuration 
+      customDuration,
+      taskTitle,
+      taskCategory,
     }: { 
       taskId?: string; 
       durationType: FocusTimerState['sessionType'];
       customDuration?: number;
+      taskTitle?: string;
+      taskCategory?: string;
     }) => {
       if (!user?.id) throw new Error('Not authenticated');
 
@@ -119,7 +135,7 @@ export function useFocusSession() {
       if (error) throw error;
       return data as FocusSession;
     },
-    onSuccess: (session) => {
+    onSuccess: (session, variables) => {
       queryClient.invalidateQueries({ queryKey: ['focus-sessions'] });
       setTimerState(prev => ({
         ...prev,
@@ -133,6 +149,20 @@ export function useFocusSession() {
         isCooldown: false,
         cooldownTimeRemaining: 0,
       }));
+      if (variables.taskId) {
+        activeTaskContextRef.current = {
+          taskId: variables.taskId,
+          taskTitle: variables.taskTitle,
+          taskCategory: variables.taskCategory,
+        };
+        dispatchCompanionAgendaEvent({
+          eventType: "task-start",
+          category: variables.taskCategory,
+          taskId: variables.taskId,
+          taskTitle: variables.taskTitle,
+        });
+      }
+      options.onSessionStarted?.(session);
     },
     onError: (error) => {
       console.error('Failed to start session:', error);
@@ -221,9 +251,21 @@ export function useFocusSession() {
           console.log('[LivingCompanion] Pomodoro trigger failed:', err)
         );
       }
+
+      if (shouldAwardXp && session.task_id) {
+        const taskContext = activeTaskContextRef.current;
+        dispatchCompanionAgendaEvent({
+          eventType: "task-complete",
+          category: taskContext?.taskCategory,
+          taskId: session.task_id,
+          taskTitle: taskContext?.taskTitle,
+        });
+        activeTaskContextRef.current = null;
+      }
        
       // Start cooldown
       startCooldown();
+      options.onSessionCompleted?.(session);
     },
     onError: (error, variables) => {
       console.error('[duration-learning] Failed to complete focus session', {
@@ -293,9 +335,10 @@ export function useFocusSession() {
       if (error) throw error;
       return data as FocusSession;
     },
-    onSuccess: () => {
+    onSuccess: (session) => {
       queryClient.invalidateQueries({ queryKey: ['focus-sessions'] });
       resetTimer();
+      options.onSessionCancelled?.(session);
     },
   });
 
@@ -399,9 +442,17 @@ export function useFocusSession() {
   const startSession = useCallback((
     taskId?: string,
     durationType: FocusTimerState['sessionType'] = 'pomodoro',
-    customDuration?: number
+    customDuration?: number,
+    taskCategory?: string,
+    taskTitle?: string,
   ) => {
-    startSessionMutation.mutate({ taskId, durationType, customDuration });
+    startSessionMutation.mutate({
+      taskId,
+      durationType,
+      customDuration,
+      taskCategory,
+      taskTitle,
+    });
   }, []);
 
   const pauseSession = useCallback(() => {

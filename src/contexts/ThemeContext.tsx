@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { PRODUCT, type ProductMode } from "@/config/product";
+import { fetchProductMentorById } from "@/services/productMentorCatalog";
 
 interface MentorTheme {
   primary: string;
@@ -32,6 +33,56 @@ interface ThemeProviderProps {
   mentorId?: string | null;
 }
 
+export const getDefaultProductTheme = (mode: ProductMode): Record<string, string> => (
+  mode === "cosmiq"
+    ? {
+        "--primary": "270 70% 55%",
+        "--primary-foreground": "0 0% 100%",
+        "--secondary": "240 8% 18%",
+        "--secondary-foreground": "0 0% 98%",
+        "--accent": "280 80% 65%",
+        "--accent-foreground": "0 0% 100%",
+        "--background": "0 0% 5%",
+        "--foreground": "0 0% 98%",
+        "--card": "240 8% 14%",
+        "--card-foreground": "0 0% 98%",
+        "--popover": "240 8% 14%",
+        "--popover-foreground": "0 0% 98%",
+        "--muted": "240 6% 22%",
+        "--muted-foreground": "240 5% 70%",
+        "--destructive": "0 84.2% 60.2%",
+        "--destructive-foreground": "0 0% 100%",
+        "--border": "240 10% 20%",
+        "--input": "240 8% 18%",
+        "--ring": "270 70% 55%",
+        "--radius": "1.25rem",
+        "--shadow-glow": "0 0 30px hsl(270 70% 55% / 0.6), 0 0 60px hsl(270 70% 55% / 0.3)",
+      }
+    : {
+        "--primary": "132 31% 34%",
+        "--primary-foreground": "45 40% 98%",
+        "--secondary": "42 33% 90%",
+        "--secondary-foreground": "132 21% 16%",
+        "--accent": "39 45% 60%",
+        "--accent-foreground": "132 21% 16%",
+        "--background": "43 30% 96%",
+        "--foreground": "132 21% 16%",
+        "--card": "45 35% 98%",
+        "--card-foreground": "132 21% 16%",
+        "--popover": "45 35% 98%",
+        "--popover-foreground": "132 21% 16%",
+        "--muted": "42 24% 89%",
+        "--muted-foreground": "130 8% 40%",
+        "--destructive": "0 65% 47%",
+        "--destructive-foreground": "0 0% 100%",
+        "--border": "132 14% 79%",
+        "--input": "132 12% 53%",
+        "--ring": "132 31% 34%",
+        "--radius": "1.25rem",
+        "--shadow-glow": "0 12px 36px hsl(132 31% 24% / 0.16)",
+      }
+);
+
 export const ThemeProvider = ({ children, mentorId }: ThemeProviderProps) => {
   const [currentTheme, setCurrentTheme] = useState<MentorTheme | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -52,11 +103,7 @@ export const ThemeProvider = ({ children, mentorId }: ThemeProviderProps) => {
 
       try {
         // Fetch theme data BEFORE showing transition
-        const { data: mentor } = await supabase
-          .from("mentors")
-          .select("theme_config")
-          .eq("id", mentorId)
-          .maybeSingle();
+        const mentor = await fetchProductMentorById(mentorId);
 
         if (!isMounted) return;
 
@@ -143,18 +190,13 @@ export const ThemeProvider = ({ children, mentorId }: ThemeProviderProps) => {
 
   const applyDefaultTheme = () => {
     const root = document.documentElement;
-    
-    // Reset to default values from index.css
-    root.style.setProperty("--primary", "270 60% 50%");
-    root.style.setProperty("--secondary", "240 6% 20%");
-    root.style.setProperty("--accent", "270 50% 35%");
-    root.style.setProperty("--background", "0 0% 7%");
-    root.style.setProperty("--foreground", "0 0% 100%");
-    root.style.setProperty("--card", "240 6% 15%");
-    root.style.setProperty("--radius", "1.25rem");
-    root.style.setProperty("--shadow-glow", "0 0 24px hsl(270 60% 50% / 0.5)");
+
+    Object.entries(getDefaultProductTheme(PRODUCT.mode)).forEach(([property, value]) => {
+      root.style.setProperty(property, value);
+    });
     
     root.classList.remove("sharp-borders");
+    root.style.removeProperty("--bg-texture");
   };
 
   const value = useMemo(() => ({ currentTheme, isTransitioning }), [currentTheme, isTransitioning]);

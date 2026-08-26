@@ -29,9 +29,9 @@ export const DeepLinkProvider = ({ children }: { children: ReactNode }) => {
     
     if (data.type === 'task' && data.taskId) {
       setPendingTaskId(data.taskId);
-      // Dispatch navigation event to go to journeys page
+      // Legacy task links now return to the prepared Today experience.
       window.dispatchEvent(new CustomEvent('deep-link-navigation', { 
-        detail: { path: '/journeys', taskId: data.taskId } 
+        detail: { path: '/mentor', taskId: data.taskId }
       }));
       return;
     }
@@ -55,6 +55,7 @@ export const DeepLinkProvider = ({ children }: { children: ReactNode }) => {
 
     if (
       (data.type === 'auth_recovery' ||
+        data.type === 'today' ||
         data.type === 'calendar_oauth_callback' ||
         data.type === 'join_epic' ||
         data.type === 'journeys') &&

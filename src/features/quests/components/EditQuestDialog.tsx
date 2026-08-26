@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useCompanion } from "@/hooks/useCompanion";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
@@ -49,6 +48,7 @@ import {
   resolveQuestReminderOffsets,
 } from "@/utils/questReminders";
 import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
+import { PRODUCT } from "@/config/product";
 
 interface Task {
   id: string;
@@ -143,10 +143,11 @@ export function EditQuestDialog({
   const [localPlannerSubtasks, setLocalPlannerSubtasks] = useState<string[]>([]);
 
   const { subtasks, addSubtask, toggleSubtask, deleteSubtask } = useSubtasks(task?.id ?? null);
-  const { companion } = useCompanion();
   const resolvedCompanionFrostedThemeStyle = useMemo(
-    () => companionFrostedThemeStyle ?? getCompanionFrostedThemeStyle(companion?.favorite_color),
-    [companionFrostedThemeStyle, companion?.favorite_color],
+    () => companionFrostedThemeStyle ?? getCompanionFrostedThemeStyle(
+      PRODUCT.mode === "cosmiq" ? "#9b6bff" : "#2f5938",
+    ),
+    [companionFrostedThemeStyle],
   );
   const hasPlannerSubtaskDraft = Array.isArray(plannerSubtaskDraft);
 
@@ -381,7 +382,7 @@ export function EditQuestDialog({
         )}
         style={resolvedCompanionFrostedThemeStyle}
       >
-        <SheetTitle className="sr-only">Edit Quest</SheetTitle>
+        <SheetTitle className="sr-only">Edit action</SheetTitle>
         <SheetDescription className="sr-only">
           Update this quest details, schedule, and reminders.
         </SheetDescription>
@@ -409,7 +410,7 @@ export function EditQuestDialog({
                 value={taskText}
                 onChange={(e) => setTaskText(e.target.value)}
                 className={QUEST_FORM_STYLES.desktopPanelInput}
-                placeholder="Quest title"
+                placeholder="Action title"
               />
 
               <div className="flex flex-wrap items-center gap-2">
@@ -440,14 +441,14 @@ export function EditQuestDialog({
                 <ArrowLeft className="h-4 w-4" />
               </button>
               <div className="flex-1 min-w-0">
-                <p className={QUEST_FORM_STYLES.mobileHeaderKicker}>Edit Quest</p>
+                <p className={QUEST_FORM_STYLES.mobileHeaderKicker}>Edit action</p>
                 <div className={QUEST_FORM_STYLES.titleFieldShell}>
                   <div className={QUEST_FORM_STYLES.titleFieldInner}>
                     <Input
                       value={taskText}
                       onChange={(e) => setTaskText(e.target.value)}
                       className={QUEST_FORM_STYLES.titleInput}
-                      placeholder="Quest title"
+                      placeholder="Action title"
                     />
                   </div>
                 </div>
@@ -757,7 +758,7 @@ export function EditQuestDialog({
           style={resolvedCompanionFrostedThemeStyle}
         >
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this quest?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this action?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete "{task?.task_text}".
             </AlertDialogDescription>

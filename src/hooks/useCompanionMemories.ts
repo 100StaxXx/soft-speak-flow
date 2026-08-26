@@ -3,6 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useCompanion } from "./useCompanion";
 import { useMemo, useCallback } from "react";
+import { useProfile } from "./useProfile";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
+import { PRODUCT } from "@/config/product";
 
 export type MemoryType = 
   | 'first_meeting'       // When companion was created
@@ -42,7 +45,7 @@ export interface BondMilestone {
 }
 
 // Bond level names and descriptions
-const BOND_MILESTONES: Omit<BondMilestone, 'unlockedAt'>[] = [
+const COSMIQ_BOND_MILESTONES: Omit<BondMilestone, 'unlockedAt'>[] = [
   { level: 1, name: 'Acquaintance', description: 'A new journey begins...', icon: '🌱' },
   { level: 2, name: 'Companion', description: 'Trust is forming between you.', icon: '🤝' },
   { level: 3, name: 'Friend', description: 'Your bond grows stronger each day.', icon: '💫' },
@@ -52,12 +55,26 @@ const BOND_MILESTONES: Omit<BondMilestone, 'unlockedAt'>[] = [
   { level: 7, name: 'Legendary Bond', description: 'A bond that transcends time.', icon: '👑' },
 ];
 
+const GRACEWARD_BOND_MILESTONES: Omit<BondMilestone, 'unlockedAt'>[] = [
+  { level: 1, name: 'New Trust', description: 'A gentle beginning.', icon: '🌱' },
+  { level: 2, name: 'Familiar Presence', description: 'You are learning each other’s rhythm.', icon: '🌿' },
+  { level: 3, name: 'Steady Companion', description: 'Returning is becoming familiar.', icon: '🐾' },
+  { level: 4, name: 'Deepening Trust', description: 'Shared days are shaping your bond.', icon: '🕊️' },
+  { level: 5, name: 'Faithful Companion', description: 'Your companion remembers the road with you.', icon: '🌳' },
+  { level: 6, name: 'Seasoned Companion', description: 'Many small returns have formed a history.', icon: '🍂' },
+  { level: 7, name: 'Enduring Bond', description: 'A lasting companionship through changing seasons.', icon: '🫶' },
+];
+
+const BOND_MILESTONES = PRODUCT.mode === "christian"
+  ? GRACEWARD_BOND_MILESTONES
+  : COSMIQ_BOND_MILESTONES;
+
 // Memory emotion to dialogue mapping
 const MEMORY_EMOTIONS: Record<string, string[]> = {
-  joy: ["That was such a happy day!", "I still feel warm thinking about it.", "One of our best moments!"],
-  pride: ["You worked so hard for that.", "I was so proud of you!", "Look how far we've come."],
+  joy: ["That was a joyful day.", "I still feel warm remembering it.", "I’m glad we shared that moment."],
+  pride: ["You gave that your care.", "I noticed how faithfully you returned.", "Look how far we’ve come."],
   gratitude: ["Thank you for that moment.", "I treasure that memory.", "You've given me so much."],
-  wonder: ["That was magical!", "I still can't believe it happened.", "What an adventure!"],
+  wonder: ["That stayed with me.", "I still remember it clearly.", "There was so much to notice in that moment."],
   relief: ["We made it through together.", "I'm so glad you came back.", "Everything is okay now."],
 };
 
@@ -74,10 +91,11 @@ const getStableRandom = (seed: string): number => {
 export function useCompanionMemories() {
   const { user } = useAuth();
   const { companion } = useCompanion();
+  const { profile } = useProfile();
   const queryClient = useQueryClient();
 
   // Fetch all memories for the companion
-  const { data: memories, isLoading: memoriesLoading } = useQuery({
+  const { data: storedMemories, isLoading: memoriesLoading, refetch: refetchMemories } = useQuery({
     queryKey: ['companion-memories', companion?.id],
     queryFn: async (): Promise<CompanionMemory[]> => {
       if (!companion?.id) return [];
@@ -100,6 +118,12 @@ export function useCompanionMemories() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
+  const memories = useMemo(() => (storedMemories ?? []).filter((memory) => {
+    if (profile?.companion_memory_enabled !== false) return true;
+    const details = memory.memory_context?.details;
+    return !(memory.memory_type === "special_moment" && details?.source === "companion_chat");
+  }), [profile?.companion_memory_enabled, storedMemories]);
+
   // Fetch current bond level
   const { data: bondData, isLoading: bondLoading } = useQuery({
     queryKey: ['companion-bond', companion?.id],
@@ -110,6 +134,7 @@ export function useCompanionMemories() {
         .from('user_companion')
         .select('bond_level, total_interactions, last_interaction_at')
         .eq('user_id', user.id)
+        .eq('product_mode', PRODUCT_RUNTIME.authProductMode)
         .maybeSingle();
 
       if (error) {
@@ -243,7 +268,14 @@ export function useCompanionMemories() {
     const line = emotionLines[index];
 
     if (context.title) {
-      return `Remember when ${context.title.toLowerCase()}? ${line}`;
+      const rememberedTitle = PRODUCT.mode === "christian"
+        ? context.title
+          .replace(/\bquests?\b/gi, "practice")
+          .replace(/\b(epic|campaign)\b/gi, "season")
+          .replace(/\bxp\b/gi, "growth")
+          .toLowerCase()
+        : context.title.toLowerCase();
+      return `Remember when ${rememberedTitle}? ${line}`;
     }
 
     return line;
@@ -298,5 +330,6 @@ export function useCompanionMemories() {
     referenceMemory,
     getRandomMemory,
     getMemoryDialogue,
+    refetchMemories,
   };
 }

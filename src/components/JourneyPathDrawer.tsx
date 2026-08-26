@@ -237,7 +237,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
               <p className="mt-1 text-lg font-semibold text-foreground">{epic.target_days}d</p>
             </div>
             <div className="rounded-xl border border-border/40 bg-card/50 p-3 text-center">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Rituals</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Rhythms</p>
               <p className="mt-1 text-lg font-semibold text-foreground">{ritualCount}</p>
             </div>
           </div>
@@ -248,7 +248,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
                 <Repeat className="h-4 w-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Next ritual</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Next rhythm</p>
                 {nextRitual ? (
                   <>
                     <p className="mt-1 truncate text-sm font-semibold text-foreground">{nextRitual.title}</p>
@@ -258,7 +258,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
                     </p>
                   </>
                 ) : (
-                  <p className="mt-1 text-sm text-muted-foreground">No rituals linked yet.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">No rhythms linked yet.</p>
                 )}
               </div>
             </div>
@@ -270,8 +270,8 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">This week</p>
                 <p className="mt-1 text-sm font-medium text-foreground">
                   {ritualCount === 0
-                    ? "No campaign rituals yet"
-                    : `${ritualCount} ritual${ritualCount === 1 ? "" : "s"} attached`}
+                    ? "No commitment rhythms yet"
+                    : `${ritualCount} rhythm${ritualCount === 1 ? "" : "s"} attached`}
                 </p>
               </div>
               <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
@@ -287,7 +287,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
             </Button>
             <Button type="button" variant="outline" className="gap-2" onClick={openAddRitual}>
               <Plus className="h-4 w-4" />
-              Add ritual
+              Add rhythm
             </Button>
             <JourneyDetailDrawer
               epicId={epic.id}

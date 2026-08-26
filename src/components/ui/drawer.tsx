@@ -28,7 +28,7 @@ const DrawerOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Overlay 
     ref={ref} 
-    className={cn("fixed inset-0 z-50 bg-black/58 backdrop-blur-[2px]", className)} 
+    className={cn("fixed inset-0 z-50 bg-black/[0.58] backdrop-blur-[2px]", className)}
     style={{ 
       touchAction: 'none',
       WebkitTapHighlightColor: 'transparent',

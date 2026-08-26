@@ -137,6 +137,22 @@ describe("AskMentorChat session handling", () => {
     expect(mocks.refreshSession).not.toHaveBeenCalled();
   });
 
+  it("keeps long guide prompts readable over the scenic background", async () => {
+    renderAskMentorChat();
+
+    await screen.findByText("Daily messages: 0/20");
+
+    const prompt = screen.getByRole("button", {
+      name: "Help me slow down and sort through what's weighing on me",
+    });
+
+    expect(prompt).toHaveClass("whitespace-normal", "break-words", "bg-card/[0.88]");
+    expect(screen.getByText("Choose a prompt or type your own message")).toHaveClass(
+      "bg-card/[0.88]",
+      "text-foreground/75",
+    );
+  });
+
   it("refreshes a missing cached session before invoking mentor-chat", async () => {
     mocks.getSession
       .mockResolvedValueOnce({ data: { session: null }, error: null })
@@ -192,5 +208,66 @@ describe("AskMentorChat session handling", () => {
         },
       ]);
     });
+  });
+
+  it("does not mislabel a provider throttle as the user's daily limit", async () => {
+    mocks.invokeFunction.mockResolvedValue({
+      data: null,
+      error: {
+        name: "FunctionsHttpError",
+        message: "Edge Function returned a non-2xx status code",
+        context: new Response(
+          JSON.stringify({ error: "Rate limit exceeded, please try again later." }),
+          { status: 429, headers: { "Content-Type": "application/json" } },
+        ),
+      },
+    });
+
+    renderAskMentorChat();
+    submitMentorMessage("Help me reset");
+
+    await waitFor(() => {
+      expect(mocks.toast).toHaveBeenCalledWith({
+        title: "Guide is temporarily busy",
+        description: "Your daily allowance is still available. Showing a short reflection while live replies recover.",
+        duration: 3000,
+      });
+    });
+    expect(screen.getByText("Daily messages: 0/20")).toBeInTheDocument();
+    expect(screen.getByText(/Bring what you cannot control to God/i)).toBeInTheDocument();
+    expect(mocks.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Daily limit reached" }),
+    );
+  });
+
+  it("treats only the explicit server daily-cap code as the daily limit", async () => {
+    mocks.invokeFunction.mockResolvedValue({
+      data: null,
+      error: {
+        name: "FunctionsHttpError",
+        message: "Edge Function returned a non-2xx status code",
+        context: new Response(
+          JSON.stringify({
+            error: "Daily limit reached",
+            code: "DAILY_GUIDE_LIMIT_REACHED",
+            message: "You've reached today's Guide conversation limit (20 messages).",
+          }),
+          { status: 429, headers: { "Content-Type": "application/json" } },
+        ),
+      },
+    });
+
+    renderAskMentorChat();
+    submitMentorMessage("One more question");
+
+    await waitFor(() => {
+      expect(mocks.toast).toHaveBeenCalledWith({
+        title: "Daily limit reached",
+        description: "You've reached today's Guide conversation limit (20 messages).",
+        variant: "destructive",
+      });
+    });
+    expect(screen.getByText("Daily messages: 20/20")).toBeInTheDocument();
+    expect(screen.queryByText("One more question")).not.toBeInTheDocument();
   });
 });

@@ -1,5 +1,0 @@
-
-module CapacitorShare.Swift {
-  header "CapacitorShare-Swift.h"
-  requires objc
-}

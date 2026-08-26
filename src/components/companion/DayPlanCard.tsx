@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
 import { formatTime12 } from "@/components/quest-shared";
 import { formatDurationLabel } from "@/components/scheduling/shared";
+import { PRODUCT } from "@/config/product";
 import { cn } from "@/lib/utils";
 import type {
   CompanionDayPlan,
@@ -115,8 +116,8 @@ const formatBlockRange = (block: CompanionDayPlanBlock): string => {
 };
 
 const SOURCE_LABELS: Record<CompanionDayPlanBlock["source"], string> = {
-  campaign: "Campaign",
-  habit: "Habit",
+  campaign: "Journey",
+  habit: "Rhythm",
   recovery: "Recovery",
   optimization: "Smart pick",
 };
@@ -184,7 +185,7 @@ export function DayPlanCard({
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className={plannerPathfinderTheme.sectionEyebrow}>
-            {isCommitted ? "Plan locked in" : "Cosmiq's draft plan"}
+            {isCommitted ? "Plan ready" : `${PRODUCT.name}’s suggested plan`}
           </p>
           <h3 className="mt-1 truncate text-base font-semibold text-foreground sm:text-lg">
             {dateLabel}
@@ -197,7 +198,7 @@ export function DayPlanCard({
             "px-3 py-1 text-[11px] font-medium",
           )}
         >
-          {blocks.length} {blocks.length === 1 ? "quest" : "quests"} ·{" "}
+          {blocks.length} {blocks.length === 1 ? "action" : "actions"} ·{" "}
           {formatDurationLabel(total) ?? `${total} min`}
         </Badge>
       </header>
@@ -306,8 +307,8 @@ export function DayPlanCard({
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
           {isCommitted
-            ? "These are now in today's quests."
-            : "Review the plan, then lock it in to drop these into today's quests."}
+            ? "These are now part of today’s agenda."
+            : "Review the suggestion, then add it to today’s agenda."}
         </p>
         {isCommitted
           ? (
@@ -318,7 +319,7 @@ export function DayPlanCard({
               )}
             >
               <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
-              Locked in
+              Added
             </Badge>
           )
           : (
@@ -333,7 +334,7 @@ export function DayPlanCard({
               {committing
                 ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
                 : <Lock className="mr-1.5 h-4 w-4" />}
-              {committing ? "Locking in…" : "Lock in plan"}
+              {committing ? "Adding…" : "Add to today"}
             </Button>
           )}
       </div>

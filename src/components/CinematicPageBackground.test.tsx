@@ -116,6 +116,21 @@ describe("CinematicPageBackground", () => {
     expect(screen.queryByTestId("cinematic-background-image-desktop")).not.toBeInTheDocument();
   });
 
+  it.each([
+    "guide",
+    "quests",
+    "companion",
+  ] as CinematicPageBackgroundKey[])("uses the bundled Graceward fallback for %s", (preset) => {
+    render(<CinematicPageBackground preset={preset} />);
+
+    expect(screen.getByTestId("cinematic-background")).toHaveAttribute(
+      "data-cinematic-source",
+      "bundled-fallback",
+    );
+    expect(screen.getByTestId("cinematic-background-image-mobile")).toBeInTheDocument();
+    expect(screen.getByTestId("cinematic-background-image-desktop")).toBeInTheDocument();
+  });
+
   it("uses the configured mobile and desktop focal points", () => {
     mocks.wallpaper = {
       source: "remote",
@@ -157,8 +172,14 @@ describe("CinematicPageBackground", () => {
     });
   });
 
-  it("omits the cosmic polish layer for quieter presets", () => {
-    render(<CinematicPageBackground preset="profile" />);
+  it.each([
+    "guide",
+    "quests",
+    "campaigns",
+    "companion",
+    "profile",
+  ] as CinematicPageBackgroundKey[])("omits Cosmiq star polish from the Graceward %s preset", (preset) => {
+    render(<CinematicPageBackground preset={preset} />);
 
     expect(
       screen.getByTestId("cinematic-background").querySelector('[data-cinematic-stars="true"]'),
@@ -194,6 +215,40 @@ describe("CinematicPageBackground", () => {
     );
     expect(screen.getByTestId("cinematic-background-image-mobile")).toHaveStyle({
       objectPosition: "41% 27%",
+    });
+  });
+
+  it("prioritizes a Garden override and applies its daily light treatment", () => {
+    mocks.wallpaper = {
+      source: "remote",
+      imageUrl: "https://example.com/wallpaper.png",
+      background: {
+        src: "https://example.com/wallpaper.png",
+        src2x: "https://example.com/wallpaper.png",
+      },
+      mobileObjectPosition: "41% 27%",
+      desktopObjectPosition: "45% 31%",
+    };
+
+    render(
+      <CinematicPageBackground
+        preset="companion"
+        overrideBackground={{ src: "/garden-stage.webp", src2x: "/garden-stage.webp" }}
+        overrideSource="garden-spring-stage-3"
+        imageFilter="brightness(0.92) saturate(1.08)"
+      />,
+    );
+
+    expect(screen.getByTestId("cinematic-background")).toHaveAttribute(
+      "data-cinematic-source",
+      "garden-spring-stage-3",
+    );
+    expect(screen.getByTestId("cinematic-background-image-mobile")).toHaveAttribute(
+      "src",
+      "/garden-stage.webp",
+    );
+    expect(screen.getByTestId("cinematic-background-image-mobile")).toHaveStyle({
+      filter: "brightness(0.92) saturate(1.08)",
     });
   });
 

@@ -166,7 +166,7 @@ export const CompanionChatModal = memo(function CompanionChatModal({
         ? "Listening"
         : assistant.isSpeaking
           ? "Speaking"
-          : "Companion chat";
+          : "Faith reflection";
   const usesGeneratedSceneAvatar = shouldContainCompanionSceneImage(imageUrl);
   const canUsePortraitShell =
     !usesGeneratedSceneAvatar && (usesPortraitShell || isCompanionSceneImageSource(imageUrl));
@@ -568,7 +568,7 @@ export const CompanionChatModal = memo(function CompanionChatModal({
               data-vaul-no-drag
             >
               <label htmlFor="companion-chat-input" className="sr-only">
-                Message your companion
+                Share with your companion
               </label>
               <Textarea
                 ref={composerRef}
@@ -643,9 +643,9 @@ export const CompanionChatModal = memo(function CompanionChatModal({
           hideCloseButton
         >
           <DialogHeader className="sr-only">
-            <DialogTitle>Companion chat</DialogTitle>
+            <DialogTitle>Faith reflection</DialogTitle>
             <DialogDescription>
-              Talk with your companion.
+              Reflect, pray, or talk through your next faithful step.
             </DialogDescription>
           </DialogHeader>
           {body}
@@ -667,8 +667,10 @@ export const CompanionChatModal = memo(function CompanionChatModal({
         data-testid="companion-chat-drawer-content"
       >
         <DrawerHeader className="sr-only">
-          <DrawerTitle>Companion chat</DrawerTitle>
-          <DrawerDescription>Talk with your companion.</DrawerDescription>
+          <DrawerTitle>Faith reflection</DrawerTitle>
+          <DrawerDescription>
+            Reflect, pray, or talk through your next faithful step.
+          </DrawerDescription>
         </DrawerHeader>
         {body}
       </DrawerContent>

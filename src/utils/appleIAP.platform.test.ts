@@ -19,17 +19,19 @@ vi.mock("@/utils/platformTargets", () => ({
 import {
   isIAPAvailable,
   resolvePlanFromProductId,
+  resolvePlanFromProductIdForMode,
   storeKitProductToIAP,
   getProductForPlan,
   getPurchaseProductIdForPlan,
   PREMIUM_MONTHLY_PRODUCT_ID,
   PREMIUM_YEARLY_PRODUCT_ID,
+  getAppleSubscriptionProductCatalog,
 } from "@/utils/appleIAP";
 import type { StoreKitProduct } from "@/types/subscription";
 
 const mockProducts: StoreKitProduct[] = [
   {
-    identifier: "cosmiq_premium_monthly",
+    identifier: "graceward_plus_monthly",
     displayName: "Monthly",
     description: "Monthly plan",
     price: 9.99,
@@ -37,7 +39,7 @@ const mockProducts: StoreKitProduct[] = [
     type: "auto_renewable_subscription",
   },
   {
-    identifier: "cosmiq_premium_yearly",
+    identifier: "graceward_plus_yearly",
     displayName: "Yearly",
     description: "Yearly plan",
     price: 99.99,
@@ -76,12 +78,29 @@ describe("appleIAP StoreKit 2 utilities", () => {
   });
 
   describe("resolvePlanFromProductId", () => {
+    it("keeps each build's StoreKit catalog product-specific", () => {
+      const graceward = getAppleSubscriptionProductCatalog("christian");
+      const cosmiq = getAppleSubscriptionProductCatalog("cosmiq");
+
+      expect(graceward.loadProductIds).not.toContain("cosmiq_premium_yearly");
+      expect(cosmiq.loadProductIds).not.toContain("graceward_plus_yearly");
+    });
+
     it("resolves yearly from product ID", () => {
-      expect(resolvePlanFromProductId("cosmiq_premium_yearly")).toBe("yearly");
+      expect(resolvePlanFromProductId("graceward_plus_yearly")).toBe("yearly");
     });
 
     it("resolves monthly from product ID", () => {
-      expect(resolvePlanFromProductId("cosmiq_premium_monthly")).toBe("monthly");
+      expect(resolvePlanFromProductId("graceward_plus_monthly")).toBe("monthly");
+    });
+
+    it("does not accept a Cosmiq product in the Graceward build", () => {
+      expect(resolvePlanFromProductId("cosmiq_premium_yearly")).toBeNull();
+    });
+
+    it("resolves only Cosmiq products when explicitly using Cosmiq mode", () => {
+      expect(resolvePlanFromProductIdForMode("cosmiq_premium_yearly", "cosmiq")).toBe("yearly");
+      expect(resolvePlanFromProductIdForMode("graceward_plus_yearly", "cosmiq")).toBeNull();
     });
 
     it("returns null for null/undefined", () => {
@@ -98,7 +117,7 @@ describe("appleIAP StoreKit 2 utilities", () => {
     it("converts a StoreKit product to IAPProduct", () => {
       const result = storeKitProductToIAP(mockProducts[0]);
       expect(result).toEqual({
-        identifier: "cosmiq_premium_monthly",
+        identifier: "graceward_plus_monthly",
         displayName: "Monthly",
         description: "Monthly plan",
         price: 9.99,
@@ -123,12 +142,12 @@ describe("appleIAP StoreKit 2 utilities", () => {
   describe("getProductForPlan", () => {
     it("finds the monthly product", () => {
       const product = getProductForPlan("monthly", mockProducts);
-      expect(product?.identifier).toBe("cosmiq_premium_monthly");
+      expect(product?.identifier).toBe("graceward_plus_monthly");
     });
 
     it("finds the yearly product", () => {
       const product = getProductForPlan("yearly", mockProducts);
-      expect(product?.identifier).toBe("cosmiq_premium_yearly");
+      expect(product?.identifier).toBe("graceward_plus_yearly");
     });
 
     it("returns undefined when no match", () => {
@@ -138,8 +157,8 @@ describe("appleIAP StoreKit 2 utilities", () => {
 
   describe("getPurchaseProductIdForPlan", () => {
     it("returns product identifier from loaded products", () => {
-      expect(getPurchaseProductIdForPlan("monthly", mockProducts)).toBe("cosmiq_premium_monthly");
-      expect(getPurchaseProductIdForPlan("yearly", mockProducts)).toBe("cosmiq_premium_yearly");
+      expect(getPurchaseProductIdForPlan("monthly", mockProducts)).toBe("graceward_plus_monthly");
+      expect(getPurchaseProductIdForPlan("yearly", mockProducts)).toBe("graceward_plus_yearly");
     });
 
     it("falls back to constant when products are empty", () => {

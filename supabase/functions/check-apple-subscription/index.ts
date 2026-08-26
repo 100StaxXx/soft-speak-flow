@@ -14,6 +14,14 @@ import {
 
 type SupabaseClient = any;
 
+type CheckAppleSubscriptionDeps = {
+  createSupabaseClient?: typeof createClient;
+};
+
+const defaultDeps: Required<CheckAppleSubscriptionDeps> = {
+  createSupabaseClient: createClient,
+};
+
 type ProfileAccessSnapshot = {
   onboarding_completed?: boolean | null;
   onboarding_step?: string | null;
@@ -72,13 +80,17 @@ async function fetchProfileAccessSnapshotForUser(
   return data;
 }
 
-export async function handleCheckAppleSubscription(req: Request) {
+export async function handleCheckAppleSubscription(
+  req: Request,
+  deps: CheckAppleSubscriptionDeps = defaultDeps,
+) {
   if (req.method === "OPTIONS") {
     return handleCors(req);
   }
 
   try {
-    const supabaseClient = createClient(
+    const { createSupabaseClient } = { ...defaultDeps, ...deps };
+    const supabaseClient = createSupabaseClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
@@ -90,7 +102,10 @@ export async function handleCheckAppleSubscription(req: Request) {
     } = await supabaseClient.auth.getUser(authHeader.replace("Bearer ", ""));
 
     if (authError || !user) {
-      return jsonResponse(req, buildAccessStateResponse(null));
+      // Authentication failure is not an entitlement decision. Returning a
+      // successful no-access payload here made a token refresh during iOS app
+      // resume replace an already-open Cosmiq screen with the paywall.
+      return errorResponse(req, "Unauthorized", 401);
     }
 
     const entitlement = await fetchAccountEntitlementForUser(

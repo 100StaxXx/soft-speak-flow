@@ -21,22 +21,22 @@ export interface JourneysCompanionLauncherTemplate {
 }
 
 const FREE_TALK_GREETINGS = [
-  "What's good, friend?",
-  "What's good, buddy?",
-  "What's good, guy?",
-  "What's good, dude?",
-  "What's good, amigo?",
-  "What's good, boss?",
-  "What's good, fam?",
-  "What's good, chief?",
-  "What's good, captain?",
-  "What's good, partner?",
-  "What's good, legend?",
-  "What's good, mon ami?",
-  "What's good, pal?",
-  "What's good, champ?",
-  "What's good, homie?",
-  "What's good today?",
+  "How are you doing today?",
+  "What's on your heart today?",
+  "What would you like to work through?",
+  "What needs your attention today?",
+  "Would you like to reflect or make a plan?",
+  "What are you carrying today?",
+  "Where could you use some clarity?",
+  "What would make today feel more grounded?",
+  "What matters most today?",
+  "How can I help you find your next step?",
+  "Would a quick check-in help?",
+  "What's one thing you want to approach with intention?",
+  "What are you hoping to make room for?",
+  "Where do you need encouragement today?",
+  "Let's take a thoughtful look at your day.",
+  "Tell me what today looks like from your side.",
 ] as const;
 
 const getPlannerDayKey = (date: Date) => {
@@ -70,8 +70,8 @@ const JOURNEYS_LAUNCHER_ACTION_ID_SET = new Set<CompanionPlannerSurfaceAction["i
 
 const QUEST_LAUNCHER_TEMPLATE: JourneysCompanionLauncherTemplate = {
   id: "quest",
-  label: "Quest?",
-  message: "New Quest",
+  label: "Action?",
+  message: "New action",
   target: "auto",
   starterIntent: "general",
 };

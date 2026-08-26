@@ -1,21 +1,23 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
+const isCosmiqBuild = process.env.VITE_PRODUCT_MODE?.trim().toLowerCase() === 'cosmiq';
+
 const config: CapacitorConfig = {
-  appId: 'com.darrylgraham.revolution',
-  appName: 'Cosmiq',
+  appId: isCosmiqBuild ? 'com.darrylgraham.revolution' : 'com.darrylgraham.graceward',
+  appName: isCosmiqBuild ? 'Cosmiq' : 'Graceward',
   webDir: 'dist',
   loggingBehavior: 'none',
   // ⚠️ PRODUCTION BUILD: server config commented out
   // Only use during LOCAL development - DO NOT uncomment for iOS/Android builds!
   // server: {
-  //   url: 'https://app.cosmiq.quest?forceHideBadge=true',
+  //   url: isCosmiqBuild ? 'https://app.cosmiq.quest' : 'https://graceward.app',
   //   cleartext: true
   // },
   plugins: {
     SplashScreen: {
       launchShowDuration: 2000,
       launchAutoHide: false,
-      backgroundColor: '#1a1a1a',
+      backgroundColor: isCosmiqBuild ? '#071a2d' : '#eef0e6',
       androidSplashResourceName: 'splash',
       androidScaleType: 'CENTER_CROP',
       showSpinner: false,

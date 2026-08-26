@@ -1,44 +1,46 @@
 import { memo } from "react";
 import { Card } from "@/components/ui/card";
-import { Bell, Sparkles, Target, TrendingUp, MessageCircle } from "lucide-react";
+import { BookOpen, Moon } from "lucide-react";
+import { PRODUCT } from "@/config/product";
 
 interface NotificationExample {
-  icon: typeof Bell;
+  icon: typeof BookOpen;
   title: string;
   message: string;
   time: string;
   color: string;
 }
 
-const exampleNotifications: NotificationExample[] = [
+const exampleNotifications: NotificationExample[] = PRODUCT.mode === "christian" ? [
   {
-    icon: Sparkles,
-    title: "Daily Pep Talk",
-    message: "Your guide has a new message: 'Remember, you're capable of more than you think.'",
+    icon: BookOpen,
+    title: "Morning Daily Grace",
+    message: "Today’s prayer, Guide encouragement, and ready-made activity are waiting.",
     time: "8:00 AM",
-    color: "text-purple-400"
+    color: "text-primary"
   },
   {
-    icon: Target,
-    title: "Daily Mission",
-    message: "New challenge unlocked: Complete 3 habits today for bonus XP!",
-    time: "9:00 AM",
-    color: "text-blue-400"
-  },
-  {
-    icon: TrendingUp,
-    title: "Streak Milestone",
-    message: "🔥 You're on fire! 7 day streak achieved!",
-    time: "6:00 PM",
-    color: "text-orange-400"
-  },
-  {
-    icon: MessageCircle,
-    title: "Motivational Quote",
-    message: "Success is not final, failure is not fatal: it is the courage to continue that counts.",
-    time: "12:00 PM",
-    color: "text-emerald-400"
+    icon: Moon,
+    title: "Evening Reflection",
+    message: "Take a moment to notice grace and release the day.",
+    time: "8:00 PM",
+    color: "text-primary"
   }
+] : [
+  {
+    icon: BookOpen,
+    title: "Morning Plan",
+    message: "Your priorities, Guide context, and next actions are ready.",
+    time: "8:00 AM",
+    color: "text-primary",
+  },
+  {
+    icon: Moon,
+    title: "Evening Reflection",
+    message: "Review what moved, what changed, and what to carry forward.",
+    time: "8:00 PM",
+    color: "text-primary",
+  },
 ];
 
 export const NotificationPreview = memo(() => {
@@ -49,7 +51,9 @@ export const NotificationPreview = memo(() => {
           What You'll Receive
         </h3>
         <p className="text-sm text-muted-foreground">
-          Preview of notifications that will help keep you motivated and on track:
+          {PRODUCT.mode === "christian"
+            ? "Graceward keeps delivery simple: one morning package and an optional evening invitation."
+            : "Cosmiq keeps delivery focused on the planning and reflection reminders you enable."}
         </p>
       </div>
 
@@ -86,7 +90,7 @@ export const NotificationPreview = memo(() => {
 
       <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
         <p className="text-xs text-muted-foreground leading-relaxed">
-          <span className="text-primary font-semibold">💡 Tip:</span> Notifications are personalized to your guide's style and your goals. You can adjust timing and frequency in settings anytime.
+          <span className="text-primary font-semibold">Your choice:</span> You can adjust the morning time, turn off the evening invitation, or disable notifications entirely.
         </p>
       </div>
     </div>

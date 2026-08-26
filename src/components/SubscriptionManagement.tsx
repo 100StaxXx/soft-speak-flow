@@ -11,8 +11,10 @@ import {
   PREMIUM_BENEFITS,
   PREMIUM_BENEFITS_SUMMARY,
   PREMIUM_PLAN_NOTE,
+  PREMIUM_PRODUCT_NAME,
   PREMIUM_SUBSCRIPTION_LEGAL_LINKS,
 } from "@/config/premiumBenefits";
+import { PRODUCT } from "@/config/product";
 
 type PlanOption = {
   id: IAPPlan;
@@ -31,24 +33,26 @@ const PLAN_OPTIONS: PlanOption[] = [
   {
     id: "monthly",
     label: "Monthly",
-    productTitle: "Cosmiq Pro Monthly",
+    productTitle: `${PREMIUM_PRODUCT_NAME} Monthly`,
     description: PREMIUM_BENEFITS_SUMMARY,
-    hint: "Full Cosmiq access billed monthly.",
-    fallbackPrice: "$9.99",
+    hint: `Full ${PREMIUM_PRODUCT_NAME} access billed monthly.`,
+    fallbackPrice: PRODUCT.mode === "cosmiq" ? "$9.99" : "$8.99",
     billingPeriodLabel: "/month",
     subscriptionLength: "1 month",
-    fallbackUnitPrice: "$9.99/month",
+    fallbackUnitPrice: PRODUCT.mode === "cosmiq" ? "$9.99/month" : "$8.99/month",
   },
   {
     id: "yearly",
     label: "Yearly",
-    productTitle: "Cosmiq Pro Yearly",
+    productTitle: `${PREMIUM_PRODUCT_NAME} Yearly`,
     description: PREMIUM_BENEFITS_SUMMARY,
-    hint: "Full Cosmiq access billed yearly with the best recurring value.",
-    fallbackPrice: "$99.99",
+    hint: `Full ${PREMIUM_PRODUCT_NAME} access billed yearly with the best recurring value.`,
+    fallbackPrice: PRODUCT.mode === "cosmiq" ? "$99.99" : "$49.99",
     billingPeriodLabel: "/year",
     subscriptionLength: "1 year",
-    fallbackUnitPrice: "$8.33/month when billed yearly",
+    fallbackUnitPrice: PRODUCT.mode === "cosmiq"
+      ? "$8.33/month when billed yearly"
+      : "$4.17/month when billed yearly",
     badge: "Most popular",
   },
 ];
@@ -71,12 +75,12 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
   } = useAppleSubscription();
 
   const [selectedPlan, setSelectedPlan] = useState<IAPPlan>("yearly");
-  const selectedProductId = getPurchaseProductIdForPlan(selectedPlan, products);
-  const activeYearlyOfferPrice = activeYearlyOffer?.price ?? "$69.99";
-  const activeYearlyOfferUnitPrice = activeYearlyOffer?.unitPrice ?? "$5.83/month for the first year";
+  const selectedProductId = getPurchaseProductIdForPlan(selectedPlan, products, hasOfferCode);
+  const activeYearlyOfferPrice = activeYearlyOffer?.price ?? "$29.99";
+  const activeYearlyOfferUnitPrice = activeYearlyOffer?.unitPrice ?? "$2.50/month, locked while active";
 
   const subscriptionStatusText = subscription
-    ? `You have Cosmiq (${plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : "Active"})`
+    ? `You have ${PREMIUM_PRODUCT_NAME} (${plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : "Active"})`
     : "You're on the free plan";
 
   const statusLabel = subscription
@@ -99,13 +103,13 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
     return PLAN_OPTIONS.reduce<Record<string, string>>((acc, option) => {
       acc[option.id] = option.id === "yearly" && hasOfferCode
         ? activeYearlyOfferPrice
-        : getProductForPlan(option.id, products)?.displayPrice ?? option.fallbackPrice;
+        : getProductForPlan(option.id, products, hasOfferCode)?.displayPrice ?? option.fallbackPrice;
       return acc;
     }, {});
   }, [activeYearlyOfferPrice, hasOfferCode, products]);
   const unitPriceByPlan = useMemo(() => {
     return PLAN_OPTIONS.reduce<Record<string, string>>((acc, option) => {
-      const product = getProductForPlan(option.id, products);
+      const product = getProductForPlan(option.id, products, hasOfferCode);
       if (option.id === "yearly" && hasOfferCode) {
         acc[option.id] = activeYearlyOfferUnitPrice;
         return acc;
@@ -136,7 +140,7 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Crown className="h-5 w-5 text-primary" />
-            Unlock unlimited companion chat, quests, and offline access
+            Unlock daily practices, Guide reflections, and offline access
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">

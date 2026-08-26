@@ -1,6 +1,6 @@
 import { useProfile } from "./useProfile";
 import { useAccessState } from "./useAccessState";
-import { hasCompletedFinalTutorialCloseout } from "@/utils/guidedTutorial";
+import { hasConcludedGuidedTutorial } from "@/utils/guidedTutorial";
 
 export type AccessSource = 'subscription' | 'promo_code' | 'trial' | 'none';
 export type AccessGateReason = 'none' | 'pre_trial_signup' | 'trial_expired';
@@ -11,7 +11,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const hasGuidedTutorialCompleted = (onboardingData: unknown): boolean => {
   if (!isRecord(onboardingData)) return false;
   const guidedTutorial = onboardingData.guided_tutorial;
-  return hasCompletedFinalTutorialCloseout(guidedTutorial);
+  return hasConcludedGuidedTutorial(guidedTutorial);
 };
 
 const hasLocalGuidedTutorialCompleted = (profileId: unknown): boolean => {
@@ -24,7 +24,7 @@ const hasLocalGuidedTutorialCompleted = (profileId: unknown): boolean => {
     const raw = storage.getItem(`guided_tutorial_progress_${profileId}`);
     if (!raw) return false;
     const parsed: unknown = JSON.parse(raw);
-    return hasCompletedFinalTutorialCloseout(parsed);
+    return hasConcludedGuidedTutorial(parsed);
   } catch {
     return false;
   }
@@ -54,7 +54,9 @@ interface AccessStatus {
 export function useAccessStatus(): AccessStatus {
   const { profile, loading: profileLoading } = useProfile();
   const { accessState, isLoading: accessLoading } = useAccessState();
-  const isSubscribed = accessState.subscribed;
+  const hasSubscriptionEntitlement = accessState.has_access && (
+    accessState.subscribed || accessState.access_source === "trial"
+  );
 
   const loading = profileLoading || accessLoading;
 
@@ -77,11 +79,13 @@ export function useAccessStatus(): AccessStatus {
   if (!profile) {
     return {
       hasAccess: true,
-      isSubscribed,
-      isInTrial: false,
+      isSubscribed: hasSubscriptionEntitlement && accessState.status !== "trialing",
+      isInTrial: hasSubscriptionEntitlement && accessState.status === "trialing",
       trialExpired: false,
       trialDaysRemaining: 0,
-      accessSource: isSubscribed ? 'subscription' : 'none',
+      accessSource: hasSubscriptionEntitlement
+        ? accessState.status === "trialing" ? 'trial' : 'subscription'
+        : 'none',
       gateReason: 'none' as AccessGateReason,
       trialEndsAt: null,
       loading: false,
@@ -95,8 +99,12 @@ export function useAccessStatus(): AccessStatus {
   const trialEndsAt = accessState.trial_ends_at ? new Date(accessState.trial_ends_at) : null;
 
   const now = new Date();
-  const isInTrial = accessState.access_source === "trial" && accessState.has_access;
-  const trialExpired = !isSubscribed && !accessState.has_access && Boolean(trialEndsAt && now > trialEndsAt);
+  const isInTrial = accessState.has_access && (
+    accessState.access_source === "trial"
+    || (accessState.access_source === "subscription" && accessState.status === "trialing")
+  );
+  const isSubscribed = hasSubscriptionEntitlement && !isInTrial;
+  const trialExpired = !hasSubscriptionEntitlement && Boolean(trialEndsAt && now > trialEndsAt);
 
   let trialDaysRemaining = 0;
   if (isInTrial && trialEndsAt) {
@@ -106,14 +114,18 @@ export function useAccessStatus(): AccessStatus {
 
   // Product rule: once guided tutorial concludes, unsubscribed users should land on the trial CTA gate.
   // This intentionally takes precedence over legacy trial timestamp fields.
-  const needsPreTrialSignup = !isSubscribed && tutorialCompleted;
+  const needsPreTrialSignup = !hasSubscriptionEntitlement && tutorialCompleted;
 
   let hasAccess = true;
   let accessSource: AccessSource = 'none';
   let gateReason: AccessGateReason = 'none';
 
-  if (isSubscribed) {
-    accessSource = accessState.access_source === 'promo_code' ? 'promo_code' : 'subscription';
+  if (hasSubscriptionEntitlement) {
+    accessSource = accessState.access_source === 'promo_code'
+      ? 'promo_code'
+      : isInTrial
+        ? 'trial'
+        : 'subscription';
     hasAccess = true;
   } else if (needsPreTrialSignup) {
     hasAccess = false;
@@ -129,9 +141,9 @@ export function useAccessStatus(): AccessStatus {
   return {
     hasAccess,
     isSubscribed,
-    isInTrial: isInTrial && !isSubscribed,
+    isInTrial,
     trialExpired: trialExpired && !isSubscribed,
-    trialDaysRemaining: isSubscribed ? 0 : trialDaysRemaining,
+    trialDaysRemaining: isInTrial ? trialDaysRemaining : 0,
     accessSource,
     gateReason,
     trialEndsAt,

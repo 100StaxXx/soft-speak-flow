@@ -290,11 +290,11 @@ Deno.test("buildFallbackCompanionOpener chooses open-context replies from the ca
   });
 
   const opener = buildFallbackCompanionOpener(snapshot, {
-    openingLine: "what's the word",
+    openingLine: COMPANION_CHAT_OPENING_LINES[0],
   });
 
   assertEquals(opener.signal.type, "open_context");
-  assertEquals(opener.reply, "what's the word");
+  assertEquals(opener.reply, COMPANION_CHAT_OPENING_LINES[0]);
   assert(
     COMPANION_CHAT_OPENING_LINES.includes(
       opener.reply as (typeof COMPANION_CHAT_OPENING_LINES)[number],

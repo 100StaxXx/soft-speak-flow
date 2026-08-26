@@ -7,7 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		21CA9D5C2380AA292E26560E /* LaunchScreenCosmiq.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 7110B758256EF90D7E87073C /* LaunchScreenCosmiq.storyboard */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
+		2FDFF856188FF427FD9A209A /* LaunchScreenGraceward.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = EEBD5B6C2120774DD99AECAF /* LaunchScreenGraceward.storyboard */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
@@ -15,23 +17,25 @@
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
-		AB1000001000000000000001 /* Plugins/AppBadge/AppBadgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB2000001000000000000001 /* Plugins/AppBadge/AppBadgePlugin.swift */; };
-		AB1000001000000000000002 /* Plugins/AppBadge/AppBadgePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = AB2000001000000000000002 /* Plugins/AppBadge/AppBadgePlugin.m */; };
-		AC1000001000000000000001 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2000001000000000000001 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.swift */; };
-		AC1000001000000000000002 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = AC2000001000000000000002 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.m */; };
+		AB1000001000000000000001 /* AppBadgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB2000001000000000000001 /* AppBadgePlugin.swift */; };
+		AB1000001000000000000002 /* AppBadgePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = AB2000001000000000000002 /* AppBadgePlugin.m */; };
+		AC1000001000000000000001 /* AppleOfferCodeRedemptionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2000001000000000000001 /* AppleOfferCodeRedemptionPlugin.swift */; };
+		AC1000001000000000000002 /* AppleOfferCodeRedemptionPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = AC2000001000000000000002 /* AppleOfferCodeRedemptionPlugin.m */; };
+		AS1000001000000000000001 /* AppleStoreKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AS2000001000000000000001 /* AppleStoreKitPlugin.swift */; };
+		AS1000001000000000000002 /* AppleStoreKitPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = AS2000001000000000000002 /* AppleStoreKitPlugin.m */; };
 		CW1000001000000000000001 /* CosmiqWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CW2000001000000000000001 /* CosmiqWidget.swift */; };
 		CW1000001000000000000002 /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = CW2000001000000000000002 /* WidgetData.swift */; };
 		CW1000001000000000000003 /* WidgetViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CW2000001000000000000003 /* WidgetViews.swift */; };
 		CW1000001000000000000004 /* CosmiqWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CW3000001000000000000001 /* CosmiqWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		EV1000001000000000000001 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = EV2000001000000000000001 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.swift */; };
-		EV1000001000000000000002 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = EV2000001000000000000002 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m */; };
-		NC1000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = NC2000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift */; };
-		NC1000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */; };
-		NP1000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = NP2000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift */; };
-		NP1000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = NP2000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m */; };
+		EV1000001000000000000001 /* EvolutionShareVideoPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = EV2000001000000000000001 /* EvolutionShareVideoPlugin.swift */; };
+		EV1000001000000000000002 /* EvolutionShareVideoPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = EV2000001000000000000002 /* EvolutionShareVideoPlugin.m */; };
+		NC1000001000000000000001 /* NativeCalendarPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = NC2000001000000000000001 /* NativeCalendarPlugin.swift */; };
+		NC1000001000000000000002 /* NativeCalendarPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = NC2000001000000000000002 /* NativeCalendarPlugin.m */; };
+		NP1000001000000000000001 /* NativePlacesAutocompletePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = NP2000001000000000000001 /* NativePlacesAutocompletePlugin.swift */; };
+		NP1000001000000000000002 /* NativePlacesAutocompletePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = NP2000001000000000000002 /* NativePlacesAutocompletePlugin.m */; };
 		SC1000001000000000000001 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = SC2000001000000000000001 /* SceneDelegate.swift */; };
-		WD1000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */; };
-		WD1000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */; };
+		WD1000001000000000000001 /* WidgetDataPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = WD2000001000000000000001 /* WidgetDataPlugin.swift */; };
+		WD1000001000000000000002 /* WidgetDataPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = WD2000001000000000000002 /* WidgetDataPlugin.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,41 +64,52 @@
 
 /* Begin PBXFileReference section */
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
+		4AAB51AFC65B1D00716D5D81 /* CosmiqProduct.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = CosmiqProduct.entitlements; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
-		50379B242058CBB4000EE86E /* CosmiqProducts.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = CosmiqProducts.storekit; sourceTree = "<group>"; };
+		50379B242058CBB4000EE86E /* GracewardProducts.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = GracewardProducts.storekit; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		504EC3AA1FED79650016851F /* Config/Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Debug.xcconfig; sourceTree = "<group>"; };
-		504EC3AB1FED79650016851F /* Config/Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Release.xcconfig; sourceTree = "<group>"; };
-		504EC3AC1FED79650016851F /* Config/LocalSecrets.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/LocalSecrets.example.xcconfig; sourceTree = "<group>"; };
+		504EC3AA1FED79650016851F /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Debug.xcconfig; sourceTree = "<group>"; };
+		504EC3AB1FED79650016851F /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Release.xcconfig; sourceTree = "<group>"; };
+		504EC3AC1FED79650016851F /* LocalSecrets.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/LocalSecrets.example.xcconfig; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		60FBC96CEF6986185E42FDC4 /* Pods-App.cosmiqrelease.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.cosmiqrelease.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.cosmiqrelease.xcconfig"; sourceTree = "<group>"; };
+		7110B758256EF90D7E87073C /* LaunchScreenCosmiq.storyboard */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file.storyboard; path = LaunchScreenCosmiq.storyboard; sourceTree = "<group>"; };
+		732713D7D3B518AF2AAA107A /* CosmiqProducts.storekit */ = {isa = PBXFileReference; includeInIndex = 1; path = CosmiqProducts.storekit; sourceTree = "<group>"; };
+		99D3657A8B4654CB0DC00A47 /* Pods-App.gracewarddebug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.gracewarddebug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.gracewarddebug.xcconfig"; sourceTree = "<group>"; };
+		9D58BB7A391BEA6D901F65C3 /* Pods-App.cosmiqdebug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.cosmiqdebug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.cosmiqdebug.xcconfig"; sourceTree = "<group>"; };
 		9DA2C7842ED96C570052831B /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
-		AB2000001000000000000001 /* Plugins/AppBadge/AppBadgePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/AppBadge/AppBadgePlugin.swift; sourceTree = "<group>"; };
-		AB2000001000000000000002 /* Plugins/AppBadge/AppBadgePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/AppBadge/AppBadgePlugin.m; sourceTree = "<group>"; };
-		AC2000001000000000000001 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.swift; sourceTree = "<group>"; };
-		AC2000001000000000000002 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.m; sourceTree = "<group>"; };
+		AB2000001000000000000001 /* AppBadgePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/AppBadge/AppBadgePlugin.swift; sourceTree = "<group>"; };
+		AB2000001000000000000002 /* AppBadgePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/AppBadge/AppBadgePlugin.m; sourceTree = "<group>"; };
+		AC2000001000000000000001 /* AppleOfferCodeRedemptionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.swift; sourceTree = "<group>"; };
+		AC2000001000000000000002 /* AppleOfferCodeRedemptionPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.m; sourceTree = "<group>"; };
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
+		AS2000001000000000000001 /* AppleStoreKitPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/AppleStoreKit/AppleStoreKitPlugin.swift; sourceTree = "<group>"; };
+		AS2000001000000000000002 /* AppleStoreKitPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/AppleStoreKit/AppleStoreKitPlugin.m; sourceTree = "<group>"; };
 		CW2000001000000000000001 /* CosmiqWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmiqWidget.swift; sourceTree = "<group>"; };
 		CW2000001000000000000002 /* WidgetData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetData.swift; sourceTree = "<group>"; };
 		CW2000001000000000000003 /* WidgetViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetViews.swift; sourceTree = "<group>"; };
 		CW2000001000000000000004 /* CosmiqWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CosmiqWidget.entitlements; sourceTree = "<group>"; };
 		CW2000001000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CW3000001000000000000001 /* CosmiqWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CosmiqWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		EV2000001000000000000001 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.swift; sourceTree = "<group>"; };
-		EV2000001000000000000002 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m; sourceTree = "<group>"; };
+		DF672717C3CF53D35E0E0684 /* Pods-App.gracewardrelease.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.gracewardrelease.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.gracewardrelease.xcconfig"; sourceTree = "<group>"; };
+		EEBD5B6C2120774DD99AECAF /* LaunchScreenGraceward.storyboard */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file.storyboard; path = LaunchScreenGraceward.storyboard; sourceTree = "<group>"; };
+		EV2000001000000000000001 /* EvolutionShareVideoPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.swift; sourceTree = "<group>"; };
+		EV2000001000000000000002 /* EvolutionShareVideoPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m; sourceTree = "<group>"; };
+		FBC866E509F70606679DD44C /* Cosmiq.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = Cosmiq.entitlements; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
-		NC2000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/NativeCalendar/NativeCalendarPlugin.swift; sourceTree = "<group>"; };
-		NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/NativeCalendar/NativeCalendarPlugin.m; sourceTree = "<group>"; };
-		NP2000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift; sourceTree = "<group>"; };
-		NP2000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m; sourceTree = "<group>"; };
+		NC2000001000000000000001 /* NativeCalendarPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/NativeCalendar/NativeCalendarPlugin.swift; sourceTree = "<group>"; };
+		NC2000001000000000000002 /* NativeCalendarPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/NativeCalendar/NativeCalendarPlugin.m; sourceTree = "<group>"; };
+		NP2000001000000000000001 /* NativePlacesAutocompletePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift; sourceTree = "<group>"; };
+		NP2000001000000000000002 /* NativePlacesAutocompletePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m; sourceTree = "<group>"; };
 		SC2000001000000000000001 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
-		WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/WidgetData/WidgetDataPlugin.swift; sourceTree = "<group>"; };
-		WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/WidgetData/WidgetDataPlugin.m; sourceTree = "<group>"; };
+		WD2000001000000000000001 /* WidgetDataPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/WidgetData/WidgetDataPlugin.swift; sourceTree = "<group>"; };
+		WD2000001000000000000002 /* WidgetDataPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/WidgetData/WidgetDataPlugin.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -128,7 +143,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3061FED79650016851F /* App */,
-				CW8000001000000000000001 /* ../CosmiqWidget */,
+				CW8000001000000000000001 /* CosmiqWidget */,
 				504EC3051FED79650016851F /* Products */,
 				7F8756D8B27F46E3366F6CEA /* Pods */,
 				27E2DDA53C4D2A4D1A88CE4A /* Frameworks */,
@@ -149,30 +164,36 @@
 			children = (
 				9DA2C7842ED96C570052831B /* App.entitlements */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
-				50379B242058CBB4000EE86E /* CosmiqProducts.storekit */,
-				504EC3AA1FED79650016851F /* Config/Debug.xcconfig */,
-				504EC3AB1FED79650016851F /* Config/Release.xcconfig */,
-				504EC3AC1FED79650016851F /* Config/LocalSecrets.example.xcconfig */,
+				50379B242058CBB4000EE86E /* GracewardProducts.storekit */,
+				504EC3AA1FED79650016851F /* Debug.xcconfig */,
+				504EC3AB1FED79650016851F /* Release.xcconfig */,
+				504EC3AC1FED79650016851F /* LocalSecrets.example.xcconfig */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				SC2000001000000000000001 /* SceneDelegate.swift */,
-				NC2000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift */,
-				NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */,
-				NP2000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift */,
-				NP2000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m */,
-				EV2000001000000000000001 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.swift */,
-				EV2000001000000000000002 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m */,
-					AB2000001000000000000001 /* Plugins/AppBadge/AppBadgePlugin.swift */,
-					AB2000001000000000000002 /* Plugins/AppBadge/AppBadgePlugin.m */,
-					AC2000001000000000000001 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.swift */,
-					AC2000001000000000000002 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.m */,
-					WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */,
-					WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */,
+				NC2000001000000000000001 /* NativeCalendarPlugin.swift */,
+				NC2000001000000000000002 /* NativeCalendarPlugin.m */,
+				NP2000001000000000000001 /* NativePlacesAutocompletePlugin.swift */,
+				NP2000001000000000000002 /* NativePlacesAutocompletePlugin.m */,
+				EV2000001000000000000001 /* EvolutionShareVideoPlugin.swift */,
+				EV2000001000000000000002 /* EvolutionShareVideoPlugin.m */,
+				AB2000001000000000000001 /* AppBadgePlugin.swift */,
+				AB2000001000000000000002 /* AppBadgePlugin.m */,
+				AC2000001000000000000001 /* AppleOfferCodeRedemptionPlugin.swift */,
+				AC2000001000000000000002 /* AppleOfferCodeRedemptionPlugin.m */,
+				AS2000001000000000000001 /* AppleStoreKitPlugin.swift */,
+				AS2000001000000000000002 /* AppleStoreKitPlugin.m */,
+				WD2000001000000000000001 /* WidgetDataPlugin.swift */,
+				WD2000001000000000000002 /* WidgetDataPlugin.m */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
 				504EC3131FED79650016851F /* Info.plist */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				FBC866E509F70606679DD44C /* Cosmiq.entitlements */,
+				732713D7D3B518AF2AAA107A /* CosmiqProducts.storekit */,
+				7110B758256EF90D7E87073C /* LaunchScreenCosmiq.storyboard */,
+				EEBD5B6C2120774DD99AECAF /* LaunchScreenGraceward.storyboard */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -182,11 +203,15 @@
 			children = (
 				FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */,
 				AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */,
+				99D3657A8B4654CB0DC00A47 /* Pods-App.gracewarddebug.xcconfig */,
+				DF672717C3CF53D35E0E0684 /* Pods-App.gracewardrelease.xcconfig */,
+				9D58BB7A391BEA6D901F65C3 /* Pods-App.cosmiqdebug.xcconfig */,
+				60FBC96CEF6986185E42FDC4 /* Pods-App.cosmiqrelease.xcconfig */,
 			);
 			name = Pods;
 			sourceTree = "<group>";
 		};
-		CW8000001000000000000001 /* ../CosmiqWidget */ = {
+		CW8000001000000000000001 /* CosmiqWidget */ = {
 			isa = PBXGroup;
 			children = (
 				CW2000001000000000000001 /* CosmiqWidget.swift */,
@@ -194,6 +219,7 @@
 				CW2000001000000000000003 /* WidgetViews.swift */,
 				CW2000001000000000000004 /* CosmiqWidget.entitlements */,
 				CW2000001000000000000005 /* Info.plist */,
+				4AAB51AFC65B1D00716D5D81 /* CosmiqProduct.entitlements */,
 			);
 			path = ../CosmiqWidget;
 			sourceTree = "<group>";
@@ -220,8 +246,6 @@
 				CW9000001000000000000001 /* PBXTargetDependency */,
 			);
 			name = App;
-			packageProductDependencies = (
-			);
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
@@ -272,8 +296,6 @@
 				Base,
 			);
 			mainGroup = 504EC2FB1FED79650016851F;
-			packageReferences = (
-			);
 			productRefGroup = 504EC3051FED79650016851F /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -295,6 +317,8 @@
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
+				21CA9D5C2380AA292E26560E /* LaunchScreenCosmiq.storyboard in Resources */,
+				2FDFF856188FF427FD9A209A /* LaunchScreenGraceward.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -357,12 +381,6 @@
 				"${BUILT_PRODUCTS_DIR}/GoogleUtilities/GoogleUtilities.framework",
 				"${BUILT_PRODUCTS_DIR}/IONFilesystemLib/IONFilesystemLib.framework",
 				"${BUILT_PRODUCTS_DIR}/PromisesObjC/FBLPromises.framework",
-				"${BUILT_PRODUCTS_DIR}/PurchasesHybridCommon/PurchasesHybridCommon.framework",
-				"${BUILT_PRODUCTS_DIR}/PurchasesHybridCommonUI/PurchasesHybridCommonUI.framework",
-				"${BUILT_PRODUCTS_DIR}/RevenueCat/RevenueCat.framework",
-				"${BUILT_PRODUCTS_DIR}/RevenueCatUI/RevenueCatUI.framework",
-				"${BUILT_PRODUCTS_DIR}/RevenuecatPurchasesCapacitor/RevenuecatPurchasesCapacitor.framework",
-				"${BUILT_PRODUCTS_DIR}/RevenuecatPurchasesCapacitorUi/RevenuecatPurchasesCapacitorUi.framework",
 			);
 			name = "[CP] Embed Pods Frameworks";
 			outputPaths = (
@@ -389,12 +407,6 @@
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/GoogleUtilities.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/IONFilesystemLib.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/FBLPromises.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/PurchasesHybridCommon.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/PurchasesHybridCommonUI.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/RevenueCat.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/RevenueCatUI.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/RevenuecatPurchasesCapacitor.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/RevenuecatPurchasesCapacitorUi.framework",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -432,7 +444,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "PROJECT_ROOT=\"${SRCROOT}/../..\"\nNODE_EXECUTABLE=\"$(${PROJECT_ROOT}/scripts/find-node-for-xcode.sh \"${PROJECT_ROOT}\")\"\n\"${NODE_EXECUTABLE}\" \"${PROJECT_ROOT}/scripts/verify-ios-web-assets.mjs\" --target-built-assets \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/public/assets\" --skip-generated-build-scan\n";
+			shellScript = "PROJECT_ROOT=\"${SRCROOT}/../..\"\nNODE_EXECUTABLE=\"$(${PROJECT_ROOT}/scripts/find-node-for-xcode.sh \"${PROJECT_ROOT}\")\"\n\"${NODE_EXECUTABLE}\" \"${PROJECT_ROOT}/scripts/verify-ios-web-assets.mjs\" --product \"${PRODUCT_BRAND}\" --target-built-assets \"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/public/assets\" --skip-generated-build-scan\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -444,19 +456,21 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				SC1000001000000000000001 /* SceneDelegate.swift in Sources */,
-				NC1000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift in Sources */,
-				NC1000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m in Sources */,
-				NP1000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift in Sources */,
-				NP1000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m in Sources */,
-				EV1000001000000000000001 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.swift in Sources */,
-					EV1000001000000000000002 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m in Sources */,
-					AB1000001000000000000001 /* Plugins/AppBadge/AppBadgePlugin.swift in Sources */,
-					AB1000001000000000000002 /* Plugins/AppBadge/AppBadgePlugin.m in Sources */,
-					AC1000001000000000000001 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.swift in Sources */,
-					AC1000001000000000000002 /* Plugins/AppleOfferCodeRedemption/AppleOfferCodeRedemptionPlugin.m in Sources */,
-					WD1000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift in Sources */,
-					WD1000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m in Sources */,
-				);
+				NC1000001000000000000001 /* NativeCalendarPlugin.swift in Sources */,
+				NC1000001000000000000002 /* NativeCalendarPlugin.m in Sources */,
+				NP1000001000000000000001 /* NativePlacesAutocompletePlugin.swift in Sources */,
+				NP1000001000000000000002 /* NativePlacesAutocompletePlugin.m in Sources */,
+				EV1000001000000000000001 /* EvolutionShareVideoPlugin.swift in Sources */,
+				EV1000001000000000000002 /* EvolutionShareVideoPlugin.m in Sources */,
+				AB1000001000000000000001 /* AppBadgePlugin.swift in Sources */,
+				AB1000001000000000000002 /* AppBadgePlugin.m in Sources */,
+				AC1000001000000000000001 /* AppleOfferCodeRedemptionPlugin.swift in Sources */,
+				AC1000001000000000000002 /* AppleOfferCodeRedemptionPlugin.m in Sources */,
+				AS1000001000000000000001 /* AppleStoreKitPlugin.swift in Sources */,
+				AS1000001000000000000002 /* AppleStoreKitPlugin.m in Sources */,
+				WD1000001000000000000001 /* WidgetDataPlugin.swift in Sources */,
+				WD1000001000000000000002 /* WidgetDataPlugin.m in Sources */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		CWB000001000000000000001 /* Sources */ = {
@@ -499,7 +513,7 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
-		504EC3141FED79650016851F /* Debug */ = {
+		0BAA62DC9ADE54358229C428 /* CosmiqDebug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -560,9 +574,137 @@
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
-			name = Debug;
+			name = CosmiqDebug;
 		};
-		504EC3151FED79650016851F /* Release */ = {
+		34AE99EF7BC8A49CE3FD69EB /* CosmiqRelease */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqProduct.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 349;
+				DEVELOPMENT_TEAM = B6VW78ABTR;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Cosmiq;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 4.8;
+				PRODUCT_BRAND = cosmiq;
+				PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.revolution.CosmiqWidget;
+				PRODUCT_DISPLAY_NAME = Cosmiq;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) COSMIQ_PRODUCT";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = CosmiqRelease;
+		};
+		4411F6AB2BF24B237EBC1A8A /* CosmiqRelease */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 504EC3AB1FED79650016851F /* Release.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconCosmiq;
+				CODE_SIGN_ENTITLEMENTS = App/Cosmiq.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 349;
+				DEVELOPMENT_TEAM = B6VW78ABTR;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Cosmiq;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 4.8;
+				PRODUCT_BRAND = cosmiq;
+				PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.revolution;
+				PRODUCT_DISPLAY_NAME = Cosmiq;
+				PRODUCT_LAUNCH_STORYBOARD = LaunchScreenCosmiq;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_URL_SCHEME = cosmiq;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) COSMIQ_PRODUCT";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = CosmiqRelease;
+		};
+		504EC3141FED79650016851F /* GracewardDebug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = B6VW78ABTR;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = GracewardDebug;
+		};
+		504EC3151FED79650016851F /* GracewardRelease */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -617,47 +759,141 @@
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				VALIDATE_PRODUCT = YES;
 			};
-			name = Release;
+			name = GracewardRelease;
 		};
-		504EC3171FED79650016851F /* Debug */ = {
+		504EC3171FED79650016851F /* GracewardDebug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 504EC3AA1FED79650016851F /* Config/Debug.xcconfig */;
+			baseConfigurationReference = 504EC3AA1FED79650016851F /* Debug.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconGraceward;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 333;
+				CURRENT_PROJECT_VERSION = 38;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = App/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Cosmiq;
+				INFOPLIST_KEY_CFBundleDisplayName = Graceward;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.6;
+				MARKETING_VERSION = 1.0;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
-				PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.revolution;
+				PRODUCT_BRAND = graceward;
+				PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.graceward;
+				PRODUCT_DISPLAY_NAME = Graceward;
+				PRODUCT_LAUNCH_STORYBOARD = LaunchScreenGraceward;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_URL_SCHEME = graceward;
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG GRACEWARD_PRODUCT";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
-			name = Debug;
+			name = GracewardDebug;
 		};
-		504EC3181FED79650016851F /* Release */ = {
+		504EC3181FED79650016851F /* GracewardRelease */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 504EC3AB1FED79650016851F /* Config/Release.xcconfig */;
+			baseConfigurationReference = 504EC3AB1FED79650016851F /* Release.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconGraceward;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 333;
+				CURRENT_PROJECT_VERSION = 38;
+				DEVELOPMENT_TEAM = B6VW78ABTR;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Graceward;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BRAND = graceward;
+				PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.graceward;
+				PRODUCT_DISPLAY_NAME = Graceward;
+				PRODUCT_LAUNCH_STORYBOARD = LaunchScreenGraceward;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_URL_SCHEME = graceward;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) GRACEWARD_PRODUCT";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = GracewardRelease;
+		};
+		5B561E5F02B97AEBA826A924 /* CosmiqRelease */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = B6VW78ABTR;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = CosmiqRelease;
+		};
+		A9BAC3F30308A5654815CD5B /* CosmiqDebug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 504EC3AA1FED79650016851F /* Debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconCosmiq;
+				CODE_SIGN_ENTITLEMENTS = App/Cosmiq.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 349;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = App/Info.plist;
@@ -668,28 +904,33 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.6;
+				MARKETING_VERSION = 4.8;
+				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
+				PRODUCT_BRAND = cosmiq;
 				PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.revolution;
+				PRODUCT_DISPLAY_NAME = Cosmiq;
+				PRODUCT_LAUNCH_STORYBOARD = LaunchScreenCosmiq;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_URL_SCHEME = cosmiq;
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG COSMIQ_PRODUCT";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
-			name = Release;
+			name = CosmiqDebug;
 		};
-		CWD000001000000000000001 /* Debug */ = {
+		B1FA1FAB25E0CD82EA2F78AF /* CosmiqDebug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
-				CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqWidget.entitlements;
+				CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqProduct.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 333;
+				CURRENT_PROJECT_VERSION = 349;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = CosmiqWidget;
+				INFOPLIST_KEY_CFBundleDisplayName = Cosmiq;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -697,28 +938,31 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 4.6;
+				MARKETING_VERSION = 4.8;
+				PRODUCT_BRAND = cosmiq;
 				PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.revolution.CosmiqWidget;
+				PRODUCT_DISPLAY_NAME = Cosmiq;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG COSMIQ_PRODUCT";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
-			name = Debug;
+			name = CosmiqDebug;
 		};
-		CWD000001000000000000002 /* Release */ = {
+		CWD000001000000000000001 /* GracewardDebug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 333;
+				CURRENT_PROJECT_VERSION = 38;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = CosmiqWidget;
+				INFOPLIST_KEY_CFBundleDisplayName = Graceward;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -726,15 +970,50 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 4.6;
-				PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.revolution.CosmiqWidget;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BRAND = graceward;
+				PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.graceward.GracewardWidget;
+				PRODUCT_DISPLAY_NAME = Graceward;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG GRACEWARD_PRODUCT";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
-			name = Release;
+			name = GracewardDebug;
+		};
+		CWD000001000000000000002 /* GracewardRelease */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 38;
+				DEVELOPMENT_TEAM = B6VW78ABTR;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Graceward;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BRAND = graceward;
+				PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.graceward.GracewardWidget;
+				PRODUCT_DISPLAY_NAME = Graceward;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) GRACEWARD_PRODUCT";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = GracewardRelease;
 		};
 /* End XCBuildConfiguration section */
 
@@ -742,29 +1021,35 @@
 		504EC2FF1FED79650016851F /* Build configuration list for PBXProject "App" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				504EC3141FED79650016851F /* Debug */,
-				504EC3151FED79650016851F /* Release */,
+				504EC3141FED79650016851F /* GracewardDebug */,
+				504EC3151FED79650016851F /* GracewardRelease */,
+				0BAA62DC9ADE54358229C428 /* CosmiqDebug */,
+				5B561E5F02B97AEBA826A924 /* CosmiqRelease */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = GracewardRelease;
 		};
 		504EC3161FED79650016851F /* Build configuration list for PBXNativeTarget "App" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				504EC3171FED79650016851F /* Debug */,
-				504EC3181FED79650016851F /* Release */,
+				504EC3171FED79650016851F /* GracewardDebug */,
+				504EC3181FED79650016851F /* GracewardRelease */,
+				A9BAC3F30308A5654815CD5B /* CosmiqDebug */,
+				4411F6AB2BF24B237EBC1A8A /* CosmiqRelease */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = GracewardRelease;
 		};
 		CWA000001000000000000001 /* Build configuration list for PBXNativeTarget "CosmiqWidgetExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				CWD000001000000000000001 /* Debug */,
-				CWD000001000000000000002 /* Release */,
+				CWD000001000000000000001 /* GracewardDebug */,
+				CWD000001000000000000002 /* GracewardRelease */,
+				B1FA1FAB25E0CD82EA2F78AF /* CosmiqDebug */,
+				34AE99EF7BC8A49CE3FD69EB /* CosmiqRelease */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = GracewardRelease;
 		};
 /* End XCConfigurationList section */
 	};

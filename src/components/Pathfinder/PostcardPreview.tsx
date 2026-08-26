@@ -24,9 +24,9 @@ export const PostcardPreview = memo(function PostcardPreview({ milestones, story
     <div className={cn('space-y-3', className)}>
       <div className={cn(plannerPathfinderTheme.raisedPanel, "flex items-center gap-2 p-4")}>
         <Book className="w-4 h-4 text-[hsl(var(--celestial-blue))]" />
-        <span className="font-medium text-sm">Your Story Chapters</span>
+        <span className="font-medium text-sm">Milestone plan</span>
         <Badge variant="outline" className={cn(plannerPathfinderTheme.chip, "ml-auto text-xs")}>
-          {postcardMilestones.length} chapters
+          {postcardMilestones.length} milestones
         </Badge>
       </div>
 
@@ -50,7 +50,7 @@ export const PostcardPreview = memo(function PostcardPreview({ milestones, story
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <span className="text-xs font-medium text-[hsl(var(--celestial-blue))]">
-                    Chapter {index + 1}
+                    Milestone {index + 1}
                   </span>
                   <Star className="w-3 h-3 text-[hsl(var(--celestial-blue))]" />
                 </div>
@@ -70,7 +70,7 @@ export const PostcardPreview = memo(function PostcardPreview({ milestones, story
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        Complete milestones to unlock cosmic postcards from your companion's journey
+        Milestones mark meaningful progress without turning the work into a score.
       </p>
     </div>
   );

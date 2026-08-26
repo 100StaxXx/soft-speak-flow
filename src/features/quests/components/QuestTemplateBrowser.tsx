@@ -123,7 +123,7 @@ export function QuestTemplateBrowser({
   );
 
   const searchPlaceholder = activeTab === "common"
-    ? "Search common quests"
+    ? "Search common actions"
     : "Search your templates";
 
   return (
@@ -141,7 +141,7 @@ export function QuestTemplateBrowser({
             Back
           </Button>
           <div className="min-w-0 text-center">
-            <p className="font-fredoka text-[1.05rem] text-foreground">Quest shortcuts</p>
+            <p className="font-fredoka text-[1.05rem] text-foreground">Action shortcuts</p>
             <p className="text-xs text-muted-foreground">Pick one to prefill your draft</p>
           </div>
           <div className="w-14" aria-hidden="true" />
@@ -217,7 +217,7 @@ export function QuestTemplateBrowser({
           ) : (
             <TemplateEmptyState
               icon={Sparkles}
-              title="No common quests found"
+              title="No common actions found"
               description="Try a different search or switch categories."
             />
           )
@@ -240,7 +240,7 @@ export function QuestTemplateBrowser({
           <TemplateEmptyState
             icon={History}
             title="Your templates will show up here"
-            description="Save a customized template or repeat a quest a couple of times and it will show up here."
+            description="Save a customized template or repeat an action a few times and it will show up here."
           />
         )}
       </div>
@@ -332,10 +332,10 @@ function buildPersonalDescription(template: PersonalQuestTemplate) {
   }
 
   const { lastUsedAt } = template;
-  if (!lastUsedAt) return "A quest you have used before.";
+  if (!lastUsedAt) return "An action you have used before.";
 
   const timestamp = Date.parse(lastUsedAt);
-  if (Number.isNaN(timestamp)) return "A quest you have used before.";
+  if (Number.isNaN(timestamp)) return "An action you have used before.";
 
   return `Last used ${formatDistanceToNow(timestamp, { addSuffix: true })}.`;
 }

@@ -169,8 +169,9 @@ export function TaskAdvancedEditSheet({
     ? `${activeReminderOffsets.length} reminders: ${activeReminderOffsets.map(formatQuestReminderOffset).join(', ')}`
     : formatQuestReminderOffset(activeReminderOffsets[0] ?? reminderMinutes);
   const selectedReminderOffsets = new Set(activeReminderOffsets);
-  const hasCustomReminderOffset = activeReminderOffsets.some((offset) => !REMINDER_PRESET_VALUES.has(offset));
-  const customReminderOffsets = activeReminderOffsets.filter((offset) => !REMINDER_PRESET_VALUES.has(offset));
+  const reminderPresetValues: ReadonlySet<number> = REMINDER_PRESET_VALUES;
+  const hasCustomReminderOffset = activeReminderOffsets.some((offset) => !reminderPresetValues.has(offset));
+  const customReminderOffsets = activeReminderOffsets.filter((offset) => !reminderPresetValues.has(offset));
   const customReminderQuestStart = parseQuestReminderDateTime(scheduledDate, scheduledTime);
   const usesCustomReminderDateTime = Boolean(customReminderQuestStart);
   const customReminderAt = usesCustomReminderDateTime
@@ -413,13 +414,13 @@ export function TaskAdvancedEditSheet({
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="max-h-[90vh]">
         <DrawerHeader className="pb-2">
-          <DrawerTitle className="text-lg">Edit Quest Details</DrawerTitle>
+          <DrawerTitle className="text-lg">Edit action details</DrawerTitle>
         </DrawerHeader>
         
         <div className="px-4 pb-4 space-y-4 overflow-y-auto overscroll-contain max-h-[60vh]" data-vaul-no-drag>
           {/* Task Title */}
           <div className="space-y-2">
-            <Label htmlFor="task-title" className="text-sm font-medium">Quest Title</Label>
+            <Label htmlFor="task-title" className="text-sm font-medium">Action title</Label>
             <Input
               id="task-title"
               value={text}

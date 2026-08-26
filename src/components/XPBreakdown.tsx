@@ -6,10 +6,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, TrendingUp, Flame } from "lucide-react";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { cn, formatDisplayLabel } from "@/lib/utils";
+import { PRODUCT } from "@/config/product";
 
 export const XPBreakdown = memo(() => {
   const { user } = useAuth();
   const { currentStreak = 0, multiplier = 1, nextMilestone } = useStreakMultiplier();
+  const isGraceward = PRODUCT.mode === "christian";
   const now = new Date();
   const today = now.toLocaleDateString('en-CA');
   const startOfTodayIso = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -42,22 +44,23 @@ export const XPBreakdown = memo(() => {
   });
 
   const typeLabels: Record<string, string> = {
-    habit_complete: "Habits",
-    task_complete: "Quests",
-    check_in: "Check-in",
+    habit_complete: "Daily Rhythms",
+    task_complete: "Daily Actions",
+    check_in: "Prayer Check-in",
     evening_reflection: "Evening Reflection",
-    pep_talk: "Pep Talk",
-    pep_talk_listen: "Pep Talk Listen",
-    all_habits_complete: "All Habits Bonus",
-    mission_check_in: "Mission",
-    mission_pep_talk: "Mission",
-    mission_habits_3: "Mission",
-    mission_all_habits: "Mission",
+    prayer_complete: "Prayer",
+    pep_talk: "Daily Encouragement",
+    pep_talk_listen: "Daily Encouragement",
+    all_habits_complete: "Daily Rhythm Bonus",
+    mission_check_in: "Daily Practice",
+    mission_pep_talk: "Daily Practice",
+    mission_habits_3: "Daily Practice",
+    mission_all_habits: "Daily Practice",
     mission_profile_update: "Profile Update",
   };
 
   return (
-    <Card className={cn("p-5 md:p-6 border-primary/16 select-none", outerShellCardClassName)}>
+    <Card className={cn("p-5 md:p-6 border-primary/[0.16] select-none", outerShellCardClassName)}>
       <div className="space-y-4" onContextMenu={(e) => e.preventDefault()}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -65,14 +68,14 @@ export const XPBreakdown = memo(() => {
               <Sparkles className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h3 className="font-heading font-black text-lg">Today's XP</h3>
+              <h3 className="font-heading font-black text-lg">Today’s Growth</h3>
               <p className="text-2xl font-bold text-primary">{todayXP?.total || 0} XP</p>
             </div>
           </div>
         </div>
 
         {/* Streak Info */}
-        <div className="flex items-center justify-between p-3 rounded-lg bg-accent/10 border border-accent/20">
+        {!isGraceward ? <div className="flex items-center justify-between p-3 rounded-lg bg-accent/10 border border-accent/20">
           <div className="flex items-center gap-2">
             <Flame className="h-5 w-5 text-orange-500" />
             <div>
@@ -86,7 +89,14 @@ export const XPBreakdown = memo(() => {
               <p className="text-sm font-bold">{nextMilestone.daysRemaining} days</p>
             </div>
           )}
-        </div>
+        </div> : (
+          <div className="rounded-lg border border-primary/10 bg-primary/[0.05] p-3">
+            <p className="text-sm font-semibold text-foreground">Faithful presence, not performance</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Growth records the practices you return to. It is never a measure of spiritual worth.
+            </p>
+          </div>
+        )}
 
         {/* XP Sources */}
         {todayXP && Object.keys(todayXP.byType).length > 0 && (
@@ -102,7 +112,7 @@ export const XPBreakdown = memo(() => {
         )}
 
         {/* Projection */}
-        {todayXP && todayXP.total > 0 && (
+        {!isGraceward && todayXP && todayXP.total > 0 && (
           <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/10">
             <TrendingUp className="h-4 w-4 text-primary" />
             <p className="text-xs text-muted-foreground">

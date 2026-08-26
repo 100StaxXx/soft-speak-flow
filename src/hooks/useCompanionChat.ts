@@ -24,8 +24,10 @@ import { isCompanionChatSetupError } from "@/utils/companionChatSetup";
 import { resolveCompanionChatError } from "@/utils/companionChatErrors";
 import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 import { safeLocalStorage } from "@/utils/storage";
+import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
-const SPOKEN_REPLY_COUNT_KEY = "companion-chat-spoken-replies-v1";
+const SPOKEN_REPLY_COUNT_KEY = productScopedStorageKey("companion-chat-spoken-replies-v1");
 const MAX_HISTORY_MESSAGES = 8;
 const DEFAULT_SPOKEN_REPLY_LIMIT = Number(import.meta.env.VITE_COMPANION_SPOKEN_REPLY_LIMIT ?? 60);
 
@@ -54,7 +56,7 @@ const createMessage = (
 const mapChatHistory = (rows: CompanionChatRow[]): CompanionChatMessage[] =>
   rows.map((row) => ({
     id: row.id,
-    role: row.role,
+    role: row.role as CompanionChatMessage["role"],
     content: row.content,
     createdAt: row.created_at,
     inputMode: (row.input_mode as CompanionChatInputMode | null) ?? undefined,
@@ -287,6 +289,7 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
     setMessages((previous) => [...previous, optimisticUserMessage]);
 
     try {
+      const currentDateTime = formatCurrentDateTimeWithOffset(new Date());
       const { data, error } = await supabase.functions.invoke("companion-chat", {
         body: {
           message,
@@ -297,6 +300,8 @@ export function useCompanionChat({ enabled = true }: UseCompanionChatOptions = {
           companionId: companion.id,
           inputMode,
           sessionId: sessionIdRef.current,
+          currentDate: currentDateTime.slice(0, 10),
+          currentDateTime,
         } satisfies CompanionChatRequest,
       });
 

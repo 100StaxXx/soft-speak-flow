@@ -131,7 +131,7 @@ const CATEGORY_META = {
   },
   default: {
     icon: Sparkles,
-    label: "Quest",
+    label: "Action",
   },
 } as const;
 

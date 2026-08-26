@@ -11,6 +11,10 @@ const mocks = vi.hoisted(() => ({
   hapticsMediumMock: vi.fn(),
   hapticsHeavyMock: vi.fn(),
   globalAudioMuted: false,
+  setGlobalAudioMutedMock: vi.fn((muted: boolean) => {
+    mocks.globalAudioMuted = muted;
+    mocks.globalAudioListeners.forEach((listener) => listener(muted));
+  }),
   ensureReadyMock: vi.fn(() => Promise.resolve()),
   globalAudioListeners: new Set<(muted: boolean) => void>(),
 }));
@@ -110,6 +114,7 @@ vi.mock("@/utils/logger", () => ({
 vi.mock("@/utils/globalAudio", () => ({
   globalAudio: {
     getMuted: () => mocks.globalAudioMuted,
+    setMuted: (muted: boolean) => mocks.setGlobalAudioMutedMock(muted),
     ensureReady: () => mocks.ensureReadyMock(),
     subscribe: (listener: (muted: boolean) => void) => {
       mocks.globalAudioListeners.add(listener);
@@ -143,17 +148,11 @@ const REDUCED_SEQUENCE_MS = {
 
 const STROBE_BEAT_OFFSETS_MS = [
   0,
-  350,
-  685,
-  1005,
-  1305,
-  1585,
-  1845,
-  2085,
-  2305,
-  2495,
-  2660,
-  2800,
+  520,
+  1040,
+  1560,
+  2080,
+  2600,
 ] as const;
 const FULL_DISMISSABLE_SEQUENCE_MS =
   FULL_SEQUENCE_MS.hold
@@ -163,7 +162,6 @@ const FULL_DISMISSABLE_SEQUENCE_MS =
   + FULL_SEQUENCE_MS.apex
   + FULL_SEQUENCE_MS.reveal
   + FULL_SEQUENCE_MS.dismissBuffer;
-const HATCH_VIDEO_FALLBACK_ASPECT_RATIO = 1764 / 1172;
 
 class MockPreloadImage {
   onload: ((event: Event) => void) | null = null;
@@ -229,6 +227,7 @@ describe("CompanionEvolution", () => {
     mocks.profile = "balanced";
     mocks.prefersReducedMotion = false;
     mocks.globalAudioMuted = false;
+    mocks.setGlobalAudioMutedMock.mockClear();
     mocks.ensureReadyMock.mockResolvedValue(undefined);
     mocks.globalAudioListeners.clear();
 
@@ -292,7 +291,7 @@ describe("CompanionEvolution", () => {
 
     await flushTimers(FULL_SEQUENCE_MS.strobe);
     expect(dialog).toHaveAttribute("data-phase", "apex");
-    expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-beat", "11");
+    expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-beat", "5");
     expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute("data-strobe-target", "next");
 
     await flushTimers(FULL_SEQUENCE_MS.apex);
@@ -392,6 +391,7 @@ describe("CompanionEvolution", () => {
     expect(artStage).toHaveAttribute("data-strobe-beat", "-1");
     expect(artStage).toHaveAttribute("data-strobe-target", "none");
     expect(screen.queryByTestId("evolution-convergence-particles")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("evolution-lightning-strike")).not.toBeInTheDocument();
 
     await flushTimers(REDUCED_SEQUENCE_MS.hold);
     expect(dialog).toHaveAttribute("data-phase", "charge");
@@ -437,12 +437,15 @@ describe("CompanionEvolution", () => {
     expect(dialog).toHaveAttribute("data-phase", "reveal");
     const video = screen.getByTestId("evolution-animation-video") as HTMLVideoElement;
     expect(video).toHaveAttribute("src", props.animationVideoUrl);
-    expect(video.muted).toBe(true);
+    expect(video.muted).toBe(false);
     expect(video.playsInline).toBe(true);
     expect(video).toHaveAttribute("data-animation-ready", "true");
     expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
     expect(video).toHaveStyle({ opacity: "1" });
     expect(screen.getByTestId("evolution-reveal-art")).toHaveAttribute("data-hold-for-animation", "true");
+    expect(screen.getByTestId("evolution-animation-audio-toggle")).toHaveAccessibleName(
+      "Mute evolution cinematic",
+    );
 
     await flushTimers(FULL_SEQUENCE_MS.reveal + FULL_SEQUENCE_MS.dismissBuffer);
     expect(screen.queryByText("Tap anywhere to continue")).not.toBeInTheDocument();
@@ -512,6 +515,7 @@ describe("CompanionEvolution", () => {
 
     expect(props.onAnimationError).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(2);
   });
 
   it("still renders the Kling evolution animation video at the reduced-motion reveal", async () => {
@@ -550,7 +554,8 @@ describe("CompanionEvolution", () => {
 
     expect(screen.queryByTestId("evolution-hatch-intro")).not.toBeInTheDocument();
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
-    expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
+    expect(screen.getByTestId("evolution-previous-art")).toBeInTheDocument();
+    expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
   });
 
   it("uses the image silhouette strobe for generated first hatches without a mapped preset video", async () => {
@@ -580,55 +585,33 @@ describe("CompanionEvolution", () => {
     expect(dialog).toHaveAttribute("data-phase", "strobe");
     expect(artStage).toHaveAttribute("data-strobe-beat", "0");
     expect(artStage).toHaveAttribute("data-strobe-target", "previous");
+    expect(screen.queryByTestId("evolution-lightning-strike")).not.toBeInTheDocument();
 
     await flushTimers(STROBE_BEAT_OFFSETS_MS[1]);
     expect(artStage).toHaveAttribute("data-strobe-beat", "1");
     expect(artStage).toHaveAttribute("data-strobe-target", "next");
   });
 
-  it("plays the mapped first hatch video with embedded audio when global audio is enabled", async () => {
+  it("uses the exact egg and infant images instead of an unverified legacy clip", async () => {
     const props = buildFirstHatchProps();
 
     render(<CompanionEvolution {...props} />);
     await prepareEvolution();
 
-    const dialog = screen.getByRole("alertdialog");
-    const video = screen.getByTestId("evolution-hatch-video") as HTMLVideoElement;
-    const videoStage = screen.getByTestId("evolution-hatch-video-stage");
-
-    expect(video.getAttribute("src")).toContain("/companion-hatch-videos/hatch__fox__fire__center-crop.mp4");
-    expect(video.muted).toBe(false);
-    expect(videoStage).toBeInTheDocument();
-    expect(videoStage.style.height).toBe("");
-    expect(videoStage.style.aspectRatio).toContain(String(HATCH_VIDEO_FALLBACK_ASPECT_RATIO));
-    expect(screen.getByTestId("evolution-hatch-video-backdrop")).toBeInTheDocument();
-    expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
-    expect(screen.queryByTestId("evolution-hatching-overlay")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("evolution-art-stage")).not.toBeInTheDocument();
-
-    Object.defineProperty(video, "videoWidth", {
-      configurable: true,
-      value: 1920,
-    });
-    Object.defineProperty(video, "videoHeight", {
-      configurable: true,
-      value: 1080,
-    });
-
-    await act(async () => {
-      fireEvent.loadedMetadata(video);
-    });
-
-    expect(videoStage.style.height).toBe("");
-    expect(videoStage.style.aspectRatio).toContain(String(1920 / 1080));
-
-    fireEvent.ended(video);
-    expect(screen.getByText("Tap anywhere to continue")).toBeInTheDocument();
-
-    fireEvent.click(dialog);
-
-    expect(props.onComplete).toHaveBeenCalledTimes(1);
-    expect(mocks.hapticsLightMock).toHaveBeenCalled();
+    expect(screen.queryByTestId("evolution-hatch-video")).not.toBeInTheDocument();
+    expect(screen.getByTestId("evolution-art-stage")).toHaveAttribute(
+      "data-strobe-enabled",
+      "true",
+    );
+    expect(screen.getByTestId("evolution-previous-art").querySelector("img")).toHaveAttribute(
+      "src",
+      props.previousImageUrl,
+    );
+    expect(screen.getByTestId("evolution-reveal-art").querySelector("img")).toHaveAttribute(
+      "src",
+      props.newImageUrl,
+    );
+    expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
   });
 
   it("uses a prewarmed evolution animation ahead of mapped first hatch videos", async () => {
@@ -662,16 +645,15 @@ describe("CompanionEvolution", () => {
     expect(video).toHaveStyle({ opacity: "1" });
   });
 
-  it("mutes the hatch video when global audio is disabled", async () => {
+  it("does not restore an unverified legacy hatch clip when global audio is disabled", async () => {
     mocks.globalAudioMuted = true;
     const props = buildFirstHatchProps();
 
     render(<CompanionEvolution {...props} />);
     await prepareEvolution();
 
-    const video = screen.getByTestId("evolution-hatch-video") as HTMLVideoElement;
-    expect(video.muted).toBe(true);
-    expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
+    expect(screen.queryByTestId("evolution-hatch-video")).not.toBeInTheDocument();
+    expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
   });
 
   it("keeps later evolution cinematics on the legacy image-based path without hatch video playback", async () => {
@@ -757,7 +739,7 @@ describe("CompanionEvolution", () => {
     expect(dialog).toHaveAttribute("data-phase", "reveal");
   });
 
-  it("runs a deterministic slower 12-beat barrage before the apex", async () => {
+  it("runs a deterministic six-beat silhouette swap at a flash-safe cadence before one apex strike", async () => {
     render(<CompanionEvolution {...buildProps()} />);
     await prepareEvolution();
 
@@ -765,7 +747,7 @@ describe("CompanionEvolution", () => {
     const artStage = screen.getByTestId("evolution-art-stage");
     const gaps = STROBE_BEAT_OFFSETS_MS.slice(1).map((offset, index) => offset - STROBE_BEAT_OFFSETS_MS[index]);
 
-    expect(gaps[0]).toBeGreaterThan(gaps[gaps.length - 1]);
+    expect(gaps.every((gap) => gap >= 500)).toBe(true);
 
     await flushTimers(FULL_SEQUENCE_MS.hold + FULL_SEQUENCE_MS.charge + FULL_SEQUENCE_MS.conceal);
     expect(dialog).toHaveAttribute("data-phase", "strobe");
@@ -782,12 +764,15 @@ describe("CompanionEvolution", () => {
       expect(dialog).toHaveAttribute("data-phase", "strobe");
       expect(artStage).toHaveAttribute("data-strobe-beat", String(beatIndex));
       expect(artStage).toHaveAttribute("data-strobe-target", expectedTarget);
+      expect(screen.queryByTestId("evolution-lightning-strike")).not.toBeInTheDocument();
     }
 
     await flushTimers(FULL_SEQUENCE_MS.strobe - elapsed);
     expect(dialog).toHaveAttribute("data-phase", "apex");
-    expect(artStage).toHaveAttribute("data-strobe-beat", "11");
+    expect(artStage).toHaveAttribute("data-strobe-beat", "5");
     expect(artStage).toHaveAttribute("data-strobe-target", "next");
+    expect(screen.getByTestId("evolution-lightning-strike")).toHaveAttribute("data-apex", "true");
+    expect(screen.getByTestId("evolution-lightning-strike")).toHaveAttribute("data-variant", "apex");
   });
 
   it("syncs haptics to the cinematic barrage, apex, and reveal", async () => {
@@ -809,7 +794,7 @@ describe("CompanionEvolution", () => {
 
     await flushTimers(FULL_SEQUENCE_MS.strobe - 1);
     expect(dialog).toHaveAttribute("data-phase", "strobe");
-    expect(mocks.hapticsMediumMock).toHaveBeenCalledTimes(3);
+    expect(mocks.hapticsMediumMock).toHaveBeenCalledTimes(1);
     expect(mocks.hapticsHeavyMock).toHaveBeenCalledTimes(1);
 
     await flushTimers(1);
@@ -818,7 +803,7 @@ describe("CompanionEvolution", () => {
 
     await flushTimers(FULL_SEQUENCE_MS.apex);
     expect(dialog).toHaveAttribute("data-phase", "reveal");
-    expect(mocks.hapticsMediumMock).toHaveBeenCalledTimes(4);
+    expect(mocks.hapticsMediumMock).toHaveBeenCalledTimes(2);
   });
 
   it("still allows emergency exit during the longer cinematic sequence", async () => {

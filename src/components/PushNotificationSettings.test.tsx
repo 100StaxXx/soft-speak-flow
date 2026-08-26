@@ -12,8 +12,8 @@ const mocks = vi.hoisted(() => {
   const defaultProfile = {
     daily_push_enabled: false,
     daily_quote_push_enabled: false,
-    habit_reminders_enabled: true,
-    task_reminders_enabled: true,
+    habit_reminders_enabled: false,
+    task_reminders_enabled: false,
     checkin_reminders_enabled: true,
     timezone: "America/Los_Angeles",
     daily_push_time: "08:00",
@@ -241,8 +241,8 @@ describe("PushNotificationSettings debug panel", () => {
   it("shows timezone, token freshness, and recent queue diagnostics", async () => {
     renderWithClient();
 
-    expect(screen.getByText("Mobile Push Notifications")).toBeInTheDocument();
-    expect(screen.getByText("Mobile Push Access")).toBeInTheDocument();
+    expect(screen.getByText("Daily Delivery")).toBeInTheDocument();
+    expect(screen.getByText("Allow Notifications")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Debug Push Notifications/i }));
 
@@ -259,20 +259,18 @@ describe("PushNotificationSettings debug panel", () => {
     expect(screen.getByText("Legacy token rows")).toBeInTheDocument();
     expect(screen.getByText("Repeated logical notifications")).toBeInTheDocument();
     expect(screen.getByText(/Potential duplicate risk detected/i)).toBeInTheDocument();
-    expect(screen.getByText("Recent Quest Queue Rows")).toBeInTheDocument();
+    expect(screen.getByText("Recent action queue rows")).toBeInTheDocument();
     expect(screen.getByText("Reason: no_device_tokens")).toBeInTheDocument();
     expect(screen.getAllByText("task_reminder").length).toBeGreaterThan(0);
     expect(screen.getByText("habit_reminder")).toBeInTheDocument();
   });
 
-  it("shows a recovery clue when quest reminders are enabled but no device token is registered", async () => {
+  it("does not expose legacy action or rhythm reminder controls", async () => {
     mocks.hasActiveNativePushSubscription.mockResolvedValue(false);
-
     renderWithClient();
 
-    await waitFor(() => {
-      expect(screen.getByText(/Quest reminders are enabled, but this device is not registered for mobile push yet/i)).toBeInTheDocument();
-    });
+    expect(screen.queryByText(/optional action reminders/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/scheduled actions and rhythms/i)).not.toBeInTheDocument();
   });
 
   it("refreshes diagnostics immediately after test registration succeeds", async () => {
@@ -331,37 +329,20 @@ describe("PushNotificationSettings debug panel", () => {
     });
   });
 
-  it("updates daily quote delivery time using the backend afternoon default option", async () => {
-    mocks.profile = {
-      ...mocks.defaultProfile,
-      daily_quote_push_enabled: true,
-      daily_quote_push_time: null,
-    };
+  it("toggles the evening examen delivery", async () => {
     const { queryClient } = renderWithClient();
 
+    await waitFor(() => expect(screen.getAllByRole("switch")[2]).not.toBeDisabled());
     await act(async () => {
-      fireEvent.click(screen.getByRole("option", { name: "2:00 PM" }));
+      fireEvent.click(screen.getAllByRole("switch")[2]);
       await Promise.resolve();
       await Promise.resolve();
     });
 
-    expect(mocks.profileUpdateMock).toHaveBeenCalledWith({ daily_quote_push_time: "14:00" });
+    expect(mocks.profileUpdateMock).toHaveBeenCalledWith({ checkin_reminders_enabled: false });
     expect(mocks.profileUpdateEqMock).toHaveBeenCalledWith("id", mocks.user.id);
     expect(queryClient.getQueryData(["profile", mocks.user.id])).toMatchObject({
-      daily_quote_push_time: "14:00",
-    });
-  });
-
-  it("selects the daily quote backend default when Supabase returns seconds", async () => {
-    mocks.profile = {
-      ...mocks.defaultProfile,
-      daily_quote_push_enabled: true,
-      daily_quote_push_time: "14:00:00",
-    };
-    renderWithClient();
-
-    await waitFor(() => {
-      expect(screen.getByRole("option", { name: "2:00 PM" }).getAttribute("aria-selected")).toBe("true");
+      checkin_reminders_enabled: false,
     });
   });
 
@@ -384,8 +365,8 @@ describe("PushNotificationSettings debug panel", () => {
 
     expect(mocks.profileUpdateEqMock).toHaveBeenCalledWith("id", mocks.user.id);
     expect(mocks.toast).toHaveBeenCalledWith({
-      title: "Daily Push Enabled",
-      description: "Settings updated successfully",
+      title: "Daily Encouragement Enabled",
+      description: "Your Guide’s encouragement will arrive at the time you choose.",
     });
     expect(setTimeoutSpy).not.toHaveBeenCalled();
     expect(queryClient.getQueryData(["profile", mocks.user.id])).toMatchObject({

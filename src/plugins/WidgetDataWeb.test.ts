@@ -26,7 +26,7 @@ describe("WidgetDataWeb", () => {
       payloadDate: null,
       payloadUpdatedAt: null,
       payloadByteCount: 0,
-      appGroupId: "group.com.darrylgraham.revolution",
+      appGroupId: "group.com.darrylgraham.graceward",
       dataKey: "widget_tasks_data",
       lastErrorCode: null,
       lastErrorMessage: null,

@@ -1,20 +1,61 @@
-project_id = "opbfpbbqvuksuvmtmssd"
+project_id = "uzyhnksdntctltwfnetd"
 
 [remotes.production]
-project_id = "opbfpbbqvuksuvmtmssd"
+project_id = "uzyhnksdntctltwfnetd"
 
 [remotes.production.auth]
-site_url = "https://app.cosmiq.quest"
+site_url = "https://graceward.app"
 additional_redirect_urls = [
-  "https://app.cosmiq.quest",
-  "https://app.cosmiq.quest/",
-  "https://app.cosmiq.quest/auth",
-  "https://app.cosmiq.quest/auth/reset-password",
-  "https://cosmiq.quest",
-  "https://cosmiq.quest/",
-  "https://cosmiq.quest/auth",
-  "https://cosmiq.quest/auth/reset-password",
+  "https://graceward.app",
+  "https://graceward.app/",
+  "https://graceward.app/auth",
+  "https://graceward.app/auth/reset-password",
+  "https://www.graceward.app",
+  "https://www.graceward.app/",
+  "https://www.graceward.app/auth",
+  "https://www.graceward.app/auth/reset-password",
 ]
+
+[auth]
+site_url = "https://graceward.app"
+additional_redirect_urls = [
+  "https://graceward.app",
+  "https://graceward.app/",
+  "https://graceward.app/auth",
+  "https://graceward.app/auth/reset-password",
+  "https://www.graceward.app",
+  "https://www.graceward.app/",
+  "https://www.graceward.app/auth",
+  "https://www.graceward.app/auth/reset-password",
+]
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+secure_password_change = false
+max_frequency = "1m"
+otp_length = 8
+otp_expiry = 3600
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+# Graceward's native iOS flow exchanges the Apple identity token directly with
+# Supabase Auth. Keep the provider enabled here so config syncs cannot silently
+# disable the production sign-in path.
+[auth.external.apple]
+enabled = true
+client_id = "com.darrylgraham.graceward.web,com.darrylgraham.graceward"
+# Supabase retains the production Apple client-secret JWT. Release automation
+# must inject this variable before any future config push; never commit it.
+secret = "env(SUPABASE_AUTH_EXTERNAL_APPLE_SECRET)"
+
+# Local analytics is not required by the application or database tests. Keeping
+# it off also avoids mounting the host Docker socket into Vector under Colima.
+[analytics]
+enabled = false
 
 [functions.validate-companion-image]
 verify_jwt = false
@@ -117,6 +158,15 @@ verify_jwt = false
 
 [functions.process-companion-animation-job]
 verify_jwt = false
+
+[functions.process-companion-cinema-event]
+verify_jwt = false
+
+[functions.cleanup-companion-cinema-private-assets]
+verify_jwt = false
+
+[functions.manage-companion-cinema-interaction]
+verify_jwt = true
 
 [functions.prewarm-companion-animation]
 verify_jwt = true
@@ -254,6 +304,9 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.generate-evening-response]
+verify_jwt = true
+
+[functions.generate-daily-formation]
 verify_jwt = true
 
 [functions.generate-weekly-recap]

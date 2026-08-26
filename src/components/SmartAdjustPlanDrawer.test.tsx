@@ -47,6 +47,12 @@ vi.mock("@/hooks/useAdjustEpicPlan", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useCompanion", () => ({
+  useCompanion: () => ({
+    companion: null,
+  }),
+}));
+
 vi.mock("@/components/journey/SmartRitualAdvisor", () => ({
   SmartRitualAdvisor: () => <div data-testid="smart-ritual-advisor" />,
 }));

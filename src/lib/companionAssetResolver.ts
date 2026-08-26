@@ -19,13 +19,20 @@ import {
 } from "@/config/companionCatalog";
 import { getCompanionPresetImageAssetKey } from "@/lib/companionImageFocal";
 import { isPresetEggCompanion } from "@/lib/companionPredicates";
+import {
+  getCosmiqCanonicalCompanionAssetUrl,
+  isBundledCosmiqCanonicalCompanionAssetUrl,
+} from "@/config/cosmiqCanonicalCompanionAssets";
+import { getPremadeCompanionPortraitDescriptorForStage } from "@/config/premadeCompanionAssets";
 
 const UNIVERSAL_EGG_ASSET_DIR = "companion-eggs/v2";
 const UNIVERSAL_EGG_CUTOUT_ASSET_DIR = "companion-eggs";
 const COMPANION_PRESET_PUBLIC_PATH_SEGMENT = `/storage/v1/object/public/${COMPANION_PRESET_BUCKET}/`;
 
 interface CompanionAssetSource {
+  product_mode?: "graceward" | "cosmiq" | string | null;
   preset_id?: string | null;
+  spirit_animal?: string | null;
   current_stage?: number | null;
   core_element?: string | null;
   current_image_url?: string | null;
@@ -66,11 +73,14 @@ const isBundledYouthPresetAssetPath = (storagePath: string): boolean => {
     return false;
   }
 
-  return hasBundledYouthCompanionPresetAssets(normalizedPresetId)
-    && (
-      variantSegment === "normal"
-      || COMPANION_EXPRESSION_MOODS.includes(variantSegment as CompanionExpressionMood)
-    );
+  if (!hasBundledYouthCompanionPresetAssets(normalizedPresetId)) return false;
+  if (variantSegment === "normal") return true;
+
+  return COMPANION_EXPRESSION_MOODS.includes(variantSegment as CompanionExpressionMood)
+    && hasBundledCompanionPresetExpressiveAssetCoverage({
+      presetId: normalizedPresetId,
+      tier: COMPANION_PREVIEW_TIER,
+    });
 };
 
 export const normalizeCompanionStoredImageUrl = (
@@ -99,7 +109,10 @@ export const normalizeCompanionStoredImageUrl = (
     return trimmed;
   }
 
-  if (isBundledYouthPresetAssetPath(storagePath)) {
+  if (
+    isBundledYouthPresetAssetPath(storagePath)
+    || isBundledCosmiqCanonicalCompanionAssetUrl(trimmed)
+  ) {
     return `/${assetKey}`;
   }
 
@@ -166,7 +179,9 @@ export const getPresetCompanionAssetUrl = ({
       .data.publicUrl;
   }
 
-  return state === "normal" ? bundledYouthUrl : null;
+  // Never substitute youth art for a later visual stage. A caller can safely
+  // fall back to the companion's last approved stored portrait instead.
+  return null;
 };
 
 export const getPresetCompanionExpressiveAssetUrl = ({
@@ -265,6 +280,21 @@ export const resolveCompanionVisualAssetUrl = (
     return getUniversalEggAssetUrl(normalizedElement);
   }
 
+  const premadePortrait = state === "normal"
+    ? getPremadeCompanionPortraitDescriptorForStage({
+      productMode: companion.product_mode,
+      species: companion.preset_id ?? companion.spirit_animal,
+      element: normalizedElement,
+      stage: companion.current_stage,
+    })
+    : null;
+
+  if (premadePortrait) {
+    return supabase.storage
+      .from(premadePortrait.portraitBucket)
+      .getPublicUrl(premadePortrait.portraitStoragePath).data.publicUrl;
+  }
+
   const normalizedCurrentImageUrl = normalizeCompanionStoredImageUrl(companion.current_image_url);
   const normalizedInitialImageUrl = normalizeCompanionStoredImageUrl(companion.initial_image_url);
   const normalizedDormantImageUrl = normalizeCompanionStoredImageUrl(companion.dormant_image_url);
@@ -279,6 +309,15 @@ export const resolveCompanionVisualAssetUrl = (
     })
     : null;
 
+  const canonicalCosmiqUrl = state === "normal"
+    ? getCosmiqCanonicalCompanionAssetUrl({
+      species: companion.preset_id ?? companion.spirit_animal ?? null,
+      element: normalizedElement,
+      stage: companion.current_stage,
+    })
+    : null;
+
+  if (canonicalCosmiqUrl) return canonicalCosmiqUrl;
   if (presetUrl) return presetUrl;
 
   if (state === "dormant") {

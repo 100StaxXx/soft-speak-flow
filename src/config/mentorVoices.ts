@@ -1,4 +1,4 @@
-import { resolveMentorSlugAlias } from "@/lib/mentorRoster";
+import { MENTOR_DISPLAY_NAMES, resolveMentorSlugAlias } from "@/lib/mentorRoster";
 
 export interface MentorVoiceConfig {
   mentorSlug: string;
@@ -19,8 +19,8 @@ export interface MentorVoiceConfig {
 export const mentorVoices: Record<string, MentorVoiceConfig> = {
   sage: {
     mentorSlug: "sage",
-    mentorName: "The Sage",
-    voiceName: "The Sage",
+    mentorName: MENTOR_DISPLAY_NAMES.sage,
+    voiceName: MENTOR_DISPLAY_NAMES.sage,
     voiceId: "goT3UYdM9bhm0n2lmKQx",
     defaultIntensity: "gentle",
     categories: ["clarity", "calm", "reflection"],
@@ -34,8 +34,8 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   },
   lyra: {
     mentorSlug: "lyra",
-    mentorName: "Lyra",
-    voiceName: "Lyra",
+    mentorName: MENTOR_DISPLAY_NAMES.lyra,
+    voiceName: MENTOR_DISPLAY_NAMES.lyra,
     voiceId: "54YYBuRuAG6KJooiOhFI",
     defaultIntensity: "gentle",
     categories: ["clarity", "signal", "insight"],
@@ -49,8 +49,8 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   },
   icon: {
     mentorSlug: "icon",
-    mentorName: "The Icon",
-    voiceName: "The Icon",
+    mentorName: MENTOR_DISPLAY_NAMES.icon,
+    voiceName: MENTOR_DISPLAY_NAMES.icon,
     voiceId: "6p0P6gezgvY1v6xbLzmU",
     defaultIntensity: "medium",
     categories: ["standards", "identity", "boundaries"],
@@ -64,8 +64,8 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   },
   charles: {
     mentorSlug: "charles",
-    mentorName: "Charles",
-    voiceName: "Charles",
+    mentorName: MENTOR_DISPLAY_NAMES.charles,
+    voiceName: MENTOR_DISPLAY_NAMES.charles,
     voiceId: "jRAAK67SEFE9m7ci5DhD",
     defaultIntensity: "medium",
     categories: ["accountability", "procrastination", "momentum"],
@@ -79,8 +79,8 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   },
   princess: {
     mentorSlug: "princess",
-    mentorName: "The Princess",
-    voiceName: "The Princess",
+    mentorName: MENTOR_DISPLAY_NAMES.princess,
+    voiceName: MENTOR_DISPLAY_NAMES.princess,
     voiceId: "uIZsnBL0YK1S5j69bAih",
     defaultIntensity: "gentle",
     categories: ["self-care", "habits", "soft-discipline"],
@@ -94,8 +94,8 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   },
   operator: {
     mentorSlug: "operator",
-    mentorName: "The Operator",
-    voiceName: "The Operator",
+    mentorName: MENTOR_DISPLAY_NAMES.operator,
+    voiceName: MENTOR_DISPLAY_NAMES.operator,
     voiceId: "pNInz6obpgDQGcFmaJgB",
     defaultIntensity: "high",
     categories: ["structure", "execution", "optimization"],
@@ -109,8 +109,8 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   },
   rival: {
     mentorSlug: "rival",
-    mentorName: "The Rival",
-    voiceName: "The Rival",
+    mentorName: MENTOR_DISPLAY_NAMES.rival,
+    voiceName: MENTOR_DISPLAY_NAMES.rival,
     voiceId: "V33LkP9pVLdcjeB2y5Na",
     defaultIntensity: "high",
     categories: ["competition", "performance", "intensity"],

@@ -711,11 +711,11 @@ describe("TodaysAgenda campaign visibility", () => {
     );
 
     const scheduledPane = screen.getByTestId("scheduled-timeline-pane");
-    expect(within(scheduledPane).getByText("Campaigns")).toBeInTheDocument();
+    expect(within(scheduledPane).getByText("Commitments")).toBeInTheDocument();
     expect(within(scheduledPane).getByText("Fallback Campaign")).toBeInTheDocument();
-    expect(screen.getAllByText("Campaigns")).toHaveLength(1);
+    expect(screen.getAllByText("Commitments")).toHaveLength(1);
 
-    fireEvent.click(within(scheduledPane).getByRole("button", { name: "Open campaigns page" }));
+    fireEvent.click(within(scheduledPane).getByRole("button", { name: "Open commitments page" }));
     expect(onOpenCampaigns).toHaveBeenCalledTimes(1);
   });
 
@@ -752,10 +752,10 @@ describe("TodaysAgenda campaign visibility", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getByText("Campaigns")).toBeInTheDocument();
+    expect(screen.getByText("Commitments")).toBeInTheDocument();
     expect(screen.getByText("Fallback Campaign")).toBeInTheDocument();
     expect(screen.getByText("Morning journal")).toBeInTheDocument();
-    expect(screen.getByText("Campaign Ritual - Fallback Campaign")).toBeInTheDocument();
+    expect(screen.getByText("Commitment rhythm · Fallback Campaign")).toBeInTheDocument();
     expect(screen.getByText("Morning journal").closest('[data-quest-card-shell="true"]')).toHaveClass(
       "campaign-ritual-card",
       "border-primary/35",
@@ -772,6 +772,7 @@ describe("TodaysAgenda campaign visibility", () => {
         mutations: { retry: false },
       },
     });
+    const onOpenCampaigns = vi.fn();
 
     render(
       <TodaysAgenda
@@ -803,12 +804,13 @@ describe("TodaysAgenda campaign visibility", () => {
             epic_habits: [],
           },
         ]}
+        onOpenCampaigns={onOpenCampaigns}
       />,
       { wrapper: createWrapper(queryClient) },
     );
 
     const campaignButton = screen.getByRole("button", {
-      name: "Open campaign Fallback Campaign",
+      name: "Open commitment Fallback Campaign",
     });
 
     fireEvent.click(campaignButton);
@@ -823,6 +825,7 @@ describe("TodaysAgenda campaign visibility", () => {
         mutations: { retry: false },
       },
     });
+    const onOpenCampaigns = vi.fn();
 
     render(
       <TodaysAgenda
@@ -854,6 +857,7 @@ describe("TodaysAgenda campaign visibility", () => {
             epic_habits: [],
           },
         ]}
+        onOpenCampaigns={onOpenCampaigns}
       />,
       { wrapper: createWrapper(queryClient) },
     );
@@ -861,7 +865,7 @@ describe("TodaysAgenda campaign visibility", () => {
     expect(screen.queryByRole("button", { name: "Expand Fallback Campaign rituals" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", {
-      name: "Open campaign Fallback Campaign",
+      name: "Open commitment Fallback Campaign",
     }));
 
     expect(mocks.journeyPathDrawerOpenMock).toHaveBeenCalledWith("epic-1");
@@ -874,6 +878,7 @@ describe("TodaysAgenda campaign visibility", () => {
         mutations: { retry: false },
       },
     });
+    const onOpenCampaigns = vi.fn();
 
     render(
       <TodaysAgenda
@@ -915,12 +920,13 @@ describe("TodaysAgenda campaign visibility", () => {
             epic_habits: [],
           },
         ]}
+        onOpenCampaigns={onOpenCampaigns}
       />,
       { wrapper: createWrapper(queryClient) },
     );
 
     const campaignButton = screen.getByRole("button", {
-      name: "Open campaign Drop 10 of my golf score",
+      name: "Open commitment Drop 10 of my golf score",
     });
 
     fireEvent.click(campaignButton);
@@ -987,7 +993,7 @@ describe("TodaysAgenda campaign visibility", () => {
 
     expect(ritualCard).toHaveAttribute("data-scheduled-timeline-card", "true");
     const detailToggle = within(ritualCard as HTMLElement).getByRole("button", {
-      name: "Show quest details for Morning journal",
+      name: "Show action details for Morning journal",
     });
     expect(detailToggle).toHaveAttribute("data-interactive", "true");
     expect(detailToggle).toHaveAttribute("data-tap-control", "true");
@@ -1033,7 +1039,7 @@ describe("TodaysAgenda campaign visibility", () => {
     );
 
     expect(screen.getByText("Morning journal")).toBeInTheDocument();
-    expect(screen.getByText("Campaign Ritual - Fallback Campaign")).toBeInTheDocument();
+    expect(screen.getByText("Commitment rhythm · Fallback Campaign")).toBeInTheDocument();
 
     view.rerender(
       <TodaysAgenda
@@ -1073,7 +1079,7 @@ describe("TodaysAgenda campaign visibility", () => {
     expect(screen.getByText("New Campaign")).toBeInTheDocument();
     expect(screen.getByText("Morning journal")).toBeInTheDocument();
     expect(screen.getByText("Evening stretch")).toBeInTheDocument();
-    expect(screen.getByText("Campaign Ritual - New Campaign")).toBeInTheDocument();
+    expect(screen.getByText("Commitment rhythm · New Campaign")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Expand New Campaign rituals" })).not.toBeInTheDocument();
   });
 
@@ -1117,7 +1123,7 @@ describe("TodaysAgenda campaign visibility", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getByText("Campaigns")).toBeInTheDocument();
+    expect(screen.getByText("Commitments")).toBeInTheDocument();
     expect(screen.getByText("Hydrated Epic")).toBeInTheDocument();
   });
 
@@ -1150,7 +1156,7 @@ describe("TodaysAgenda campaign visibility", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getByText("Loading campaigns...")).toBeInTheDocument();
+    expect(screen.getByText("Loading commitments...")).toBeInTheDocument();
   });
 });
 
@@ -1430,125 +1436,6 @@ describe("TodaysAgenda attachments", () => {
   });
 });
 
-describe("TodaysAgenda combo feedback", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("increments combo for consecutive completions", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <TodaysAgenda
-        tasks={[
-          { id: "task-1", task_text: "Task One", completed: false, xp_reward: 10, scheduled_time: "09:00" },
-          { id: "task-2", task_text: "Task Two", completed: false, xp_reward: 10, scheduled_time: "09:30" },
-        ]}
-        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
-        onToggle={vi.fn()}
-        onAddQuest={vi.fn()}
-        completedCount={0}
-        totalCount={2}
-        onUndoToggle={vi.fn()}
-      />,
-      { wrapper: createWrapper(queryClient) },
-    );
-
-    fireEvent.click(screen.getAllByRole("checkbox", { name: /mark task as complete/i })[0]);
-    fireEvent.click(screen.getAllByRole("checkbox", { name: /mark task as complete/i })[0]);
-
-    expect(await screen.findByTestId("combo-banner")).toHaveTextContent("Combo x2");
-  });
-
-  it("resets combo on undo and does not immediately retrigger", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <TodaysAgenda
-        tasks={[
-          { id: "task-1", task_text: "Task One", completed: false, xp_reward: 10, scheduled_time: "09:00" },
-          { id: "task-2", task_text: "Task Two", completed: false, xp_reward: 10, scheduled_time: "09:30" },
-        ]}
-        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
-        onToggle={vi.fn()}
-        onAddQuest={vi.fn()}
-        completedCount={0}
-        totalCount={2}
-        onUndoToggle={vi.fn()}
-      />,
-      { wrapper: createWrapper(queryClient) },
-    );
-
-    fireEvent.click(screen.getAllByRole("checkbox", { name: /mark task as complete/i })[0]);
-    fireEvent.click(screen.getAllByRole("checkbox", { name: /mark task as complete/i })[0]);
-    expect(await screen.findByTestId("combo-banner")).toHaveTextContent("Combo x2");
-
-    fireEvent.click(screen.getAllByRole("checkbox", { name: /mark task as incomplete/i })[0]);
-
-    await waitFor(
-      () => {
-        expect(screen.queryByTestId("combo-banner")).not.toBeInTheDocument();
-      },
-      { timeout: 1200 },
-    );
-
-    fireEvent.click(screen.getAllByRole("checkbox", { name: /mark task as complete/i })[0]);
-    const comboBanner = screen.queryByTestId("combo-banner");
-    if (comboBanner) {
-      expect(comboBanner).toHaveStyle({ opacity: "0" });
-    } else {
-      expect(comboBanner).not.toBeInTheDocument();
-    }
-  });
-
-  it("does not chain combo when completion window is exceeded", () => {
-    vi.useFakeTimers();
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <TodaysAgenda
-        tasks={[
-          { id: "task-1", task_text: "Task One", completed: false, xp_reward: 10, scheduled_time: "09:00" },
-          { id: "task-2", task_text: "Task Two", completed: false, xp_reward: 10, scheduled_time: "09:30" },
-        ]}
-        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
-        onToggle={vi.fn()}
-        onAddQuest={vi.fn()}
-        completedCount={0}
-        totalCount={2}
-        onUndoToggle={vi.fn()}
-      />,
-      { wrapper: createWrapper(queryClient) },
-    );
-
-    fireEvent.click(screen.getAllByRole("checkbox", { name: /mark task as complete/i })[0]);
-
-    act(() => {
-      vi.advanceTimersByTime(9000);
-    });
-
-    fireEvent.click(screen.getAllByRole("checkbox", { name: /mark task as complete/i })[0]);
-    expect(screen.queryByTestId("combo-banner")).not.toBeInTheDocument();
-
-    vi.useRealTimers();
-  });
-});
-
 describe("TodaysAgenda scheduled timeline behavior", () => {
   beforeEach(() => {
     mocks.timelineDragState.draggingTaskId = null;
@@ -1752,13 +1639,12 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    const launcher = within(screen.getByTestId("empty-state-pane")).getByRole("button", { name: /Add Quest/i });
+    const launcher = within(screen.getByTestId("empty-state-pane")).getByRole("button", { name: /Add action/i });
     fireEvent.click(launcher);
 
     expect(onAddQuest).toHaveBeenCalledTimes(1);
     expect(onOpenCompanionPlanner).not.toHaveBeenCalled();
     expect(launcher).toHaveAttribute("data-tour", "add-quest-launcher");
-    expect(screen.getByText("New quest")).toBeInTheDocument();
   });
 
   it("adds mobile timeline clearance for the stacked quest launchers", () => {
@@ -2157,11 +2043,10 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(titleRow).toHaveClass("flex", "min-w-0", "w-full");
     expect(marquee).toHaveClass("min-w-0", "w-full", "flex-1");
     expect(actions).toHaveClass("min-w-max", "gap-1.5");
-    expect(within(actions).getByRole("button", { name: "Quest actions" })).toBeInTheDocument();
-    expect(within(actions).getByRole("button", { name: `Show quest details for ${longTitle}` })).toBeInTheDocument();
-    expect(within(actions).getByText("+14")).toBeInTheDocument();
+    expect(within(actions).getByRole("button", { name: "Action menu" })).toBeInTheDocument();
+    expect(within(actions).getByRole("button", { name: `Show action details for ${longTitle}` })).toBeInTheDocument();
     expect(within(actions).getAllByRole("button")).toHaveLength(2);
-    expect(within(titleRegion).getByText("Campaign Ritual - Master UGC content creation")).toBeInTheDocument();
+    expect(within(titleRegion).getByText("Commitment rhythm · Master UGC content creation")).toBeInTheDocument();
   });
 
   it("opens full scheduled quest details from the mobile chevron", async () => {
@@ -2232,11 +2117,10 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
 
     const drawer = await screen.findByTestId("mobile-scheduled-quest-detail-drawer-task-detail-1");
     expect(within(drawer).getByText("Daily Wealth Learning")).toBeInTheDocument();
-    expect(within(drawer).getByText("Quest details")).toBeInTheDocument();
+    expect(within(drawer).getByText("Action details")).toBeInTheDocument();
     expect(within(drawer).getByText("9:00 AM")).toBeInTheDocument();
     expect(within(drawer).getByText("45 min")).toBeInTheDocument();
-    expect(within(drawer).getByText("+30 XP")).toBeInTheDocument();
-    expect(within(drawer).getByText("Main quest")).toBeInTheDocument();
+    expect(within(drawer).getByText("Focus")).toBeInTheDocument();
     expect(within(drawer).getByText("Read chapter one and capture three takeaways.")).toBeInTheDocument();
     expect(within(drawer).getByText("Write three takeaways")).toBeInTheDocument();
     expect(within(drawer).getByRole("link", { name: "Lesson Plan.pdf" })).toHaveAttribute(
@@ -3532,7 +3416,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getByLabelText("Quest actions")).toBeInTheDocument();
+    expect(screen.getByLabelText("Action menu")).toBeInTheDocument();
     expect(onDeleteQuest).not.toHaveBeenCalled();
   });
 
@@ -3565,7 +3449,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    const actionTrigger = screen.getByLabelText("Quest actions");
+    const actionTrigger = screen.getByLabelText("Action menu");
     expect(actionTrigger).toHaveClass("opacity-100");
     expect(actionTrigger).toHaveClass("md:opacity-0");
     expect(actionTrigger).toHaveClass("md:group-hover:opacity-100");
@@ -3609,18 +3493,18 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    const [firstActionTrigger, secondActionTrigger] = screen.getAllByLabelText("Quest actions");
+    const [firstActionTrigger, secondActionTrigger] = screen.getAllByLabelText("Action menu");
 
     openDropdownMenu(firstActionTrigger);
 
     await waitFor(() => {
-      expect(screen.getAllByText("Delete quest")).toHaveLength(1);
+      expect(screen.getAllByText("Delete action")).toHaveLength(1);
     });
 
     openDropdownMenu(secondActionTrigger);
 
     await waitFor(() => {
-      expect(screen.getAllByText("Delete quest")).toHaveLength(1);
+      expect(screen.getAllByText("Delete action")).toHaveLength(1);
     });
   });
 
@@ -3664,17 +3548,17 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    openDropdownMenu(screen.getAllByLabelText("Quest actions")[0]);
+    openDropdownMenu(screen.getAllByLabelText("Action menu")[0]);
 
     await waitFor(() => {
-      expect(screen.getAllByText("Delete quest")).toHaveLength(1);
+      expect(screen.getAllByText("Delete action")).toHaveLength(1);
     });
     expect(screen.getByTestId("quest-action-menu-task-scheduled-1")).toHaveClass("companion-frosted-planner-dark");
     expect(screen.getByTestId("quest-action-menu-task-scheduled-1")).toHaveStyle({
       "--companion-frosted-primary": "155 64% 55%",
     });
 
-    openDropdownMenu(screen.getByLabelText("Sort tasks"));
+    openDropdownMenu(screen.getByLabelText("Sort actions"));
 
     await waitFor(() => {
       expect(screen.getByText("Custom")).toBeInTheDocument();
@@ -3686,7 +3570,6 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     });
     expect(screen.getByText("Time")).toBeInTheDocument();
     expect(screen.getByText("Priority")).toBeInTheDocument();
-    expect(screen.getByText("XP")).toBeInTheDocument();
   });
 
   it("shows the row action trigger when move-to-tomorrow is available", () => {
@@ -3719,7 +3602,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getByLabelText("Quest actions")).toBeInTheDocument();
+    expect(screen.getByLabelText("Action menu")).toBeInTheDocument();
     expect(onMoveQuestToNextDay).not.toHaveBeenCalled();
   });
 
@@ -3929,7 +3812,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(slotMinutes[0]).toBe(0);
     expect(slotMinutes.at(-1)).toBe(23 * 60 + 30);
     expect(screen.getByTestId("journeys-day-grid")).toHaveStyle({ height: "2496px" });
-    expect(screen.getByText("No tasks for this day")).toBeInTheDocument();
+    expect(screen.getByText("No actions for this day")).toBeInTheDocument();
   });
 
   it("positions timed quests by scheduled minute and duration", () => {
@@ -4063,9 +3946,8 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
 
     expect(within(row).getByText("Daily ritual")).toBeInTheDocument();
     expect(within(row).getByText("7:00 AM")).toBeInTheDocument();
-    expect(within(row).getByText("+20")).toBeInTheDocument();
-    expect(within(row).getByRole("button", { name: "Quest actions" })).toBeInTheDocument();
-    expect(within(row).queryByText("Campaign Ritual - Compact Campaign")).not.toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Action menu" })).toBeInTheDocument();
+    expect(within(row).queryByText("Commitment rhythm · Compact Campaign")).not.toBeInTheDocument();
   });
 
   it("keeps 60-minute scheduled quest rows non-compact", () => {

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
 import { useRef, useMemo, useCallback, useEffect } from "react";
@@ -46,10 +47,15 @@ import {
   isAiGeneratedCompanion,
   isPresetEggCompanion,
 } from "@/lib/companionPredicates";
+import {
+  PREMADE_COMPANION_BOUNDARY_LEVELS,
+  isPremadeCompanionBoundaryLevelForProduct,
+} from "@/config/premadeCompanionAssets";
 
 export interface Companion {
   id: string;
   user_id: string;
+  product_mode?: "graceward" | "cosmiq";
   preset_id?: string | null;
   favorite_color: string;
   spirit_animal: string;
@@ -223,6 +229,7 @@ const fetchCompanionById = async (companionId: string): Promise<Companion | null
     .from("user_companion")
     .select("*")
     .eq("id", companionId)
+    .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
     .maybeSingle();
 
   if (error) throw error;
@@ -266,7 +273,8 @@ const repairStalePresetCompanionNormalImage = async ({
       current_image_url: repairedImageUrl,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", companion.id);
+    .eq("id", companion.id)
+    .eq("product_mode", PRODUCT_RUNTIME.authProductMode);
 
   if (error) {
     logger.warn("Failed to repair stale preset companion image", {
@@ -301,6 +309,7 @@ export const fetchCompanion = async (userId: string): Promise<Companion | null> 
     .from("user_companion")
     .select("*")
     .eq("user_id", userId)
+    .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -436,97 +445,6 @@ interface HatchCompanionMutationResult extends HatchCompanionResponse {
   previous_image_url: string;
 }
 
-interface GeneratedCompanionImageResponse {
-  imageUrl?: string;
-  imageFocalX?: number | null;
-  imageFocalY?: number | null;
-  // Provider fallback may return a different aspect ratio than requested.
-  requestedImageSize?: string | null;
-  imageSize?: string | null;
-  visualIdentityProfile?: Record<string, unknown> | null;
-  imageLineageMetadata?: Record<string, unknown> | null;
-  qualityWarning?: Record<string, unknown> | null;
-  qualityWarnings?: Array<Record<string, unknown>>;
-  judgeUnavailable?: boolean;
-  idempotencyReplay?: boolean;
-}
-
-interface CompanionAnimationPrewarmResponse {
-  status?: "queued" | "processing" | "succeeded" | "skipped" | "failed";
-  jobId?: string | null;
-  evolutionId?: string;
-  videoUrl?: string;
-  reason?: string;
-}
-
-const AI_COMPANION_IMAGE_REQUEST_KEY_PREFIX = "soft-speak-flow:ai-companion-image-request:";
-
-const createClientRequestId = (): string => {
-  if (typeof globalThis.crypto?.randomUUID === "function") {
-    return globalThis.crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-};
-
-const getAiCompanionImageRequestKey = (userId: string, fingerprint: string): string => {
-  const fallback = createClientRequestId();
-  try {
-    const storageKey = `${AI_COMPANION_IMAGE_REQUEST_KEY_PREFIX}${userId}`;
-    const existingRaw = window.sessionStorage.getItem(storageKey);
-    if (existingRaw) {
-      const existing = JSON.parse(existingRaw) as { fingerprint?: unknown; requestId?: unknown };
-      if (existing.fingerprint === fingerprint && typeof existing.requestId === "string" && existing.requestId.trim()) {
-        return existing.requestId;
-      }
-    }
-
-    window.sessionStorage.setItem(storageKey, JSON.stringify({ fingerprint, requestId: fallback }));
-  } catch {
-    // Session storage is best-effort; the server still accepts a one-off key.
-  }
-  return fallback;
-};
-
-const clearAiCompanionImageRequestKey = (userId: string): void => {
-  try {
-    window.sessionStorage.removeItem(`${AI_COMPANION_IMAGE_REQUEST_KEY_PREFIX}${userId}`);
-  } catch {
-    // Best-effort cleanup only.
-  }
-};
-
-const requestCompanionAnimationPrewarm = async ({
-  companionId,
-  stage,
-}: {
-  companionId: string;
-  stage: number;
-}): Promise<CompanionAnimationPrewarmResponse | null> => {
-  try {
-    const { data, error } = await supabase.functions.invoke("prewarm-companion-animation", {
-      body: { companionId, stage },
-    });
-
-    if (error) {
-      logger.warn("Companion animation prewarm failed", {
-        companionId,
-        stage,
-        error: error.message ?? String(error),
-      });
-      return null;
-    }
-
-    return (data ?? null) as CompanionAnimationPrewarmResponse | null;
-  } catch (error) {
-    logger.warn("Companion animation prewarm threw", {
-      companionId,
-      stage,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return null;
-  }
-};
-
 type CreateAiCompanionInput = {
   creationMode: "ai";
   favoriteColor: string;
@@ -566,26 +484,51 @@ type AwardXpResult = {
   pending_evolution_count?: number | null;
 };
 
-const getReadyVisualBoundaryLevel = (claimedStage: number, earnedLevel: number): number | null =>
-  getNextUnclaimedVisualStageBoundaryLevel(claimedStage, earnedLevel);
+const getReadyVisualBoundaryLevel = (
+  claimedStage: number,
+  earnedLevel: number,
+  productMode?: Companion["product_mode"],
+): number | null => {
+  const boundaryLevel = getNextUnclaimedVisualStageBoundaryLevel(claimedStage, earnedLevel);
+  return boundaryLevel !== null && isPremadeCompanionBoundaryLevelForProduct({
+    productMode,
+    boundaryLevel,
+  })
+    ? boundaryLevel
+    : null;
+};
 
-const getPendingVisualEvolutionCount = (claimedStage: number, earnedLevel: number): number => (
-  getPendingVisualStageBoundaryCount(claimedStage, earnedLevel)
-);
+const getPendingVisualEvolutionCount = (
+  claimedStage: number,
+  earnedLevel: number,
+  productMode?: Companion["product_mode"],
+): number => {
+  if (productMode !== "graceward" && productMode !== "cosmiq") {
+    return getPendingVisualStageBoundaryCount(claimedStage, earnedLevel);
+  }
+
+  return PREMADE_COMPANION_BOUNDARY_LEVELS.filter((boundaryLevel) =>
+    boundaryLevel > claimedStage &&
+    boundaryLevel <= earnedLevel &&
+    isPremadeCompanionBoundaryLevelForProduct({ productMode, boundaryLevel })
+  ).length;
+};
 
 const getLevelProgressFeedback = ({
   claimedStage,
   earnedLevel,
   earnedLevelBefore,
+  productMode,
 }: {
   claimedStage: number;
   earnedLevel: number;
   earnedLevelBefore: number;
+  productMode?: Companion["product_mode"];
 }): { message: string } | null => {
   if (earnedLevel <= earnedLevelBefore) return null;
 
-  const readyBoundaryLevel = getReadyVisualBoundaryLevel(claimedStage, earnedLevel);
-  const pendingEvolutionCount = getPendingVisualEvolutionCount(claimedStage, earnedLevel);
+  const readyBoundaryLevel = getReadyVisualBoundaryLevel(claimedStage, earnedLevel, productMode);
+  const pendingEvolutionCount = getPendingVisualEvolutionCount(claimedStage, earnedLevel, productMode);
   if (readyBoundaryLevel !== null) {
     return {
       message: pendingEvolutionCount > 1
@@ -851,21 +794,70 @@ type EvolutionMutationResult = {
   status: string;
 } | null;
 
-const kickQueuedEvolutionJob = (jobId: string) => {
-  void supabase.functions.invoke("process-companion-evolution-job", {
-    body: { jobId },
-  }).then(({ error }) => {
-    if (!error) return;
-    logger.warn("Queued companion evolution processor kick failed", {
-      jobId,
+const EVOLUTION_PROCESSOR_RETRY_DELAYS_MS = [0, 250, 1_000] as const;
+
+const waitForEvolutionProcessorRetry = (delayMs: number) =>
+  new Promise<void>((resolve) => window.setTimeout(resolve, delayMs));
+
+export const kickQueuedEvolutionJob = async (
+  jobId: string,
+  retryDelaysMs: readonly number[] = EVOLUTION_PROCESSOR_RETRY_DELAYS_MS,
+): Promise<boolean> => {
+  for (let attempt = 0; attempt < retryDelaysMs.length; attempt += 1) {
+    const delayMs = retryDelaysMs[attempt] ?? 0;
+    if (delayMs > 0) {
+      await waitForEvolutionProcessorRetry(delayMs);
+    }
+
+    try {
+      const { error } = await supabase.functions.invoke("process-companion-evolution-job", {
+        body: { jobId },
+      });
+      if (!error) return true;
+
+      logger.warn("Queued companion evolution processor kick failed", {
+        jobId,
+        attempt: attempt + 1,
+        willRetry: attempt + 1 < retryDelaysMs.length,
+        error: error.message ?? String(error),
+      });
+    } catch (error) {
+      logger.warn("Queued companion evolution processor kick threw", {
+        jobId,
+        attempt: attempt + 1,
+        willRetry: attempt + 1 < retryDelaysMs.length,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return false;
+};
+
+export const enqueueNextCosmiqCinemaEvent = async (
+  companionId: string,
+): Promise<boolean> => {
+  try {
+    const { error } = await supabase.functions.invoke(
+      "process-companion-cinema-event",
+      {
+        body: { action: "enqueue", companionId },
+      },
+    );
+    if (!error) return true;
+
+    logger.warn("Cosmiq cinema enqueue failed", {
+      companionId,
       error: error.message ?? String(error),
     });
-  }).catch((error) => {
-    logger.warn("Queued companion evolution processor kick threw", {
-      jobId,
+  } catch (error) {
+    logger.warn("Cosmiq cinema enqueue threw", {
+      companionId,
       error: error instanceof Error ? error.message : String(error),
     });
-  });
+  }
+
+  return false;
 };
 
 interface UseCompanionOptions {
@@ -1006,7 +998,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
           ? data.favoriteColor?.trim() || getCompanionElementAnchorColor(normalizedElement)
           : getCompanionElementAnchorColor(normalizedElement);
         const resolvedSpiritAnimal = isAiCreation
-          ? data.spiritAnimal?.trim() || "Dragon"
+          ? data.spiritAnimal?.trim() || "Lamb"
           : data.spiritAnimal?.trim() || preset?.displayName || "Egg";
 
         logger.info("Companion creation started", {
@@ -1020,101 +1012,10 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
         const eyeColor = "";
         const furColor = "";
-        let currentImageUrl = getUniversalEggAssetUrl(normalizedElement);
-        let currentImageFocal = getBundledCompanionImageFocalPoint(currentImageUrl);
-        let visualIdentityProfile: Record<string, unknown> | null = null;
-        let imageLineageMetadata: Record<string, unknown> | null = null;
-        const shouldDeferInitialImageGeneration =
-          isAiCreation && data.deferInitialImageGeneration === true;
-        const aiImageRequest = isAiCreation
-          ? {
-            spiritAnimal: resolvedSpiritAnimal,
-            element: normalizedElement,
-            stage: 0,
-            favoriteColor: resolvedFavoriteColor,
-            storyTone: data.storyTone,
-            flowType: "ai_onboarding_egg",
-            idempotencyKey: getAiCompanionImageRequestKey(
-              user.id,
-              JSON.stringify({
-                spiritAnimal: resolvedSpiritAnimal,
-                element: normalizedElement,
-                favoriteColor: resolvedFavoriteColor,
-                storyTone: data.storyTone,
-                flowType: "ai_onboarding_egg",
-              }),
-            ),
-          }
-          : null;
-
-        const generateAiCompanionEggImage = async (): Promise<GeneratedCompanionImageResponse> => {
-          if (!aiImageRequest) {
-            throw new Error("AI companion image request was not prepared.");
-          }
-
-          const { data: generatedImageData, error: generatedImageError } =
-            await supabase.functions.invoke("generate-companion-image", {
-              body: aiImageRequest,
-            });
-
-          if (generatedImageError) {
-            const parsed = await parseFunctionInvokeError(generatedImageError);
-            throw new Error(toUserFacingFunctionError(parsed, { action: "create your AI companion egg" }));
-          }
-
-          const generatedImage = (generatedImageData ?? null) as GeneratedCompanionImageResponse | null;
-          if (!generatedImage?.imageUrl) {
-            throw new Error("AI companion image generation did not return an egg portrait.");
-          }
-
-          return generatedImage;
-        };
-
-        const applyGeneratedAiImageLocally = (generatedImage: GeneratedCompanionImageResponse) => {
-          currentImageUrl = generatedImage.imageUrl!;
-          currentImageFocal = {
-            x: typeof generatedImage.imageFocalX === "number" ? generatedImage.imageFocalX : 0.5,
-            y: typeof generatedImage.imageFocalY === "number" ? generatedImage.imageFocalY : 0.5,
-          };
-          visualIdentityProfile = generatedImage.visualIdentityProfile ?? null;
-          imageLineageMetadata = generatedImage.imageLineageMetadata ?? null;
-        };
-
-        const logGeneratedAiImageWarnings = (generatedImage: GeneratedCompanionImageResponse) => {
-          if (generatedImage.qualityWarning || generatedImage.judgeUnavailable) {
-            logger.warn("AI companion image returned with quality warning", {
-              userId: user.id,
-              idempotencyReplay: generatedImage.idempotencyReplay === true,
-              qualityWarning: generatedImage.qualityWarning ?? null,
-              judgeUnavailable: generatedImage.judgeUnavailable === true,
-            });
-          }
-          if (
-            generatedImage.requestedImageSize &&
-            generatedImage.imageSize &&
-            generatedImage.requestedImageSize !== generatedImage.imageSize
-          ) {
-            logger.warn("AI companion image returned with provider size fallback", {
-              userId: user.id,
-              requestedImageSize: generatedImage.requestedImageSize,
-              imageSize: generatedImage.imageSize,
-            });
-          }
-        };
-
-        if (isAiCreation) {
-          if (shouldDeferInitialImageGeneration) {
-            logger.info("Deferring AI companion egg image generation until after companion record creation", {
-              userId: user.id,
-              coreElement: normalizedElement,
-              spiritAnimal: resolvedSpiritAnimal,
-            });
-          } else {
-            const generatedImage = await generateAiCompanionEggImage();
-            applyGeneratedAiImageLocally(generatedImage);
-            logGeneratedAiImageWarnings(generatedImage);
-          }
-        }
+        const currentImageUrl = getUniversalEggAssetUrl(normalizedElement);
+        const currentImageFocal = getBundledCompanionImageFocalPoint(currentImageUrl);
+        const visualIdentityProfile: Record<string, unknown> | null = null;
+        const imageLineageMetadata: Record<string, unknown> | null = null;
 
         logger.log("Stage 0 asset resolved successfully, creating companion record...");
 
@@ -1196,13 +1097,18 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
           preset_id: companionResult[0]?.preset_id ?? null,
           ...companionResult[0],
         } as CreateCompanionIfNotExistsResult;
+        const returnedProductMode = companionData.product_mode;
+        if (
+          (returnedProductMode === "graceward" || returnedProductMode === "cosmiq") &&
+          returnedProductMode !== PRODUCT_RUNTIME.authProductMode
+        ) {
+          throw new Error(
+            "An existing companion belongs to the other app. Sign out and use the account created for this app.",
+          );
+        }
         const isNewCompanion = companionData.is_new;
 
         logger.log(`Companion ${isNewCompanion ? "created" : "already exists"}:`, companionData.id);
-        if (isAiCreation) {
-          clearAiCompanionImageRequestKey(user.id);
-        }
-
         // Stage 0 history is now created by the security-definer RPC so onboarding
         // does not depend on client-side INSERT access to companion_evolutions.
         const { data: stageZeroEvolution, error: stageZeroEvolutionError } = await supabase
@@ -1231,6 +1137,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
                 .from("user_companion")
                 .select("*")
                 .eq("id", companionData.id)
+                .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
                 .single();
 
               await supabase.functions.invoke("generate-evolution-card", {
@@ -1303,72 +1210,8 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
           });
         }
 
-        if (isNewCompanion && companionData.current_stage === 0) {
-          void requestCompanionAnimationPrewarm({
-            companionId: companionData.id,
-            stage: 1,
-          });
-        }
-
         if (Object.prototype.hasOwnProperty.call(data, "companionName")) {
           await persistCompanionCustomName(companionData.id, data.companionName);
-        }
-
-        if (shouldDeferInitialImageGeneration && aiImageRequest && companionData.current_stage === 0) {
-          void (async () => {
-            try {
-              const generatedImage = await generateAiCompanionEggImage();
-              logGeneratedAiImageWarnings(generatedImage);
-
-              const applyDeferredImage = supabase.rpc as unknown as (
-                functionName: "apply_deferred_companion_onboarding_image",
-                args: {
-                  p_companion_id: string;
-                  p_image_url: string;
-                  p_image_focal_x: number | null;
-                  p_image_focal_y: number | null;
-                  p_visual_identity_profile: Record<string, unknown> | null;
-                  p_image_lineage_metadata: Record<string, unknown> | null;
-                },
-              ) => Promise<{ error: SupabaseRpcError | null }>;
-
-              const { error: applyError } = await applyDeferredImage(
-                "apply_deferred_companion_onboarding_image",
-                {
-                  p_companion_id: companionData.id,
-                  p_image_url: generatedImage.imageUrl!,
-                  p_image_focal_x: typeof generatedImage.imageFocalX === "number" ? generatedImage.imageFocalX : 0.5,
-                  p_image_focal_y: typeof generatedImage.imageFocalY === "number" ? generatedImage.imageFocalY : 0.5,
-                  p_visual_identity_profile: generatedImage.visualIdentityProfile ?? null,
-                  p_image_lineage_metadata: generatedImage.imageLineageMetadata ?? null,
-                },
-              );
-
-              if (applyError) {
-                throw new Error(applyError.message?.trim() || "Failed to apply deferred companion image.");
-              }
-
-              clearAiCompanionImageRequestKey(user.id);
-              void requestCompanionAnimationPrewarm({
-                companionId: companionData.id,
-                stage: 1,
-              });
-              queryClient.invalidateQueries({ queryKey: ["companion"] });
-              logger.info("Deferred AI companion egg image applied", {
-                userId: user.id,
-                companionId: companionData.id,
-                durationMs: Date.now() - creationStartedAt,
-              });
-            } catch (deferredImageError) {
-              logger.warn("Deferred AI companion egg image generation failed", {
-                userId: user.id,
-                companionId: companionData.id,
-                error: deferredImageError instanceof Error
-                  ? deferredImageError.message
-                  : String(deferredImageError),
-              });
-            }
-          })();
         }
 
         logger.info("Companion creation completed", {
@@ -1521,10 +1364,12 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
       void generateStageOneArtifacts();
 
-      await requestCompanionAnimationPrewarm({
-        companionId: companionToUse.id,
-        stage: 1,
-      });
+      if (companionToUse.product_mode === "cosmiq") {
+        // The hatch reveal must never wait for generation. The cinema worker is
+        // idempotent and cron-backed, so this best-effort kick only reduces the
+        // time until the Level 5 portrait and film are ready.
+        void enqueueNextCosmiqCinemaEvent(companionToUse.id);
+      }
 
       return {
         ...hatchResult,
@@ -1603,6 +1448,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         claimedStage,
         earnedLevel,
         earnedLevelBefore,
+        productMode: companion?.product_mode,
       });
 
       if (feedback) {
@@ -1710,7 +1556,11 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
     const claimedStage = typeof awardResult.claimed_stage_after === "number"
       ? awardResult.claimed_stage_after
       : companionData.current_stage;
-    const pendingEvolutionCount = getPendingVisualEvolutionCount(claimedStage, earnedLevel);
+    const pendingEvolutionCount = getPendingVisualEvolutionCount(
+      claimedStage,
+      earnedLevel,
+      companionData.product_mode,
+    );
     const shouldEvolveNow = pendingEvolutionCount > 0;
 
     logger.log("[XP Award Debug]", {
@@ -1747,7 +1597,10 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
   };
 
   const evolveCompanion = useMutation<EvolutionMutationResult, Error, { newStage: number; currentXP: number }>({
-    mutationFn: async ({ newStage: _newStage, currentXP: _currentXP }: { newStage: number; currentXP: number }) => {
+    mutationFn: async ({ newStage: _newStage, currentXP: _currentXP }: {
+      newStage: number;
+      currentXP: number;
+    }): Promise<EvolutionMutationResult> => {
       // Prevent duplicate evolution requests - wait for any ongoing evolution
       if (evolutionInProgress.current) {
         logger.log("Evolution already in progress, rejecting duplicate request");
@@ -1788,10 +1641,20 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
             throw new Error("Evolution service is temporarily unavailable. Please try again in a minute.");
           }
 
-          kickQueuedEvolutionJob(queuedJob.job_id);
+          void kickQueuedEvolutionJob(queuedJob.job_id).then((started) => {
+            if (started) return;
+
+            setIsEvolvingLoading(false);
+            queryClient.invalidateQueries({ queryKey: ["companion"] });
+            toast.error(
+              queuedJob.requested_stage === 1
+                ? "Your hatch is queued but couldn't start. Tap Hatch to try again."
+                : "Your evolution is queued but couldn't start. Tap Evolve to try again.",
+            );
+          });
 
           return {
-            queued: true,
+            queued: true as const,
             jobId: queuedJob.job_id,
             newStage: queuedJob.requested_stage,
             status: queuedJob.status,
@@ -1879,7 +1742,11 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
   const canEvolve = useMemo(() => {
     if (!companion) return false;
-    return getReadyVisualBoundaryLevel(companion.current_stage, earnedLevel) !== null;
+    return getReadyVisualBoundaryLevel(
+      companion.current_stage,
+      earnedLevel,
+      companion.product_mode,
+    ) !== null;
   }, [companion, earnedLevel]);
 
   const isEvolutionBusy = evolveCompanion.isPending || hatchCompanion.isPending;
@@ -1912,6 +1779,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
     const nextVisualBoundaryLevel = getReadyVisualBoundaryLevel(
       latestCompanion.current_stage,
       latestEarnedLevel,
+      latestCompanion.product_mode,
     );
     const latestCanEvolve = nextVisualBoundaryLevel !== null;
     const hatchAnimationSnapshot = options?.hatchAnimationSnapshot;
@@ -1945,6 +1813,8 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
 
       if (latestEarnedLevel > latestCompanion.current_stage) {
         toast.success(`Level ${latestEarnedLevel} reached!`);
+      } else if (hatchAnimationSnapshot && latestCompanion.current_stage === 0) {
+        toast.error("Your hatch progress is still syncing. Please try again in a moment.");
       }
       return;
     }

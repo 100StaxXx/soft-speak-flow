@@ -399,29 +399,41 @@ describe("CompanionDialogue", () => {
     }
   });
 
-  it("falls back to bundled youth preset art when expressive portraits are not available for the current tier", () => {
+  it("preserves the approved portrait when a legacy preset has no art for the current tier", async () => {
+    const restoreImage = installMockImageLoader(() => false);
     mocks.companion.current_stage = 21;
-    mocks.companion.current_image_url = "/companion-eggs/egg__t0_egg__normal__fire.png";
+    mocks.companion.current_image_url =
+      "https://assets.example.com/approved-griffin-stage-5.png";
     mocks.companion.preset_id = "griffin";
     mocks.companion.core_element = "fire";
     mocks.companion.cached_creature_name = "Griffin";
     mocks.companion.spirit_animal = "Griffin";
 
-    const { container } = render(<CompanionDialogue />);
+    try {
+      const { container } = render(<CompanionDialogue />);
 
-    expect(container.innerHTML).toContain(
-      "griffin/t1_youth/normal/griffin__t1_youth__normal__fire.png",
-    );
-    expect(container.innerHTML).not.toContain("/companion-eggs/egg__t0_egg__normal__fire.png");
+      await waitFor(() => {
+        expect(container.innerHTML).toContain(
+          "https://assets.example.com/approved-griffin-stage-5.png",
+        );
+      });
+      expect(container.innerHTML).not.toContain(
+        "griffin/t1_youth/normal/griffin__t1_youth__normal__fire.png",
+      );
 
-    fireEvent.click(screen.getByRole("button", { name: /open griffin dialogue/i }));
-    const dialog = screen.getByRole("dialog", { name: "Griffin" });
-    expect(dialog.innerHTML).toContain(
-      "griffin/t1_youth/normal/griffin__t1_youth__normal__fire.png",
-    );
+      fireEvent.click(screen.getByRole("button", { name: /open griffin dialogue/i }));
+      const dialog = screen.getByRole("dialog", { name: "Griffin" });
+      await waitFor(() => {
+        expect(dialog.innerHTML).toContain(
+          "https://assets.example.com/approved-griffin-stage-5.png",
+        );
+      });
+    } finally {
+      restoreImage();
+    }
   });
 
-  it("uses expressive portraits for the dialogue avatar when the active tier supports them", () => {
+  it("keeps expression metadata while using the real normal portrait pack", () => {
     mocks.companion.current_stage = 6;
     mocks.companion.current_image_url = "/companion-eggs/egg__t0_egg__normal__fire.png";
     mocks.companion.preset_id = "griffin";
@@ -446,8 +458,9 @@ describe("CompanionDialogue", () => {
       "4",
     );
     expect(container.innerHTML).toContain(
-      "griffin/t2_guardian/happy/griffin__t2_guardian__happy__v4__fire.png",
+      "griffin/t2_guardian/normal/griffin__t2_guardian__normal__fire.png",
     );
+    expect(container.innerHTML).not.toContain("griffin/t2_guardian/happy/");
   });
 
   it("falls back to the normal portrait when the expressive avatar URL fails to load", async () => {

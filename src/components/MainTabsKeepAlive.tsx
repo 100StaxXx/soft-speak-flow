@@ -11,26 +11,31 @@ import {
 } from "react";
 import { MainTabVisibilityProvider } from "@/contexts/MainTabVisibilityContext";
 import { logger } from "@/utils/logger";
+import { PRODUCT } from "@/config/product";
 
-type MainTabPath = "/mentor" | "/journeys" | "/campaigns" | "/companion";
+type MainTabPath = "/companion" | "/mentor" | "/guide" | "/journeys";
 
-const TAB_ORDER: MainTabPath[] = ["/mentor", "/journeys", "/campaigns", "/companion"];
+const TAB_ORDER: MainTabPath[] = PRODUCT.mode === "cosmiq"
+  ? ["/mentor", "/journeys", "/companion"]
+  : ["/companion", "/mentor", "/guide"];
 
 const TAB_COMPONENTS: Record<MainTabPath, LazyExoticComponent<ComponentType>> = {
-  "/mentor": lazy(() => import("@/pages/Mentor")),
-  "/journeys": lazy(() => import("@/pages/Journeys")),
-  "/campaigns": lazy(() => import("@/pages/Campaigns")),
   "/companion": lazy(() => import("@/pages/Companion")),
+  "/mentor": PRODUCT.mode === "cosmiq"
+    ? lazy(() => import("@/pages/Mentor"))
+    : lazy(() => import("@/pages/Today")),
+  "/guide": lazy(() => import("@/pages/Guide")),
+  "/journeys": lazy(() => import("@/pages/Journeys")),
 };
 
 export const isMainTabPath = (pathname: string): pathname is MainTabPath =>
   TAB_ORDER.includes(pathname as MainTabPath);
 
 const initialScrollPositions: Record<MainTabPath, number> = {
-  "/mentor": 0,
-  "/journeys": 0,
-  "/campaigns": 0,
   "/companion": 0,
+  "/mentor": 0,
+  "/guide": 0,
+  "/journeys": 0,
 };
 
 const SCROLL_RESTORE_EPSILON_PX = 1;

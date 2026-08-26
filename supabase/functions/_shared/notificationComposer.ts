@@ -3,6 +3,7 @@ import {
   getNotificationSafeCompanionName,
   type NotificationCompanionNameContext,
 } from "./companionName.ts";
+import { MENTOR_DISPLAY_NAMES, resolveActiveMentorSlug } from "./mentorRoster.ts";
 
 export interface CompanionNotificationContext extends NotificationCompanionNameContext {
   currentMood?: string | null;
@@ -61,10 +62,11 @@ export function composeNotificationCopy(input: NotificationComposeInput): Notifi
 
   switch (input.type) {
     case "daily_pep": {
-      const companionName = getCompanionName(input.companion);
-      const summary = asString(payload.summary, "Your daily pep talk is ready.");
+      const summary = asString(payload.summary, "Your daily encouragement is ready.");
+      const mentorSlug = resolveActiveMentorSlug(asString(payload.mentor_slug));
+      const mentorName = mentorSlug ? MENTOR_DISPLAY_NAMES[mentorSlug] : "Your Guide";
       return {
-        title: `${companionName} has a message for you`,
+        title: `A word from ${mentorName}`,
         body: summary,
       };
     }
@@ -80,7 +82,7 @@ export function composeNotificationCopy(input: NotificationComposeInput): Notifi
 
     case "mentor_nudge": {
       const companionName = getCompanionName(input.companion);
-      const message = asString(payload.message, "Your mentor left you a quick nudge.");
+      const message = asString(payload.message, "Your Guide left you a note for today.");
       return {
         title: `${companionName} is checking in`,
         body: message,
@@ -89,22 +91,22 @@ export function composeNotificationCopy(input: NotificationComposeInput): Notifi
 
     case "task_start": {
       const isRitualTask = isRitualTaskPayload(payload);
-      const taskText = asString(payload.task_text, isRitualTask ? "Your ritual" : "Your quest");
+      const taskText = asString(payload.task_text, isRitualTask ? "Your rhythm" : "Your action");
       const xpReward = asNumber(payload.xp_reward, 0);
       return {
-        title: isRitualTask ? "Ritual starting now" : "Quest starting now",
+        title: isRitualTask ? "Your rhythm is ready" : "Your action is ready",
         body: xpReward > 0 ? `${taskText} (+${xpReward} XP)` : taskText,
       };
     }
 
     case "task_reminder": {
       const isRitualTask = isRitualTaskPayload(payload);
-      const taskText = asString(payload.task_text, isRitualTask ? "Your ritual" : "Your quest");
+      const taskText = asString(payload.task_text, isRitualTask ? "Your rhythm" : "Your action");
       const xpReward = asNumber(payload.xp_reward, 0);
       const leadMinutes = asNumber(payload.reminder_minutes_before, 15);
       const leadLabel = formatLeadMinutes(leadMinutes);
       return {
-        title: isRitualTask ? "Ritual reminder" : "Quest reminder",
+        title: isRitualTask ? "Rhythm reminder" : "Action reminder",
         body: xpReward > 0
           ? `${taskText} starts in ${leadLabel} (+${xpReward} XP)`
           : `${taskText} starts in ${leadLabel}`,
@@ -112,10 +114,10 @@ export function composeNotificationCopy(input: NotificationComposeInput): Notifi
     }
 
     case "habit_reminder": {
-      const title = asString(payload.habit_title, "your habit");
+      const title = asString(payload.habit_title, "your rhythm");
       return {
-        title: "Habit reminder",
-        body: `Time to work on ${title}.`,
+        title: "A faithful rhythm",
+        body: `An invitation to return to ${title}.`,
       };
     }
 
@@ -137,8 +139,8 @@ export function composeNotificationCopy(input: NotificationComposeInput): Notifi
 
     case "checkin_evening_reminder": {
       return {
-        title: "Evening reflection reminder",
-        body: "Close the day with a quick reflection and a small reset for tomorrow.",
+        title: "Release the day",
+        body: "Notice grace, name what was hard, and rest in God’s care.",
       };
     }
 

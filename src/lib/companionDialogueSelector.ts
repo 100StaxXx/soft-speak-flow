@@ -7,6 +7,7 @@ import {
   getLinesForToneAndBucket,
 } from "@/config/companionDialoguePacks";
 import { safeLocalStorage } from "@/utils/storage";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
 export type DialogueMood = "thriving" | "content" | "concerned" | "desperate" | "recovering";
 export type DialogueTriggerSource =
@@ -66,7 +67,7 @@ export interface DialogueSelectionResult {
 
 type ShimmerWeights = Record<CompanionShimmerType, number>;
 
-const HISTORY_STORAGE_KEY = "companion_dialogue_history_v1";
+const HISTORY_STORAGE_KEY = productScopedStorageKey("companion_dialogue_history_v1");
 const HISTORY_MAX = 50;
 const RECENT_LINE_BLOCK_DAYS = 14;
 const RED_COOLDOWN_MS = 20 * 60 * 1000;
@@ -213,6 +214,9 @@ const inferPreferredTonePack = (
   if (
     normalized.includes("calm")
     || normalized.includes("mentor")
+    || normalized.includes("gentle")
+    || normalized.includes("reflective")
+    || normalized.includes("faith-aware")
     || normalized.includes("grounded")
     || normalized.includes("supportive")
     || normalized.includes("wise")
@@ -223,6 +227,8 @@ const inferPreferredTonePack = (
 
   if (
     normalized.includes("strategic")
+    || normalized.includes("practical")
+    || normalized.includes("organized")
     || normalized.includes("analytical")
     || normalized.includes("efficient")
     || normalized.includes("systems")
@@ -233,6 +239,10 @@ const inferPreferredTonePack = (
   if (
     normalized.includes("alpha")
     || normalized.includes("chaotic")
+    || normalized.includes("steadfast")
+    || normalized.includes("courageous")
+    || normalized.includes("joyful")
+    || normalized.includes("playful")
     || normalized.includes("sharp")
     || normalized.includes("streetwise")
     || normalized.includes("irreverent")

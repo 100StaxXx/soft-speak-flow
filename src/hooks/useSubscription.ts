@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import type { CustomerInfo } from "@revenuecat/purchases-capacitor";
+import type { AppleCustomerInfo } from "@/providers/StoreKitProvider";
 import { useAccessState } from "./useAccessState";
 import { useStoreKit } from "./useStoreKit";
 
@@ -34,7 +34,7 @@ export function useSubscription() {
       plan: accessState.plan === "monthly" || accessState.plan === "yearly" ? accessState.plan : null,
       current_period_end: accessState.subscription_end ?? null,
       product_identifier: currentEntitlement?.productId ?? null,
-      billing_provider: "revenuecat",
+      billing_provider: "storekit2",
       trial_ends_at: accessState.trial_ends_at,
     };
   }, [accessState, currentEntitlement]);
@@ -50,8 +50,8 @@ export function useSubscription() {
   }, [expirationDate, subscription?.current_period_end]);
 
   const planPrice = useMemo(() => {
-    if (subscription?.plan === "yearly") return "$99.99/year";
-    if (subscription?.plan === "monthly") return "$9.99/month";
+    if (subscription?.plan === "yearly") return "$49.99/year";
+    if (subscription?.plan === "monthly") return "$8.99/month";
     return null;
   }, [subscription?.plan]);
 
@@ -71,6 +71,6 @@ export function useSubscription() {
     nextBillingDate,
     planPrice,
     plan: subscription?.plan,
-    customerInfo: customerInfo as CustomerInfo | null,
+    customerInfo: customerInfo as AppleCustomerInfo | null,
   };
 }

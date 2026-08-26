@@ -9,6 +9,12 @@ const mocks = vi.hoisted(() => ({
     access_source: "none",
     trial_ends_at: null,
     subscribed: false,
+  } as {
+    has_access: boolean;
+    access_source: string;
+    trial_ends_at: string | null;
+    subscribed: boolean;
+    status?: string | null;
   },
   accessLoading: false,
 }));
@@ -110,7 +116,7 @@ describe("useAccessStatus", () => {
     mocks.accessState = {
       has_access: true,
       access_source: "trial",
-      trial_ends_at: "2026-03-01T00:00:00.000Z",
+      trial_ends_at: "2099-03-01T00:00:00.000Z",
       subscribed: false,
     };
 
@@ -159,11 +165,11 @@ describe("useAccessStatus", () => {
     expect(result.current.gateReason).toBe("none");
   });
 
-  it("shows pre-trial signup gate after final closeout even if legacy trial dates exist", () => {
+  it("keeps an already-active trial open after final tutorial closeout", () => {
     mocks.accessState = {
       has_access: true,
       access_source: "trial",
-      trial_ends_at: "2026-03-01T00:00:00.000Z",
+      trial_ends_at: "2099-03-01T00:00:00.000Z",
       subscribed: false,
     };
     mocks.profile = createProfile({
@@ -177,8 +183,35 @@ describe("useAccessStatus", () => {
 
     const { result } = renderHook(() => useAccessStatus());
 
-    expect(result.current.hasAccess).toBe(false);
-    expect(result.current.gateReason).toBe("pre_trial_signup");
+    expect(result.current.hasAccess).toBe(true);
+    expect(result.current.isInTrial).toBe(true);
+    expect(result.current.gateReason).toBe("none");
+  });
+
+  it("recognizes a StoreKit introductory subscription as an active trial", () => {
+    mocks.accessState = {
+      has_access: true,
+      access_source: "subscription",
+      trial_ends_at: "2099-03-01T00:00:00.000Z",
+      subscribed: true,
+      status: "trialing",
+    };
+    mocks.profile = createProfile({
+      onboarding_data: {
+        guided_tutorial: {
+          completed: true,
+          milestonesCompleted: ["mentor_closeout_message"],
+        },
+      },
+    });
+
+    const { result } = renderHook(() => useAccessStatus());
+
+    expect(result.current.hasAccess).toBe(true);
+    expect(result.current.isInTrial).toBe(true);
+    expect(result.current.isSubscribed).toBe(false);
+    expect(result.current.accessSource).toBe("trial");
+    expect(result.current.gateReason).toBe("none");
   });
 
   it("shows pre-trial signup gate from local final closeout completion before profile refresh", () => {
@@ -215,7 +248,7 @@ describe("useAccessStatus", () => {
     expect(result.current.gateReason).toBe("none");
   });
 
-  it("does not trigger the pre-trial gate when the tutorial was dismissed instead of completed", () => {
+  it("shows the pre-trial gate when the optional tutorial was dismissed", () => {
     mocks.profile = createProfile({
       onboarding_data: {
         guided_tutorial: { completed: false, dismissed: true },
@@ -224,7 +257,7 @@ describe("useAccessStatus", () => {
 
     const { result } = renderHook(() => useAccessStatus());
 
-    expect(result.current.hasAccess).toBe(true);
-    expect(result.current.gateReason).toBe("none");
+    expect(result.current.hasAccess).toBe(false);
+    expect(result.current.gateReason).toBe("pre_trial_signup");
   });
 });

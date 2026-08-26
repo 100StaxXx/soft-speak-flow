@@ -641,7 +641,7 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
         if (habitLookupError) throw habitLookupError;
         if (!matchingHabits || matchingHabits.length === 0) return;
 
-        throw new Error("Campaign ritual link not found");
+        throw new Error("Commitment rhythm link not found");
       }
 
       await runDailyTaskCleanupUpdate({

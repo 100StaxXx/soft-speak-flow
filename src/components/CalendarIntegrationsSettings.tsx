@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
-import { CalendarDays, Link2, Unlink2, RefreshCcw, EyeOff, Eye } from 'lucide-react';
+import { CalendarDays, Link2, Unlink2, RefreshCcw, EyeOff, Eye, ChevronDown, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
 import {
   useCalendarIntegrations,
   type CalendarProvider,
+  type CalendarSyncMode,
 } from '@/hooks/useCalendarIntegrations';
+import { useQuestCalendarSync } from '@/hooks/useQuestCalendarSync';
 import { getCalendarOAuthRedirectUri, getCalendarOAuthSource } from '@/utils/calendarOAuthRedirect';
+import { PRODUCT } from '@/config/product';
 
 const PROVIDERS: Array<{ key: CalendarProvider; label: string; web: boolean; ios: boolean }> = [
   { key: 'google', label: 'Google Calendar', web: true, ios: true },
@@ -19,13 +23,68 @@ const PROVIDERS: Array<{ key: CalendarProvider; label: string; web: boolean; ios
   { key: 'apple', label: 'Apple Calendar', web: false, ios: true },
 ];
 
+const SYNC_MODE_LABELS: Record<CalendarSyncMode, string> = {
+  send_only: 'Send only',
+  full_sync: 'Two-way sync',
+};
+
 const isNativeIOS = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
 
 const providerLabel = (provider: CalendarProvider): string =>
   PROVIDERS.find((item) => item.key === provider)?.label ?? provider;
 
+const toCount = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : 0;
+
 const plural = (count: number, singular: string, pluralLabel = `${singular}s`) =>
   `${count} ${count === 1 ? singular : pluralLabel}`;
+
+const formatLastSyncedAt = (value: string | null | undefined): string => {
+  if (!value) return 'Waiting for first sync';
+  const syncedAt = new Date(value);
+  if (Number.isNaN(syncedAt.getTime())) return 'Sync time unavailable';
+  return `Last synced ${syncedAt.toLocaleString()}`;
+};
+
+const summarizeSyncResult = (result: unknown): string => {
+  if (!result || typeof result !== 'object') {
+    return 'No linked updates found.';
+  }
+
+  const payload = result as {
+    linkedEvents?: Record<string, unknown> | null;
+    linkedTasks?: Record<string, unknown> | null;
+    plannerWindow?: Record<string, unknown> | null;
+    plannerTasks?: Record<string, unknown> | null;
+  };
+  const responses = [payload.linkedEvents, payload.linkedTasks, payload.plannerTasks]
+    .filter((item): item is Record<string, unknown> => Boolean(item));
+
+  const checked = responses.reduce((total, item) => total + toCount(item.linksChecked), 0);
+  const providerUpdates = responses.reduce((total, item) => total + toCount(item.pulledProviderChanges), 0);
+  const imported = toCount(payload.plannerTasks?.importedCount);
+  const updated = providerUpdates + toCount(payload.plannerTasks?.updatedCount);
+  const removed = responses.reduce(
+    (total, item) =>
+      total
+      + toCount(item.removedCancelled)
+      + toCount(item.removedMissing)
+      + (Array.isArray(item.removedTaskIds) ? item.removedTaskIds.length : 0),
+    0,
+  );
+  const cachedAvailability = toCount(payload.plannerWindow?.cachedCount);
+
+  const parts: string[] = [];
+  if (checked > 0) parts.push(`${plural(checked, 'linked item')} checked`);
+  if (imported > 0) parts.push(`${plural(imported, 'To Do task')} imported`);
+  if (updated > 0) parts.push(`${plural(updated, 'item')} updated`);
+  if (removed > 0) parts.push(`${plural(removed, 'stale item')} removed`);
+  if (parts.length === 0 && cachedAvailability > 0) {
+    parts.push(`${plural(cachedAvailability, 'calendar item')} refreshed`);
+  }
+
+  return parts.length > 0 ? `${parts.join(', ')}.` : 'No linked updates found.';
+};
 
 export function CalendarIntegrationsSettings() {
   const { toast } = useToast();
@@ -39,6 +98,7 @@ export function CalendarIntegrationsSettings() {
     beginOAuthConnection,
     completeOAuthConnection,
     disconnectProvider,
+    setProviderSyncMode,
     listProviderCalendars,
     setPrimaryCalendar,
     listProviderTaskLists,
@@ -49,6 +109,8 @@ export function CalendarIntegrationsSettings() {
     refreshCalendarIntegrations,
   } = useCalendarIntegrations();
 
+  const { syncProviderPull } = useQuestCalendarSync();
+
   const [calendarOptionsByProvider, setCalendarOptionsByProvider] = useState<
     Partial<Record<CalendarProvider, Array<{ id: string; name: string }>>>
   >({});
@@ -56,11 +118,23 @@ export function CalendarIntegrationsSettings() {
     Partial<Record<CalendarProvider, Array<{ id: string; name: string }>>>
   >({});
   const [connectingProvider, setConnectingProvider] = useState<CalendarProvider | null>(null);
+  const [syncingProvider, setSyncingProvider] = useState<Exclude<CalendarProvider, 'apple'> | null>(null);
+  const [isAutoLoadingOutlookOptions, setIsAutoLoadingOutlookOptions] = useState(false);
+  const [isActivatingOutlookPlanning, setIsActivatingOutlookPlanning] = useState(false);
+  const [autoLoadedOutlookConnectionId, setAutoLoadedOutlookConnectionId] = useState<string | null>(null);
+  const [advancedOpenByProvider, setAdvancedOpenByProvider] = useState<Partial<Record<CalendarProvider, boolean>>>({});
 
   const canUseApple = isNativeIOS();
   const hasConnectedProviders = connections.length > 0;
   const isEffectivelyVisible = integrationVisible || !hasConnectedProviders;
   const outlookConnection = connectedByProvider.outlook;
+  const isOutlookPlannerReady = Boolean(
+    outlookConnection
+    && outlookConnection.sync_mode === 'full_sync'
+    && defaultProvider === 'outlook'
+    && outlookConnection.primary_calendar_id
+    && outlookConnection.primary_task_list_id,
+  );
 
   const clearOauthParams = useCallback((params: URLSearchParams, keys: string[]) => {
     keys.forEach((key) => params.delete(key));
@@ -213,6 +287,60 @@ export function CalendarIntegrationsSettings() {
       });
   }, [clearOauthParams, completeOAuthConnection, toast]);
 
+  useEffect(() => {
+    if (!outlookConnection) return;
+    if (isAutoLoadingOutlookOptions) return;
+    if (autoLoadedOutlookConnectionId === outlookConnection.id) return;
+
+    const hasLoadedCalendars = (calendarOptionsByProvider.outlook?.length ?? 0) > 0;
+    const hasLoadedTaskLists = (taskListOptionsByProvider.outlook?.length ?? 0) > 0;
+    if (hasLoadedCalendars && hasLoadedTaskLists) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      setIsAutoLoadingOutlookOptions(true);
+      try {
+        if (!hasLoadedCalendars) {
+          await loadCalendarsForProvider('outlook', {
+            autoSelectIfMissing: true,
+            silent: true,
+          });
+        }
+
+        if (!hasLoadedTaskLists) {
+          await loadOutlookTaskLists({
+            autoSelectIfMissing: true,
+            silent: true,
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('Failed to auto-load Outlook destinations:', error);
+        }
+      } finally {
+        if (!cancelled) {
+          setAutoLoadedOutlookConnectionId(outlookConnection.id);
+          setIsAutoLoadingOutlookOptions(false);
+        }
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    calendarOptionsByProvider.outlook?.length,
+    loadCalendarsForProvider,
+    loadOutlookTaskLists,
+    autoLoadedOutlookConnectionId,
+    outlookConnection?.id,
+    taskListOptionsByProvider.outlook?.length,
+    isAutoLoadingOutlookOptions,
+  ]);
+
   const handleConnect = async (provider: CalendarProvider) => {
     try {
       setConnectingProvider(provider);
@@ -228,7 +356,7 @@ export function CalendarIntegrationsSettings() {
       const url = await beginOAuthConnection.mutateAsync({
         provider,
         redirectUri: callbackBase,
-        syncMode: 'send_only',
+        syncMode: 'full_sync',
         source,
       });
       if (source === 'native') {
@@ -292,6 +420,74 @@ export function CalendarIntegrationsSettings() {
     }
   };
 
+  const handleSyncNow = async (provider: Exclude<CalendarProvider, 'apple'>) => {
+    setSyncingProvider(provider);
+    try {
+      const result = await syncProviderPull.mutateAsync({ provider });
+      toast({
+        title: `${providerLabel(provider)} synced`,
+        description: summarizeSyncResult(result),
+      });
+    } catch (err) {
+      toast({
+        title: `Failed to sync ${providerLabel(provider)}`,
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setSyncingProvider(null);
+    }
+  };
+
+  const handleEnableOutlookPlanning = async () => {
+    if (!outlookConnection) return;
+
+    setIsActivatingOutlookPlanning(true);
+    try {
+      const calendars = await loadCalendarsForProvider('outlook', {
+        autoSelectIfMissing: true,
+      });
+      const taskLists = await loadOutlookTaskLists({
+        autoSelectIfMissing: true,
+      });
+
+      if (!outlookConnection.primary_calendar_id && calendars.length === 0) {
+        throw new Error('No Outlook calendars are available for this account.');
+      }
+
+      if (!outlookConnection.primary_task_list_id && taskLists.length === 0) {
+        throw new Error('No Microsoft To Do lists are available for this account.');
+      }
+
+      if (outlookConnection.sync_mode !== 'full_sync') {
+        await setProviderSyncMode.mutateAsync({
+          provider: 'outlook',
+          syncMode: 'full_sync',
+        });
+      }
+
+      if (defaultProvider !== 'outlook' || !integrationVisible) {
+        await upsertSettings.mutateAsync({
+          default_provider: 'outlook',
+          integration_visible: true,
+        });
+      }
+
+      toast({
+        title: 'Outlook ready for planning',
+        description: 'Planner changes will now read from and sync back to Outlook.',
+      });
+    } catch (err) {
+      toast({
+        title: 'Failed to enable Outlook planning',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsActivatingOutlookPlanning(false);
+    }
+  };
+
   const toggleVisibility = async () => {
     try {
       await upsertSettings.mutateAsync({ integration_visible: !integrationVisible });
@@ -345,7 +541,7 @@ export function CalendarIntegrationsSettings() {
           Calendar Integrations
         </CardTitle>
         <CardDescription className="text-xs">
-          Connect destinations for sending quests to external calendars.
+          Two-way sync keeps {PRODUCT.name} and your external calendars current automatically.
         </CardDescription>
       </CardHeader>
 
@@ -366,6 +562,11 @@ export function CalendarIntegrationsSettings() {
           const taskLists = provider.key === 'outlook'
             ? taskListOptionsByProvider.outlook || []
             : [];
+          const syncableProvider = provider.key === 'google' || provider.key === 'outlook'
+            ? provider.key
+            : null;
+          const isSyncing = syncableProvider !== null && syncingProvider === syncableProvider;
+          const shouldCollapseDestinationRefresh = provider.key === 'outlook' && isOutlookPlannerReady;
           const destinationRefreshActions = (
             <>
               <Button size="sm" variant="outline" onClick={() => handleLoadCalendars(provider.key)}>
@@ -396,6 +597,11 @@ export function CalendarIntegrationsSettings() {
                           ? appleNativeUnavailableReason || 'Apple Calendar is unavailable in this app build.'
                         : 'Not connected'}
                   </p>
+                  {connection?.sync_mode === 'full_sync' && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {formatLastSyncedAt(connection.last_synced_at)}
+                    </p>
+                  )}
                 </div>
 
                 {connection ? (
@@ -424,7 +630,57 @@ export function CalendarIntegrationsSettings() {
                 </Button>
               ) : (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-1 gap-2">
+                  {provider.key === 'outlook' && (
+                    <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/50 px-3 py-2">
+                      <div className="text-xs text-muted-foreground">
+                        {isOutlookPlannerReady
+                          ? 'Outlook is the active planning source.'
+                          : 'Finish setup once to make Outlook the planner source.'}
+                      </div>
+                      {isOutlookPlannerReady ? (
+                        <Badge variant="secondary">Planner active</Badge>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => void handleEnableOutlookPlanning()}
+                          disabled={isActivatingOutlookPlanning}
+                        >
+                          {isActivatingOutlookPlanning ? 'Activating Outlook...' : 'Use Outlook for Planning'}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {syncableProvider ? (
+                      <Select
+                        value={connection.sync_mode}
+                        onValueChange={(value) => {
+                          void setProviderSyncMode
+                            .mutateAsync({ provider: syncableProvider, syncMode: value as CalendarSyncMode })
+                            .catch((err) => {
+                              toast({
+                                title: 'Failed to update sync mode',
+                                description: err instanceof Error ? err.message : 'Unknown error',
+                                variant: 'destructive',
+                              });
+                            });
+                        }}
+                      >
+                        <SelectTrigger className="h-9 text-xs">
+                          <SelectValue placeholder="Sync mode" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="send_only">{SYNC_MODE_LABELS.send_only}</SelectItem>
+                          <SelectItem value="full_sync">{SYNC_MODE_LABELS.full_sync}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="flex h-9 items-center rounded-md border border-border/60 px-3 text-xs text-muted-foreground">
+                        Apple Calendar · {SYNC_MODE_LABELS.send_only}
+                      </div>
+                    )}
+
                     <Select
                       value={defaultProvider || undefined}
                       onValueChange={(value) => {
@@ -458,12 +714,54 @@ export function CalendarIntegrationsSettings() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {destinationRefreshActions}
+                    {!shouldCollapseDestinationRefresh && destinationRefreshActions}
+
+                    {syncableProvider && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void handleSyncNow(syncableProvider)}
+                        disabled={isSyncing}
+                      >
+                        {isSyncing ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <RefreshCcw className="h-4 w-4 mr-2" />
+                        )}
+                        {isSyncing ? 'Syncing...' : 'Sync Now'}
+                      </Button>
+                    )}
 
                     <Button size="sm" variant="outline" onClick={() => handleDisconnect(provider.key)}>
                       <Unlink2 className="h-4 w-4 mr-2" />
                       Disconnect
                     </Button>
+
+                    {shouldCollapseDestinationRefresh && (
+                      <Collapsible
+                        open={Boolean(advancedOpenByProvider[provider.key])}
+                        onOpenChange={(open) =>
+                          setAdvancedOpenByProvider((prev) => ({ ...prev, [provider.key]: open }))
+                        }
+                        className="w-full"
+                      >
+                        <CollapsibleTrigger asChild>
+                          <Button size="sm" variant="ghost" className="px-1">
+                            Advanced
+                            <ChevronDown
+                              className={`ml-2 h-4 w-4 transition-transform ${
+                                advancedOpenByProvider[provider.key] ? 'rotate-180' : ''
+                              }`}
+                            />
+                          </Button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="flex flex-wrap gap-2 pt-2">
+                            {destinationRefreshActions}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
                   </div>
 
                   {calendars.length > 0 && (

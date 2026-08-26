@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 
 const Search = () => {
   const prefersReducedMotion = useReducedMotion();
@@ -29,11 +30,12 @@ const Search = () => {
   } = useFirstTimeModal("search");
 
   const { data: featuredQuotes, isLoading: quotesLoading } = useQuery({
-    queryKey: ["featured-quotes"],
+    queryKey: ["featured-quotes", PRODUCT_RUNTIME.authProductMode],
     queryFn: async () => {
       const { data } = await supabase
         .from("quotes")
         .select("id, text, author")
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
         .order("created_at", { ascending: false })
         .limit(4);
       return data || [];
@@ -41,11 +43,12 @@ const Search = () => {
   });
 
   const { data: featuredPepTalks, isLoading: pepTalksLoading } = useQuery({
-    queryKey: ["featured-pep-talks"],
+    queryKey: ["featured-pep-talks", PRODUCT_RUNTIME.authProductMode],
     queryFn: async () => {
       const { data } = await supabase
         .from("pep_talks")
         .select("id, title, category, description")
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
         .order("created_at", { ascending: false })
         .limit(3);
       return data || [];

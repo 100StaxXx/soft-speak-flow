@@ -50,12 +50,12 @@ const setNavigatorValues = (userAgent: string, maxTouchPoints: number) => {
   });
 };
 
-const renderExpandedVoidFaction = () => {
+const renderExpandedStillwaterPath = () => {
   render(<FactionSelector onComplete={vi.fn()} />);
 
-  fireEvent.click(screen.getByRole("button", { name: /Void Collective/i }));
+  fireEvent.click(screen.getByRole("button", { name: /The Stillwater/i }));
 
-  const joinButton = screen.getByRole("button", { name: /Join Void Collective/i });
+  const joinButton = screen.getByRole("button", { name: /Choose This Path/i });
   const ctaWrapper = joinButton.parentElement;
   expect(ctaWrapper).not.toBeNull();
 
@@ -89,7 +89,7 @@ describe("FactionSelector CTA spacing", () => {
     capacitorMocks.getPlatform.mockReturnValue("ios");
     setNavigatorValues("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)", 0);
 
-    const ctaWrapper = renderExpandedVoidFaction();
+    const ctaWrapper = renderExpandedStillwaterPath();
 
     expect(ctaWrapper.className).toContain("pt-2");
     expect(ctaWrapper.className).toContain("pb-6");
@@ -100,7 +100,7 @@ describe("FactionSelector CTA spacing", () => {
     capacitorMocks.getPlatform.mockReturnValue("ios");
     setNavigatorValues("Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)", 5);
 
-    const ctaWrapper = renderExpandedVoidFaction();
+    const ctaWrapper = renderExpandedStillwaterPath();
 
     expect(ctaWrapper.className).toContain("pt-2");
     expect(ctaWrapper.className).not.toContain("pb-6");
@@ -109,7 +109,7 @@ describe("FactionSelector CTA spacing", () => {
   it("leaves web CTA spacing unchanged", () => {
     setNavigatorValues("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)", 0);
 
-    const ctaWrapper = renderExpandedVoidFaction();
+    const ctaWrapper = renderExpandedStillwaterPath();
 
     expect(ctaWrapper.className).toContain("pt-2");
     expect(ctaWrapper.className).not.toContain("pb-6");

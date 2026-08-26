@@ -9,8 +9,10 @@ export interface SubmitFalKlingVideoParams {
   apiKey: string;
   model: string;
   imageUrl: string;
+  endImageUrl?: string | null;
   prompt: string;
   durationSeconds?: number;
+  generateAudio?: boolean;
 }
 
 export interface FalQueueSubmitResult {
@@ -31,6 +33,13 @@ export interface FalQueueResult {
   raw: Record<string, unknown>;
 }
 
+export interface CancelFalKlingRequestParams {
+  fetchFn: typeof fetch;
+  apiKey: string;
+  model: string;
+  requestId: string;
+}
+
 export class FalKlingVideoError extends Error {
   status: number | null;
   code: string;
@@ -49,9 +58,17 @@ export class FalKlingVideoError extends Error {
   }
 }
 
-const FAL_QUEUE_BASE_URL = "https://queue.fal.run";
+const readOptionalEnv = (name: string): string | undefined => {
+  try {
+    return Deno.env.get(name)?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+};
+const FAL_QUEUE_BASE_URL = (readOptionalEnv("FAL_QUEUE_BASE_URL") ||
+  "https://queue.fal.run").replace(/\/+$/, "");
 const DEFAULT_NEGATIVE_PROMPT =
-  "identity drift, distorted anatomy, extra limbs, extra heads, text, captions, logos, cuts, scene changes, jitter, blur, low quality";
+  "photorealism, live action, realistic fur, realistic feathers, natural-history footage, CGI, 3D render, painterly realism, style drift, identity drift, distorted anatomy, extra limbs, extra heads, text, captions, logos, franchise resemblance, cuts, scene changes, jitter, blur, low quality";
 
 const ELEMENT_MOTION_LANGUAGE: Record<string, string> = {
   fire: "warm ember motes and a slow heat shimmer",
@@ -59,7 +76,7 @@ const ELEMENT_MOTION_LANGUAGE: Record<string, string> = {
   storm: "subtle charged arcs and restrained electric atmosphere",
   nature: "gentle organic bloom, leaf drift, and living light",
   void: "quiet starfield depth and distant nebula glints",
-  light: "soft halo rings and noble celestial motes",
+  light: "soft sunlit rings and warm floating motes",
   water: "calm ripples, soft caustic light, and fluid glow",
 };
 
@@ -106,6 +123,43 @@ const falQueueRequestUrls = (
 const shouldTryNextQueueUrl = (error: unknown): boolean =>
   error instanceof FalKlingVideoError &&
   (error.status === 404 || error.status === 405);
+
+export const cancelFalKlingRequest = async ({
+  fetchFn,
+  apiKey,
+  model,
+  requestId,
+}: CancelFalKlingRequestParams): Promise<boolean> => {
+  const urls = falQueueRequestUrls(model, requestId, "/cancel");
+  for (const [index, url] of urls.entries()) {
+    let response: Response;
+    try {
+      response = await fetchFn(url, {
+        method: "PUT",
+        headers: { Authorization: `Key ${apiKey}` },
+      });
+    } catch (error) {
+      throw new FalKlingVideoError(
+        `fal cancellation failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        { code: "fal_cancel_failed", retryable: true },
+      );
+    }
+    if (response.ok || response.status === 409) return true;
+    const failure = new FalKlingVideoError(
+      `fal cancellation failed with status ${response.status}`,
+      {
+        status: response.status,
+        code: "fal_cancel_failed",
+        retryable: response.status === 429 || response.status >= 500,
+      },
+    );
+    if (index < urls.length - 1 && shouldTryNextQueueUrl(failure)) continue;
+    throw failure;
+  }
+  return false;
+};
 
 const parseJsonResponse = async (
   response: Response,
@@ -167,19 +221,37 @@ export const buildCompanionAnimationPrompt = ({
   const normalizedElement = element?.trim().toLowerCase() ?? "";
   const elementLanguage = ELEMENT_MOTION_LANGUAGE[normalizedElement] ??
     "subtle premium glow, sparse particles, and slow atmospheric motion";
+
+  if (stage === 1) {
+    return [
+      "COMPANION HATCH TRANSITION ART BIBLE V2: Create one continuous premium 2D anime/storybook hatch transition between the two supplied endpoint images.",
+      "Use the supplied endpoint images as the sole source of product identity, species, element, and visual direction.",
+      "The supplied start image is the exact companion egg and must be the opening frame. The supplied end image is the exact infant companion portrait and must be the final frame.",
+      "Begin with the egg composition unchanged, then add a restrained tremble, spreading luminous cracks, and a soft shell-opening burst that naturally conceals the transformation.",
+      `Transition atmosphere: ${elementLanguage}.`,
+      "Reveal only the infant shown in the supplied end image. Preserve its exact species, face and eye design, markings, colors, expression, linework, cel shading, background, and framing.",
+      "Hold on the supplied infant portrait at the end so the final video frame aligns cleanly with the in-app stage-one image.",
+      "One continuous shot with no cuts, captions, logos, alternate creatures, extra limbs, identity drift, style drift, photorealism, live action, CGI, or 3D rendering.",
+    ].join(" ");
+  }
+
   const prestige = typeof stage === "number" && stage >= 56
-    ? "legendary, powerful, and elegant"
+    ? "grand, powerful, and elegant"
     : typeof stage === "number" && stage >= 13
-    ? "evolved, confident, and magical"
+    ? "evolved, confident, and flourishing"
     : "gentle, alive, and companionable";
 
   return [
-    "Animate this exact companion portrait into a short evolution reveal.",
-    "Preserve the companion identity, silhouette, species, colors, expression, and framing.",
+    "COMPANION EVOLUTION TRANSITION ART BIBLE V4: Create one continuous premium 2D anime/storybook transition between the two supplied endpoint portraits.",
+    "Use the supplied endpoint images as the sole source of product identity, species, element, and visual direction.",
+    "The supplied start image is the exact prior approved companion portrait and must be the opening frame. The supplied end image is the exact new companion portrait and must be the final frame.",
+    "Evolve naturally from the prior form into the new form while preserving identity, silhouette lineage, face and eye design, markings, species, colors, line weight, and cel shading.",
     `Motion style: ${prestige}; ${elementLanguage}.`,
-    "Create a soft, stable, element-themed background environment behind the companion during the animation; do not leave a blank or transparent canvas.",
-    "One continuous shot with no cuts. The subject breathes subtly and settles into the final pose.",
-    "Camera movement is minimal and cinematic; premium reveal energy surrounds the companion without obscuring it.",
+    "Use a restrained luminous transition to bridge only the differences visible between the supplied portraits, then hold on the exact supplied end portrait for a clean in-app handoff.",
+    "Keep the supplied illustrated backgrounds and framing coherent; never introduce a realistic environment.",
+    "One continuous shot with no cuts. Camera movement is minimal and steady.",
+    "Never convert the companion portrait or illustrated scene into photorealism, live action, realistic fur or feathers, CGI, 3D, or a different illustration style.",
+    "Do not imitate or resemble any specific existing game, anime, mascot, or copyrighted character.",
   ].join(" ");
 };
 
@@ -188,23 +260,40 @@ export const submitFalKlingVideo = async ({
   apiKey,
   model,
   imageUrl,
+  endImageUrl,
   prompt,
   durationSeconds = DEFAULT_COMPANION_ANIMATION_DURATION_SECONDS,
+  generateAudio = false,
 }: SubmitFalKlingVideoParams): Promise<FalQueueSubmitResult> => {
-  const response = await fetchFn(falQueueUrl(model), {
-    method: "POST",
-    headers: {
-      Authorization: `Key ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      start_image_url: imageUrl,
-      prompt,
-      duration: String(durationSeconds),
-      generate_audio: false,
-      negative_prompt: DEFAULT_NEGATIVE_PROMPT,
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetchFn(falQueueUrl(model), {
+      method: "POST",
+      headers: {
+        Authorization: `Key ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        start_image_url: imageUrl,
+        ...(endImageUrl ? { end_image_url: endImageUrl } : {}),
+        prompt,
+        duration: String(durationSeconds),
+        generate_audio: generateAudio,
+        negative_prompt: DEFAULT_NEGATIVE_PROMPT,
+      }),
+    });
+  } catch (error) {
+    if (error instanceof FalKlingVideoError) throw error;
+    if (error instanceof TypeError) {
+      // A connection failure after POST may mean fal accepted the job but the
+      // response never reached us. Retrying would risk duplicate paid work.
+      throw new FalKlingVideoError(
+        `fal submission outcome is ambiguous: ${error.message}`,
+        { code: "fal_submit_ambiguous", retryable: false },
+      );
+    }
+    throw error;
+  }
   const payload = await parseJsonResponse(response);
   const requestId = firstString([
     payload.request_id,

@@ -23,6 +23,7 @@ import {
   getResultFromAccuracy 
 } from '@/utils/adversaryGenerator';
 import { isMacSession } from '@/utils/platformTargets';
+import { PRODUCT_RUNTIME } from '@/config/productRuntime';
 import { toast } from "@/components/ui/sonner";
 import { useLivingCompanionSafe } from '@/hooks/useLivingCompanion';
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
@@ -396,7 +397,7 @@ export const useAstralEncounters = () => {
               });
               throwIfSupabaseError(rewardInsertError, 'Failed to award epic reward');
               
-              toast.success(`🎁 New Loot: ${selectedReward.name}!`, {
+              toast.success(`🎁 New Keepsake: ${selectedReward.name}!`, {
                 description: selectedReward.description,
               });
             }
@@ -487,7 +488,8 @@ export const useAstralEncounters = () => {
                 .update({
                   care_recovery: Math.min(1, currentRecovery + careBoost),
                 })
-                .eq('id', companion.id);
+                .eq('id', companion.id)
+                .eq('product_mode', PRODUCT_RUNTIME.authProductMode);
               throwIfSupabaseError(recoveryUpdateError, 'Failed to update companion care recovery');
             }
 

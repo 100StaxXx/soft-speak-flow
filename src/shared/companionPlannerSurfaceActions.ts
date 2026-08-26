@@ -42,8 +42,8 @@ export const COMPANION_PLANNER_SURFACE_ACTIONS: CompanionPlannerSurfaceAction[] 
     },
     {
       id: "advance-campaign",
-      label: "Advance my campaign",
-      message: "Advance my campaign",
+      label: "Continue my journey",
+      message: "Continue my journey",
       target: "planner",
       starterIntent: "advance_campaign_start",
     },

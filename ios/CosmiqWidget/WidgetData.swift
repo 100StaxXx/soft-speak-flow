@@ -1,5 +1,25 @@
 import Foundation
 
+enum NativeProduct {
+#if COSMIQ_PRODUCT
+    static let name = "Cosmiq"
+    static let urlScheme = "cosmiq"
+    static let appGroupId = "group.com.darrylgraham.revolution"
+    static let dailyLabel = "TODAY’S QUEST"
+    static let emptyPrompt = "Open Cosmiq to plan your next quest."
+    static let widgetDisplayName = "Cosmiq Today"
+    static let widgetDescription = "View today’s quests and momentum at a glance."
+#else
+    static let name = "Graceward"
+    static let urlScheme = "graceward"
+    static let appGroupId = "group.com.darrylgraham.graceward"
+    static let dailyLabel = "TODAY’S PRACTICE"
+    static let emptyPrompt = "Open Graceward to receive today’s practice."
+    static let widgetDisplayName = "Graceward Today"
+    static let widgetDescription = "View today’s ready-made practice at a glance."
+#endif
+}
+
 /// Data structure for widget task information
 struct WidgetTaskData: Codable {
     let tasks: [WidgetTask]
@@ -95,7 +115,7 @@ struct WidgetTask: Codable, Identifiable {
 class WidgetDataManager {
     static let shared = WidgetDataManager()
     
-    private let appGroupId = "group.com.darrylgraham.revolution"
+    private let appGroupId = NativeProduct.appGroupId
     private let payloadFileName = "widget_tasks_data.json"
     
     private init() {}
@@ -156,53 +176,23 @@ class WidgetDataManager {
         return WidgetTaskData(
             tasks: [
                 WidgetTask(
-                    id: "preview-ritual-meditation",
-                    text: "Morning meditation",
-                    completed: true,
-                    xpReward: 50,
-                    isMainQuest: false,
-                    category: "wellness",
-                    section: "morning",
-                    scheduledTime: "07:00",
-                    kind: "ritual",
-                    isRitual: true,
-                    isCampaignRitual: false,
-                    habitSourceId: "habit-meditation"
-                ),
-                WidgetTask(
-                    id: "preview-quest-daily",
-                    text: "Complete daily quest",
+                    id: "preview-daily-practice",
+                    text: "Name three gifts from the last 24 hours and thank God for each one.",
                     completed: false,
-                    xpReward: 100,
-                    isMainQuest: true,
-                    category: "growth",
-                    section: "morning",
-                    scheduledTime: "09:00",
-                    kind: "quest",
+                    xpReward: 5,
+                    isMainQuest: false,
+                    category: "soul",
+                    section: "unscheduled",
+                    scheduledTime: nil,
+                    kind: "daily_practice",
                     isRitual: false,
                     isCampaignRitual: false
-                ),
-                WidgetTask(
-                    id: "preview-campaign-portfolio",
-                    text: "Build portfolio website",
-                    completed: false,
-                    xpReward: 30,
-                    isMainQuest: false,
-                    category: "creative",
-                    section: "afternoon",
-                    scheduledTime: "14:00",
-                    kind: "campaign_ritual",
-                    isRitual: true,
-                    isCampaignRitual: true,
-                    campaignTitle: "Portfolio",
-                    epicId: "epic-portfolio",
-                    habitSourceId: "habit-portfolio"
                 )
             ],
             completedCount: 0,
             totalCount: 1,
-            ritualCount: 2,
-            ritualCompleted: 1,
+            ritualCount: 0,
+            ritualCompleted: 0,
             date: WidgetTaskData.localDateString(),
             updatedAt: nil,
             profileWallpaperRelativePath: nil,

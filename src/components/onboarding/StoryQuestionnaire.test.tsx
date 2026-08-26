@@ -54,7 +54,7 @@ describe("StoryQuestionnaire", () => {
     const { onComplete } = renderQuestionnaire(true);
 
     const backButton = screen.getByRole("button", { name: /back/i });
-    const firstOption = screen.getByRole("button", { name: /a male/i });
+    const firstOption = screen.getByRole("button", { name: /^amale$/i });
     const continueButton = screen.getByRole("button", { name: /continue/i });
 
     expect(backButton).toBeDisabled();
@@ -78,7 +78,7 @@ describe("StoryQuestionnaire", () => {
 
     expect(screen.getByRole("button", { name: /female/i })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: /continue/i })).not.toBeDisabled();
-    expect(screen.getByText(/for generated title art/i)).toBeInTheDocument();
+    expect(screen.getByText(/a faithful path begins with the dignity/i)).toBeInTheDocument();
 
     fireEvent.touchStart(screen.getByRole("button", { name: /continue/i }));
 
@@ -97,14 +97,13 @@ describe("StoryQuestionnaire", () => {
     fireEvent.click(firstQuestionContinue);
 
     expect(screen.getByText(/would you prefer your guide to be a man or a woman/i)).toBeInTheDocument();
-    expect(screen.queryByText(/what do you want to work on right now/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/where would you most like to grow right now/i)).not.toBeInTheDocument();
   });
 
   it("falls back instead of crashing when a runtime faction value is unrecognized", () => {
     renderQuestionnaire(false, [], "legacy_faction" as any);
 
-    expect(screen.getByText(/for generated title art/i)).toBeInTheDocument();
-    expect(screen.getByText(/the first constellation sketches/i)).toBeInTheDocument();
+    expect(screen.getByText(/a faithful path begins with the dignity/i)).toBeInTheDocument();
   });
 
   it("restores the previous selection when moving back", () => {
@@ -112,13 +111,13 @@ describe("StoryQuestionnaire", () => {
 
     answerCurrentQuestion(/female/i);
     answerCurrentQuestion(/woman/i);
-    fireEvent.click(screen.getByRole("button", { name: /emotions & healing/i }));
+    fireEvent.click(screen.getByRole("button", { name: /peace & emotional healing/i }));
     clickContinue();
 
     fireEvent.click(screen.getByRole("button", { name: /back/i }));
 
-    expect(screen.getByText(/what do you want to work on right now/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /emotions & healing/i })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/where would you most like to grow right now/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /peace & emotional healing/i })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: /continue/i })).not.toBeDisabled();
   });
 
@@ -146,8 +145,8 @@ describe("StoryQuestionnaire", () => {
 
     expect(screen.getByText(/how do you want guidance to feel/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /back/i }));
-    expect(screen.getByText(/what do you want to work on right now/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /clarity & mindset/i })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/where would you most like to grow right now/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /prayer & spiritual attention/i })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("aligns legacy saved answers by question id instead of index", () => {
@@ -166,7 +165,7 @@ describe("StoryQuestionnaire", () => {
       },
     ]);
 
-    expect(screen.getByText(/for generated title art/i)).toBeInTheDocument();
+    expect(screen.getByText(/a faithful path begins with the dignity/i)).toBeInTheDocument();
     answerCurrentQuestion(/prefer not to say/i);
     expect(screen.getByText(/would you prefer your guide to be a man or a woman/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /woman/i })).toHaveAttribute("aria-pressed", "true");
@@ -177,7 +176,7 @@ describe("StoryQuestionnaire", () => {
 
     answerCurrentQuestion(/female/i);
     answerCurrentQuestion(/woman/i);
-    answerCurrentQuestion(/clarity & mindset/i);
+    answerCurrentQuestion(/prayer & spiritual attention/i);
     answerCurrentQuestion(/gentle & compassionate/i);
     answerCurrentQuestion(/clear principles and logic/i);
     fireEvent.click(screen.getByRole("button", { name: /i work a 9-5/i }));
@@ -202,7 +201,7 @@ describe("StoryQuestionnaire", () => {
 
     answerCurrentQuestion(/female/i);
     answerCurrentQuestion(/woman/i);
-    answerCurrentQuestion(/clarity & mindset/i);
+    answerCurrentQuestion(/prayer & spiritual attention/i);
     answerCurrentQuestion(/gentle & compassionate/i);
     answerCurrentQuestion(/clear principles and logic/i);
     fireEvent.click(screen.getByRole("button", { name: /i work a 9-5/i }));

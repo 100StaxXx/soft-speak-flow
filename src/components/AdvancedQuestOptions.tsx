@@ -84,7 +84,7 @@ function toAppDayIndex(date: Date): number {
   return jsDay === 0 ? 6 : jsDay - 1; // 0 = Mon, ... 6 = Sun
 }
 
-const CUSTOM_REMINDER_PAST_START_MESSAGE = "Choose a future quest time before adding a custom reminder.";
+const CUSTOM_REMINDER_PAST_START_MESSAGE = "Choose a future action time before adding a custom reminder.";
 const CUSTOM_REMINDER_PAST_TIME_MESSAGE = "Choose a reminder time in the future.";
 
 export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
@@ -123,7 +123,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     props.requireScheduledTimeForRecurrence && !hasScheduledTimeValue(props.scheduledTime),
   );
 
-  const reminderPresetValues = useMemo(
+  const reminderPresetValues = useMemo<number[]>(
     () => QUEST_REMINDER_PRESET_OPTIONS.map((option) => option.value),
     [],
   );
@@ -482,7 +482,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
         return;
       }
       if (!customReminderOffsetCandidate) {
-        setCustomReminderError("Choose a reminder before the quest starts, up to 1 week before.");
+        setCustomReminderError("Choose a reminder before the action starts, up to 1 week before.");
         return;
       }
       if (
@@ -639,7 +639,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
             <Label className={labelClassName}>Early Reminder</Label>
           </div>
           <p className={helperClassName}>
-            You'll be notified when the quest starts. Add up to {MAX_QUEST_REMINDER_OFFSETS} early reminders for a little breathing room.
+            You'll be notified when the action starts. Add up to {MAX_QUEST_REMINDER_OFFSETS} early reminders for a little breathing room.
           </p>
 
           <Popover open={showReminderOptions} onOpenChange={setShowReminderOptions}>
@@ -774,7 +774,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                             </p>
                           ) : (
                             <p className={cn("text-xs", isQuestSoft ? "text-muted-foreground" : "text-muted-foreground")}>
-                              Pick a time before the quest starts.
+                              Pick a time before the action starts.
                             </p>
                           )}
                         </div>

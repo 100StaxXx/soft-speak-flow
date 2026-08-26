@@ -21,7 +21,6 @@ describe("resolveCompanionName", () => {
     mocks.from.mockReset();
 
     mocks.evolutionMaybeSingle.mockResolvedValue({ data: null });
-    mocks.updateEq.mockResolvedValue({ data: null, error: null });
 
     mocks.from.mockImplementation((table: string) => {
       if (table === "companion_evolution_cards") {
@@ -45,6 +44,7 @@ describe("resolveCompanionName", () => {
           eq: mocks.updateEq,
         };
         chain.update.mockReturnValue(chain);
+        mocks.updateEq.mockReturnValue(chain);
         return chain;
       }
 

@@ -4,6 +4,7 @@ import { toUserFacingCalendarOAuthError } from '@/utils/calendarOAuthErrors';
 import { parseFunctionInvokeError } from '@/utils/supabaseFunctionErrors';
 import { supabase } from '@/integrations/supabase/client';
 import type { CalendarProvider } from '@/hooks/useCalendarIntegrations';
+import { PRODUCT_RUNTIME } from '@/config/productRuntime';
 
 type OAuthProvider = Exclude<CalendarProvider, 'apple'>;
 type CallbackStatus = 'success' | 'error';
@@ -71,12 +72,30 @@ const getCallbackRedirectOrigin = (params: URLSearchParams, fallbackOrigin: stri
 
   try {
     const parsed = new URL(rawOrigin);
-    if (parsed.protocol !== 'https:' || parsed.pathname !== '/' || parsed.search || parsed.hash) {
+    if (
+      parsed.protocol !== 'https:' ||
+      parsed.pathname !== '/' ||
+      parsed.search ||
+      parsed.hash ||
+      !PRODUCT_RUNTIME.webOrigins.includes(parsed.origin)
+    ) {
       return fallbackOrigin;
     }
     return parsed.origin;
   } catch {
     return fallbackOrigin;
+  }
+};
+
+const isCurrentProductCallbackUri = (value: string | undefined): value is string => {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' &&
+      PRODUCT_RUNTIME.webOrigins.includes(parsed.origin) &&
+      parsed.pathname === '/calendar/oauth/callback';
+  } catch {
+    return false;
   }
 };
 
@@ -113,7 +132,9 @@ export const getCalendarOAuthCallbackContext = (args: {
       pathname: args.pathname,
     })
     : `${redirectOrigin}${args.pathname}`;
-  const redirectUri = stateHint?.redirectUri ?? fallbackRedirectUri;
+  const redirectUri = isCurrentProductCallbackUri(stateHint?.redirectUri)
+    ? stateHint.redirectUri
+    : fallbackRedirectUri;
 
   return {
     provider,
@@ -157,7 +178,7 @@ const buildNativeRedirect = (args: {
     params.set('message', args.message);
   }
 
-  return `cosmiq://calendar/oauth/callback?${params.toString()}`;
+  return `${PRODUCT_RUNTIME.nativeScheme}://calendar/oauth/callback?${params.toString()}`;
 };
 
 export default function CalendarOAuthCallback() {
@@ -233,6 +254,7 @@ export default function CalendarOAuthCallback() {
           code,
           redirectUri,
           state: state ?? undefined,
+          productMode: PRODUCT_RUNTIME.authProductMode,
         },
       });
 

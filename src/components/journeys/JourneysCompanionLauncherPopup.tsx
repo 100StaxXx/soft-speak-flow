@@ -49,30 +49,30 @@ const OPTION_META: Record<
 > = {
   "free-talk": {
     Icon: MessageCircle,
-    className: "border-[#6b3416] bg-[linear-gradient(180deg,#fffdf7_0%,#fff1cb_100%)] text-[#3c1f10]",
-    iconClassName: "bg-[#fff7dc] text-[#b04b12]",
+    className: "border-white/10 bg-white/[0.06] text-white",
+    iconClassName: "bg-cyan-300/10 text-cyan-200",
   },
   "plan-day": {
     Icon: CalendarCheck,
-    className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
-    iconClassName: "bg-[#fff7dc] text-[#b04b12]",
+    className: "border-white/10 bg-white/[0.06] text-white",
+    iconClassName: "bg-violet-300/10 text-violet-200",
   },
   upcoming: {
     label: "Coming up",
     Icon: Clock3,
-    className: "border-[#315114] bg-[linear-gradient(180deg,#d7ff86_0%,#9fda3f_100%)] text-[#183304]",
-    iconClassName: "bg-white/55 text-[#183304]",
+    className: "border-white/10 bg-white/[0.06] text-white",
+    iconClassName: "bg-emerald-300/10 text-emerald-200",
   },
   quest: {
     Icon: Sparkles,
-    className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
-    iconClassName: "bg-[#fff7dc] text-[#b04b12]",
+    className: "border-white/10 bg-white/[0.06] text-white",
+    iconClassName: "bg-amber-300/10 text-amber-200",
   },
   goal: {
     label: "New goal",
     Icon: Plus,
-    className: "border-[#6b3416] bg-[linear-gradient(180deg,#fff8e5_0%,#ffd77d_100%)] text-[#3c1f10]",
-    iconClassName: "bg-[#fff7dc] text-[#b04b12]",
+    className: "border-white/10 bg-white/[0.06] text-white",
+    iconClassName: "bg-fuchsia-300/10 text-fuchsia-200",
   },
 };
 
@@ -93,7 +93,7 @@ export function JourneysCompanionLauncherPopup({
           initial={{ opacity: 0, scale: 0.92, y: alignment.vertical === "bottom" ? 10 : -10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: alignment.vertical === "bottom" ? 6 : -6 }}
-          transition={{ duration: 0.1, ease: "easeOut" }}
+          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
           className={cn(
             "absolute z-[70] w-[min(19rem,calc(100vw-2rem))]",
             POPUP_VERTICAL_CLASSNAME[alignment.vertical],
@@ -106,29 +106,29 @@ export function JourneysCompanionLauncherPopup({
           data-popup-horizontal={alignment.horizontal}
           data-popup-vertical={alignment.vertical}
         >
-          <div className="relative rounded-[1.6rem] border-[3px] border-[#543012] bg-[linear-gradient(180deg,#fff8e7_0%,#ffe3a1_35%,#ffc861_100%)] p-3 shadow-[0_12px_0_#5f3212,0_24px_38px_rgba(55,24,5,0.42)]">
+          <div className="relative rounded-[1.6rem] border border-white/10 bg-[linear-gradient(180deg,rgba(28,25,46,0.97),rgba(13,11,23,0.97))] p-3 shadow-[0_24px_52px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
             <span
               aria-hidden="true"
               className={cn(
-                "pointer-events-none absolute h-6 w-6 border-b-[3px] border-r-[3px] border-[#543012] bg-[#ffc861] shadow-[4px_4px_0_rgba(95,50,18,0.55)]",
+                "pointer-events-none absolute h-6 w-6 border-b border-r border-white/10 bg-[#171328]",
                 TAIL_VERTICAL_CLASSNAME[alignment.vertical],
                 TAIL_ROTATION_CLASSNAME[alignment.vertical],
               )}
               style={tailStyle}
             />
-            <div className="flex items-center justify-between gap-3 rounded-[1.15rem] border-2 border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,244,210,0.88))] px-3 py-2 shadow-[inset_0_3px_0_rgba(255,255,255,0.55)]">
+            <div className="flex items-center justify-between gap-3 rounded-[1.15rem] border border-white/10 bg-white/[0.04] px-3 py-2">
               <div className="min-w-0">
-                <p className="truncate text-[0.7rem] font-black uppercase tracking-[0.2em] text-[#b04b12]">
+                <p className="truncate text-[0.7rem] font-black uppercase tracking-[0.2em] text-cyan-200">
                   {companionLabel}
                 </p>
-                <p className="text-xs font-semibold text-[#6b3416]/75">
+                <p className="text-xs font-semibold text-white/55">
                   Pick a planner starter
                 </p>
               </div>
               <button
                 type="button"
                 onClick={onOpenHistory}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-[3px] border-[#6b3416] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,233,183,0.96))] text-[#b04b12] shadow-[0_3px_0_#7a3a14] transition-transform hover:-translate-y-0.5"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/70 transition-colors hover:bg-white/10 hover:text-white"
                 aria-label="Open past chats"
                 data-testid="journeys-companion-launcher-history-button"
               >
@@ -150,7 +150,7 @@ export function JourneysCompanionLauncherPopup({
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.01 * index, duration: 0.1 }}
                     className={cn(
-                      "flex min-h-[4.25rem] flex-col items-start justify-between gap-2 rounded-[1.1rem] border-[3px] px-3 py-2.5 text-left shadow-[0_5px_0_rgba(95,50,18,0.72),0_10px_18px_rgba(74,31,8,0.18)] transition-transform hover:-translate-y-0.5 hover:shadow-[0_7px_0_rgba(95,50,18,0.76),0_13px_20px_rgba(74,31,8,0.2)]",
+                      "flex min-h-[4.25rem] flex-col items-start justify-between gap-2 rounded-[1.1rem] border px-3 py-2.5 text-left shadow-[0_10px_20px_rgba(0,0,0,0.16)] transition-all hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.09]",
                       option.id === "free-talk" && "col-span-2 min-h-[3.5rem] flex-row items-center justify-start",
                       meta.className,
                     )}
