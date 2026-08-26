@@ -76,7 +76,7 @@ export const AICompanionCreator = ({
   initialCompanionName = null,
   onBack,
   title = "Shape Your Companion",
-  description = "Choose the form, colors, and personality that will make your daily progress feel alive.",
+  description = "Choose the creature, colors, and character that will grow alongside your daily formation.",
   submitLabel = "Create My Companion",
 }: AICompanionCreatorProps) => {
   const isCompact = layout === "compact";
@@ -107,7 +107,11 @@ export const AICompanionCreator = ({
   );
 
   return (
-    <div className={cn("relative z-10", isCompact ? "w-full" : "min-h-screen px-4 pt-safe-top pb-safe-bottom")}>
+    <div className={cn(
+      "relative z-10",
+      PRODUCT.mode === "christian" && "graceward-companion-creator",
+      isCompact ? "w-full" : "min-h-screen px-4 pt-safe-top pb-safe-bottom",
+    )}>
       <div
         className={cn(
           "mx-auto w-full rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,16,28,0.95),rgba(11,10,20,0.96))] shadow-[0_24px_60px_rgba(0,0,0,0.34)] backdrop-blur-xl",
@@ -118,7 +122,7 @@ export const AICompanionCreator = ({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-3">
               <span className="inline-flex rounded-full border border-white/[0.12] bg-white/[0.08] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
-                AI Companion
+                {PRODUCT.mode === "christian" ? "Living Companion" : "AI Companion"}
               </span>
               <div className="space-y-2">
                 <h1 className="text-3xl font-semibold text-white sm:text-4xl">{title}</h1>
@@ -181,7 +185,7 @@ export const AICompanionCreator = ({
                     Visual Nature
                   </Label>
                   <p className="text-sm text-white/60">
-                    Pick the visual world and color language your companion will grow through.
+                    Choose a symbolic atmosphere. Your companion still grows naturally; light and nature appear around meaningful moments.
                   </p>
                 </div>
                 <div

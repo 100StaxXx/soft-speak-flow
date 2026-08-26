@@ -25,10 +25,10 @@ describe("Graceward bottom navigation", () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it("places Today in the center as the primary tab", () => {
+  it("places Companion in the center as the primary tab", () => {
     renderBottomNav();
     const labels = screen.getAllByRole("link").map((link) => link.textContent);
-    expect(labels).toEqual(["Companion", "Today", "Guide"]);
+    expect(labels).toEqual(["Today", "Companion", "Guide"]);
     expect(screen.getByRole("link", { name: "Today" })).toHaveAttribute("href", "/mentor");
     expect(labels.join(" ")).not.toMatch(/mentor|quests|campaigns|garden/i);
   });

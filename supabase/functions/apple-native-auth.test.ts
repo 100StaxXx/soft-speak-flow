@@ -15,10 +15,7 @@ Deno.env.set("SUPABASE_URL", "https://example.supabase.co");
 Deno.env.set("SUPABASE_ANON_KEY", "anon-key");
 Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
 Deno.env.set("APPLE_SERVICE_ID", "com.example.web");
-Deno.env.set(
-  "APPLE_IOS_BUNDLE_IDS",
-  "com.darrylgraham.graceward,com.darrylgraham.revolution",
-);
+Deno.env.set("APPLE_IOS_BUNDLE_ID", "com.darrylgraham.graceward");
 
 const appleNativeAuthModule = await import("./apple-native-auth/index.ts");
 
@@ -27,6 +24,13 @@ type TestUser = {
   email?: string | null;
   app_metadata?: Record<string, unknown> | null;
   user_metadata?: Record<string, unknown> | null;
+  identities?:
+    | Array<{
+      id?: string | null;
+      provider?: string | null;
+      identity_data?: Record<string, unknown> | null;
+    }>
+    | null;
 };
 
 const createActionLink = (email: string) =>
@@ -53,7 +57,7 @@ function createAppleDeps(options: {
     generateLinkEmails: [] as string[],
     verifyIdentityToken: [] as Array<{
       appleServiceId: string;
-      iosBundleIds: string[];
+      iosBundleId: string;
     }>,
   };
 
@@ -119,9 +123,9 @@ function createAppleDeps(options: {
     verifyIdentityToken: async (
       _identityToken: string,
       appleServiceId: string,
-      iosBundleIds: string[],
+      iosBundleId: string,
     ) => {
-      calls.verifyIdentityToken.push({ appleServiceId, iosBundleIds });
+      calls.verifyIdentityToken.push({ appleServiceId, iosBundleId });
       return options.payload;
     },
     sha256HexFn: async () => "hashed-nonce",
@@ -186,16 +190,70 @@ Deno.test("apple-native-auth reuses an existing account during sign-in", async (
     "Expected a session access token",
   );
   assert(
-    calls.verifyIdentityToken[0]?.iosBundleIds.includes(
-      "com.darrylgraham.graceward",
-    ),
+    calls.verifyIdentityToken[0]?.iosBundleId === "com.darrylgraham.graceward",
     "Expected Graceward's bundle ID to be accepted",
   );
   assert(
-    calls.verifyIdentityToken[0]?.iosBundleIds.includes(
-      "com.darrylgraham.revolution",
-    ),
-    "Expected Cosmiq's bundle ID to remain accepted",
+    calls.verifyIdentityToken[0]?.iosBundleId !== "com.darrylgraham.revolution",
+    "Expected Cosmiq's bundle ID to be rejected by Graceward",
+  );
+});
+
+Deno.test("apple-native-auth migrates a returning legacy Apple identity when email is omitted", async () => {
+  const { deps, calls } = createAppleDeps({
+    users: [
+      {
+        id: "legacy-cosmiq-user",
+        email: "returning@example.com",
+        app_metadata: {
+          provider: "apple",
+        },
+        identities: [
+          {
+            provider: "apple",
+            identity_data: {
+              sub: "legacy-apple-sub",
+            },
+          },
+        ],
+      },
+    ],
+    payload: {
+      sub: "legacy-apple-sub",
+      nonce: "hashed-nonce",
+      aud: "com.darrylgraham.revolution",
+    },
+  });
+
+  const response = await appleNativeAuthModule.handleAppleNativeAuth(
+    makeRequest({
+      identityToken: "identity-token",
+      rawNonce: "raw-nonce",
+      intent: "sign_in",
+      productMode: "cosmiq",
+    }),
+    deps,
+  );
+
+  assertEquals(
+    response.status,
+    200,
+    "Expected legacy Apple sign-in to succeed",
+  );
+  assertEquals(
+    calls.createUser,
+    0,
+    "Expected the existing account to be reused",
+  );
+  assertEquals(
+    calls.updateUserById,
+    1,
+    "Expected trusted Cosmiq Apple metadata to be migrated",
+  );
+  assertEquals(
+    calls.generateLinkEmails[0],
+    "returning@example.com",
+    "Expected session creation to use the existing account email",
   );
 });
 
@@ -398,9 +456,21 @@ Deno.test("apple-native-auth ignores editable user metadata as an account bindin
   );
 
   const body = await response.json();
-  assertEquals(response.status, 404, "Expected untrusted metadata match to be rejected");
-  assertEquals(body.code, "ACCOUNT_NOT_FOUND", "Expected account-not-found response");
-  assertEquals(calls.generateLinkEmails.length, 0, "Expected no session link to be generated");
+  assertEquals(
+    response.status,
+    404,
+    "Expected untrusted metadata match to be rejected",
+  );
+  assertEquals(
+    body.code,
+    "ACCOUNT_NOT_FOUND",
+    "Expected account-not-found response",
+  );
+  assertEquals(
+    calls.generateLinkEmails.length,
+    0,
+    "Expected no session link to be generated",
+  );
 });
 
 Deno.test("apple-native-auth creates a separate Graceward identity when Apple email belongs to Cosmiq", async () => {

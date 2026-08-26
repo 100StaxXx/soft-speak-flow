@@ -45,10 +45,26 @@ Deno.test("requires Soul scripture tasks to use the approved reference in the ac
     scriptureReference: "Psalm 23:1-3",
   };
   assertEquals(validateGeneratedPractice(soulPractice, "Soul"), { valid: true });
+  assertEquals(validateGeneratedPractice(soulPractice, "Soul", [], "Psalm 23:1-3"), { valid: true });
   assertEquals(validateGeneratedPractice({
     ...soulPractice,
     scriptureReference: "Psalm 999:1",
   }, "Soul"), { valid: false, reason: "unapproved_scripture_reference" });
+  assertEquals(
+    validateGeneratedPractice(soulPractice, "Soul", [], "Micah 6:8"),
+    { valid: false, reason: "scripture_reference_not_daily_thread" },
+  );
+  assertEquals(
+    validateGeneratedPractice({
+      title: "Pray With Gratitude",
+      action: "Pray to God with gratitude for one ordinary gift you received today.",
+      benefit: "Practices faithful attention and honest prayer before God.",
+      minutes: 4,
+      focus: "faith",
+      scriptureReference: null,
+    }, "Soul", [], "Micah 6:8"),
+    { valid: false, reason: "daily_scripture_focus_required" },
+  );
 });
 
 Deno.test("detects near-duplicate tasks and parses schema output", () => {

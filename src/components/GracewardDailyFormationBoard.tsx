@@ -9,7 +9,8 @@ import {
   getDailyFormationAssetDescriptor,
   type CompanionReactionAnimation,
 } from "@/config/gracewardMotion";
-import { PRODUCT } from "@/config/product";
+import { PRODUCT, PRODUCT_COPY } from "@/config/product";
+import { getChristianDailyContent } from "@/data/christianDailyContent";
 import type { DailyFormationCategory } from "@/data/dailyFormationPractices";
 import { useAdaptiveDailyFormation } from "@/hooks/useAdaptiveDailyFormation";
 import { useAuth } from "@/hooks/useAuth";
@@ -36,20 +37,27 @@ const PILLAR_META = {
   Soul: { icon: Heart, color: "text-violet-600 dark:text-violet-300" },
 } satisfies Record<DailyFormationCategory, { icon: typeof Brain; color: string }>;
 
+const COMPANION_FORMATION_RESPONSES: Record<DailyFormationCategory, string> = {
+  Mind: "Your attention grew steadier. I’m learning to notice with you.",
+  Body: "You cared for the life you’ve been given. Let’s carry that gentleness forward.",
+  Soul: "You made room for Scripture and prayer. I’ll stay near as you carry the Word with you.",
+};
+
+const GracewardRevealMark = () => (
+  <svg
+    viewBox="0 0 56 104"
+    className="h-24 w-14 text-[#f4ecd9] drop-shadow-[0_8px_22px_rgba(0,0,0,0.22)]"
+    aria-hidden="true"
+  >
+    <circle cx="28" cy="25" r="25" fill="currentColor" opacity="0.18" />
+    <path d="M28 7v36M10 25h36" fill="none" stroke="#d9bd76" strokeLinecap="round" strokeWidth="10" />
+    <path d="M48 48c-2 19-13 26-23 42-4 6-7 10-11 14H2c7-18 15-33 25-47 8-11 13-18 13-9z" fill="currentColor" />
+  </svg>
+);
+
 const parseCategory = (value: string | null): DailyFormationCategory | null => (
   value === "Mind" || value === "Body" || value === "Soul" ? value : null
 );
-
-const readRevealedCategories = (key: string): DailyFormationCategory[] => {
-  try {
-    const stored = JSON.parse(safeLocalStorage.getItem(key) ?? "[]") as unknown;
-    return Array.isArray(stored)
-      ? stored.map(String).map(parseCategory).filter(Boolean) as DailyFormationCategory[]
-      : [];
-  } catch {
-    return [];
-  }
-};
 
 const resolveFormationMedia = ({
   species,
@@ -99,6 +107,10 @@ export const GracewardDailyFormationBoard = ({
   const { user } = useAuth();
   const { profile } = useProfile();
   const dateKey = getEffectiveDailyDate(profile?.timezone ?? undefined);
+  const dailyContent = useMemo(
+    () => getChristianDailyContent(new Date(`${dateKey}T12:00:00`)),
+    [dateKey],
+  );
   const species = companion?.spirit_animal ?? companion?.preset_id;
   const element = companion?.core_element;
   const stage = companion?.current_stage;
@@ -109,17 +121,14 @@ export const GracewardDailyFormationBoard = ({
   const soul = useAdaptiveDailyFormation({ category: "Soul", enabled: formationSupported });
   const storageScope = `${user?.id ?? "preview"}:${dateKey}`;
   const activeStorageKey = `graceward:formation-active:v1:${storageScope}`;
-  // v2 replays the newly restored bundled Body/Soul media once for users who
-  // previously revealed those pillars while only the fallback was available.
-  const revealStorageKey = `graceward:formation-reveals:v2:${storageScope}`;
   const [activeCategory, setActiveCategory] = useState<DailyFormationCategory | null>(() => (
     parseCategory(safeLocalStorage.getItem(activeStorageKey))
   ));
-  const [revealed, setRevealed] = useState<DailyFormationCategory[]>(() => (
-    readRevealedCategories(revealStorageKey)
+  const [revealingCategory, setRevealingCategory] = useState<DailyFormationCategory | null>(() => (
+    parseCategory(safeLocalStorage.getItem(activeStorageKey))
   ));
-  const [revealingCategory, setRevealingCategory] = useState<DailyFormationCategory | null>(null);
   const [celebratedCategory, setCelebratedCategory] = useState<DailyFormationCategory | null>(null);
+  const [showCompletionReveal, setShowCompletionReveal] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const restoredStorageKeyRef = useRef<string | null>(null);
 
@@ -134,27 +143,38 @@ export const GracewardDailyFormationBoard = ({
   const completedCount = entries.filter((entry) => Boolean(entry.state.assignment?.completedAt)).length;
 
   useEffect(() => {
-    setActiveCategory(parseCategory(safeLocalStorage.getItem(activeStorageKey)));
-    setRevealed(readRevealedCategories(revealStorageKey));
-    setRevealingCategory(null);
+    const restoredCategory = parseCategory(safeLocalStorage.getItem(activeStorageKey));
+    setActiveCategory(restoredCategory);
+    setRevealingCategory(restoredCategory);
     setCelebratedCategory(null);
     restoredStorageKeyRef.current = null;
-  }, [activeStorageKey, revealStorageKey]);
+  }, [activeStorageKey]);
+
+  useEffect(() => {
+    if (!showCompletionReveal) return;
+    const timer = window.setTimeout(() => setShowCompletionReveal(false), 4_500);
+    return () => window.clearTimeout(timer);
+  }, [showCompletionReveal]);
 
   useEffect(() => {
     if (restoredStorageKeyRef.current === activeStorageKey || activeEntry?.state.isLoading) return;
     if (!formationSupported || !activeCategory || activeEntry?.state.assignment?.completedAt) {
       onFormationMediaChange?.(null);
+      setRevealingCategory(null);
       restoredStorageKeyRef.current = activeStorageKey;
       return;
     }
 
     const media = resolveFormationMedia({ species, element, stage, category: activeCategory, dateKey });
+    setRevealingCategory(activeCategory);
     onFormationMediaChange?.({
       category: activeCategory,
       ...media,
-      playVideo: false,
+      playVideo: true,
       phase: "practice",
+      onPlaybackComplete: () => setRevealingCategory((current) => (
+        current === activeCategory ? null : current
+      )),
     });
     restoredStorageKeyRef.current = activeStorageKey;
   }, [
@@ -176,22 +196,16 @@ export const GracewardDailyFormationBoard = ({
     const entry = entries.find((candidate) => candidate.category === category);
     const media = resolveFormationMedia({ species, element, stage, category, dateKey });
 
-    const firstReveal = !revealed.includes(category);
-    const shouldStageReveal = firstReveal && !entry?.state.assignment?.completedAt;
+    const shouldStageReveal = !entry?.state.assignment?.completedAt;
     setActiveCategory(category);
     setRevealingCategory(shouldStageReveal ? category : null);
     setCelebratedCategory(null);
     setCollapsed(false);
     safeLocalStorage.setItem(activeStorageKey, category);
-    if (firstReveal) {
-      const next = [...revealed, category];
-      setRevealed(next);
-      safeLocalStorage.setItem(revealStorageKey, JSON.stringify(next));
-    }
     onFormationMediaChange?.(entry?.state.assignment?.completedAt ? null : {
       category,
       ...media,
-      playVideo: firstReveal,
+      playVideo: true,
       phase: "practice",
       onPlaybackComplete: shouldStageReveal
         ? () => setRevealingCategory((current) => current === category ? null : current)
@@ -206,6 +220,37 @@ export const GracewardDailyFormationBoard = ({
       const nextCompletedCount = Math.min(3, completedCount + 1);
       await activeEntry.state.completePractice();
       setCelebratedCategory(category);
+      if (profile?.companion_memory_enabled !== false && user?.id && companion?.id) {
+        void supabase
+          .from("companion_memories")
+          .insert({
+            user_id: user.id,
+            companion_id: companion.id,
+            memory_type: "special_moment",
+            memory_date: dateKey,
+            referenced_count: 0,
+            memory_context: {
+              title: `${activeEntry.state.practice.title}`,
+              emotion: "gratitude",
+              description: `A ${category.toLowerCase()} practice shaped by ${dailyContent.reference}.`,
+              details: {
+                source: "daily_formation",
+                category,
+                daily_theme: dailyContent.theme,
+                scripture_reference: dailyContent.reference,
+              },
+            },
+          })
+          .then(({ error }) => {
+            if (error) {
+              console.warn("Companion formation memory was not saved:", error);
+              return;
+            }
+            window.dispatchEvent(new CustomEvent("companion-memory-created", {
+              detail: { companionId: companion.id, source: "daily_formation" },
+            }));
+          });
+      }
       const reaction: CompanionReactionAnimation = nextCompletedCount === 3 ? "celebrate" : "encourage";
       const reactionVideoUrl = getCompanionReactionAnimationUrl({ species, element, reaction });
       onFormationMediaChange?.({
@@ -215,7 +260,10 @@ export const GracewardDailyFormationBoard = ({
         playVideo: true,
         phase: "completion",
         reaction,
-        onPlaybackComplete: () => onFormationMediaChange?.(null),
+        onPlaybackComplete: () => {
+          onFormationMediaChange?.(null);
+          if (nextCompletedCount === 3) setShowCompletionReveal(true);
+        },
       });
     } catch {
       // The formation hook owns the error toast; keep the finish frame visible so the user can retry.
@@ -232,7 +280,9 @@ export const GracewardDailyFormationBoard = ({
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">Today’s formation</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {completedCount === 3 ? "Mind, body, and soul are complete." : "Choose one gentle practice at a time."}
+            {completedCount === 3
+              ? "Mind, body, and soul are complete."
+              : `${dailyContent.theme} · ${dailyContent.reference}`}
           </p>
         </div>
         <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground" aria-label={`${completedCount} of 3 practices complete`}>
@@ -297,13 +347,21 @@ export const GracewardDailyFormationBoard = ({
           >
             <span className="min-w-0 truncate text-sm font-semibold">{activeEntry.state.practice.title}</span>
             <span className="flex shrink-0 items-center gap-2 text-[11px] font-medium text-muted-foreground">
-              {activeEntry.state.practice.minutes} min · +{activeEntry.state.practice.xpReward} XP
+              {activeEntry.state.practice.minutes} min · +{activeEntry.state.practice.xpReward} {PRODUCT_COPY.growthLabel}
               <ChevronDown className={cn("h-3.5 w-3.5 transition", collapsed && "-rotate-90")} />
             </span>
           </button>
           {!collapsed ? (
             <div className="border-t border-border/50 px-3.5 pb-3 pt-2.5">
               <p className="text-xs leading-5 text-muted-foreground">{activeEntry.state.practice.action}</p>
+              <p className="mt-2 text-[11px] leading-5 text-primary/80">
+                {activeEntry.state.assignment?.selectionReason ?? `Connected to today’s theme: ${dailyContent.theme}.`}
+              </p>
+              {celebratedCategory === activeEntry.category ? (
+                <p className="mt-2 rounded-xl bg-primary/[0.07] px-3 py-2 text-xs leading-5 text-foreground/80" role="status">
+                  {COMPANION_FORMATION_RESPONSES[activeEntry.category]}
+                </p>
+              ) : null}
               {celebratedCategory === activeEntry.category || activeEntry.state.assignment?.completedAt ? (
                 <div className="mt-2 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500/10 py-2 text-xs font-semibold text-emerald-600 dark:text-emerald-300">
                   <Check className="h-3.5 w-3.5" /> Complete
@@ -353,6 +411,38 @@ export const GracewardDailyFormationBoard = ({
           Today’s formation is complete. Carry it gently into the rest of your day.
         </motion.div>
       ) : null}
+
+      <AnimatePresence>
+        {showCompletionReveal ? (
+          <motion.button
+            type="button"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.45 }}
+            className="fixed inset-0 z-[80] flex flex-col items-center justify-center bg-[#193824]/[0.94] px-8 text-center backdrop-blur-md"
+            onClick={() => setShowCompletionReveal(false)}
+            aria-label="Today’s formation is complete. Continue."
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.92 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 0.18, duration: 0.7, ease: "easeOut" }}
+              className="flex flex-col items-center"
+            >
+              <GracewardRevealMark />
+              <p className="mt-2 font-serif text-4xl tracking-[0.08em] text-[#f4ecd9]">Graceward</p>
+              <p className="mt-5 text-xs font-semibold uppercase tracking-[0.24em] text-[#d9bd76]">
+                Mind · Body · Soul
+              </p>
+              <p className="mt-4 max-w-xs font-serif text-lg leading-7 text-[#f4ecd9]/90">
+                Carry today’s formation gently: {dailyContent.theme.toLowerCase()}.
+              </p>
+              <p className="mt-2 text-sm font-semibold text-[#d9bd76]">{dailyContent.reference}</p>
+            </motion.div>
+          </motion.button>
+        ) : null}
+      </AnimatePresence>
     </section>
   );
 };

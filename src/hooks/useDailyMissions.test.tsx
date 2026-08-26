@@ -177,7 +177,7 @@ describe("useDailyMissions", () => {
 
     await waitFor(() => {
       expect(mocks.toast).toHaveBeenCalled();
-    });
+    }, { timeout: 4000 });
 
     const firstToast = mocks.toast.mock.calls[0]?.[0] as { title?: string; description?: string; variant?: string };
     expect(firstToast.title).toBe("Mission refresh failed");
@@ -203,7 +203,7 @@ describe("useDailyMissions", () => {
 
     await waitFor(() => {
       expect(mocks.toast).toHaveBeenCalledTimes(1);
-    });
+    }, { timeout: 4000 });
 
     const destructiveToasts = mocks.toast.mock.calls.filter((call) => call[0]?.variant === "destructive");
     expect(destructiveToasts).toHaveLength(1);

@@ -20,6 +20,8 @@ import {
 } from "@/lib/adaptiveDailyFormation";
 import { getEffectiveDailyDate } from "@/utils/timezone";
 import { PRODUCT_RUNTIME } from "@/config/productRuntime";
+import { getChristianDailyContent } from "@/data/christianDailyContent";
+import { PRODUCT } from "@/config/product";
 
 export const DAILY_FORMATION_QUERY_KEY = "daily-formation";
 export const FORMATION_PROGRESS_QUERY_KEY = "formation-progress";
@@ -195,6 +197,7 @@ export function useAdaptiveDailyFormation({
   const queryClient = useQueryClient();
   const dateKey = getEffectiveDailyDate(profile?.timezone ?? undefined);
   const effectiveDateAtNoon = new Date(`${dateKey}T12:00:00`);
+  const dailyContent = getChristianDailyContent(effectiveDateAtNoon);
   const reviewedFallback = selectAdaptiveDailyFormation({
     dateKey,
     userId: user?.id ?? `${PRODUCT_RUNTIME.authProductMode}-preview`,
@@ -314,7 +317,14 @@ export function useAdaptiveDailyFormation({
         try {
           const { data: generated, error: generationError } = await supabase.functions.invoke(
             "generate-daily-formation",
-            { body: { practiceDate: dateKey, category } },
+            {
+              body: {
+                practiceDate: dateKey,
+                category,
+                dailyTheme: dailyContent.theme,
+                scriptureReference: dailyContent.reference,
+              },
+            },
           );
           if (generationError) throw generationError;
           if (generated?.assignment) {
@@ -374,7 +384,7 @@ export function useAdaptiveDailyFormation({
         }
       }
 
-      if (companionXPAwarded > 0) {
+      if (companionXPAwarded > 0 && PRODUCT.mode === "cosmiq") {
         showXPToast(companionXPAwarded, "Faithful practice complete");
       }
 

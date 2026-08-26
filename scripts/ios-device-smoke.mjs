@@ -13,11 +13,29 @@ const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 
 const workspacePath = path.join(projectRoot, "ios", "App", "App.xcworkspace");
-const scheme = process.env.IOS_SCHEME ?? "App";
-const configuration = process.env.IOS_CONFIGURATION ?? "Debug";
-const bundleId = process.env.IOS_BUNDLE_ID ?? "com.darrylgraham.graceward";
+const PRODUCTS = {
+  cosmiq: {
+    scheme: "Cosmiq",
+    configuration: "CosmiqDebug",
+    bundleId: "com.darrylgraham.revolution",
+  },
+  graceward: {
+    scheme: "Graceward",
+    configuration: "GracewardDebug",
+    bundleId: "com.darrylgraham.graceward",
+  },
+};
+const requestedProduct = process.env.IOS_PRODUCT?.trim().toLowerCase();
+if (!requestedProduct || !(requestedProduct in PRODUCTS)) {
+  console.error("[ios:smoke:device] Set IOS_PRODUCT=cosmiq or IOS_PRODUCT=graceward.");
+  process.exit(1);
+}
+const product = PRODUCTS[requestedProduct];
+const scheme = process.env.IOS_SCHEME ?? product.scheme;
+const configuration = process.env.IOS_CONFIGURATION ?? product.configuration;
+const bundleId = process.env.IOS_BUNDLE_ID ?? product.bundleId;
 const derivedDataPath = path.join(projectRoot, "ios", "App", "build-cli-device-smoke");
-const appPath = path.join(derivedDataPath, "Build", "Products", "Debug-iphoneos", "App.app");
+const appPath = path.join(derivedDataPath, "Build", "Products", `${configuration}-iphoneos`, "App.app");
 const coreDeviceTransientErrorPatterns = [
   /Timed out waiting for CoreDeviceService/i,
   /CoreDeviceService was unable to locate a device matching the requested device identifier/i,

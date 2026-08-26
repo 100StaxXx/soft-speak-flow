@@ -89,6 +89,10 @@ import { useExternalCalendarEvents } from "@/hooks/useExternalCalendarEvents";
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
+export const resolveJourneysThemeColor = (
+  mode: "christian" | "cosmiq",
+) => mode === "cosmiq" ? "#9b6bff" : "#2f5938";
+
 const toEditableQuestTask = (
   task: Pick<DailyTask, "id" | "task_text"> & Partial<EditableQuestTask>,
 ): EditableQuestTask => ({
@@ -156,7 +160,7 @@ const Journeys = () => {
   const isMacHostedIOSApp = useMemo(() => isMacDesignedForIPadIOSApp(), []);
   const isMacDesktopSession = useMemo(() => isMacSession(), []);
   const companionFrostedThemeStyle = useMemo(
-    () => getCompanionFrostedThemeStyle("#2f5938"),
+    () => getCompanionFrostedThemeStyle(resolveJourneysThemeColor(PRODUCT.mode)),
     [],
   );
   const macTimedTaskDurationFallbackMinutes = isMacDesktopSession

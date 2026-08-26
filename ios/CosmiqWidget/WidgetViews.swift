@@ -1,7 +1,7 @@
 import SwiftUI
 import WidgetKit
 
-private let todayDeepLinkURL = URL(string: "graceward://today")!
+private let todayDeepLinkURL = URL(string: "\(NativeProduct.urlScheme)://today")!
 
 private struct DailyPracticeWidgetContent: View {
     let entry: TaskEntry
@@ -16,7 +16,7 @@ private struct DailyPracticeWidgetContent: View {
     }
 
     private var practiceText: String {
-        practice?.text ?? "Open Graceward to receive today’s practice."
+        practice?.text ?? NativeProduct.emptyPrompt
     }
 
     private var statusText: String {
@@ -30,7 +30,7 @@ private struct DailyPracticeWidgetContent: View {
                 HStack(spacing: 6) {
                     Text("✝︎")
                         .font(isCompact ? .caption : .subheadline)
-                    Text("TODAY’S PRACTICE")
+                    Text(NativeProduct.dailyLabel)
                         .font(.system(size: isCompact ? 9 : 11, weight: .bold))
                         .tracking(1.1)
                         .foregroundColor(.cosmicSecondary)
@@ -54,7 +54,7 @@ private struct DailyPracticeWidgetContent: View {
                         .foregroundColor(.cosmicSecondary)
                     Spacer(minLength: 0)
                     if !isCompact {
-                        Text("Open Graceward")
+                        Text("Open \(NativeProduct.name)")
                             .font(.caption2.weight(.semibold))
                             .foregroundColor(.cosmicText)
                     }

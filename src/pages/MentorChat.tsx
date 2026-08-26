@@ -257,7 +257,7 @@ export default function MentorChat() {
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={() => navigate('/mentor')} 
+              onClick={() => navigate(PRODUCT.mode === "christian" ? "/guide" : "/mentor")}
               className="bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-full shadow-soft"
             >
               <ArrowLeft className="w-5 h-5" />

@@ -23,6 +23,15 @@ const ENDPOINT_NAME = "generate-daily-formation";
 const DEFAULT_MODEL = "gpt-5.6-luna";
 const VALID_CATEGORIES = new Set<FormationCategory>(["Mind", "Body", "Soul"]);
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const REVIEWED_DAILY_THREADS: Record<string, string> = {
+  "Psalm 118:24": "Receive the day",
+  "Micah 6:8": "Walk humbly",
+  "Matthew 11:28": "Make room for rest",
+  "Colossians 3:17": "Practice presence",
+  "Philippians 4:6–7": "Bring what is real",
+  "James 1:19": "Listen first",
+  "Galatians 6:9": "Keep going",
+};
 
 interface OpenAIResponse {
   status?: string;
@@ -129,6 +138,11 @@ export async function handleGenerateDailyFormation(req: Request): Promise<Respon
     const body = await req.json().catch(() => ({}));
     const practiceDate = typeof body?.practiceDate === "string" ? body.practiceDate : "";
     const category = typeof body?.category === "string" ? body.category as FormationCategory : null;
+    const requestedReference = typeof body?.scriptureReference === "string" ? body.scriptureReference.trim() : "";
+    const requestedTheme = typeof body?.dailyTheme === "string" ? body.dailyTheme.trim() : "";
+    const dailyThread = REVIEWED_DAILY_THREADS[requestedReference] === requestedTheme
+      ? { scriptureReference: requestedReference, theme: requestedTheme }
+      : null;
     if (!DATE_PATTERN.test(practiceDate) || !category || !VALID_CATEGORIES.has(category)) {
       return createSafeErrorResponse(req, {
         status: 400,
@@ -204,6 +218,8 @@ export async function handleGenerateDailyFormation(req: Request): Promise<Respon
     ].filter(Boolean).join(" | ")).join("\n").slice(0, 900) || "No recent reflection supplied";
     const userPrompt = `Prepare the ${category} practice for ${practiceDate}.
 
+Shared daily formation thread: ${dailyThread ? `${dailyThread.theme} (${dailyThread.scriptureReference})` : "not supplied"}.
+
 Recent ${category} practices to avoid repeating:
 ${recentSummary}
 
@@ -240,7 +256,7 @@ Minimum useful personalization context:
         },
         body: JSON.stringify({
           model,
-          instructions: buildFormationInstructions(category),
+          instructions: buildFormationInstructions(category, dailyThread),
           input: attempt === 1
             ? userPrompt
             : `${userPrompt}\n\nThe previous candidate failed server validation: ${validationFailure}. Produce a meaningfully different valid practice.`,
@@ -275,7 +291,12 @@ Minimum useful personalization context:
         continue;
       }
 
-      const validation = validateGeneratedPractice(practice, category, recent);
+      const validation = validateGeneratedPractice(
+        practice,
+        category,
+        recent,
+        category === "Soul" ? dailyThread?.scriptureReference ?? null : null,
+      );
       if (!validation.valid) {
         validationFailure = validation.reason;
         continue;
@@ -300,7 +321,9 @@ Minimum useful personalization context:
           p_action: practice.action,
           p_benefit: practice.benefit,
           p_minutes: practice.minutes,
-          p_selection_reason: "Personalized from your recent rhythm",
+          p_selection_reason: dailyThread
+            ? `Connected to ${dailyThread.theme.toLowerCase()} and your recent rhythm`
+            : "Personalized from your recent rhythm",
           p_scripture_reference: practice.scriptureReference,
           p_generation_model: model,
           p_prompt_version: FORMATION_PROMPT_VERSION,

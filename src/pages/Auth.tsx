@@ -22,12 +22,9 @@ import {
   getAuthRedirectPath,
   getProfileAwareAuthFallbackPath,
 } from "@/utils/authRedirect";
-import { PRODUCT } from "@/config/product";
+import { PRODUCT, type ProductMode } from "@/config/product";
 import { PRODUCT_RUNTIME } from "@/config/productRuntime";
-import {
-  getAuthUserAccountEmail,
-  type AuthProductMode,
-} from "@/utils/authUser";
+import { getAuthUserAccountEmail } from "@/utils/authUser";
 import { logger } from "@/utils/logger";
 import { hasWalkthroughCompleted } from "@/utils/profileOnboarding";
 import { getRedirectUrlWithPath, getRedirectUrl } from "@/utils/redirectUrl";
@@ -51,6 +48,7 @@ import { Eye, EyeOff } from "lucide-react";
 
 const POST_AUTH_NAVIGATION_TIMEOUT_MS = 5000;
 const POST_AUTH_DEFAULT_PATH = "/onboarding";
+const SOCIAL_AUTH_NEW_USER_WINDOW_MS = 120_000;
 const AUTH_GATEWAY_RETRY_DELAY_MS = 350;
 const FUNCTION_TRANSPORT_ERROR_MESSAGES = new Set([
   "edge function returned a non-2xx status code",
@@ -62,11 +60,6 @@ const AUTH_GATEWAY_OUTAGE_CODES = new Set([
   "ABUSE_CHECK_FAILED",
   "AUTH_GATEWAY_FAILED",
 ]);
-const SOCIAL_AUTH_OUTAGE_CODES = new Set([
-  "ABUSE_CHECK_FAILED",
-  "APPLE_AUTH_UNAVAILABLE",
-  "GOOGLE_AUTH_UNAVAILABLE",
-]);
 const AUTH_TEMPORARY_OUTAGE_MESSAGE =
   "Authentication is temporarily unavailable. Please try again in a moment.";
 const APPLE_AUTH_TEMPORARY_OUTAGE_MESSAGE =
@@ -75,15 +68,72 @@ const ACCOUNT_CREATION_ERROR_TOAST_TITLE = "Couldn't create account";
 const getProductBoundaryErrorMessage = (
   boundary: AuthProductBoundaryResult,
 ): string => {
-  const otherProductName = boundary.actualProductMode === "cosmiq" ? "Cosmiq" : "Graceward";
+  const otherProductName =
+    boundary.actualProductMode === "cosmiq" ? "Cosmiq" : "Graceward";
   return boundary.actualProductMode
     ? `That session belongs to your ${otherProductName} account, so ${PRODUCT.name} signed it out. Use or create a separate ${PRODUCT.name} account.`
     : `${PRODUCT.name} couldn't safely verify this Apple account. Use ${PRODUCT.name}'s Sign up with Apple flow to create a separate account.`;
 };
-const APPLE_NATIVE_PRODUCT_MODE: AuthProductMode =
-  PRODUCT_RUNTIME.authProductMode;
 const APPLE_NATIVE_CLIENT_ID = PRODUCT_RUNTIME.iosBundleId;
 const APPLE_NATIVE_REDIRECT_URI = `${APPLE_NATIVE_CLIENT_ID}://`;
+
+export const getAuthPresentation = (mode: ProductMode) =>
+  mode === "cosmiq"
+    ? {
+        productMode: "cosmiq",
+        rootClassName:
+          "min-h-screen relative overflow-hidden bg-[#090311] text-pure-white",
+        backgroundClassName:
+          "absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_82%,rgba(179,92,255,0.16),transparent_28%),radial-gradient(circle_at_50%_18%,rgba(39,18,71,0.3),transparent_38%),linear-gradient(180deg,#090311_0%,#0a0314_38%,#09020f_100%)]",
+        glowClassName:
+          "absolute inset-x-0 bottom-0 -z-10 h-[30vh] bg-[radial-gradient(circle_at_50%_100%,rgba(209,100,255,0.12),transparent_52%)]",
+        showBrandHeader: false,
+        fieldLabelClassName:
+          "text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-white/[0.5]",
+        fieldInputClassName:
+          "h-[3.35rem] rounded-[1.15rem] border border-[#2a1a49] bg-[#12091f] px-5 text-[0.98rem] font-medium text-white shadow-[0_0_0_1px_rgba(255,255,255,0.01),0_10px_28px_rgba(5,2,16,0.45),inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-white/[0.34] focus-visible:border-[#4b2c7e] focus-visible:ring-[3px] focus-visible:ring-[#b86dff]/15 focus-visible:ring-offset-0",
+        passwordToggleClassName:
+          "absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-white/[0.58] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b86dff]/35",
+        secondaryTextClassName: "text-white/[0.72]",
+        subtleActionClassName:
+          "text-white/[0.6] transition-colors hover:text-pure-white",
+        primaryButtonClassName:
+          "h-[3.35rem] w-full rounded-[1.1rem] bg-gradient-to-r from-[#b254ea] via-[#c45ff3] to-[#df67dc] text-[0.98rem] font-semibold text-pure-white shadow-[0_22px_42px_rgba(148,58,230,0.38)] hover:brightness-105",
+        dividerClassName: "border-white/[0.12]",
+        dividerLabelClassName:
+          "rounded-[0.45rem] bg-[#171023] px-2.5 py-0.5 text-[0.72rem] text-white/[0.58] shadow-[0_10px_20px_rgba(0,0,0,0.3)]",
+        appleButtonClassName:
+          "h-[3.15rem] w-full rounded-[1rem] bg-white text-[0.98rem] font-semibold text-black shadow-[0_16px_30px_rgba(0,0,0,0.26)] hover:bg-white/95",
+        switchModeClassName:
+          "text-[0.93rem] font-medium text-white/[0.72] underline underline-offset-[3px] transition-colors hover:text-white",
+      }
+    : {
+        productMode: "graceward",
+        rootClassName:
+          "min-h-screen relative overflow-hidden bg-[#f4efe3] text-[#203124]",
+        backgroundClassName:
+          "absolute inset-0 -z-10 bg-[radial-gradient(circle_at_75%_18%,rgba(195,162,93,0.22),transparent_34%),radial-gradient(circle_at_16%_86%,rgba(73,111,76,0.18),transparent_36%),linear-gradient(145deg,#f7f1e5_0%,#edf0e4_56%,#dfe8db_100%)]",
+        glowClassName: null,
+        showBrandHeader: true,
+        fieldLabelClassName:
+          "text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-[#3f5f46]",
+        fieldInputClassName:
+          "h-[3.35rem] rounded-[1.15rem] border border-[#2f5938]/20 bg-white/70 px-5 text-[0.98rem] font-medium text-[#203124] shadow-[0_12px_30px_rgba(32,49,36,0.08)] placeholder:text-[#617064] focus-visible:border-[#2f5938]/60 focus-visible:ring-[3px] focus-visible:ring-[#2f5938]/[0.12] focus-visible:ring-offset-0",
+        passwordToggleClassName:
+          "absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-[#526456] transition-colors hover:text-[#203124] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2f5938]/35",
+        secondaryTextClassName: "text-[#5b685e]",
+        subtleActionClassName:
+          "text-[#526456] transition-colors hover:text-[#203124]",
+        primaryButtonClassName:
+          "h-[3.35rem] w-full rounded-[1.1rem] bg-[#2f5938] text-[0.98rem] font-semibold text-white shadow-[0_22px_42px_rgba(47,89,56,0.25)] hover:bg-[#24482d]",
+        dividerClassName: "border-[#203124]/15",
+        dividerLabelClassName:
+          "rounded-[0.45rem] bg-[#edf0e4] px-2.5 py-0.5 text-[0.72rem] text-[#617064]",
+        appleButtonClassName:
+          "h-[3.15rem] w-full rounded-[1rem] border border-[#203124]/[0.12] bg-white text-[0.98rem] font-semibold text-black shadow-[0_16px_30px_rgba(32,49,36,0.1)] hover:bg-white/95",
+        switchModeClassName:
+          "text-[0.93rem] font-medium text-[#526456] underline underline-offset-[3px] transition-colors hover:text-[#203124]",
+      };
 
 type AuthGatewayAction =
   "sign_in_password" | "sign_up_password" | "reset_password";
@@ -107,6 +157,18 @@ const hasOAuthCallbackParams = (): boolean => {
   const url = new URL(window.location.href);
   return Boolean(
     url.searchParams.get("code") || url.hash.includes("access_token"),
+  );
+};
+
+const wasAuthUserCreatedDuringAttempt = (
+  createdAt: string | undefined,
+  attemptStartedAt: number,
+): boolean => {
+  if (!createdAt) return false;
+  const createdAtMs = Date.parse(createdAt);
+  return (
+    Number.isFinite(createdAtMs) &&
+    createdAtMs >= attemptStartedAt - SOCIAL_AUTH_NEW_USER_WINDOW_MS
   );
 };
 
@@ -171,6 +233,13 @@ const getAppleErrorDescription = (error: unknown): string => {
 
   if (normalized.includes("nonce") || normalized.includes("security check")) {
     return "Apple Sign-In security verification failed. Please try again.";
+  }
+
+  if (
+    normalized.includes("provider is not enabled") ||
+    normalized.includes("unsupported provider")
+  ) {
+    return APPLE_AUTH_TEMPORARY_OUTAGE_MESSAGE;
   }
 
   if (normalized.includes("session")) {
@@ -262,47 +331,6 @@ const getAuthGatewayErrorMessage = async (
   });
 };
 
-const getAppleAuthActionDescription = (intent: SocialAuthIntent): string =>
-  intent === "sign_in"
-    ? "sign you in with Apple"
-    : "create your account with Apple";
-
-const getAppleAuthErrorMessage = async (
-  error: unknown,
-  intent: SocialAuthIntent,
-): Promise<string> => {
-  const parsed = await parseFunctionInvokeError(error);
-  logAuthFunctionError("[Auth Apple] Social auth request failed", parsed, {
-    intent,
-  });
-  const errorCode = getParsedFunctionErrorCode(parsed);
-
-  if (errorCode && SOCIAL_AUTH_OUTAGE_CODES.has(errorCode)) {
-    return APPLE_AUTH_TEMPORARY_OUTAGE_MESSAGE;
-  }
-
-  if (
-    typeof parsed.backendMessage === "string" &&
-    parsed.backendMessage.trim() &&
-    !isFunctionTransportErrorMessage(parsed.backendMessage)
-  ) {
-    return parsed.backendMessage;
-  }
-
-  const directMessage = getErrorMessage(error).trim();
-  if (
-    directMessage &&
-    !isFunctionTransportErrorMessage(directMessage) &&
-    !directMessage.toLowerCase().includes("functionsfetcherror")
-  ) {
-    return directMessage;
-  }
-
-  return toUserFacingFunctionError(parsed, {
-    action: getAppleAuthActionDescription(intent),
-  });
-};
-
 interface AuthGatewayPayload {
   action: AuthGatewayAction;
   email?: string;
@@ -345,21 +373,6 @@ const invokeAuthGateway = async (payload: AuthGatewayPayload) => {
   }
 };
 
-const readFunctionErrorContext = async (error: unknown) => {
-  const maybeErrorWithContext = error as {
-    context?: { json?: () => Promise<Record<string, unknown>> };
-  };
-  if (!maybeErrorWithContext.context?.json) {
-    return null;
-  }
-
-  try {
-    return await maybeErrorWithContext.context.json();
-  } catch {
-    return null;
-  }
-};
-
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -379,6 +392,7 @@ const Auth = () => {
   const pendingPostAuthNavigationContextRef = useRef<
     (PostAuthNavigationContext & { userId: string }) | null
   >(null);
+  const directSocialAuthInProgressRef = useRef(false);
   const setPendingPostAuthNavigationContext = useCallback(
     (userId: string, context: PostAuthNavigationContext) => {
       pendingPostAuthNavigationContextRef.current = {
@@ -687,35 +701,35 @@ const Auth = () => {
       session: Session | null,
       source: string,
       attempt: PendingSocialAuthAttempt | null,
-    ) => {
+    ): Promise<boolean> => {
       if (!session) {
         clearPendingSocialAuthAttempt();
         await handlePostAuthNavigation(session, source);
-        return;
+        return false;
       }
 
       const productBoundary = await validateSessionProductBoundary(session);
       if (!productBoundary.allowed) {
         await handlePostAuthNavigation(session, source);
-        return;
+        return false;
       }
 
       if (!attempt) {
         await handlePostAuthNavigation(session, source);
-        return;
+        return true;
       }
 
       if (attempt.intent !== "sign_in") {
         clearPendingSocialAuthAttempt();
         await handlePostAuthNavigation(session, source);
-        return;
+        return true;
       }
 
       try {
         const path = await getAuthRedirectPath(session.user.id);
         if (path === POST_AUTH_DEFAULT_PATH) {
           await blockSocialSignIn(attempt, source);
-          return;
+          return false;
         }
       } catch (error) {
         logger.warn(
@@ -726,6 +740,7 @@ const Auth = () => {
 
       clearPendingSocialAuthAttempt();
       await handlePostAuthNavigation(session, source);
+      return true;
     },
     [blockSocialSignIn, handlePostAuthNavigation],
   );
@@ -874,6 +889,13 @@ const Auth = () => {
         ["SIGNED_IN", "TOKEN_REFRESHED", "INITIAL_SESSION"].includes(event) &&
         session
       ) {
+        if (directSocialAuthInProgressRef.current) {
+          logger.debug(
+            `[Auth onAuthStateChange] Deferring ${event} while direct social auth is resolving`,
+          );
+          return;
+        }
+
         if (oauthCallbackInProgress.current) {
           logger.debug(
             `[Auth onAuthStateChange] Deferring ${event} while OAuth callback is processing`,
@@ -1147,114 +1169,33 @@ const Auth = () => {
           throw new Error("Apple Sign-In failed - no identity token returned");
         }
 
-        console.log("[Apple OAuth] Calling apple-native-auth edge function");
+        const nativeAttempt: PendingSocialAuthAttempt = {
+          provider: "apple",
+          intent: socialAuthIntent,
+        };
+        storedPendingSocialAuth = storePendingSocialAuthAttempt(nativeAttempt);
+        directSocialAuthInProgressRef.current = true;
 
-        // Call our edge function to handle native Apple auth
-        const edgeInvokeStart = Date.now();
-        const { data: sessionData, error: functionError } =
-          await supabase.functions.invoke("apple-native-auth", {
-            body: {
-              identityToken: result.response.identityToken,
-              rawNonce,
-              intent: socialAuthIntent,
-              productMode: APPLE_NATIVE_PRODUCT_MODE,
-            },
-          });
-        const functionErrorBody = functionError
-          ? await readFunctionErrorContext(functionError)
-          : null;
-        console.log(
-          `[Apple OAuth] apple-native-auth completed in ${Date.now() - edgeInvokeStart}ms`,
-        );
-
-        console.log("[Apple OAuth] Edge function response:", {
-          hasAccessToken: !!sessionData?.access_token,
-          hasRefreshToken: !!sessionData?.refresh_token,
-          error: functionErrorBody?.error || functionError?.message,
-          errorCode: functionErrorBody?.code,
-        });
-
-        if (functionError) {
-          if (functionErrorBody?.code === "ACCOUNT_NOT_FOUND") {
-            setInlineError(getSocialAccountNotFoundMessage("apple"));
-            setIsLogin(true);
-            setIsForgotPassword(false);
-            return;
-          }
-
-          if (functionErrorBody?.code === "APPLE_EMAIL_MISSING") {
-            console.warn(
-              "[Apple OAuth] Missing email for Apple ID, prompting user to re-register",
-            );
-            setInlineError(
-              `We couldn’t create an account with your Apple ID. Open Settings, remove ${PRODUCT.name} from Sign in with Apple, then try again and share your email.`,
-            );
-            setIsLogin(true);
-            setIsForgotPassword(false);
-            return;
-          }
-
-          if (
-            functionErrorBody?.code === "APPLE_NONCE_MISSING" ||
-            functionErrorBody?.code === "APPLE_NONCE_MISMATCH"
-          ) {
-            throw new Error(
-              "Apple Sign-In security check failed. Please try again.",
-            );
-          }
-
-          throw new Error(
-            await getAppleAuthErrorMessage(functionError, socialAuthIntent),
-          );
-        }
-        if (!sessionData?.access_token || !sessionData?.refresh_token) {
-          clearPendingPostAuthNavigationContext();
-          throw new Error("Failed to get session tokens from edge function");
-        }
-
-        const nativeAppleSessionUserId =
-          sessionData?.user &&
-          typeof sessionData.user === "object" &&
-          "id" in sessionData.user
-            ? (sessionData.user.id as string | undefined)
-            : undefined;
-
-        if (nativeAppleSessionUserId) {
-          setPendingPostAuthNavigationContext(
-            nativeAppleSessionUserId,
-            applePostAuthNavigationContext,
-          );
-        }
-
-        // Set the session with tokens from edge function
-        const setSessionStart = Date.now();
+        console.log("[Apple OAuth] Exchanging the Apple ID token with Supabase Auth");
+        const idTokenExchangeStart = Date.now();
         const {
-          error: sessionError,
-          data: { session: newSession },
-        } = await supabase.auth.setSession({
-          access_token: sessionData.access_token,
-          refresh_token: sessionData.refresh_token,
+          data: { session: sessionToUse },
+          error: idTokenError,
+        } = await supabase.auth.signInWithIdToken({
+          provider: "apple",
+          token: result.response.identityToken,
+          nonce: rawNonce,
         });
         console.log(
-          `[Apple OAuth] setSession completed in ${Date.now() - setSessionStart}ms`,
+          `[Apple OAuth] Supabase ID-token exchange completed in ${Date.now() - idTokenExchangeStart}ms`,
         );
 
-        if (sessionError) {
-          clearPendingPostAuthNavigationContext(nativeAppleSessionUserId);
-          throw sessionError;
+        if (idTokenError) {
+          throw idTokenError;
         }
-
-        // Ensure Supabase client state reflects the session before navigating
-        const {
-          data: { session: currentSession },
-        } = await supabase.auth.getSession();
-        const sessionToUse = newSession ?? currentSession;
 
         if (!sessionToUse) {
-          clearPendingPostAuthNavigationContext(nativeAppleSessionUserId);
-          throw new Error(
-            "Failed to establish Supabase session after Apple sign-in",
-          );
+          throw new Error("Apple Sign-In completed without a Supabase session");
         }
 
         setPendingPostAuthNavigationContext(
@@ -1262,16 +1203,33 @@ const Auth = () => {
           applePostAuthNavigationContext,
         );
 
+        if (
+          socialAuthIntent === "sign_in" &&
+          wasAuthUserCreatedDuringAttempt(
+            sessionToUse.user.created_at,
+            idTokenExchangeStart,
+          )
+        ) {
+          await blockSocialSignIn(nativeAttempt, "appleNativeNewUser");
+          directSocialAuthInProgressRef.current = false;
+          storedPendingSocialAuth = false;
+          return;
+        }
+
         const sessionSetTime = Date.now();
         console.log(
           `[Apple OAuth] Session set successfully at ${sessionSetTime}, proceeding to navigation`,
         );
-        console.log("[Apple OAuth] Triggering post-auth navigation");
-        void handlePostAuthNavigation(
+        console.log("[Apple OAuth] Resolving post-auth navigation");
+        clearPendingSocialAuthAttempt();
+        storedPendingSocialAuth = false;
+        await handlePostAuthNavigation(
           sessionToUse,
           "appleNative",
           applePostAuthNavigationContext,
         );
+        directSocialAuthInProgressRef.current = false;
+
         console.log(
           `[Apple OAuth] Total native flow completed in ${Date.now() - appleFlowStart}ms`,
         );
@@ -1366,16 +1324,15 @@ const Auth = () => {
 
       setInlineError(getAppleErrorDescription(error));
     } finally {
+      directSocialAuthInProgressRef.current = false;
       setOauthLoading(null);
     }
   };
 
-  const fieldLabelClassName =
-    "text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-[#3f5f46]";
-  const fieldInputClassName =
-    "h-[3.35rem] rounded-[1.15rem] border border-[#2f5938]/20 bg-white/70 px-5 text-[0.98rem] font-medium text-[#203124] shadow-[0_12px_30px_rgba(32,49,36,0.08)] placeholder:text-[#617064] focus-visible:border-[#2f5938]/60 focus-visible:ring-[3px] focus-visible:ring-[#2f5938]/[0.12] focus-visible:ring-offset-0";
-  const passwordToggleButtonClassName =
-    "absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-[#526456] transition-colors hover:text-[#203124] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2f5938]/35";
+  const presentation = getAuthPresentation(PRODUCT.mode);
+  const fieldLabelClassName = presentation.fieldLabelClassName;
+  const fieldInputClassName = presentation.fieldInputClassName;
+  const passwordToggleButtonClassName = presentation.passwordToggleClassName;
   const passwordInputClassName = isLogin
     ? fieldInputClassName
     : `${fieldInputClassName} pr-14`;
@@ -1394,24 +1351,32 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-[#f4efe3] text-[#203124]">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_75%_18%,rgba(195,162,93,0.22),transparent_34%),radial-gradient(circle_at_16%_86%,rgba(73,111,76,0.18),transparent_36%),linear-gradient(145deg,#f7f1e5_0%,#edf0e4_56%,#dfe8db_100%)]" />
+    <div
+      data-product-mode={presentation.productMode}
+      className={presentation.rootClassName}
+    >
+      <div className={presentation.backgroundClassName} />
+      {presentation.glowClassName ? (
+        <div className={presentation.glowClassName} />
+      ) : null}
       <section
         id="auth-form"
         className="min-h-screen relative flex items-center justify-center px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(4.5rem,env(safe-area-inset-top)+2.75rem)]"
       >
         <div className="relative z-10 w-full max-w-[20.5rem] py-4 sm:max-w-[21.75rem]">
-          <div className="mb-8 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] bg-[#2f5938] shadow-[0_16px_35px_rgba(47,89,56,0.22)]">
-              <span className="font-serif text-3xl text-[#f8f4e8]">{PRODUCT.mode === "christian" ? "†" : "✦"}</span>
+          {presentation.showBrandHeader ? (
+            <div className="mb-8 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] bg-[#2f5938] shadow-[0_16px_35px_rgba(47,89,56,0.22)]">
+                <span className="font-serif text-3xl text-[#f8f4e8]">†</span>
+              </div>
+              <p className="mt-4 text-xs font-semibold uppercase tracking-[0.26em] text-[#496f4c]">
+                {PRODUCT.name}
+              </p>
+              <p className="mt-2 text-sm text-[#5b685e]">
+                Faith for the shape of your day.
+              </p>
             </div>
-            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.26em] text-[#496f4c]">
-              {PRODUCT.name}
-            </p>
-            <p className="mt-2 text-sm text-[#5b685e]">
-              {PRODUCT.mode === "christian" ? "Faith for the shape of your day." : PRODUCT.tagline}
-            </p>
-          </div>
+          ) : null}
           <h1 className="sr-only">
             {isForgotPassword
               ? "Reset password"
@@ -1424,7 +1389,9 @@ const Auth = () => {
             {isForgotPassword ? (
               <form onSubmit={handleForgotPassword} className="space-y-5">
                 <div className="space-y-2 pb-1">
-                  <p className="text-sm leading-6 text-[#5b685e]">
+                  <p
+                    className={`text-sm leading-6 ${presentation.secondaryTextClassName}`}
+                  >
                     Enter your email and we&apos;ll send a reset link.
                   </p>
                 </div>
@@ -1451,7 +1418,7 @@ const Auth = () => {
                 </div>
                 <Button
                   type="submit"
-                  className="h-[3.35rem] w-full rounded-[1.1rem] bg-[#2f5938] text-[0.98rem] font-semibold text-white shadow-[0_20px_38px_rgba(47,89,56,0.24)] hover:bg-[#24482d]"
+                  className={presentation.primaryButtonClassName}
                   disabled={loading}
                 >
                   {loading ? "Sending..." : "Send Reset Link"}
@@ -1529,7 +1496,7 @@ const Auth = () => {
                         setInlineError(null);
                         setIsForgotPassword(true);
                       }}
-                      className="pl-1 pt-0.5 text-[0.74rem] font-medium text-[#526456] transition-colors hover:text-[#203124]"
+                      className={`pl-1 pt-0.5 text-[0.74rem] font-medium ${presentation.subtleActionClassName}`}
                     >
                       Forgot password?
                     </button>
@@ -1583,7 +1550,7 @@ const Auth = () => {
                 )}
                 <Button
                   type="submit"
-                  className="h-[3.35rem] w-full rounded-[1.1rem] bg-[#2f5938] text-[0.98rem] font-semibold text-white shadow-[0_22px_42px_rgba(47,89,56,0.25)] hover:bg-[#24482d]"
+                  className={presentation.primaryButtonClassName}
                   disabled={loading}
                 >
                   {loading ? "Loading..." : isLogin ? "Sign In" : "Get Started"}
@@ -1595,10 +1562,12 @@ const Auth = () => {
               <>
                 <div className="relative pt-1">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-[#203124]/15" />
+                    <div
+                      className={`w-full border-t ${presentation.dividerClassName}`}
+                    />
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="rounded-[0.45rem] bg-[#edf0e4] px-2.5 py-0.5 text-[0.72rem] text-[#617064]">
+                    <span className={presentation.dividerLabelClassName}>
                       or
                     </span>
                   </div>
@@ -1608,7 +1577,7 @@ const Auth = () => {
                   type="button"
                   onClick={() => handleOAuthSignIn("apple")}
                   disabled={loading || oauthLoading !== null}
-                  className="h-[3.15rem] w-full rounded-[1rem] border border-[#203124]/[0.12] bg-white text-[0.98rem] font-semibold text-black shadow-[0_16px_30px_rgba(32,49,36,0.1)] hover:bg-white/95"
+                  className={presentation.appleButtonClassName}
                 >
                   {oauthLoading === "apple" ? (
                     <div className="animate-spin h-5 w-5 border-2 border-black/20 border-t-black rounded-full" />
@@ -1646,7 +1615,7 @@ const Auth = () => {
               <button
                 type="button"
                 onClick={switchMode}
-                className="text-[0.93rem] font-medium text-[#526456] underline underline-offset-[3px] transition-colors hover:text-[#203124]"
+                className={presentation.switchModeClassName}
               >
                 {isForgotPassword
                   ? "Back to Sign In"

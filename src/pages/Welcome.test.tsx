@@ -10,7 +10,10 @@ const authState = vi.hoisted(() => ({
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => authState }));
 vi.mock("@/utils/authRedirect", () => ({ getAuthRedirectPath: vi.fn() }));
 
-import Welcome, { getWelcomeProductContent } from "./Welcome";
+import Welcome, {
+  WelcomePresentation,
+  getWelcomeProductContent,
+} from "./Welcome";
 
 describe("Graceward welcome", () => {
   beforeEach(() => {
@@ -33,15 +36,33 @@ describe("Graceward welcome", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: "Graceward", level: 1 })).toBeInTheDocument();
-    expect(screen.getByText(/a christian daily companion/i)).toBeInTheDocument();
-    expect(screen.getByText(/faithful action for the day you actually have/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Graceward", level: 1 }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/a christian daily companion/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/faithful action for the day you actually have/i),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/—/)).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /receive the day/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /without pretending to speak for god/i })).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /begin|start a daily rhythm/i })[0]).toHaveAttribute("href", "/auth?mode=signup");
-    expect(screen.getAllByRole("link", { name: /sign in/i })[0]).toHaveAttribute("href", "/auth");
-    expect(screen.queryByText(/faction|destiny|quest-based/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /receive the day/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        name: /without pretending to speak for god/i,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("link", { name: /begin|start a daily rhythm/i })[0],
+    ).toHaveAttribute("href", "/auth?mode=signup");
+    expect(
+      screen.getAllByRole("link", { name: /sign in/i })[0],
+    ).toHaveAttribute("href", "/auth");
+    expect(
+      screen.queryByText(/faction|destiny|quest-based/i),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps legal links available", () => {
@@ -51,8 +72,14 @@ describe("Graceward welcome", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("link", { name: /^terms$/i })).toHaveAttribute("href", "/terms");
-    expect(screen.getByRole("link", { name: /^privacy$/i })).toHaveAttribute("href", "/privacy");
+    expect(screen.getByRole("link", { name: /^terms$/i })).toHaveAttribute(
+      "href",
+      "/terms",
+    );
+    expect(screen.getByRole("link", { name: /^privacy$/i })).toHaveAttribute(
+      "href",
+      "/privacy",
+    );
   });
 
   it("keeps Cosmiq landing copy free of Graceward faith language", () => {
@@ -62,5 +89,42 @@ describe("Graceward welcome", () => {
     expect(content.eyebrow).toMatch(/living companion/i);
     expect(content.finalCopy).toMatch(/cinematic moments/i);
     expect(allCopy).not.toMatch(/scripture|prayer|church|god/i);
+  });
+
+  it("renders Cosmiq with its cinematic visual system instead of Graceward styling", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <WelcomePresentation mode="cosmiq" />
+      </MemoryRouter>,
+    );
+
+    const shell = container.querySelector('[data-product-mode="cosmiq"]');
+    expect(shell).toHaveClass("bg-[#05080d]", "text-white");
+    expect(shell).not.toHaveClass("bg-[#f4efe3]", "text-[#203124]");
+    expect(
+      screen.getByRole("heading", { name: "Cosmiq", level: 1 }),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('img[src="/landing-backdrops/quests.jpg"]'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Graceward")).not.toBeInTheDocument();
+  });
+
+  it("keeps Graceward on its cream and forest visual system", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <WelcomePresentation mode="christian" />
+      </MemoryRouter>,
+    );
+
+    const shell = container.querySelector('[data-product-mode="graceward"]');
+    expect(shell).toHaveClass("bg-[#f4efe3]", "text-[#203124]");
+    expect(shell).not.toHaveClass("bg-[#05080d]", "text-white");
+    expect(
+      screen.getByRole("heading", { name: "Graceward", level: 1 }),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector("img[src^='/landing-backdrops/']"),
+    ).toBeNull();
   });
 });

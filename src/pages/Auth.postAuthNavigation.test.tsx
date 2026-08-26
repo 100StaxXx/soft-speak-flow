@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => {
   const getSessionMock = vi.fn();
   const onAuthStateChangeMock = vi.fn();
   const invokeMock = vi.fn();
-  const setSessionMock = vi.fn();
+  const signInWithIdTokenMock = vi.fn();
   const appleAuthorizeMock = vi.fn();
   const maybeSingleMock = vi.fn();
   const loggerDebugMock = vi.fn();
@@ -38,7 +38,7 @@ const mocks = vi.hoisted(() => {
     getSessionMock,
     onAuthStateChangeMock,
     invokeMock,
-    setSessionMock,
+    signInWithIdTokenMock,
     appleAuthorizeMock,
     maybeSingleMock,
     selectEqMock,
@@ -116,7 +116,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       signUp: vi.fn(),
       resetPasswordForEmail: vi.fn(),
       signInWithOAuth: vi.fn(),
-      setSession: mocks.setSessionMock,
+      signInWithIdToken: mocks.signInWithIdTokenMock,
     },
     from: mocks.fromMock,
     functions: {
@@ -170,15 +170,7 @@ const primeNativeAppleFlow = () => {
       user: "apple-user-1",
     },
   });
-  mocks.invokeMock.mockResolvedValue({
-    data: {
-      access_token: "access-token",
-      refresh_token: "refresh-token",
-      user: signedInSession.user,
-    },
-    error: null,
-  });
-  mocks.setSessionMock.mockResolvedValue({
+  mocks.signInWithIdTokenMock.mockResolvedValue({
     data: {
       session: signedInSession,
     },
@@ -209,7 +201,7 @@ describe("Auth post-auth navigation", () => {
 
     mocks.getAuthRedirectPathMock.mockResolvedValue("/tasks");
     mocks.getProfileAwareAuthFallbackPathMock.mockResolvedValue("/tasks");
-    mocks.setSessionMock.mockResolvedValue({
+    mocks.signInWithIdTokenMock.mockResolvedValue({
       data: {
         session: signedInSession,
       },
@@ -677,7 +669,7 @@ describe("Auth post-auth navigation", () => {
     await flushMicrotasks();
     await flushMicrotasks();
 
-    expect(mocks.setSessionMock).toHaveBeenCalledTimes(1);
+    expect(mocks.signInWithIdTokenMock).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);

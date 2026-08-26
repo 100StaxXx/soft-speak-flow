@@ -5,6 +5,7 @@ import { useCompanionPresence } from "@/contexts/CompanionPresenceContext";
 import { useCompanionAuraColors } from "@/hooks/useCompanionAuraColors";
 import { cn } from "@/lib/utils";
 import { announceCompanionPresenceSpeech } from "@/lib/companionPresenceEvents";
+import { PRODUCT } from "@/config/product";
 
 interface MemoryWhisperProps {
   className?: string;
@@ -18,7 +19,7 @@ interface MemoryWhisperProps {
  * Meant to be placed in the CompanionDialogue area or companion page.
  */
 export const MemoryWhisper = memo(({ className, chance = 0.15 }: MemoryWhisperProps) => {
-  const { getRandomMemory, getMemoryDialogue, referenceMemory, memories } = useCompanionMemories();
+  const { getRandomMemory, getMemoryDialogue, referenceMemory, refetchMemories, memories } = useCompanionMemories();
   const { presence } = useCompanionPresence();
   const { primaryAura } = useCompanionAuraColors();
   
@@ -27,6 +28,14 @@ export const MemoryWhisper = memo(({ className, chance = 0.15 }: MemoryWhisperPr
 
   // Track if we've already shown a memory this mount
   const hasShownRef = useRef(false);
+
+  useEffect(() => {
+    const handleMemoryCreated = () => {
+      void refetchMemories();
+    };
+    window.addEventListener("companion-memory-created", handleMemoryCreated);
+    return () => window.removeEventListener("companion-memory-created", handleMemoryCreated);
+  }, [refetchMemories]);
 
   // Try to show a memory on mount if conditions are right
   useEffect(() => {
@@ -83,7 +92,7 @@ export const MemoryWhisper = memo(({ className, chance = 0.15 }: MemoryWhisperPr
         }}
       >
         <p className="text-xs text-muted-foreground italic">
-          💭 "{memoryLine}"
+          {PRODUCT.mode === "christian" ? "🌿" : "💭"} "{memoryLine}"
         </p>
       </motion.div>
     </AnimatePresence>

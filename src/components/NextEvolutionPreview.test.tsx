@@ -52,7 +52,7 @@ describe("NextEvolutionPreview", () => {
 
     expect(screen.getByText("New form ready: Stage 2 • Growing")).toBeInTheDocument();
     expect(screen.getByText("Stage 2 • Growing")).toBeInTheDocument();
-    expect(screen.getByText("Next Stage")).toBeInTheDocument();
+    expect(screen.getByText("Next Form")).toBeInTheDocument();
     expect(screen.getByTestId("next-evolution-progress")).not.toHaveClass("motion-safe:animate-pulse");
   });
 
@@ -67,8 +67,8 @@ describe("NextEvolutionPreview", () => {
       />,
     );
 
-    expect(screen.getByText("21 XP needed")).toBeInTheDocument();
-    expect(screen.getByText("Level 3 • Young")).toBeInTheDocument();
-    expect(screen.getByText("Next stage: Stage 2 • Growing at Level 5")).toBeInTheDocument();
+    expect(screen.getByText("21 Growth until the next form")).toBeInTheDocument();
+    expect(screen.getByText("Stage 2 • Growing")).toBeInTheDocument();
+    expect(screen.getByText("Next form: Stage 2 • Growing")).toBeInTheDocument();
   });
 });

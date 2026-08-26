@@ -100,7 +100,7 @@ const OverviewTab = memo(({
     return (
       <div className="space-y-6 pt-1">
         <div className={cn("rounded-2xl border p-4", outerShellCardClassName)}>
-          <MemoryWhisper chance={0.2} className="px-0" />
+          <MemoryWhisper chance={isGraceward ? 0.65 : 0.2} className="px-0" />
         </div>
 
         {companion?.product_mode === "cosmiq" && companion.current_stage >= 1 ? (
@@ -131,7 +131,7 @@ const OverviewTab = memo(({
 
   return (
     <div className="space-y-6 mt-6">
-      <MemoryWhisper chance={0.2} className="px-2" />
+      <MemoryWhisper chance={isGraceward ? 0.65 : 0.2} className="px-2" />
 
       {companion?.product_mode === "cosmiq" && companion.current_stage >= 1 ? (
         <>
@@ -203,12 +203,18 @@ const CompanionTabBar = ({
   onCollectionPrefetch: () => void;
 }) => {
   const isDesktop = layoutMode === "desktop";
+  const isGraceward = PRODUCT.mode === "christian";
+  const triggerClassName = isGraceward
+    ? "flex items-center gap-2 data-[state=active]:border-primary/30 data-[state=active]:bg-primary/[0.10] data-[state=active]:text-primary"
+    : "flex items-center gap-2 data-[state=active]:border-stardust-gold/35 data-[state=active]:bg-stardust-gold/[0.12] data-[state=active]:text-stardust-gold";
 
   return (
       <TabsList
         data-testid="companion-tab-list"
         className={cn(
-          "border-stardust-gold/[0.16] bg-[linear-gradient(180deg,rgba(34,28,15,0.56),rgba(20,16,8,0.6))] text-stardust-gold/[0.78] backdrop-blur-md shadow-[0_16px_34px_rgba(0,0,0,0.16)]",
+          isGraceward
+            ? "border-primary/15 bg-card/[0.78] text-muted-foreground backdrop-blur-md shadow-sm"
+            : "border-stardust-gold/[0.16] bg-[linear-gradient(180deg,rgba(34,28,15,0.56),rgba(20,16,8,0.6))] text-stardust-gold/[0.78] backdrop-blur-md shadow-[0_16px_34px_rgba(0,0,0,0.16)]",
           isDesktop
             ? "inline-grid h-auto w-auto min-w-[460px] grid-cols-4 justify-start p-1.5"
             : "grid w-full grid-cols-4",
@@ -216,35 +222,35 @@ const CompanionTabBar = ({
     >
       <TabsTrigger
         value="overview"
-        className="flex items-center gap-2 data-[state=active]:border-stardust-gold/35 data-[state=active]:bg-stardust-gold/[0.12] data-[state=active]:text-stardust-gold"
+        className={triggerClassName}
       >
         <TrendingUp className="h-4 w-4" />
-        <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Overview</span>
+        <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>{isGraceward ? "Formation" : "Overview"}</span>
       </TabsTrigger>
       <TabsTrigger
         value="focus"
-        className="flex items-center gap-2 data-[state=active]:border-stardust-gold/35 data-[state=active]:bg-stardust-gold/[0.12] data-[state=active]:text-stardust-gold"
+        className={triggerClassName}
       >
         <Timer className="h-4 w-4" />
         <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Focus</span>
       </TabsTrigger>
       <TabsTrigger
         value="stories"
-        className="flex items-center gap-2 data-[state=active]:border-stardust-gold/35 data-[state=active]:bg-stardust-gold/[0.12] data-[state=active]:text-stardust-gold"
+        className={triggerClassName}
         onPointerDown={onStoriesPrefetch}
         onFocus={onStoriesPrefetch}
       >
         <BookOpen className="h-4 w-4" />
-        <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Stories</span>
+        <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>{isGraceward ? "Memories" : "Stories"}</span>
       </TabsTrigger>
       <TabsTrigger
         value="collection"
-        className="flex items-center gap-2 data-[state=active]:border-stardust-gold/35 data-[state=active]:bg-stardust-gold/[0.12] data-[state=active]:text-stardust-gold"
+        className={triggerClassName}
         onPointerDown={onCollectionPrefetch}
         onFocus={onCollectionPrefetch}
       >
         <Package className="h-4 w-4" />
-        <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Collection</span>
+        <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>{isGraceward ? "Keepsakes" : "Collection"}</span>
       </TabsTrigger>
     </TabsList>
   );
@@ -532,7 +538,7 @@ const Companion = () => {
             <Sparkles className="h-16 w-16 mx-auto text-primary" />
             <h2 className="text-2xl font-bold">No Companion Found</h2>
             <p className="text-muted-foreground max-w-md">
-              Your companion has not been created yet. Shape one now and your completed daily actions will begin building its XP.
+              Your companion has not been created yet. Shape one now and your completed daily practices will begin building its growth.
             </p>
             <Button
               variant="default"
@@ -632,11 +638,16 @@ const Companion = () => {
           className="min-h-screen pb-nav-safe relative z-10"
           data-testid="companion-theme-shell"
           data-tour="companion-page"
-          style={COMPANION_GOLD_THEME_VARS}
+          style={PRODUCT.mode === "cosmiq" ? COMPANION_GOLD_THEME_VARS : undefined}
         >
           {/* Fixed header - won't move on iOS overscroll */}
           <header
-            className="fixed top-0 left-0 right-0 z-40 w-full cosmiq-glass-header cosmiq-glass-header--companion safe-area-top"
+            className={cn(
+              "fixed top-0 left-0 right-0 z-40 w-full safe-area-top",
+              PRODUCT.mode === "cosmiq"
+                ? "cosmiq-glass-header cosmiq-glass-header--companion"
+                : "border-b border-primary/15 bg-background/[0.86] shadow-sm backdrop-blur-xl",
+            )}
             data-tour="companion-header"
           >
             <div

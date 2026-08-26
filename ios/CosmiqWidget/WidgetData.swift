@@ -1,5 +1,25 @@
 import Foundation
 
+enum NativeProduct {
+#if COSMIQ_PRODUCT
+    static let name = "Cosmiq"
+    static let urlScheme = "cosmiq"
+    static let appGroupId = "group.com.darrylgraham.revolution"
+    static let dailyLabel = "TODAY’S QUEST"
+    static let emptyPrompt = "Open Cosmiq to plan your next quest."
+    static let widgetDisplayName = "Cosmiq Today"
+    static let widgetDescription = "View today’s quests and momentum at a glance."
+#else
+    static let name = "Graceward"
+    static let urlScheme = "graceward"
+    static let appGroupId = "group.com.darrylgraham.graceward"
+    static let dailyLabel = "TODAY’S PRACTICE"
+    static let emptyPrompt = "Open Graceward to receive today’s practice."
+    static let widgetDisplayName = "Graceward Today"
+    static let widgetDescription = "View today’s ready-made practice at a glance."
+#endif
+}
+
 /// Data structure for widget task information
 struct WidgetTaskData: Codable {
     let tasks: [WidgetTask]
@@ -95,7 +115,7 @@ struct WidgetTask: Codable, Identifiable {
 class WidgetDataManager {
     static let shared = WidgetDataManager()
     
-    private let appGroupId = "group.com.darrylgraham.graceward"
+    private let appGroupId = NativeProduct.appGroupId
     private let payloadFileName = "widget_tasks_data.json"
     
     private init() {}

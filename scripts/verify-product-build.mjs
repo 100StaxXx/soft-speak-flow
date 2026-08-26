@@ -14,11 +14,14 @@ const PRODUCTS = {
     name: "Graceward",
     scheme: "graceward",
     bundleId: "com.darrylgraham.graceward",
+    supabaseProjectRef: "uzyhnksdntctltwfnetd",
+    forbiddenSupabaseProjectRefs: ["opbfpbbqvuksuvmtmssd"],
     iconPath: "/icon-192.svg",
     forbidden: ["Cosmiq", "cosmiq://", "com.darrylgraham.revolution"],
     forbiddenArtifacts: [
       "COSMIQ_PRIVACY_POLICY.md",
       "COSMIQ_TERMS_OF_SERVICE.md",
+      "cosmiq-icon.png",
       "cosmiq-icon.svg",
       "companion-eggs",
       "companion-hatch-videos",
@@ -41,7 +44,9 @@ const PRODUCTS = {
     name: "Cosmiq",
     scheme: "cosmiq",
     bundleId: "com.darrylgraham.revolution",
-    iconPath: "/cosmiq-icon.svg",
+    supabaseProjectRef: "opbfpbbqvuksuvmtmssd",
+    forbiddenSupabaseProjectRefs: ["uzyhnksdntctltwfnetd"],
+    iconPath: "/cosmiq-icon.png",
     forbidden: ["Graceward", "graceward://", "com.darrylgraham.graceward"],
     forbiddenArtifacts: [
       "PRIVACY_POLICY.md",
@@ -153,6 +158,29 @@ const run = async () => {
     }
   }
 
+  const runtimeArtifactFiles = emittedFiles.filter((relativePath) =>
+    /\.(?:css|html|js|json|webmanifest)$/i.test(relativePath),
+  );
+  const runtimeArtifactText = (
+    await Promise.all(
+      runtimeArtifactFiles.map((relativePath) => readText(relativePath)),
+    )
+  ).join("\n");
+
+  if (!runtimeArtifactText.includes(product.supabaseProjectRef)) {
+    fail(
+      `${product.name} build does not contain its required Supabase project ${product.supabaseProjectRef}.`,
+    );
+  }
+
+  for (const forbiddenRef of product.forbiddenSupabaseProjectRefs) {
+    if (runtimeArtifactText.includes(forbiddenRef)) {
+      fail(
+        `${product.name} build contains the opposite product's Supabase project ${forbiddenRef}.`,
+      );
+    }
+  }
+
   const expectedCacheName = `${product.scheme}-image-cache`;
   if (!serviceWorker.includes(expectedCacheName)) {
     fail(`Service worker does not use the product-scoped cache ${expectedCacheName}.`);
@@ -169,6 +197,9 @@ const run = async () => {
   }
   if (!identityFiles["index.html"].includes(product.iconPath)) {
     fail(`index.html does not use the ${product.name} icon ${product.iconPath}.`);
+  }
+  if (!identityFiles["index.html"].includes(`class="product-${product.scheme}"`)) {
+    fail(`index.html does not apply the product-${product.scheme} root presentation class.`);
   }
   if (!identityFiles["calendar/oauth/callback.html"].includes(`${product.scheme}://`)) {
     fail(`Calendar callback does not return to the ${product.scheme} URL scheme.`);

@@ -348,6 +348,7 @@ vi.mock("@/components/GracewardDailyFormationBoard", () => ({
       videoUrl: string | null;
       stillUrl: string | null;
       playVideo: boolean;
+      phase?: "practice" | "completion";
     }) => void;
   }) => (
     <div>
@@ -358,6 +359,7 @@ vi.mock("@/components/GracewardDailyFormationBoard", () => ({
           videoUrl: "/graceward-motion/v1/lion/light/mind-1.mp4",
           stillUrl: "/graceward-motion/v1/lion/light/mind-1.jpg",
           playVideo: true,
+          phase: "practice",
         })}
       >
         Start Mind formation animation
@@ -690,7 +692,7 @@ describe("CompanionDisplay overlay stack", () => {
     );
   });
 
-  it("stops a Graceward formation when the user switches screens and preserves the finish frame", async () => {
+  it("restarts an unfinished Graceward formation when the user returns to the screen", async () => {
     mocks.isRegenerating = false;
     mocks.isDormant = false;
 
@@ -707,6 +709,13 @@ describe("CompanionDisplay overlay stack", () => {
     expect(screen.getByAltText(/companion at level 8/i)).toHaveAttribute(
       "src",
       "/graceward-motion/v1/lion/light/mind-1.jpg",
+    );
+
+    rerender(<CompanionDisplay isVisible />);
+
+    expect(await screen.findByLabelText("Mind companion formation animation")).toHaveAttribute(
+      "src",
+      "/graceward-motion/v1/lion/light/mind-1.mp4",
     );
   });
 
@@ -1042,7 +1051,7 @@ describe("CompanionDisplay overlay stack", () => {
     expect(screen.queryByText("Ember Egg")).not.toBeInTheDocument();
     expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 1 • Young");
     expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 1");
-    expect(screen.getByText(/XP to Level 2/)).toBeInTheDocument();
+    expect(screen.getByText(/Growth to Level 2/)).toBeInTheDocument();
     const image = screen.getByAltText(/young companion at level 1/i);
     expect(image).toBeInTheDocument();
     expect(image).toHaveAttribute("data-companion-image-fit", "portrait");

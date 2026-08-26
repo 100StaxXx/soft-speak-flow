@@ -15,9 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { EveningReflectionDrawer } from "@/components/EveningReflectionDrawer";
 import { CinematicPageBackground } from "@/components/CinematicPageBackground";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageTransition } from "@/components/PageTransition";
-import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { EarlyAccessFeedbackCard } from "@/components/EarlyAccessFeedbackCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -138,7 +136,7 @@ export default function Today() {
   }, [hasCompletedEveningReflection, isEvening]);
 
   useEffect(() => {
-    if (location.hash !== "#daily-encouragement" && location.hash !== "#daily-adventure") return;
+    if (location.hash !== "#daily-adventure") return;
 
     const frame = window.requestAnimationFrame(() => {
       document.getElementById(location.hash.slice(1))?.scrollIntoView({
@@ -277,6 +275,26 @@ export default function Today() {
               ) : null}
             </Card>
 
+            <div
+              className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 px-2 py-1 text-center"
+              aria-label="Today’s formation path"
+            >
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Receive</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Scripture</p>
+              </div>
+              <ArrowRight className="h-3.5 w-3.5 text-primary/45" aria-hidden="true" />
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Practice</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">With companion</p>
+              </div>
+              <ArrowRight className="h-3.5 w-3.5 text-primary/45" aria-hidden="true" />
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Notice</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Reflect tonight</p>
+              </div>
+            </div>
+
             <Card id="daily-adventure" className="scroll-mt-24 border-primary/25 bg-card/90 p-5 shadow-sm backdrop-blur-xl sm:p-6">
               <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
                 <div className="rounded-2xl bg-primary/[0.12] p-3 text-primary">
@@ -286,7 +304,7 @@ export default function Today() {
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Daily formation</p>
                   <h2 className="mt-1.5 text-xl font-semibold">Your companion has three practices waiting.</h2>
                   <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
-                    Strengthen your mind, care for your body, and feed your soul—one small faithful step at a time.
+                    Today’s theme is <span className="font-semibold text-foreground">{dailyContent.theme.toLowerCase()}</span>. Strengthen your mind, care for your body, and feed your soul through one shared thread.
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2" aria-label="Daily formation pillars">
                     {["Mind", "Body", "Soul"].map((pillar) => (
@@ -306,14 +324,6 @@ export default function Today() {
                 </Button>
               </div>
             </Card>
-
-            <section id="daily-encouragement" className="scroll-mt-24" aria-label="Daily encouragement">
-              <ErrorBoundary>
-                <MentorConnectionProvider>
-                  <TodaysPepTalk />
-                </MentorConnectionProvider>
-              </ErrorBoundary>
-            </section>
 
             <EarlyAccessFeedbackCard />
 

@@ -166,7 +166,7 @@ const RootRoute = memo(() => {
     return <Welcome />;
   }
 
-  return <Navigate to={PRODUCT.mode === "cosmiq" ? "/journeys" : "/mentor"} replace />;
+  return <Navigate to={PRODUCT.mode === "cosmiq" ? "/journeys" : "/companion"} replace />;
 });
 
 RootRoute.displayName = "RootRoute";
@@ -445,7 +445,7 @@ const AppContent = memo(() => {
                   <Route path="/plan" element={<Navigate to="/mentor" replace />} />
                   <Route path="/grow" element={<Navigate to="/companion" replace />} />
                   <Route path="/garden" element={<Navigate to="/companion" replace />} />
-                  <Route path="/journeys" element={<Navigate to={PRODUCT.mode === "cosmiq" ? "/journeys" : "/mentor"} replace />} />
+                  <Route path="/journeys" element={<Navigate to={PRODUCT.mode === "cosmiq" ? "/journeys" : "/companion"} replace />} />
                   <Route path="/campaigns" element={<Navigate to="/mentor" replace />} />
                   <Route path="/advanced-planner" element={<Navigate to="/mentor" replace />} />
                   
@@ -466,8 +466,8 @@ const AppContent = memo(() => {
                   <Route path="/challenges" element={<Navigate to="/companion" replace />} />
                   <Route path="/reflection" element={<Navigate to={EVENING_REFLECTION_CANONICAL_PATH} replace />} />
                   <Route path="/library" element={<Navigate to="/mentor" replace />} />
-                  <Route path="/pep-talks" element={<Navigate to="/mentor#daily-encouragement" replace />} />
-                  <Route path="/inspire" element={<Navigate to="/mentor#daily-encouragement" replace />} />
+                  <Route path="/pep-talks" element={<Navigate to="/guide#daily-encouragement" replace />} />
+                  <Route path="/inspire" element={<Navigate to="/guide#daily-encouragement" replace />} />
                   <Route path="/search" element={<Navigate to="/mentor" replace />} />
                   <Route path="/partners" element={<Navigate to="/welcome" replace />} />
                   <Route path="/account-deletion" element={<AccountDeletionHelp />} />

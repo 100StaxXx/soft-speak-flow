@@ -48,6 +48,7 @@ import {
   resolveQuestReminderOffsets,
 } from "@/utils/questReminders";
 import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
+import { PRODUCT } from "@/config/product";
 
 interface Task {
   id: string;
@@ -143,7 +144,9 @@ export function EditQuestDialog({
 
   const { subtasks, addSubtask, toggleSubtask, deleteSubtask } = useSubtasks(task?.id ?? null);
   const resolvedCompanionFrostedThemeStyle = useMemo(
-    () => companionFrostedThemeStyle ?? getCompanionFrostedThemeStyle("#2f5938"),
+    () => companionFrostedThemeStyle ?? getCompanionFrostedThemeStyle(
+      PRODUCT.mode === "cosmiq" ? "#9b6bff" : "#2f5938",
+    ),
     [companionFrostedThemeStyle],
   );
   const hasPlannerSubtaskDraft = Array.isArray(plannerSubtaskDraft);

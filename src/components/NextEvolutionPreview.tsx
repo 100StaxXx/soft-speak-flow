@@ -15,7 +15,7 @@ import {
   getVisualStageDisplay,
   resolveProgressionLevelFromXp,
 } from "@/config/progression";
-import { PRODUCT } from "@/config/product";
+import { PRODUCT, PRODUCT_COPY } from "@/config/product";
 
 interface NextEvolutionPreviewProps {
   currentStage: number;
@@ -79,7 +79,9 @@ export const NextEvolutionPreview = memo(({
           <div>
             <h3 className="font-heading font-bold text-sm">Fully Flourished</h3>
             <p className="text-xs text-muted-foreground">
-              Your companion has reached {getProgressionLevelAndTierDisplay(100)}
+              {PRODUCT.mode === "christian"
+                ? "Your companion has reached its mature form."
+                : `Your companion has reached ${getProgressionLevelAndTierDisplay(100)}`}
             </p>
           </div>
         </div>
@@ -102,10 +104,12 @@ export const NextEvolutionPreview = memo(({
           </div>
           <div className="flex-1">
             <h3 className="font-heading font-bold text-sm">
-              {readyBoundaryDisplay ? "Next Stage" : "Next Level"}
+              {PRODUCT.mode === "christian" ? "Next Form" : readyBoundaryDisplay ? "Next Stage" : "Next Level"}
             </h3>
             <p className="text-xs text-muted-foreground">
-              {readyBoundaryDisplay ?? nextLevelLabel}
+              {PRODUCT.mode === "christian"
+                ? readyBoundaryDisplay ?? nextVisualStageDisplay ?? "Growing"
+                : readyBoundaryDisplay ?? nextLevelLabel}
             </p>
           </div>
         </div>
@@ -121,17 +125,21 @@ export const NextEvolutionPreview = memo(({
               {readyStateCopy
                 ? readyStateCopy
                 : xpNeeded > 0
-                  ? `${xpNeeded} XP needed`
-                  : `Level ${earnedLevel} reached`}
+                  ? PRODUCT.mode === "christian"
+                    ? `${xpNeeded} ${PRODUCT_COPY.growthLabel} until the next form`
+                    : `${xpNeeded} ${PRODUCT_COPY.growthLabel} needed`
+                  : PRODUCT.mode === "christian" ? "Growth is ready" : `Level ${earnedLevel} reached`}
             </span>
           </div>
           <Progress value={readyBoundaryDisplay ? 100 : progressPercent} className="h-2" />
           <p className="text-xs text-muted-foreground">
-            {currentXP} / {progressTargetXP} XP
+            {currentXP} / {progressTargetXP} {PRODUCT_COPY.growthLabel}
           </p>
           {!isMaxStage && nextVisualStageBoundaryLevel !== null && nextVisualStageDisplay && (
             <p className="text-xs text-muted-foreground">
-              Next stage: {nextVisualStageDisplay} at {getProgressionLevelLabel(nextVisualStageBoundaryLevel)}
+              {PRODUCT.mode === "christian"
+                ? `Next form: ${nextVisualStageDisplay}`
+                : `Next stage: ${nextVisualStageDisplay} at ${getProgressionLevelLabel(nextVisualStageBoundaryLevel)}`}
             </p>
           )}
         </div>
@@ -158,7 +166,7 @@ export const NextEvolutionPreview = memo(({
 
         <div className="rounded-lg border border-border/40 bg-background/35 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
           {PRODUCT.mode === "christian"
-            ? "Daily practices gently nourish this one growth path. Your level reflects return, not spiritual worth."
+            ? "Daily practices gently nourish this growth path. Progress reflects returning, never spiritual worth."
             : "Complete meaningful quests to fill this level. Major visual changes arrive only at the stage shown above."}
         </div>
       </div>

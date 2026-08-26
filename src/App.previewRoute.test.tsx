@@ -338,7 +338,7 @@ describe("App preview route", () => {
   });
 
   it.each([
-    ["/journeys", "/mentor"],
+    ["/journeys", "/companion"],
     ["/campaigns", "/mentor"],
     ["/advanced-planner", "/mentor"],
     ["/tasks", "/mentor"],
@@ -346,7 +346,9 @@ describe("App preview route", () => {
     authMock.session = { user: { id: "user-1" } };
     authMock.user = { id: "user-1" };
     authMock.status = "authenticated";
-    isMainTabPathMock.mockImplementation((pathname: string) => pathname === "/mentor");
+    isMainTabPathMock.mockImplementation((pathname: string) =>
+      ["/mentor", "/companion"].includes(pathname),
+    );
     window.history.pushState({}, "", legacyPath);
 
     render(<App />);

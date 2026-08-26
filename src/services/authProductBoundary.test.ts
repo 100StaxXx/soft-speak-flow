@@ -106,7 +106,7 @@ describe("auth product boundary", () => {
     });
   });
 
-  it("fails closed for an unscoped Apple web OAuth session in Graceward", async () => {
+  it("allows a built-in Apple session inside the dedicated Graceward Auth project", async () => {
     const boundary = await validateSessionProductBoundary(
       makeSession({
         app_metadata: { provider: "apple" },
@@ -114,9 +114,9 @@ describe("auth product boundary", () => {
     );
 
     expect(boundary).toMatchObject({
-      allowed: false,
-      actualProductMode: null,
-      reason: "unscoped_apple_session",
+      allowed: true,
+      actualProductMode: "graceward",
+      reason: "dedicated_apple_project",
     });
   });
 

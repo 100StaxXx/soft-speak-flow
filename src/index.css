@@ -674,6 +674,42 @@
   }
 }
 
+/* Graceward companion creation: warm parchment and garden tones instead of game UI. */
+.graceward-companion-creator > div {
+  border-color: rgba(105, 121, 81, 0.28) !important;
+  background:
+    radial-gradient(circle at 90% 8%, rgba(255, 255, 255, 0.72), transparent 30%),
+    linear-gradient(180deg, rgba(255, 252, 242, 0.96), rgba(239, 230, 207, 0.97)) !important;
+  box-shadow: 0 24px 60px rgba(66, 60, 39, 0.16) !important;
+}
+
+.graceward-companion-creator .text-white,
+.graceward-companion-creator [class*="text-white/"] {
+  color: #2e3b2d !important;
+}
+
+.graceward-companion-creator [class*="border-white"] {
+  border-color: rgba(83, 105, 72, 0.24) !important;
+}
+
+.graceward-companion-creator [class*="bg-black"],
+.graceward-companion-creator [class*="bg-white/"] {
+  background-color: rgba(255, 252, 241, 0.64) !important;
+}
+
+.graceward-companion-creator select,
+.graceward-companion-creator input {
+  border-color: rgba(83, 105, 72, 0.28) !important;
+  background: rgba(255, 253, 246, 0.88) !important;
+  color: #263325 !important;
+}
+
+.graceward-companion-creator [data-selected="true"] {
+  border-color: rgba(72, 112, 74, 0.58) !important;
+  background: rgba(103, 139, 95, 0.14) !important;
+  box-shadow: 0 16px 36px rgba(73, 98, 64, 0.13) !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .onboarding-egg-slot,
   .onboarding-egg-slot__egg,
@@ -1228,8 +1264,52 @@ All colors MUST be HSL.
     --sab: var(--safe-area-inset-bottom);
     --sal: var(--safe-area-inset-left);
   }
-  
-  .dark {
+
+  :root.product-cosmiq {
+    --background: 0 0% 5%;
+    --foreground: 0 0% 98%;
+    --card: 240 8% 14%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 8% 14%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 270 70% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 8% 18%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 6% 22%;
+    --muted-foreground: 240 5% 70%;
+    --accent: 280 80% 65%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 10% 20%;
+    --input: 240 8% 18%;
+    --ring: 270 70% 55%;
+  }
+
+  :root.product-cosmiq.dark {
+    --background: 0 0% 7%;
+    --foreground: 0 0% 100%;
+    --card: 240 6% 15%;
+    --card-foreground: 0 0% 100%;
+    --popover: 240 6% 15%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 270 60% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 6% 20%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 240 6% 25%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 270 50% 35%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 6% 25%;
+    --input: 240 6% 25%;
+    --ring: 270 60% 50%;
+  }
+
+  :root:not(.product-cosmiq).dark {
     --background: 132 20% 11%;
     --foreground: 43 32% 94%;
     --card: 132 17% 15%;
@@ -1276,11 +1356,18 @@ All colors MUST be HSL.
     overscroll-behavior-x: none;
   }
 
-  .daily-way-page {
+  .product-graceward .daily-way-page {
     background:
       radial-gradient(circle at 82% 8%, hsl(39 45% 60% / 0.16), transparent 28rem),
       radial-gradient(circle at 8% 72%, hsl(132 31% 34% / 0.1), transparent 32rem),
       linear-gradient(155deg, hsl(43 36% 97%), hsl(91 20% 93%));
+  }
+
+  .product-cosmiq .daily-way-page {
+    background:
+      radial-gradient(circle at 82% 8%, hsl(280 80% 65% / 0.14), transparent 28rem),
+      radial-gradient(circle at 8% 72%, hsl(211 86% 58% / 0.1), transparent 32rem),
+      linear-gradient(155deg, hsl(240 10% 8%), hsl(0 0% 5%));
   }
 
   .daily-way-page.daily-way-scenic-page {

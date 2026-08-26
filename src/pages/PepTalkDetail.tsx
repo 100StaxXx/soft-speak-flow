@@ -143,7 +143,7 @@ export default function PepTalkDetail() {
 
     const load = async () => {
       if (!id) {
-        navigate("/mentor#daily-encouragement", { replace: true });
+        navigate("/guide#daily-encouragement", { replace: true });
         return;
       }
 
@@ -153,7 +153,7 @@ export default function PepTalkDetail() {
 
         if (!nextEncouragement) {
           toast.error("That daily encouragement is no longer available.");
-          navigate("/mentor#daily-encouragement", { replace: true });
+          navigate("/guide#daily-encouragement", { replace: true });
           return;
         }
 
@@ -162,7 +162,7 @@ export default function PepTalkDetail() {
         console.error("Error loading daily encouragement:", error);
         if (!cancelled) {
           toast.error("We couldn’t load this daily encouragement.");
-          navigate("/mentor#daily-encouragement", { replace: true });
+          navigate("/guide#daily-encouragement", { replace: true });
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -208,8 +208,8 @@ export default function PepTalkDetail() {
               variant="ghost"
               size="icon"
               className="rounded-full"
-              onClick={() => navigate("/mentor#daily-encouragement")}
-              aria-label="Back to Today"
+              onClick={() => navigate("/guide#daily-encouragement")}
+              aria-label="Back to Guide"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>

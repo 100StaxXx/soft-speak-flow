@@ -91,7 +91,7 @@ export function resolvePushNotificationDestination(
 
   switch (type) {
     case "daily_pep":
-      return "/mentor#daily-encouragement";
+      return productMode === "christian" ? "/guide#daily-encouragement" : "/mentor#daily-encouragement";
     case "daily_quote":
       return "/mentor";
     case "mentor_nudge":

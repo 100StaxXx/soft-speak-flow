@@ -6,9 +6,16 @@ import { initializeCapacitor } from "./utils/capacitor";
 import { logger } from "./utils/logger";
 import { isMacDesignedForIPadIOSApp } from "./utils/platformTargets";
 import { applyProductDocumentIdentity } from "./config/productDocumentIdentity";
+import { PRODUCT } from "./config/product";
 import App from "./App";
 
 applyProductDocumentIdentity();
+
+const productClassName = PRODUCT.mode === "cosmiq" ? "product-cosmiq" : "product-graceward";
+document.documentElement.classList.remove("product-cosmiq", "product-graceward");
+document.documentElement.classList.add(productClassName);
+document.body.classList.remove("product-cosmiq", "product-graceward");
+document.body.classList.add(productClassName);
 
 // Initialize Sentry error tracking (only in production with valid DSN)
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN;

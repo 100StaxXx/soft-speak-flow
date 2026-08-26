@@ -55,7 +55,7 @@ import {
   resolveCompanionVisualAssetUrl,
 } from "@/lib/companionAssetResolver";
 import { getCompanionEggLabel } from "@/config/companionCatalog";
-import { PRODUCT } from "@/config/product";
+import { PRODUCT, PRODUCT_COPY } from "@/config/product";
 import { isPremadeCompanionBoundaryLevelForProduct } from "@/config/premadeCompanionAssets";
 import { buildPremadeCompanionPublicStorageUrl } from "@/config/premadeCompanionAssets";
 import { getCosmiqAgendaMotionAssetDescriptor } from "@/config/cosmiqAgendaMotion";
@@ -663,7 +663,14 @@ export const CompanionDisplay = memo(({
     setImageLoaded(false);
     setImageError(false);
     setImageKey((prev) => prev + 1);
-  }, [isVisible]);
+    if (
+      formationMedia?.phase === "practice"
+      && formationMedia.playVideo
+      && !prefersReducedMotion
+    ) {
+      setFormationVideoPlaying(true);
+    }
+  }, [formationMedia, isVisible, prefersReducedMotion]);
 
   const handlePortraitImageLoad = useCallback((event: ReactSyntheticEvent<HTMLImageElement>) => {
     const { naturalWidth, naturalHeight } = event.currentTarget;
@@ -900,6 +907,7 @@ export const CompanionDisplay = memo(({
 
   const visualStageLabel = getVisualStageLabelForLevel(displayCompanion.current_stage);
   const visualStageDisplay = getVisualStageDisplay(displayCompanion.current_stage);
+  const formationStageDisplay = visualStageDisplay.replace(/^Stage\s+\d+\s*•\s*/i, "");
   const earnedLevel = isPreHatchDisplay
     ? displayCompanion.current_stage
     : resolveProgressionLevelFromXp(displayCompanion.current_xp);
@@ -1105,20 +1113,22 @@ export const CompanionDisplay = memo(({
                     backgroundImage: `linear-gradient(90deg, ${companionPalette.accentText}, ${companionPalette.badgeText}, ${companionPalette.accentText})`,
                   }}
                 >
-                  {visualStageDisplay}
+                  {experienceMode === "formation" ? formationStageDisplay : visualStageDisplay}
                 </h2>
                 <AttributeTooltip title="Progression" description="Your companion's current visual stage." />
               </div>
               <p className="text-sm text-muted-foreground font-medium">
                 {isMaxStage
-                  ? "Maximum level reached"
+                  ? experienceMode === "formation" ? "Fully grown" : "Maximum level reached"
                   : displayCanEvolve && readyEvolutionCopy
                     ? readyEvolutionCopy
                     : isGracewardVisualReleaseCeiling
                       ? "More companion forms coming soon"
                     : nextVisualStageBoundaryLevel === null || !nextVisualStageLabel
-                      ? `Final stage • ${visualStageLabel}`
-                      : `Next stage at Level ${nextVisualStageBoundaryLevel} • ${nextVisualStageLabel}`}
+                      ? experienceMode === "formation" ? `Mature form · ${visualStageLabel}` : `Final stage • ${visualStageLabel}`
+                      : experienceMode === "formation"
+                        ? `Growing toward ${nextVisualStageLabel}`
+                        : `Next stage at Level ${nextVisualStageBoundaryLevel} • ${nextVisualStageLabel}`}
               </p>
             </div>
             <div
@@ -1149,13 +1159,17 @@ export const CompanionDisplay = memo(({
           <div
             className="flex justify-center py-2 relative group"
             role="group"
-            aria-label={`Your companion at ${visualStageDisplay}, ${currentLevelLabel}`}
+            aria-label={experienceMode === "formation"
+              ? `Your companion in its ${formationStageDisplay} form`
+              : `Your companion at ${visualStageDisplay}, ${currentLevelLabel}`}
           >
             {/* Companion presence glow */}
             <div 
-              className={`absolute inset-0 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : 'animate-orbit'}`}
+              className={`absolute inset-0 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion || experienceMode === "formation" ? 'animate-none' : 'animate-orbit'}`}
               style={{
-                background: `radial-gradient(circle, hsl(var(--celestial-blue) / ${(displayCompanion.vitality ?? 300) / 600}), hsl(var(--nebula-pink) / ${(displayCompanion.vitality ?? 300) / 600}), transparent)`,
+                background: experienceMode === "formation"
+                  ? "radial-gradient(circle, hsl(var(--primary) / 0.28), hsl(92 28% 58% / 0.16), transparent 70%)"
+                  : `radial-gradient(circle, hsl(var(--celestial-blue) / ${(displayCompanion.vitality ?? 300) / 600}), hsl(var(--nebula-pink) / ${(displayCompanion.vitality ?? 300) / 600}), transparent)`,
               }}
               aria-hidden="true" 
             />
@@ -1186,9 +1200,14 @@ export const CompanionDisplay = memo(({
               onDoubleClick={companionPortraitIsInteractive ? livingPresence.greet : undefined}
               onKeyDown={companionPortraitIsInteractive ? handleKeyDown : undefined}
             >
-              {/* Twinkling star particles around companion */}
-              <div className={`absolute inset-0 rounded-2xl ${!prefersReducedMotion ? 'star-shimmer' : ''}`} aria-hidden="true" />
-              <div className={`absolute inset-0 bg-gradient-to-br from-nebula-pink/30 to-celestial-blue/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-pulse' : ''}`} aria-hidden="true" />
+              {experienceMode === "full" ? (
+                <>
+                  <div className={`absolute inset-0 rounded-2xl ${!prefersReducedMotion ? 'star-shimmer' : ''}`} aria-hidden="true" />
+                  <div className={`absolute inset-0 bg-gradient-to-br from-nebula-pink/30 to-celestial-blue/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-pulse' : ''}`} aria-hidden="true" />
+                </>
+              ) : (
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/10 via-transparent to-emerald-700/10 blur-xl" aria-hidden="true" />
+              )}
               <div
                 className={cn(
                   "relative overflow-hidden rounded-2xl",
@@ -1274,7 +1293,9 @@ export const CompanionDisplay = memo(({
                           <CompanionImage
                             key={imageKey}
                             src={effectiveImageUrl}
-                            alt={`${visualStageLabel} companion at level ${earnedLevel}`}
+                            alt={experienceMode === "formation"
+                              ? `${visualStageLabel} companion`
+                              : `${visualStageLabel} companion at level ${earnedLevel}`}
                             fit={portraitImageFit}
                             element={displayCompanion.core_element}
                             focalX={effectiveImageFocal.x}
@@ -1519,17 +1540,19 @@ export const CompanionDisplay = memo(({
                   boxShadow: `0 0 16px ${companionPalette.glow}`,
                 }}
               >
-                {currentLevelLabel}
+                {experienceMode === "formation" ? formationStageDisplay : currentLevelLabel}
               </Badge>
               {experienceMode === "full" ? <CompanionBondBadge /> : null}
             </div>
             <div className="text-center">
               <p className="text-sm font-medium text-muted-foreground mb-2" id="xp-progress-label">
                 {isMaxStage
-                  ? `${currentLevelLabel} maxed`
+                  ? experienceMode === "formation" ? "Fully grown" : `${currentLevelLabel} maxed`
                   : displayCanEvolve && readyEvolutionCopy
                     ? readyEvolutionCopy
-                    : `${displayCompanion.current_xp} / ${safeNextEvolutionXP} XP to ${nextLevelLabel}`}
+                    : experienceMode === "formation"
+                      ? `${displayCompanion.current_xp} / ${safeNextEvolutionXP} ${PRODUCT_COPY.growthLabel} toward ${nextVisualStageLabel ?? "the next form"}`
+                      : `${displayCompanion.current_xp} / ${safeNextEvolutionXP} ${PRODUCT_COPY.growthLabel} to ${nextLevelLabel}`}
               </p>
               <Progress 
                 value={displayedProgressValue}

@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Graceward</string>
+	<string>$(PRODUCT_DISPLAY_NAME)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -37,7 +37,7 @@
 			<string>app-callback</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.darrylgraham.graceward</string>
+				<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 		</array>
 	</dict>
 	<dict>
@@ -47,7 +47,7 @@
 		<string>widget-deeplink</string>
 		<key>CFBundleURLSchemes</key>
 		<array>
-				<string>graceward</string>
+				<string>$(PRODUCT_URL_SCHEME)</string>
 		</array>
 	</dict>
 	</array>
@@ -70,7 +70,7 @@
 	<key>NSCalendarsUsageDescription</key>
 	<string>We use calendar access to let you optionally add planned actions to Apple Calendar and keep linked events in sync.</string>
 	<key>UILaunchStoryboardName</key>
-	<string>LaunchScreen</string>
+	<string>$(PRODUCT_LAUNCH_STORYBOARD)</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 	<key>UIApplicationSceneManifest</key>

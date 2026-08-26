@@ -65,6 +65,7 @@ import {
   resolveQuestReminderOffsets,
 } from "@/utils/questReminders";
 import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
+import { PRODUCT } from "@/config/product";
 
 export interface AddQuestData {
   text: string;
@@ -179,7 +180,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const { toast } = useToast();
   const { user } = useAuth();
   const resolvedCompanionFrostedThemeStyle = useMemo(
-    () => companionFrostedThemeStyle ?? getCompanionFrostedThemeStyle("#2f5938"),
+    () => companionFrostedThemeStyle ?? getCompanionFrostedThemeStyle(
+      PRODUCT.mode === "cosmiq" ? "#9b6bff" : "#2f5938",
+    ),
     [companionFrostedThemeStyle],
   );
 

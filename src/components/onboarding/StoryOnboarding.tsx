@@ -57,7 +57,7 @@ import type { OnboardingResumeStep } from "@/utils/profileOnboarding";
 import { safeLocalStorage } from "@/utils/storage";
 import { resolveAssignedMentorFromActiveMentors } from "@/config/onboardingMentorAssignments";
 import { trackOnboardingTutorialEvent } from "@/utils/onboardingTutorialTelemetry";
-import { PRODUCT } from "@/config/product";
+import { PRODUCT, type ProductMode } from "@/config/product";
 import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 import { fetchActiveProductMentors } from "@/services/productMentorCatalog";
 
@@ -99,6 +99,18 @@ export const resolveQuestionnaireCompletionStage = (): OnboardingStage => "calcu
 export const CALCULATING_STAGE_DURATION_MS = 1_000;
 export const QUESTIONNAIRE_PIPELINE_TIMEOUT_MS = 8_000;
 export const MENTOR_CATALOG_RECOVERY_TIMEOUT_MS = 8_000;
+
+export const getOnboardingShellPresentation = (mode: ProductMode) => (
+  mode === "cosmiq"
+    ? {
+        rootClassName: "relative min-h-[100dvh] overflow-x-hidden bg-background",
+        backdropClassName: "pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,hsl(var(--onb-nebula-1)/0.22),transparent_34%),radial-gradient(circle_at_10%_70%,hsl(var(--onb-nebula-2)/0.14),transparent_38%),linear-gradient(180deg,hsl(var(--onb-base-1))_0%,hsl(var(--onb-base-2))_58%,hsl(var(--onb-base-3))_100%)]",
+      }
+    : {
+        rootClassName: "relative min-h-[100dvh] overflow-x-hidden bg-[#f2ead8]",
+        backdropClassName: "pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_8%,rgba(255,255,255,0.72),transparent_34%),radial-gradient(circle_at_8%_78%,rgba(96,132,92,0.18),transparent_40%),radial-gradient(circle_at_90%_62%,rgba(193,154,84,0.16),transparent_36%),linear-gradient(180deg,#f8f2e5_0%,#eee4cf_58%,#e5dbc2_100%)]",
+      }
+);
 
 export const scheduleMentorRevealTransition = (
   onComplete: () => void,
@@ -327,6 +339,7 @@ export const GracewardOnboarding = ({
   onJourneyCinematicStart,
   onJourneyCinematicComplete,
 }: StoryOnboardingProps) => {
+  const shellPresentation = getOnboardingShellPresentation(PRODUCT.mode);
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -1522,10 +1535,10 @@ export const GracewardOnboarding = ({
   }, [mentorCatalogStatus, mentors.length, user?.id]);
 
   return (
-    <div className="relative min-h-[100dvh] overflow-x-hidden bg-[#09110d]">
+    <div className={shellPresentation.rootClassName}>
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(196,168,92,0.18),transparent_34%),radial-gradient(circle_at_10%_70%,rgba(62,110,79,0.20),transparent_38%),linear-gradient(180deg,#0d1812_0%,#09110d_58%,#07100c_100%)]"
+        className={shellPresentation.backdropClassName}
       />
 
       <AnimatePresence mode="wait">

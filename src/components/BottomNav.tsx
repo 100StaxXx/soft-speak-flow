@@ -10,8 +10,8 @@ const navItems = PRODUCT.mode === "cosmiq" ? [
   { to: "/journeys", label: "Plan", icon: Compass, primary: true },
   { to: "/companion", label: "Companion", icon: PawPrint, primary: false },
 ] as const : [
-  { to: "/companion", label: "Companion", icon: PawPrint, primary: false },
-  { to: "/mentor", label: "Today", icon: Sunrise, primary: true },
+  { to: "/mentor", label: "Today", icon: Sunrise, primary: false },
+  { to: "/companion", label: "Companion", icon: PawPrint, primary: true },
   { to: "/guide", label: "Guide", icon: MessageCircle, primary: false },
 ] as const;
 

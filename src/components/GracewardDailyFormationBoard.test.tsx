@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
     Mind: false,
     Body: false,
     Soul: false,
-  } satisfies Record<DailyFormationCategory, boolean>,
+  } as Record<DailyFormationCategory, boolean>,
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -22,7 +22,7 @@ vi.mock("@/hooks/useAuth", () => ({
 }));
 
 vi.mock("@/hooks/useProfile", () => ({
-  useProfile: () => ({ profile: { timezone: "America/Los_Angeles" } }),
+  useProfile: () => ({ profile: { timezone: "America/Los_Angeles", companion_memory_enabled: false } }),
 }));
 
 vi.mock("@/utils/timezone", () => ({
@@ -113,7 +113,7 @@ describe("GracewardDailyFormationBoard", () => {
     }));
   });
 
-  it("plays a pillar animation only on its first reveal and keeps the finish frame afterward", () => {
+  it("restarts an unfinished pillar animation whenever it is selected again", () => {
     const onFormationMediaChange = vi.fn();
     render(
       <GracewardDailyFormationBoard
@@ -134,7 +134,30 @@ describe("GracewardDailyFormationBoard", () => {
     fireEvent.click(bodyButton);
     expect(onFormationMediaChange).toHaveBeenLastCalledWith(expect.objectContaining({
       category: "Body",
-      playVideo: false,
+      playVideo: true,
+    }));
+  });
+
+  it("restarts an unfinished sequence after switching to another pillar and back", () => {
+    const onFormationMediaChange = vi.fn();
+    render(
+      <GracewardDailyFormationBoard
+        companion={makeCompanion()}
+        onFormationMediaChange={onFormationMediaChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Mind" }));
+    finishLatestFormationMedia(onFormationMediaChange);
+    fireEvent.click(screen.getByRole("button", { name: "Body" }));
+    finishLatestFormationMedia(onFormationMediaChange);
+    fireEvent.click(screen.getByRole("button", { name: "Mind" }));
+
+    expect(screen.getByText(/preparing today’s mind practice/i)).toBeInTheDocument();
+    expect(onFormationMediaChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      category: "Mind",
+      playVideo: true,
+      phase: "practice",
     }));
   });
 
@@ -179,7 +202,7 @@ describe("GracewardDailyFormationBoard", () => {
     }));
   });
 
-  it("restores the selected finish frame without replaying when the screen remounts", async () => {
+  it("restarts the selected unfinished sequence when the screen remounts", async () => {
     localStorage.setItem("graceward:formation-active:v1:user-1:2026-08-11", "Soul");
     localStorage.setItem("graceward:formation-reveals:v2:user-1:2026-08-11", "[\"Soul\"]");
     const onFormationMediaChange = vi.fn();
@@ -191,15 +214,17 @@ describe("GracewardDailyFormationBoard", () => {
       />,
     );
 
-    expect(await screen.findByText("Soul practice")).toBeInTheDocument();
     await waitFor(() => {
       expect(onFormationMediaChange).toHaveBeenLastCalledWith(expect.objectContaining({
         category: "Soul",
-        playVideo: false,
+        playVideo: true,
         videoUrl: expect.stringMatching(/\/companion-animation-videos\/premade\/v1\/graceward\/lamb\/nature\/formation\/level-1\/soul-1\.mp4$/),
         stillUrl: expect.stringMatching(/\/companion-presets\/premade\/v1\/graceward\/lamb\/nature\/formation\/level-1\/soul-1\.jpg$/),
       }));
     });
+    expect(screen.getByText(/preparing today’s soul practice/i)).toBeInTheDocument();
+    finishLatestFormationMedia(onFormationMediaChange);
+    expect(await screen.findByText("Soul practice")).toBeInTheDocument();
   });
 
   it("clears the finish frame after the practice is completed", async () => {
@@ -223,6 +248,29 @@ describe("GracewardDailyFormationBoard", () => {
       playVideo: true,
       videoUrl: "/graceward-motion/v1/lion/light/reaction-encourage.mp4",
     }));
+    expect(await screen.findByText(/made room for Scripture and prayer/i)).toBeInTheDocument();
+  });
+
+  it("ends a completed Mind Body and Soul day with the containerless Graceward reveal", async () => {
+    mocks.completed.Mind = true;
+    mocks.completed.Body = true;
+    const onFormationMediaChange = vi.fn();
+    render(
+      <GracewardDailyFormationBoard
+        companion={makeCompanion()}
+        onFormationMediaChange={onFormationMediaChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Soul" }));
+    finishLatestFormationMedia(onFormationMediaChange);
+    fireEvent.click(await screen.findByRole("button", { name: "Mark practice complete" }));
+
+    await waitFor(() => expect(mocks.completePractice.Soul).toHaveBeenCalledTimes(1));
+    finishLatestFormationMedia(onFormationMediaChange);
+    expect(await screen.findByText("Graceward")).toBeInTheDocument();
+    expect(screen.getByText("Mind · Body · Soul")).toBeInTheDocument();
+    expect(screen.getByText("Galatians 6:9")).toBeInTheDocument();
   });
 
   it("keeps the finish frame when completion cannot be saved", async () => {

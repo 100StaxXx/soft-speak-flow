@@ -77,8 +77,8 @@ describe("push notification navigation", () => {
     ).toBe("/pep-talk/daily-encouragement-1");
   });
 
-  it("falls back to the Today encouragement card when an old push has no id", () => {
+  it("falls back to the Guide encouragement card when an old Graceward push has no id", () => {
     expect(resolvePushNotificationDestination({ type: "daily_pep" }))
-      .toBe("/mentor#daily-encouragement");
+      .toBe("/guide#daily-encouragement");
   });
 });

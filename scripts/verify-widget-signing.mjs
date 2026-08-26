@@ -3,6 +3,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import sharp from "sharp";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -13,9 +14,44 @@ const xcodeProjectPath = path.join(iosAppDirectory, "App.xcodeproj", "project.pb
 
 const APP_TARGET = "App";
 const WIDGET_TARGET = "CosmiqWidgetExtension";
-const EXPECTED_APP_GROUP = "group.com.darrylgraham.graceward";
-const EXPECTED_APP_BUNDLE_ID = "com.darrylgraham.graceward";
-const EXPECTED_WIDGET_BUNDLE_ID = "com.darrylgraham.graceward.GracewardWidget";
+const PRODUCTS = {
+  graceward: {
+    buildVersion: "38",
+    appGroup: "group.com.darrylgraham.graceward",
+    appBundleId: "com.darrylgraham.graceward",
+    widgetBundleId: "com.darrylgraham.graceward.GracewardWidget",
+    appEntitlements: "App/App.entitlements",
+    widgetEntitlements: "../CosmiqWidget/CosmiqWidget.entitlements",
+    associatedDomains: ["applinks:graceward.app", "applinks:www.graceward.app"],
+    appIcon: "AppIconGraceward",
+    displayName: "Graceward",
+    launchStoryboard: "LaunchScreenGraceward",
+    marketingVersion: "1.0",
+    urlScheme: "graceward",
+    swiftCondition: "GRACEWARD_PRODUCT",
+    debugConfiguration: "GracewardDebug",
+    releaseConfiguration: "GracewardRelease",
+    storeKitFile: "App/GracewardProducts.storekit",
+  },
+  cosmiq: {
+    buildVersion: "349",
+    appGroup: "group.com.darrylgraham.revolution",
+    appBundleId: "com.darrylgraham.revolution",
+    widgetBundleId: "com.darrylgraham.revolution.CosmiqWidget",
+    appEntitlements: "App/Cosmiq.entitlements",
+    widgetEntitlements: "../CosmiqWidget/CosmiqProduct.entitlements",
+    associatedDomains: ["applinks:app.cosmiq.quest"],
+    appIcon: "AppIconCosmiq",
+    displayName: "Cosmiq",
+    launchStoryboard: "LaunchScreenCosmiq",
+    marketingVersion: "4.8",
+    urlScheme: "cosmiq",
+    swiftCondition: "COSMIQ_PRODUCT",
+    debugConfiguration: "CosmiqDebug",
+    releaseConfiguration: "CosmiqRelease",
+    storeKitFile: "App/CosmiqProducts.storekit",
+  },
+};
 const PREFIX = "[ios:verify-widget-signing]";
 
 const log = (message) => {
@@ -45,7 +81,7 @@ const findConfigBlocksByBundleId = (lines, bundleId) => {
 
     let startIdx = i;
     for (let j = i; j >= 0; j -= 1) {
-      if (/^\s*\w+\s*\/\*\s*(Debug|Release)\s*\*\/\s*=\s*\{/.test(lines[j])) {
+      if (/^\s*\w+\s*\/\*\s*[^*]+\s*\*\/\s*=\s*\{/.test(lines[j])) {
         startIdx = j;
         break;
       }
@@ -120,7 +156,7 @@ const resolveConsistentSetting = (settingsList, key, targetName, errors) => {
   return uniqueValues[0];
 };
 
-const parseEntitlementAppGroups = async (entitlementsPath) => {
+const parseEntitlementValues = async (entitlementsPath, key) => {
   let xml;
   try {
     xml = await fs.readFile(entitlementsPath, "utf8");
@@ -129,9 +165,10 @@ const parseEntitlementAppGroups = async (entitlementsPath) => {
     throw new Error(`Failed to read entitlements file ${entitlementsPath}: ${message}`);
   }
 
-  const keyMatch = xml.match(
-    /<key>\s*com\.apple\.security\.application-groups\s*<\/key>\s*<array>([\s\S]*?)<\/array>/,
-  );
+  const escapedKey = escapeRegex(key);
+  const keyMatch = xml.match(new RegExp(
+    `<key>\\s*${escapedKey}\\s*<\\/key>\\s*<array>([\\s\\S]*?)<\\/array>`,
+  ));
   if (!keyMatch) {
     return [];
   }
@@ -142,14 +179,22 @@ const parseEntitlementAppGroups = async (entitlementsPath) => {
 };
 
 const run = async () => {
+  const productFlagIndex = process.argv.indexOf("--product");
+  const requestedProduct = productFlagIndex >= 0
+    ? process.argv[productFlagIndex + 1]?.toLowerCase()
+    : process.env.IOS_PRODUCT?.trim().toLowerCase();
+  if (!requestedProduct || !(requestedProduct in PRODUCTS)) {
+    fail([`Choose a product with --product graceward or --product cosmiq.`]);
+  }
+  const product = PRODUCTS[requestedProduct];
   const errors = [];
   const pbxprojContent = await fs.readFile(xcodeProjectPath, "utf8");
   const lines = pbxprojContent.split(/\r?\n/);
 
-  const appSettingsByConfig = collectTargetSettings(lines, EXPECTED_APP_BUNDLE_ID, APP_TARGET, errors);
+  const appSettingsByConfig = collectTargetSettings(lines, product.appBundleId, APP_TARGET, errors);
   const widgetSettingsByConfig = collectTargetSettings(
     lines,
-    EXPECTED_WIDGET_BUNDLE_ID,
+    product.widgetBundleId,
     WIDGET_TARGET,
     errors,
   );
@@ -178,6 +223,18 @@ const run = async () => {
     WIDGET_TARGET,
     errors,
   );
+  const appMarketingVersion = resolveConsistentSetting(
+    appSettingsByConfig,
+    "MARKETING_VERSION",
+    APP_TARGET,
+    errors,
+  );
+  const widgetMarketingVersion = resolveConsistentSetting(
+    widgetSettingsByConfig,
+    "MARKETING_VERSION",
+    WIDGET_TARGET,
+    errors,
+  );
   const appEntitlementsRel = resolveConsistentSetting(
     appSettingsByConfig,
     "CODE_SIGN_ENTITLEMENTS",
@@ -191,15 +248,15 @@ const run = async () => {
     errors,
   );
 
-  if (appBundleId && appBundleId !== EXPECTED_APP_BUNDLE_ID) {
+  if (appBundleId && appBundleId !== product.appBundleId) {
     errors.push(
-      `Unexpected app bundle identifier: expected ${EXPECTED_APP_BUNDLE_ID}, got ${appBundleId}`,
+      `Unexpected app bundle identifier: expected ${product.appBundleId}, got ${appBundleId}`,
     );
   }
 
-  if (widgetBundleId && widgetBundleId !== EXPECTED_WIDGET_BUNDLE_ID) {
+  if (widgetBundleId && widgetBundleId !== product.widgetBundleId) {
     errors.push(
-      `Unexpected widget bundle identifier: expected ${EXPECTED_WIDGET_BUNDLE_ID}, got ${widgetBundleId}`,
+      `Unexpected widget bundle identifier: expected ${product.widgetBundleId}, got ${widgetBundleId}`,
     );
   }
 
@@ -209,6 +266,28 @@ const run = async () => {
 
   if (appBuildVersion && widgetBuildVersion && appBuildVersion !== widgetBuildVersion) {
     errors.push(`CURRENT_PROJECT_VERSION mismatch: app=${appBuildVersion}, widget=${widgetBuildVersion}`);
+  }
+
+  if (appBuildVersion && appBuildVersion !== product.buildVersion) {
+    errors.push(
+      `Unexpected app CURRENT_PROJECT_VERSION: expected ${product.buildVersion}, got ${appBuildVersion}`,
+    );
+  }
+
+  if (appMarketingVersion && appMarketingVersion !== product.marketingVersion) {
+    errors.push(
+      `Unexpected app MARKETING_VERSION: expected ${product.marketingVersion}, got ${appMarketingVersion}`,
+    );
+  }
+
+  if (
+    appMarketingVersion &&
+    widgetMarketingVersion &&
+    appMarketingVersion !== widgetMarketingVersion
+  ) {
+    errors.push(
+      `MARKETING_VERSION mismatch: app=${appMarketingVersion}, widget=${widgetMarketingVersion}`,
+    );
   }
 
   if (errors.length > 0) {
@@ -235,20 +314,21 @@ const run = async () => {
     fail(errors);
   }
 
-  const [appGroups, widgetGroups] = await Promise.all([
-    parseEntitlementAppGroups(appEntitlementsPath),
-    parseEntitlementAppGroups(widgetEntitlementsPath),
+  const [appGroups, widgetGroups, associatedDomains] = await Promise.all([
+    parseEntitlementValues(appEntitlementsPath, "com.apple.security.application-groups"),
+    parseEntitlementValues(widgetEntitlementsPath, "com.apple.security.application-groups"),
+    parseEntitlementValues(appEntitlementsPath, "com.apple.developer.associated-domains"),
   ]);
 
-  if (!appGroups.includes(EXPECTED_APP_GROUP)) {
+  if (!appGroups.includes(product.appGroup)) {
     errors.push(
-      `Expected app group ${EXPECTED_APP_GROUP} missing in app entitlements (${appEntitlementsPath})`,
+      `Expected app group ${product.appGroup} missing in app entitlements (${appEntitlementsPath})`,
     );
   }
 
-  if (!widgetGroups.includes(EXPECTED_APP_GROUP)) {
+  if (!widgetGroups.includes(product.appGroup)) {
     errors.push(
-      `Expected app group ${EXPECTED_APP_GROUP} missing in widget entitlements (${widgetEntitlementsPath})`,
+      `Expected app group ${product.appGroup} missing in widget entitlements (${widgetEntitlementsPath})`,
     );
   }
 
@@ -267,6 +347,108 @@ const run = async () => {
     );
   }
 
+  const missingDomains = product.associatedDomains.filter((domain) => !associatedDomains.includes(domain));
+  const unexpectedDomains = associatedDomains.filter((domain) => !product.associatedDomains.includes(domain));
+  if (missingDomains.length > 0 || unexpectedDomains.length > 0) {
+    errors.push(
+      `Associated domains mismatch. expected=${JSON.stringify(product.associatedDomains)} actual=${JSON.stringify(associatedDomains)}`,
+    );
+  }
+
+  const appIcon = resolveConsistentSetting(appSettingsByConfig, "ASSETCATALOG_COMPILER_APPICON_NAME", APP_TARGET, errors);
+  const displayName = resolveConsistentSetting(appSettingsByConfig, "PRODUCT_DISPLAY_NAME", APP_TARGET, errors);
+  const launchStoryboard = resolveConsistentSetting(appSettingsByConfig, "PRODUCT_LAUNCH_STORYBOARD", APP_TARGET, errors);
+  const urlScheme = resolveConsistentSetting(appSettingsByConfig, "PRODUCT_URL_SCHEME", APP_TARGET, errors);
+  if (appIcon && appIcon !== product.appIcon) {
+    errors.push(`Unexpected app icon: expected ${product.appIcon}, got ${appIcon}`);
+  }
+  if (displayName && displayName !== product.displayName) {
+    errors.push(`Unexpected display name: expected ${product.displayName}, got ${displayName}`);
+  }
+  if (launchStoryboard && launchStoryboard !== product.launchStoryboard) {
+    errors.push(`Unexpected launch storyboard: expected ${product.launchStoryboard}, got ${launchStoryboard}`);
+  }
+  if (urlScheme && urlScheme !== product.urlScheme) {
+    errors.push(`Unexpected URL scheme: expected ${product.urlScheme}, got ${urlScheme}`);
+  }
+
+  const appSwiftConditions = appSettingsByConfig.map((settings) => settings.SWIFT_ACTIVE_COMPILATION_CONDITIONS ?? "");
+  const widgetSwiftConditions = widgetSettingsByConfig.map((settings) => settings.SWIFT_ACTIVE_COMPILATION_CONDITIONS ?? "");
+  if (!appSwiftConditions.every((conditions) => conditions.includes(product.swiftCondition))) {
+    errors.push(`App configurations are missing ${product.swiftCondition}.`);
+  }
+  if (!widgetSwiftConditions.every((conditions) => conditions.includes(product.swiftCondition))) {
+    errors.push(`Widget configurations are missing ${product.swiftCondition}.`);
+  }
+
+  if (appEntitlementsRel !== product.appEntitlements) {
+    errors.push(`Unexpected app entitlements path: expected ${product.appEntitlements}, got ${appEntitlementsRel}`);
+  }
+  if (widgetEntitlementsRel !== product.widgetEntitlements) {
+    errors.push(`Unexpected widget entitlements path: expected ${product.widgetEntitlements}, got ${widgetEntitlementsRel}`);
+  }
+
+  const schemePath = path.join(
+    iosAppDirectory,
+    "App.xcodeproj",
+    "xcshareddata",
+    "xcschemes",
+    `${product.displayName}.xcscheme`,
+  );
+  const schemeContents = await fs.readFile(schemePath, "utf8");
+  if (!new RegExp(`buildConfiguration\\s*=\\s*"${product.debugConfiguration}"`).test(schemeContents)) {
+    errors.push(`${product.displayName} scheme does not use ${product.debugConfiguration} for development.`);
+  }
+  if (!new RegExp(`buildConfiguration\\s*=\\s*"${product.releaseConfiguration}"`).test(schemeContents)) {
+    errors.push(`${product.displayName} scheme does not use ${product.releaseConfiguration} for release/archive.`);
+  }
+  if (!new RegExp(`storeKitConfigurationFile\\s*=\\s*"${escapeRegex(product.storeKitFile)}"`).test(schemeContents)) {
+    errors.push(`${product.displayName} scheme does not use ${product.storeKitFile}.`);
+  }
+
+  const parameterizedInfoPlist = await fs.readFile(path.join(iosAppDirectory, "App", "Info.plist"), "utf8");
+  for (const requiredVariable of [
+    "$(PRODUCT_DISPLAY_NAME)",
+    "$(PRODUCT_BUNDLE_IDENTIFIER)",
+    "$(PRODUCT_URL_SCHEME)",
+    "$(PRODUCT_LAUNCH_STORYBOARD)",
+  ]) {
+    if (!parameterizedInfoPlist.includes(requiredVariable)) {
+      errors.push(`App Info.plist is missing ${requiredVariable}.`);
+    }
+  }
+
+  const requiredNativeAssets = [
+    path.join(iosAppDirectory, "App", "Assets.xcassets", `${product.appIcon}.appiconset`, "Contents.json"),
+    path.join(iosAppDirectory, "App", `${product.launchStoryboard}.storyboard`),
+    path.join(iosAppDirectory, product.storeKitFile),
+  ];
+  const nativeAssetChecks = await Promise.allSettled(requiredNativeAssets.map((assetPath) => fs.access(assetPath)));
+  nativeAssetChecks.forEach((result, index) => {
+    if (result.status === "rejected") {
+      errors.push(`Missing native release asset: ${requiredNativeAssets[index]}`);
+    }
+  });
+
+  const appIconDirectory = path.join(
+    iosAppDirectory,
+    "App",
+    "Assets.xcassets",
+    `${product.appIcon}.appiconset`,
+  );
+  const appIconContents = JSON.parse(
+    await fs.readFile(path.join(appIconDirectory, "Contents.json"), "utf8"),
+  );
+  const appIconFilename = appIconContents.images?.find((image) => image.filename)?.filename;
+  if (!appIconFilename) {
+    errors.push(`${product.displayName} app icon catalog does not declare an icon file.`);
+  } else {
+    const appIconMetadata = await sharp(path.join(appIconDirectory, appIconFilename)).metadata();
+    if (appIconMetadata.hasAlpha) {
+      errors.push(`${product.displayName} App Store icon must be opaque and cannot contain an alpha channel.`);
+    }
+  }
+
   if (errors.length > 0) {
     fail(errors);
   }
@@ -274,10 +456,11 @@ const run = async () => {
   log(`App bundle ID: ${appBundleId}`);
   log(`Widget bundle ID: ${widgetBundleId}`);
   log(`Shared CURRENT_PROJECT_VERSION: ${appBuildVersion}`);
+  log(`Shared MARKETING_VERSION: ${appMarketingVersion}`);
   log(`App entitlements: ${appEntitlementsRel}`);
   log(`Widget entitlements: ${widgetEntitlementsRel}`);
   log(`Shared app groups: ${sharedGroups.join(", ")}`);
-  log("Widget signing/capability checks passed.");
+  log(`${product.displayName} widget signing/capability checks passed.`);
 };
 
 run().catch((error) => {

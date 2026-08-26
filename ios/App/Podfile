@@ -71,6 +71,13 @@ configure_social_login_podspec
 platform :ios, '16.0'
 use_frameworks!
 
+project 'App.xcodeproj', {
+  'GracewardDebug' => :debug,
+  'GracewardRelease' => :release,
+  'CosmiqDebug' => :debug,
+  'CosmiqRelease' => :release
+}
+
 def capacitor_pods
   pod 'Capacitor', :path => '../../node_modules/@capacitor/ios'
   pod 'CapacitorCordova', :path => '../../node_modules/@capacitor/ios'
@@ -131,7 +138,7 @@ post_install do |installer|
       next unless user_target.name == 'App'
 
       user_target.build_configurations.each do |config|
-        next unless %w[Debug Release].include?(config.name)
+        next unless %w[GracewardDebug GracewardRelease CosmiqDebug CosmiqRelease].include?(config.name)
         next if config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] == 'NO'
 
         config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'

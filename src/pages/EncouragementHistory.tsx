@@ -96,8 +96,8 @@ export default function EncouragementHistory() {
               variant="ghost"
               size="icon"
               className="h-11 w-11 shrink-0 rounded-full"
-              onClick={() => navigate("/mentor")}
-              aria-label="Back to Today"
+              onClick={() => navigate("/guide")}
+              aria-label="Back to Guide"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -144,7 +144,7 @@ export default function EncouragementHistory() {
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
                   Open today’s encouragement and it will appear here automatically.
                 </p>
-                <Button className="mt-5 rounded-full" onClick={() => navigate("/mentor#daily-encouragement")}>
+                <Button className="mt-5 rounded-full" onClick={() => navigate("/guide#daily-encouragement")}>
                   Go to today’s encouragement
                 </Button>
               </Card>

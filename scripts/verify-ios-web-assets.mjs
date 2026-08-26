@@ -26,13 +26,18 @@ const LEGACY_JOURNEY_PATH_CONTRACT_PATTERN =
   /generate-journey-path["']?\s*,\s*\{[\s\S]{0,250}?body:\{[\s\S]{0,250}?userId:/;
 const LEGACY_JOURNEY_PATH_ERROR =
   "Missing required parameters: epicId, milestoneIndex, userId";
-const EXPECTED_NATIVE_PRODUCT = "Graceward";
-const EXPECTED_NATIVE_BUNDLE_ID = "com.darrylgraham.graceward";
-const FORBIDDEN_NATIVE_PRODUCT_PATTERNS = [
-  /Cosmiq/i,
-  /cosmiq:\/\//i,
-  /com\.darrylgraham\.revolution/i,
-];
+const PRODUCTS = {
+  graceward: {
+    name: "Graceward",
+    bundleId: "com.darrylgraham.graceward",
+    forbiddenPatterns: [/Cosmiq/i, /cosmiq:\/\//i, /com\.darrylgraham\.revolution/i],
+  },
+  cosmiq: {
+    name: "Cosmiq",
+    bundleId: "com.darrylgraham.revolution",
+    forbiddenPatterns: [/Graceward/i, /graceward:\/\//i, /com\.darrylgraham\.graceward/i],
+  },
+};
 const PRODUCT_IDENTITY_FILES = [
   "index.html",
   "manifest.webmanifest",
@@ -49,7 +54,7 @@ const info = (message) => {
 
 const fail = (message) => {
   console.error(`${prefix} ${message}`);
-  console.error(`${prefix} Run \`npm run ios:sync\` and retry.`);
+  console.error(`${prefix} Run \`npm run ios:sync:cosmiq\` or \`npm run ios:sync:graceward\` and retry.`);
   process.exit(1);
 };
 
@@ -57,6 +62,7 @@ const parseArgs = (argv) => {
   let targetBuiltAssetsDir = null;
   let skipGeneratedBuildScan = false;
   let scanGeneratedBuilds = false;
+  let productName = process.env.IOS_PRODUCT?.trim().toLowerCase() || null;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -68,6 +74,25 @@ const parseArgs = (argv) => {
 
     if (arg === "--skip-generated-build-scan") {
       skipGeneratedBuildScan = true;
+      continue;
+    }
+
+    if (arg === "--product") {
+      const nextArg = argv[index + 1];
+      if (!nextArg || !(nextArg.toLowerCase() in PRODUCTS)) {
+        fail(`Expected --product graceward or --product cosmiq; got ${String(nextArg)}.`);
+      }
+      productName = nextArg.toLowerCase();
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--product=")) {
+      const value = arg.slice("--product=".length).toLowerCase();
+      if (!(value in PRODUCTS)) {
+        fail(`Expected --product graceward or --product cosmiq; got ${value}.`);
+      }
+      productName = value;
       continue;
     }
 
@@ -89,7 +114,7 @@ const parseArgs = (argv) => {
     fail(`Unsupported argument: ${arg}`);
   }
 
-  return { targetBuiltAssetsDir, skipGeneratedBuildScan, scanGeneratedBuilds };
+  return { targetBuiltAssetsDir, skipGeneratedBuildScan, scanGeneratedBuilds, productName };
 };
 
 const directoryExists = async (directory) => {
@@ -173,7 +198,21 @@ const hashFile = async (filePath) => {
   return createHash("sha256").update(fileBuffer).digest("hex");
 };
 
-const verifyGracewardNativeProductIdentity = async (compareDist = true) => {
+const resolveProduct = async (requestedProductName, compareDist) => {
+  if (requestedProductName) return PRODUCTS[requestedProductName];
+
+  const identityRoot = compareDist ? distRoot : iosPublicRoot;
+  const manifest = JSON.parse(
+    await fs.readFile(path.join(identityRoot, "manifest.webmanifest"), "utf8"),
+  );
+  const match = Object.values(PRODUCTS).find((product) => product.name === manifest.short_name);
+  if (!match) {
+    fail(`Could not infer iOS product from manifest short_name ${String(manifest.short_name)}.`);
+  }
+  return match;
+};
+
+const verifyNativeProductIdentity = async (product, compareDist = true) => {
   for (const relativePath of PRODUCT_IDENTITY_FILES) {
     const distPath = path.join(distRoot, relativePath);
     const iosPath = path.join(iosPublicRoot, relativePath);
@@ -187,19 +226,19 @@ const verifyGracewardNativeProductIdentity = async (compareDist = true) => {
         : iosContents;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      fail(`Missing required ${EXPECTED_NATIVE_PRODUCT} identity artifact ${relativePath}: ${message}`);
+      fail(`Missing required ${product.name} identity artifact ${relativePath}: ${message}`);
     }
 
     if (distContents !== iosContents) {
       fail(`Capacitor iOS identity artifact is stale: ${relativePath}`);
     }
 
-    const forbiddenPattern = FORBIDDEN_NATIVE_PRODUCT_PATTERNS.find((pattern) =>
+    const forbiddenPattern = product.forbiddenPatterns.find((pattern) =>
       pattern.test(distContents)
     );
     if (forbiddenPattern) {
       fail(
-        `${relativePath} contains a Cosmiq identifier and cannot be packaged in the ${EXPECTED_NATIVE_PRODUCT} iOS target.`,
+        `${relativePath} contains an opposite-product identifier and cannot be packaged in the ${product.name} iOS target.`,
       );
     }
   }
@@ -208,9 +247,9 @@ const verifyGracewardNativeProductIdentity = async (compareDist = true) => {
   const manifest = JSON.parse(
     await fs.readFile(path.join(identityRoot, "manifest.webmanifest"), "utf8"),
   );
-  if (manifest.short_name !== EXPECTED_NATIVE_PRODUCT) {
+  if (manifest.short_name !== product.name) {
     fail(
-      `Expected ${EXPECTED_NATIVE_PRODUCT} manifest, got ${String(manifest.short_name ?? "missing short_name")}.`,
+      `Expected ${product.name} manifest, got ${String(manifest.short_name ?? "missing short_name")}.`,
     );
   }
 
@@ -218,7 +257,7 @@ const verifyGracewardNativeProductIdentity = async (compareDist = true) => {
     await fs.readFile(path.join(identityRoot, "apple-app-site-association"), "utf8"),
   );
   const associatedAppIds = association?.applinks?.details?.map((detail) => detail.appID) ?? [];
-  const expectedAssociatedAppId = `B6VW78ABTR.${EXPECTED_NATIVE_BUNDLE_ID}`;
+  const expectedAssociatedAppId = `B6VW78ABTR.${product.bundleId}`;
   if (
     associatedAppIds.length !== 1
     || associatedAppIds[0] !== expectedAssociatedAppId
@@ -230,11 +269,11 @@ const verifyGracewardNativeProductIdentity = async (compareDist = true) => {
 
   const capacitorConfig = JSON.parse(await fs.readFile(iosCapacitorConfigPath, "utf8"));
   if (
-    capacitorConfig.appId !== EXPECTED_NATIVE_BUNDLE_ID
-    || capacitorConfig.appName !== EXPECTED_NATIVE_PRODUCT
+    capacitorConfig.appId !== product.bundleId
+    || capacitorConfig.appName !== product.name
   ) {
     fail(
-      `Capacitor native identity mismatch: expected ${EXPECTED_NATIVE_PRODUCT} (${EXPECTED_NATIVE_BUNDLE_ID}), `
+      `Capacitor native identity mismatch: expected ${product.name} (${product.bundleId}), `
       + `got ${String(capacitorConfig.appName)} (${String(capacitorConfig.appId)}).`,
     );
   }
@@ -305,16 +344,18 @@ const verifyAssets = async () => {
     targetBuiltAssetsDir,
     skipGeneratedBuildScan,
     scanGeneratedBuilds,
+    productName,
   } = parseArgs(process.argv.slice(2));
 
   // During an Xcode build the copied Capacitor bundle is the immutable source
   // of truth. The root dist directory may legitimately be replaced by a
   // separate Cosmiq web build while the archive is compiling.
   if (targetBuiltAssetsDir) {
+    const product = await resolveProduct(productName, false);
     const iosBundles = await listIndexBundles(iosAssetsDir);
     const iosJavaScriptBundles = await listJavaScriptBundles(iosAssetsDir);
     await verifyNoLegacyJourneyPathContract(iosAssetsDir, iosJavaScriptBundles);
-    await verifyGracewardNativeProductIdentity(false);
+    await verifyNativeProductIdentity(product, false);
     await verifyDirectoryMatchesDist(
       targetBuiltAssetsDir,
       iosBundles,
@@ -322,7 +363,7 @@ const verifyAssets = async () => {
       "Xcode target bundled assets",
       iosAssetsDir,
     );
-    info(`Verified ${iosBundles.length} staged index bundle(s) in the Xcode target.`);
+    info(`Verified ${iosBundles.length} staged ${product.name} index bundle(s) in the Xcode target.`);
     return;
   }
 
@@ -335,7 +376,8 @@ const verifyAssets = async () => {
 
   await verifyNoLegacyJourneyPathContract(distAssetsDir, distJavaScriptBundles);
   await verifyDirectoryMatchesDist(iosAssetsDir, distBundles, distJavaScriptBundles, "Capacitor iOS public assets");
-  await verifyGracewardNativeProductIdentity();
+  const product = await resolveProduct(productName, true);
+  await verifyNativeProductIdentity(product);
 
   const buildAssetDirs = new Set();
   if (scanGeneratedBuilds && !skipGeneratedBuildScan) {
@@ -357,7 +399,7 @@ const verifyAssets = async () => {
     );
   }
 
-  info(`Verified ${distBundles.length} index bundle(s) are synced between dist and iOS public assets.`);
+  info(`Verified ${distBundles.length} ${product.name} index bundle(s) are synced between dist and iOS public assets.`);
 };
 
 verifyAssets().catch((error) => {

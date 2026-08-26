@@ -13,6 +13,7 @@ interface ProductBuildIdentity {
   themeColor: string;
   backgroundColor: string;
   iconPath: string;
+  cssClass: "product-graceward" | "product-cosmiq";
   excludedPublicArtifacts: string[];
 }
 
@@ -27,9 +28,10 @@ function getProductBuildIdentity(env: Record<string, string>): ProductBuildIdent
         title: "Cosmiq — Turn intention into meaningful momentum",
         description:
           "A living companion for planning, focus, reflection, and personalized cinematic evolution.",
-        themeColor: "#155e75",
-        backgroundColor: "#071a2d",
-        iconPath: "/cosmiq-icon.svg",
+        themeColor: "#4c007d",
+        backgroundColor: "#090311",
+        iconPath: "/cosmiq-icon.png",
+        cssClass: "product-cosmiq",
         excludedPublicArtifacts: [
           "PRIVACY_POLICY.md",
           "TERMS_OF_SERVICE.md",
@@ -38,6 +40,7 @@ function getProductBuildIdentity(env: Record<string, string>): ProductBuildIdent
           "icon-192.png",
           "icon-192.svg",
           "icon-512.svg",
+          "cosmiq-icon.svg",
           "graceward-motion",
         ],
       }
@@ -51,9 +54,11 @@ function getProductBuildIdentity(env: Record<string, string>): ProductBuildIdent
         themeColor: "#2f5938",
         backgroundColor: "#f4efe3",
         iconPath: "/icon-192.svg",
+        cssClass: "product-graceward",
         excludedPublicArtifacts: [
           "COSMIQ_PRIVACY_POLICY.md",
           "COSMIQ_TERMS_OF_SERVICE.md",
+          "cosmiq-icon.png",
           "cosmiq-icon.svg",
           "companion-eggs",
           "companion-hatch-videos",
@@ -507,6 +512,8 @@ function productDocumentIdentityPlugin(env: Record<string, string>): Plugin {
     name: "product-document-identity",
     transformIndexHtml(html) {
       let transformed = html
+        .replace(/<html([^>]*)>/i, `<html$1 class="${identity.cssClass}">`)
+        .replace(/<body([^>]*)>/i, `<body$1 class="${identity.cssClass}">`)
         .replace(/<title>[^<]*<\/title>/i, `<title>${identity.title}</title>`)
         .replace(/Loading (?:Graceward|Cosmiq)…/g, `Loading ${identity.productName}…`)
         .replace(/(<link\s+rel=["']icon["'][^>]*href=)["'][^"']*["']([^>]*>)/i, `$1"${identity.iconPath}"$2`)
@@ -545,7 +552,7 @@ export default defineConfig(({ mode }) => {
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: identity.productName === "Cosmiq"
-          ? ['cosmiq-icon.svg']
+          ? ['cosmiq-icon.png']
           : ['favicon.ico', 'icon-192.svg', 'icon-512.svg'],
         manifest: {
           name: identity.title,
@@ -560,8 +567,8 @@ export default defineConfig(({ mode }) => {
           icons: [
             {
               src: identity.iconPath,
-              sizes: 'any',
-              type: 'image/svg+xml',
+              sizes: identity.productName === "Cosmiq" ? '1024x1024' : 'any',
+              type: identity.productName === "Cosmiq" ? 'image/png' : 'image/svg+xml',
               purpose: 'any maskable'
             }
           ]

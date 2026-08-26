@@ -32,6 +32,17 @@ type SupabaseAuthUser = {
   email?: string | null;
   app_metadata?: AppleUserMetadata | null;
   user_metadata?: AppleUserMetadata | null;
+  identities?:
+    | Array<{
+      id?: string | null;
+      provider?: string | null;
+      identity_data?: {
+        sub?: string | null;
+        provider_id?: string | null;
+        [key: string]: unknown;
+      } | null;
+    }>
+    | null;
 };
 
 type AppleNativeAuthRequest = {
@@ -54,7 +65,7 @@ type AppleNativeAuthDeps = {
   verifyIdentityToken: (
     identityToken: string,
     appleServiceId: string,
-    iosBundleIds: string[],
+    iosBundleId: string,
   ) => Promise<Record<string, unknown>>;
   sha256HexFn: (value: string) => Promise<string>;
   applyAbuseProtectionFn: (
@@ -76,6 +87,7 @@ const REQUIRED_ENV_KEYS = [
   "SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
   "APPLE_SERVICE_ID",
+  "APPLE_IOS_BUNDLE_ID",
 ] as const;
 
 const APPLE_PRODUCT_BY_AUDIENCE: Readonly<Record<string, AppleProductMode>> = {
@@ -118,8 +130,24 @@ const getUserProductMode = (
 
 const getUserAppleId = (user: SupabaseAuthUser): string | null => {
   const trustedAppleId = user.app_metadata?.apple_user_id;
-  return typeof trustedAppleId === "string" && trustedAppleId.length > 0
-    ? trustedAppleId
+  if (typeof trustedAppleId === "string" && trustedAppleId.length > 0) {
+    return trustedAppleId;
+  }
+
+  // Accounts created by the older Supabase Apple OAuth flow do not have our
+  // custom apple_user_id metadata. Their verified Apple subject is still kept
+  // on the admin-only provider identity, and Apple normally omits email on
+  // every authorization after the first one. Use that trusted identity so a
+  // returning native sign-in can migrate the account instead of reporting it
+  // as missing.
+  const appleIdentity = user.identities?.find((identity) =>
+    identity.provider === "apple"
+  );
+  const identitySubject = appleIdentity?.identity_data?.sub ??
+    appleIdentity?.identity_data?.provider_id ?? appleIdentity?.id;
+
+  return typeof identitySubject === "string" && identitySubject.length > 0
+    ? identitySubject
     : null;
 };
 
@@ -180,11 +208,11 @@ const defaultDeps: AppleNativeAuthDeps = {
   verifyIdentityToken: async (
     identityToken: string,
     appleServiceId: string,
-    iosBundleIds: string[],
+    iosBundleId: string,
   ) => {
     const verification = await jwtVerify(identityToken, appleJWKS, {
       issuer: "https://appleid.apple.com",
-      audience: [appleServiceId, ...iosBundleIds],
+      audience: [appleServiceId, iosBundleId],
     });
     return verification.payload as Record<string, unknown>;
   },
@@ -248,16 +276,12 @@ export async function handleAppleNativeAuth(
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const appleServiceId = Deno.env.get("APPLE_SERVICE_ID");
-    const iosBundleIds = (Deno.env.get("APPLE_IOS_BUNDLE_IDS") ??
-      "com.darrylgraham.graceward,com.darrylgraham.revolution")
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean);
+    const iosBundleId = Deno.env.get("APPLE_IOS_BUNDLE_ID")?.trim();
     const missingEnvKeys = findMissingRequiredEnv([...REQUIRED_ENV_KEYS]);
 
     if (
       !supabaseUrl || !supabaseAnonKey || !supabaseServiceKey ||
-      !appleServiceId || missingEnvKeys.length > 0
+      !appleServiceId || !iosBundleId || missingEnvKeys.length > 0
     ) {
       return createLoggedSafeErrorResponse({
         status: 500,
@@ -354,7 +378,7 @@ export async function handleAppleNativeAuth(
       payload = await deps.verifyIdentityToken(
         identityToken,
         appleServiceId,
-        iosBundleIds,
+        iosBundleId,
       );
     } catch (jwtError) {
       logAuthEvent("apple-native-auth", "error", "JWT verification failed", {

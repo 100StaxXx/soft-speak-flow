@@ -409,11 +409,9 @@ describe("Companion tabs performance behavior", () => {
       "data-preset",
       "companion",
     );
-    expect(screen.getByTestId("companion-theme-shell")).toHaveStyle(
-      "--primary: 45 100% 65%; --accent: 40 96% 57%",
-    );
+    expect(screen.getByTestId("companion-theme-shell")).not.toHaveAttribute("style");
     expect(screen.getByTestId("companion-tab-list")).toHaveClass(
-      "border-stardust-gold/[0.16]",
+      "border-primary/15",
     );
   });
 
@@ -423,7 +421,7 @@ describe("Companion tabs performance behavior", () => {
 
   it("renders collection in top-level companion tabs", () => {
     renderCompanion();
-    expect(screen.getByRole("tab", { name: /collection/i }))
+    expect(screen.getByRole("tab", { name: /keepsakes/i }))
       .toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /postcards/i })).not
       .toBeInTheDocument();
@@ -432,7 +430,7 @@ describe("Companion tabs performance behavior", () => {
   it("keeps collection tab content mounted after first visit", async () => {
     renderCompanion();
 
-    fireEvent.click(screen.getByRole("tab", { name: /collection/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /keepsakes/i }));
     await waitFor(() => {
       expect(screen.getByTestId("collection-mode")).toBeInTheDocument();
     });
@@ -441,8 +439,8 @@ describe("Companion tabs performance behavior", () => {
     fireEvent.click(screen.getByText("Toggle Collection Mode"));
     expect(screen.getByTestId("collection-mode")).toHaveTextContent("loot");
 
-    fireEvent.click(screen.getByRole("tab", { name: /overview/i }));
-    fireEvent.click(screen.getByRole("tab", { name: /collection/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /formation/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /keepsakes/i }));
 
     expect(screen.getByTestId("collection-mode")).toHaveTextContent("loot");
     expect(mocks.collectionMountCount).toBe(1);
@@ -457,7 +455,7 @@ describe("Companion tabs performance behavior", () => {
     });
     expect(mocks.focusMountCount).toBe(1);
 
-    fireEvent.click(screen.getByRole("tab", { name: /overview/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /formation/i }));
     fireEvent.click(screen.getByRole("tab", { name: /focus/i }));
 
     await waitFor(() => {
@@ -501,7 +499,7 @@ describe("Companion tabs performance behavior", () => {
     fireEvent.click(screen.getByText("Toggle Focus Mode"));
     expect(screen.getByTestId("focus-mode")).toHaveTextContent("resist");
 
-    fireEvent.click(screen.getByRole("tab", { name: /overview/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /formation/i }));
     fireEvent.click(screen.getByRole("tab", { name: /focus/i }));
 
     expect(screen.getByTestId("focus-mode")).toHaveTextContent("resist");
@@ -539,12 +537,12 @@ describe("Companion tabs performance behavior", () => {
         ]),
       );
 
-      fireEvent.focus(screen.getByRole("tab", { name: /stories/i }));
+      fireEvent.focus(screen.getByRole("tab", { name: /memories/i }));
       await waitFor(() => {
         expect(mocks.prefetchQuery).toHaveBeenCalledTimes(3);
       }, { timeout: 1500 });
 
-      fireEvent.pointerDown(screen.getByRole("tab", { name: /collection/i }));
+      fireEvent.pointerDown(screen.getByRole("tab", { name: /keepsakes/i }));
       await waitFor(() => {
         expect(mocks.prefetchQuery).toHaveBeenCalledTimes(4);
       }, { timeout: 1500 });
@@ -580,7 +578,7 @@ describe("Companion tabs performance behavior", () => {
 
     renderCompanion();
 
-    expect(screen.getByRole("tab", { name: /overview/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /formation/i })).toBeInTheDocument();
     expect(screen.queryByText("No Companion Found")).not.toBeInTheDocument();
     expect(screen.queryByText("Error Loading Companion")).not
       .toBeInTheDocument();

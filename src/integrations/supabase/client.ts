@@ -7,6 +7,8 @@ import { PRODUCT_RUNTIME } from '@/config/productRuntime';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const EXPECTED_SUPABASE_PROJECT_REF =
+  import.meta.env.VITE_EXPECTED_SUPABASE_PROJECT_REF?.trim();
 
 const getSupabaseProjectRef = (url: string): string => {
   try {
@@ -22,10 +24,22 @@ export const SUPABASE_AUTH_STORAGE_KEY =
   `${LEGACY_SUPABASE_AUTH_STORAGE_KEY}-${PRODUCT_RUNTIME.authProductMode}`;
 
 // Validate required environment variables
-if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+if (
+  !SUPABASE_URL ||
+  !SUPABASE_PUBLISHABLE_KEY ||
+  !EXPECTED_SUPABASE_PROJECT_REF
+) {
   throw new Error(
-    'Missing required environment variables: VITE_SUPABASE_URL and/or VITE_SUPABASE_PUBLISHABLE_KEY. ' +
+    'Missing required environment variables: VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY, ' +
+    'and/or VITE_EXPECTED_SUPABASE_PROJECT_REF. ' +
     'Copy .env.example to .env.local and populate the Supabase values before starting the app.'
+  );
+}
+
+if (projectRef !== EXPECTED_SUPABASE_PROJECT_REF) {
+  throw new Error(
+    `Blocked ${PRODUCT_RUNTIME.authProductMode} startup: Supabase project ${projectRef} does not match ` +
+    `the expected project ${EXPECTED_SUPABASE_PROJECT_REF}.`,
   );
 }
 

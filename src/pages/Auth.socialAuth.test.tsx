@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => {
   const onAuthStateChangeMock = vi.fn();
   const exchangeCodeForSessionMock = vi.fn();
   const invokeMock = vi.fn();
-  const setSessionMock = vi.fn();
+  const signInWithIdTokenMock = vi.fn();
   const signOutMock = vi.fn();
   const signInWithOAuthMock = vi.fn();
   const appleAuthorizeMock = vi.fn();
@@ -34,7 +34,7 @@ const mocks = vi.hoisted(() => {
     onAuthStateChangeMock,
     exchangeCodeForSessionMock,
     invokeMock,
-    setSessionMock,
+    signInWithIdTokenMock,
     signOutMock,
     signInWithOAuthMock,
     appleAuthorizeMock,
@@ -106,7 +106,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       signUp: vi.fn(),
       resetPasswordForEmail: vi.fn(),
       signInWithOAuth: mocks.signInWithOAuthMock,
-      setSession: mocks.setSessionMock,
+      signInWithIdToken: mocks.signInWithIdTokenMock,
       signOut: mocks.signOutMock,
     },
     from: vi.fn(() => ({
@@ -127,7 +127,7 @@ vi.mock("@/services/authProductBoundary", () => ({
   announceAuthProductMismatch: mocks.announceAuthProductMismatchMock,
 }));
 
-import Auth from "./Auth";
+import Auth, { getAuthPresentation } from "./Auth";
 
 const signedInSession = {
   user: {
@@ -188,7 +188,7 @@ describe("Auth social auth intent guard", () => {
       },
       error: null,
     });
-    mocks.setSessionMock.mockResolvedValue({
+    mocks.signInWithIdTokenMock.mockResolvedValue({
       data: {
         session: signedInSession,
       },
@@ -258,17 +258,17 @@ describe("Auth social auth intent guard", () => {
     mocks.isNativePlatform = true;
     mocks.platform = "ios";
     mocks.applePluginAvailable = true;
-    mocks.invokeMock.mockResolvedValue({
-      data: null,
-      error: {
-        message: "Function failed",
-        context: {
-          json: vi.fn().mockResolvedValue({
-            code: "ACCOUNT_NOT_FOUND",
-            error: "No account",
-          }),
+    mocks.signInWithIdTokenMock.mockResolvedValue({
+      data: {
+        session: {
+          ...signedInSession,
+          user: {
+            ...signedInSession.user,
+            created_at: new Date().toISOString(),
+          },
         },
       },
+      error: null,
     });
 
     renderAuth();
@@ -279,12 +279,10 @@ describe("Auth social auth intent guard", () => {
     );
 
     await waitFor(() => {
-      expect(mocks.invokeMock).toHaveBeenCalledWith("apple-native-auth", {
-        body: expect.objectContaining({
-          identityToken: "apple-identity-token",
-          intent: "sign_in",
-          productMode: "graceward",
-        }),
+      expect(mocks.signInWithIdTokenMock).toHaveBeenCalledWith({
+        provider: "apple",
+        token: "apple-identity-token",
+        nonce: expect.any(String),
       });
     });
 
@@ -294,15 +292,15 @@ describe("Auth social auth intent guard", () => {
     expect(mocks.safeNavigateMock).not.toHaveBeenCalled();
   });
 
-  it("shows a friendly inline error when native Apple auth cannot reach the edge function", async () => {
+  it("shows a friendly inline error when native Apple auth cannot reach Supabase Auth", async () => {
     mocks.isNativePlatform = true;
     mocks.platform = "ios";
     mocks.applePluginAvailable = true;
-    mocks.invokeMock.mockResolvedValue({
-      data: null,
+    mocks.signInWithIdTokenMock.mockResolvedValue({
+      data: { session: null },
       error: {
-        name: "FunctionsFetchError",
-        message: "Failed to send a request to the Edge Function",
+        name: "AuthRetryableFetchError",
+        message: "Failed to fetch",
       },
     });
 
@@ -314,9 +312,33 @@ describe("Auth social auth intent guard", () => {
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "We couldn't reach the server to sign you in with Apple. Check your connection and try again.",
+      "Network issue while signing in with Apple. Check your connection and try again.",
     );
     expect(mocks.safeNavigateMock).not.toHaveBeenCalled();
+  });
+
+  it("shows an actionable outage message when the Apple provider is unavailable", async () => {
+    mocks.isNativePlatform = true;
+    mocks.platform = "ios";
+    mocks.applePluginAvailable = true;
+    mocks.signInWithIdTokenMock.mockResolvedValue({
+      data: { session: null },
+      error: {
+        name: "AuthApiError",
+        message: "Unsupported provider: provider is not enabled",
+      },
+    });
+
+    renderAuth();
+    await flushMicrotasks();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /sign in with apple/i }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Sign in with Apple is temporarily unavailable. Please try again in a moment.",
+    );
   });
 
   it("routes native Apple sign-in timeout fallbacks to guarded home instead of onboarding", async () => {
@@ -339,7 +361,7 @@ describe("Auth social auth intent guard", () => {
     await flushMicrotasks();
     await flushMicrotasks();
 
-    expect(mocks.setSessionMock).toHaveBeenCalledTimes(1);
+    expect(mocks.signInWithIdTokenMock).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);
@@ -370,12 +392,10 @@ describe("Auth social auth intent guard", () => {
     );
 
     await waitFor(() => {
-      expect(mocks.invokeMock).toHaveBeenCalledWith("apple-native-auth", {
-        body: expect.objectContaining({
-          identityToken: "apple-identity-token",
-          intent: "sign_up",
-          productMode: "graceward",
-        }),
+      expect(mocks.signInWithIdTokenMock).toHaveBeenCalledWith({
+        provider: "apple",
+        token: "apple-identity-token",
+        nonce: expect.any(String),
       });
     });
 
@@ -437,5 +457,20 @@ describe("Auth social auth intent guard", () => {
     );
     expect(mocks.getAuthRedirectPathMock).not.toHaveBeenCalled();
     expect(mocks.safeNavigateMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the Cosmiq and Graceward auth presentations visually isolated", () => {
+    const cosmiq = getAuthPresentation("cosmiq");
+    const graceward = getAuthPresentation("christian");
+
+    expect(cosmiq.rootClassName).toContain("bg-[#090311]");
+    expect(cosmiq.primaryButtonClassName).toContain("from-[#b254ea]");
+    expect(cosmiq.showBrandHeader).toBe(false);
+    expect(cosmiq.rootClassName).not.toContain("#f4efe3");
+
+    expect(graceward.rootClassName).toContain("bg-[#f4efe3]");
+    expect(graceward.primaryButtonClassName).toContain("bg-[#2f5938]");
+    expect(graceward.showBrandHeader).toBe(true);
+    expect(graceward.rootClassName).not.toContain("#090311");
   });
 });

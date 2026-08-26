@@ -11,6 +11,7 @@ export type AuthProductBoundaryReason =
   | "companion_binding"
   | "profile_binding"
   | "legacy_binding"
+  | "dedicated_apple_project"
   | "boundary_lookup_failed"
   | "unscoped_apple_session"
   | "unscoped_non_apple_session";
@@ -152,16 +153,16 @@ export const validateSessionProductBoundary = async (
     return result(false, expectedProductMode, null, "boundary_lookup_failed");
   }
 
-  // A native Apple session created by apple-native-auth always has a trusted
-  // product binding. An unbound Apple session came through the shared web OAuth
-  // path, so Graceward must fail closed instead of treating a Cosmiq identity as
-  // a new Graceward account. Cosmiq remains the legacy default for old sessions.
+  // Each shipped product is pinned to its own Supabase project at client
+  // startup. A built-in Apple identity therefore inherits the product boundary
+  // from the dedicated Auth project instead of relying on editable user
+  // metadata or the retired shared apple-native-auth function.
   if (isAppleUser(session.user)) {
     return result(
-      expectedProductMode === "cosmiq",
+      true,
       expectedProductMode,
-      expectedProductMode === "cosmiq" ? "cosmiq" : null,
-      "unscoped_apple_session",
+      expectedProductMode,
+      "dedicated_apple_project",
     );
   }
 
