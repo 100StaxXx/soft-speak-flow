@@ -1,0 +1,60 @@
+--- a/supabase/functions/process-companion-cinema-event/index.ts
++++ b/supabase/functions/process-companion-cinema-event/index.ts
+@@ -52,6 +52,8 @@
+ import {
+   getCompanionCinemaRolloutConfig,
+   isCompanionCinemaUserEligible,
++  isCompanionCinemaBoundaryEligible,
++  isCompanionHatchEnabled,
+ } from "../_shared/companionCinemaRollout.ts";
+ 
+ const corsHeaders = {
+@@ -215,6 +217,9 @@
+     query = query.eq("id", eventId);
+   } else {
+     const currentIso = nowIso();
++    if (!getCompanionCinemaRolloutConfig().enabled) {
++      query = query.eq("event_type", "evolution").eq("boundary_level", 1);
++    }
+     query = query
+       .in("status", ["queued", "rendering_portrait", "rendering_video"])
+       .or(`next_retry_at.is.null,next_retry_at.lte.${currentIso}`)
+@@ -1426,7 +1431,7 @@
+     }
+ 
+     const rolloutConfig = getCompanionCinemaRolloutConfig();
+-    if (!rolloutConfig.enabled) {
++    if (!rolloutConfig.enabled && !isCompanionHatchEnabled()) {
+       return new Response(
+         JSON.stringify({ status: "disabled", code: "cosmiq_cinema_disabled" }),
+         {
+@@ -1449,7 +1454,10 @@
+           },
+         );
+       }
+-      if (!isCompanionCinemaUserEligible(userId)) {
++      const { data: enqueueCompanion, error: enqueueCompanionError } = await supabase
++        .from("user_companion").select("current_stage").eq("id", companionId).eq("user_id", userId).maybeSingle();
++      if (enqueueCompanionError) throw enqueueCompanionError;
++      if (!isCompanionCinemaBoundaryEligible(userId, enqueueCompanion?.current_stage === 0 ? 1 : null)) {
+         return new Response(
+           JSON.stringify({
+             status: "unavailable",
+@@ -1505,7 +1513,7 @@
+           excludeEventIds: claimCollisions,
+         });
+         if (!candidate) break;
+-        if (!isCompanionCinemaUserEligible(candidate.user_id)) {
++        if (!isCompanionCinemaBoundaryEligible(candidate.user_id, candidate.event_type === "evolution" ? candidate.boundary_level : null)) {
+           await deferRolloutIneligibleEvent(supabase, candidate);
+           claimCollisions.push(candidate.id);
+           continue;
+@@ -1527,7 +1535,7 @@
+         },
+       );
+     }
+-    if (!isCompanionCinemaUserEligible(currentEvent.user_id)) {
++    if (!isCompanionCinemaBoundaryEligible(currentEvent.user_id, currentEvent.event_type === "evolution" ? currentEvent.boundary_level : null)) {
+       if (!currentEvent.lease_token) {
+         await deferRolloutIneligibleEvent(supabase, currentEvent);
+       }

@@ -240,7 +240,7 @@ export const resolveCompanionExpressiveAssetUrl = (
     variant: number;
   },
 ): string | null => {
-  if (!companion?.preset_id || (companion.current_stage ?? 0) <= 0) {
+  if (!companion?.preset_id || (companion.current_stage ?? 0) <= 0 || hasPersonalizedCinemaPortrait(companion)) {
     return null;
   }
 
@@ -252,6 +252,12 @@ export const resolveCompanionExpressiveAssetUrl = (
     variant,
   });
 };
+
+// Preset IDs now describe the species, not necessarily the displayed artwork.
+// A promoted custom cinema portrait must never be replaced by stock art.
+const hasPersonalizedCinemaPortrait = (companion: CompanionAssetSource): boolean =>
+  Boolean(companion.current_image_url?.includes("/evolution-cards/")
+    && companion.current_image_url.includes("_cinema_"));
 
 export const resolveCompanionVisualAssetUrl = (
   companion: CompanionAssetSource | null | undefined,
@@ -272,6 +278,12 @@ export const resolveCompanionVisualAssetUrl = (
   const normalizedInitialImageUrl = normalizeCompanionStoredImageUrl(companion.initial_image_url);
   const normalizedDormantImageUrl = normalizeCompanionStoredImageUrl(companion.dormant_image_url);
   const normalizedNeglectedImageUrl = normalizeCompanionStoredImageUrl(companion.neglected_image_url);
+
+  if (hasPersonalizedCinemaPortrait(companion)) {
+    if (state === "dormant") return normalizedDormantImageUrl ?? normalizedCurrentImageUrl;
+    if (state === "neglected") return normalizedNeglectedImageUrl ?? normalizedCurrentImageUrl;
+    return normalizedCurrentImageUrl;
+  }
 
   const presetUrl = companion.preset_id
     ? getPresetCompanionAssetUrl({

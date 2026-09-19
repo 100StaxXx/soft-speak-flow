@@ -1775,7 +1775,7 @@ describe("useCompanion evolveCompanion", () => {
     expect(mocks.setIsEvolvingLoadingMock).not.toHaveBeenCalled();
   });
 
-  it("directly hatches preset-backed eggs once they are ready", async () => {
+  it("queues preset-backed eggs so the custom video is ready before claiming hatch", async () => {
     mocks.userCompanionResponses.length = 0;
     mocks.userCompanionResponses.push(
       {
@@ -1802,6 +1802,9 @@ describe("useCompanion evolveCompanion", () => {
       },
     );
     mocks.rpcMock.mockImplementation(async (fnName: string) => {
+      if (fnName === "request_companion_evolution_job") {
+        return { data: [{ job_id: "hatch-job", requested_stage: 1, status: "queued" }], error: null };
+      }
       if (fnName === "hatch_companion_with_preset") {
         return {
           data: [
@@ -1835,15 +1838,9 @@ describe("useCompanion evolveCompanion", () => {
     });
 
     await waitFor(() => {
-      expect(mocks.rpcMock).toHaveBeenCalledWith(
-        "hatch_companion_with_preset",
-        expect.objectContaining({
-          p_companion_id: companionFixture.id,
-          p_preset_id: "dragon",
-        }),
-      );
+      expect(mocks.rpcMock).toHaveBeenCalledWith("request_companion_evolution_job");
     });
-
+    expect(mocks.rpcMock).not.toHaveBeenCalledWith("hatch_companion_with_preset", expect.anything());
     expect(mocks.setIsEvolvingLoadingMock).toHaveBeenCalledWith(true);
   });
 
@@ -1998,6 +1995,9 @@ describe("useCompanion evolveCompanion", () => {
       },
     );
     mocks.rpcMock.mockImplementation(async (fnName: string) => {
+      if (fnName === "request_companion_evolution_job") {
+        return { data: [{ job_id: "hatch-job", requested_stage: 1, status: "queued" }], error: null };
+      }
       if (fnName === "repair_auto_advanced_companion_state") {
         return {
           data: [
@@ -2044,13 +2044,7 @@ describe("useCompanion evolveCompanion", () => {
     });
 
     await waitFor(() => {
-      expect(mocks.rpcMock).toHaveBeenCalledWith(
-        "hatch_companion_with_preset",
-        expect.objectContaining({
-          p_companion_id: companionFixture.id,
-          p_preset_id: "dragon",
-        }),
-      );
+      expect(mocks.rpcMock).toHaveBeenCalledWith("request_companion_evolution_job");
     });
   });
 

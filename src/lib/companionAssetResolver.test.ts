@@ -33,6 +33,16 @@ describe("companion asset resolver", () => {
     getPublicUrlMock.mockClear();
   });
 
+  it("keeps the custom cinema portrait instead of replacing it with preset art", () => {
+    const imageUrl = "https://example.supabase.co/storage/v1/object/public/evolution-cards/user/evolutions/companion_stage_1_cinema_event.png";
+    const companion = { preset_id: "fox", current_stage: 1, core_element: "storm", current_image_url: imageUrl };
+    for (const state of ["normal", "dormant", "neglected"] as const) {
+      expect(resolveCompanionVisualAssetUrl(companion, state)).toBe(imageUrl);
+    }
+    expect(resolveCompanionExpressiveAssetUrl(companion, { mood: "happy", variant: 1 })).toBeNull();
+    expect(resolveCompanionVisualAssetUrl({ ...companion, current_stage: 0 })).toBe(getUniversalEggAssetUrl("storm"));
+  });
+
   it("keeps bundled youth art for early stages", () => {
     expect(
       getPresetCompanionAssetUrl({

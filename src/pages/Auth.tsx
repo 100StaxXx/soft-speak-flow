@@ -272,7 +272,7 @@ const invokeAuthGateway = async (payload: AuthGatewayPayload) => {
     const data = await retryWithBackoff(
       async () => {
         const { data, error } = await supabase.functions.invoke("auth-gateway", {
-          body: payload,
+          body: { ...payload, productMode: "cosmiq" },
         });
 
         if (error) {
