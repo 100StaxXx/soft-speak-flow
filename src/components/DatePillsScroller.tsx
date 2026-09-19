@@ -499,8 +499,15 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       onPointerDownCapture={handleUserDateInteraction}
       onTouchStartCapture={handleUserDateInteraction}
       onWheelCapture={handleUserDateInteraction}
-      className={cn("flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1")}
-      style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      className={cn("flex gap-1.5 overflow-x-auto overflow-y-hidden pb-1 scrollbar-hide -mx-1 px-1")}
+      style={{
+        scrollbarWidth: "none",
+        msOverflowStyle: "none",
+        touchAction: "manipulation",
+        // Contain horizontal swipes while allowing vertical swipes to scroll the page.
+        overscrollBehaviorX: "contain",
+        WebkitOverflowScrolling: "touch",
+      }}
     >
       <div
         aria-hidden="true"
