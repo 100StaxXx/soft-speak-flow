@@ -1461,7 +1461,9 @@ describe("useCompanionPlanner", () => {
 
   it("keeps active standalone rituals in upcoming planner context", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-05-11T20:00:00-07:00"));
+    // The planner uses device-local wall time; keep this before the 08:00 ritual
+    // on both developer machines and UTC CI runners.
+    vi.setSystemTime(new Date(2026, 4, 13, 7, 0));
     mocks.habits = [
       {
         id: "habit-standalone",
@@ -1522,9 +1524,6 @@ describe("useCompanionPlanner", () => {
       ],
     }];
     mocks.activeEpics = [];
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-05-13T14:00:00.000Z"));
-
     const { result } = renderHook(() =>
       useCompanionPlanner({ bootstrapGreeting: false })
     );
@@ -1551,7 +1550,7 @@ describe("useCompanionPlanner", () => {
 
   it("marks queued campaign ritual creates as pending local habits", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-04-19T14:30:00.000Z"));
+    vi.setSystemTime(new Date(2026, 3, 19, 7, 30));
     mocks.activeEpics = [{
       id: "epic-active",
       user_id: "user-1",
@@ -1708,7 +1707,7 @@ describe("useCompanionPlanner", () => {
 
   it("keeps in-progress coming-up rows out of missed in the local fallback", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-05-12T20:15:00.000Z"));
+    vi.setSystemTime(new Date(2026, 4, 12, 13, 15));
     const currentTask = {
       id: "task-current-cardio",
       task_text: "Daily Cardio",
