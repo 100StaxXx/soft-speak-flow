@@ -55,6 +55,15 @@ comm -13 "$tmp_discovered" "$tmp_declared" > "$tmp_stale"
 
 status=0
 
+# Supabase validates configured entry points even when CI excludes edge-runtime.
+# Catch orphaned function configuration before starting or deploying the stack.
+while IFS= read -r function_name; do
+  if [ ! -f "supabase/functions/$function_name/index.ts" ]; then
+    echo "Configured function has no entry point: $function_name" >&2
+    status=1
+  fi
+done < <(sed -n 's/^\[functions\.\([^]]*\)\]$/\1/p' supabase/config.toml)
+
 if [ -s "$tmp_missing" ]; then
   echo "Manifest missing function entries:" >&2
   sed 's/^/- /' "$tmp_missing" >&2
