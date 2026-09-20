@@ -71,8 +71,12 @@ Deleted the three explicitly approved regenerable caches for device smoke testin
 
 ## TestFlight availability
 
-Upload succeeded; Apple processed build 355 and automatically attached the existing internal Test Group 1 (two testers). No external beta review or App Store review submission was made.
+Upload succeeded; Apple processed build 355 and automatically attached the existing internal Test Group 1 (two testers). The group's Builds page confirms **Testing** for 4.8 (355). Focused testing notes were saved. No external beta review or App Store review submission was made.
 
 ## Clean-install follow-up
 
 The first remote CI run exposed an orphaned patch for the removed `@capgo/native-purchases` package. Local incremental installs had not surfaced this missing-package failure. Removed that obsolete patch; active purchases use RevenueCat and its existing native integration. This changes installation tooling only, not the uploaded app bundle. Remote CI is being rerun; local passing checks above are not a claim that remote checks have finished.
+
+Further clean-run findings: removed an orphaned `generate-daily-quotes` local configuration entry and added an entry-point existence check. Three planner fixtures incorrectly used Pacific-relative timestamps for local wall-clock expectations; all 43 planner tests now pass under both UTC and Pacific after correcting the fixtures (no planner runtime change).
+
+The test database also exposed missing already-applied cinema/product schema prerequisites. Recovered five migrations verbatim from production's recorded statements: `20260812090000`, `20260812100000`, `20260819090000`, `20260819101500`, and `20260819143000`. They cover the companion selection matrix, explicit product identity, cinema engine, compatible hatch RPC, and final premade product binding. These files reconstruct relevant test dependencies; they are not a claim that every historical shared-backend migration has been reconciled. No production SQL was executed. Static migration tests and secret scanning pass; a fresh isolated database rebuild remains under CI verification. The function manifest now has 100 entries, including the two existing cinema jobs recorded in the recovered history; this does not expand the four-function deployment allow-list.
