@@ -1,5 +1,5 @@
 import { assertEquals, assert } from "https://deno.land/std@0.168.0/testing/asserts.ts";
-import { deps, handleWellbeingVideo, trustedSourceImage, retryMode } from "./index.ts";
+import { deps, handleWellbeingVideo, trustedSourceImage, resolveWellbeingSourceImage, hasWellbeingVideoAccess, retryMode } from "./index.ts";
 const BASE = "https://testproject.supabase.co";
 const IMAGE = `${BASE}/storage/v1/object/public/companion-images/user-1/one.png`;
 const body = { action: "prepare", companionId: "companion-1", category: "mind", stage: 5, sourceImageUrl: IMAGE };
@@ -7,7 +7,7 @@ const body = { action: "prepare", companionId: "companion-1", category: "mind", 
 function fixture() {
   const jobs: any[] = [];
   const companion: any = { id: "companion-1", user_id: "user-1", current_stage: 8, current_image_url: IMAGE, core_element: "storm", product_mode: "cosmiq" };
-  const calls = { submit: [] as any[], upload: 0, ledger: 0, product: "cosmiq", internal: false, denied: false, poll: "COMPLETED", throws: false };
+  const calls = { submit: [] as any[], upload: 0, ledger: 0, product: "cosmiq", internal: false, denied: false, access: true, poll: "COMPLETED", throws: false };
   const db: any = {
     rpc: () => {
       const job = jobs.find((row) => ["queued", "submitting", "processing"].includes(row.status) && !row.lease_token);
@@ -46,6 +46,7 @@ function fixture() {
     ...deps, database: () => db,
     authenticate: async () => calls.denied ? new Response("Unauthorized", { status: 401 }) : calls.internal ? { isInternal: true } : { userId: "user-1", isInternal: false },
     product: async () => calls.product as "cosmiq" | "graceward",
+    access: async () => calls.access,
     env: (key) => key === "SUPABASE_URL" ? BASE : "fake-test-key", now: () => Date.now(),
     guardrails: (() => ({ wrapFetch: (fetcher: any) => fetcher })) as any,
     submit: async (args) => { calls.submit.push(args); if (calls.throws) throw new Error("Timeout after submit"); return { requestId: "fal-one", statusUrl: "", responseUrl: "", cancelUrl: "" }; },
@@ -71,6 +72,41 @@ Deno.test("rejects unauthenticated, other-product, unowned and stale appearance 
 Deno.test("only accepts images from approved project storage buckets", () => {
   assert(trustedSourceImage(IMAGE, BASE));
   for (const image of ["http://localhost:54321/private", "https://evil.test/photo.png", `${BASE}/storage/v1/object/public/private/a.png`, `${IMAGE}?secret=x`, "/companion.png"]) assertEquals(trustedSourceImage(image, BASE), false);
+});
+Deno.test("fresh cinema portraits and legacy bundled portraits can prepare and submit", async () => {
+  const relative = "/companion-presets/dragon/t1_youth/normal/dragon__t1_youth__normal__ice.png";
+  for (const portrait of [IMAGE.replace("companion-images", "evolution-cards"), relative]) {
+    const f = fixture(); f.companion.current_image_url = portrait;
+    assertEquals((await f.request({ ...body, sourceImageUrl: portrait })).status, 200);
+    f.calls.internal = true; await f.request({});
+    assertEquals(f.calls.submit.length, 1);
+    assertEquals(f.calls.submit[0].imageUrl, resolveWellbeingSourceImage(portrait, BASE));
+  }
+});
+Deno.test("relative remote presets match their normalized client URLs without permitting arbitrary hosts", async () => {
+  const f = fixture();
+  const path = "companion-presets/dragon/t2_adolescent/normal/dragon__t2_adolescent__normal__ice.png";
+  f.companion.current_image_url = `/${path}`;
+  assertEquals((await f.request({ ...body, sourceImageUrl: `${BASE}/storage/v1/object/public/${path}` })).status, 200);
+  for (const invalid of [`//evil.test/${path}`, `https://evil.test/${path}`, "/companion-presets/../private.png", `/${path}?token=secret`, `https://user:password@testproject.supabase.co/storage/v1/object/public/${path}`]) {
+    assertEquals(resolveWellbeingSourceImage(invalid, BASE), null);
+  }
+});
+Deno.test("expired access cannot queue or submit paid generation, but can read a cached clip", async () => {
+  const f = fixture(); f.calls.access = false;
+  assertEquals((await f.request()).status, 403); assertEquals(f.jobs.length, 0);
+  f.calls.access = true; await f.request();
+  f.calls.access = false; f.calls.internal = true; await f.request({});
+  assertEquals(f.calls.submit.length, 0); assertEquals(f.jobs[0].error_code, "access_required");
+  f.jobs[0].status = "succeeded"; f.jobs[0].video_url = "cached.mp4";
+  f.calls.internal = false;
+  assertEquals((await (await f.request({ ...body, action: "status" })).json()).clip.video_url, "cached.mp4");
+});
+Deno.test("a valid 14-day app trial is honored without requiring a paid subscription", async () => {
+  const now = Date.now();
+  const row = { user_id: "user-1", source: "trial", is_active: true, trial_started_at: new Date(now - 13 * 86400_000).toISOString(), trial_ends_at: new Date(now + 86400_000).toISOString() };
+  const query: any = { select: () => query, eq: () => query, maybeSingle: async () => ({ data: row, error: null }) };
+  assertEquals(await hasWellbeingVideoAccess({ from: (table: string) => { assertEquals(table, "account_entitlements"); return query; } }, "user-1"), true);
 });
 Deno.test("status checks never enqueue, repeated prepare calls reuse one saved job", async () => {
   const f = fixture();

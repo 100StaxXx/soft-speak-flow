@@ -1,4 +1,15 @@
 import "@testing-library/jest-dom";
+import { vi } from "vitest";
+
+// Tests get a local, non-persistent client unless a suite supplies its own mock.
+// Never relax the real client's production-project pin to accommodate tests.
+vi.mock("@/integrations/supabase/client", async () => {
+  const { createClient } = await import("@supabase/supabase-js");
+  return { supabase: createClient("http://127.0.0.1:54321", "test-anon-key", {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { fetch: async () => { throw new Error("Unmocked Supabase request in unit test"); } },
+  }) };
+});
 
 if (typeof globalThis.indexedDB === "undefined") {
   const compareKeys = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);

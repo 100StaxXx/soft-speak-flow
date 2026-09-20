@@ -4,7 +4,24 @@ import { WellbeingVideoPlayer } from "./WellbeingVideoPlayer";
 const clip = { url: "https://example.com/one.mp4", sourceImageUrl: "one.png", category: "mind" as const };
 describe("Three-second companion playback", () => {
   beforeEach(() => { vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(); vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {}); });
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
+  it("shows a recoverable error when playback never starts", async () => {
+    vi.useFakeTimers();
+    vi.mocked(HTMLMediaElement.prototype.play).mockImplementation(() => new Promise(() => {}));
+    render(<WellbeingVideoPlayer clip={clip} onClose={vi.fn()} />);
+    act(() => vi.advanceTimersByTime(15_000));
+    expect(screen.getByRole("status")).toHaveTextContent("Couldn’t play");
+    expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+  });
+  it("does not time out while waiting for an explicit autoplay-permission tap", async () => {
+    vi.useFakeTimers();
+    vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValueOnce(new Error("NotAllowedError"));
+    await act(async () => render(<WellbeingVideoPlayer clip={clip} onClose={vi.fn()} />));
+    act(() => vi.advanceTimersByTime(30_000));
+    expect(screen.getByRole("button", { name: "Play moment" })).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
   it("plays a real inline silent video and returns to the portrait after three seconds", () => {
     const onClose = vi.fn(); render(<WellbeingVideoPlayer clip={clip} onClose={onClose} />);
     const video = screen.getByLabelText("mind companion moment") as HTMLVideoElement;

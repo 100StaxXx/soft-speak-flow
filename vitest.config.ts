@@ -22,14 +22,7 @@ export default defineConfig({
       VITE_SUPABASE_PUBLISHABLE_KEY: "test-anon-key",
     },
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
-    poolOptions: {
-      threads: {
-        execArgv: vitestWorkerExecArgv,
-      },
-      forks: {
-        execArgv: vitestWorkerExecArgv,
-      },
-    },
+    execArgv: vitestWorkerExecArgv,
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },

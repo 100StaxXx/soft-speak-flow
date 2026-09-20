@@ -1,12 +1,16 @@
+import { PROGRESSION_LEVEL_CAP, PROGRESSION_VISUAL_BOUNDARY_LEVELS } from "./progression";
+
+export const PREMIUM_PROGRESSION_BENEFIT = `${PROGRESSION_LEVEL_CAP} levels and ${PROGRESSION_VISUAL_BOUNDARY_LEVELS.length} companion forms`;
+
 export const PREMIUM_BENEFITS = [
   "Unlimited companion chat",
-  "100+ levels and 12+ evolutions",
+  PREMIUM_PROGRESSION_BENEFIT,
   "Unlimited Quests & Epics",
   "Offline access to downloaded content",
 ] as const;
 
 export const PREMIUM_BENEFITS_SUMMARY =
-  "Unlimited companion chat, 100+ levels and 12+ evolutions, unlimited Quests & Epics, and offline access to downloaded content.";
+  `Unlimited companion chat, ${PREMIUM_PROGRESSION_BENEFIT}, unlimited Quests & Epics, and offline access to downloaded content.`;
 
 export const PREMIUM_PLAN_NOTE =
   "Both monthly and yearly plans include the same Cosmiq features and renew automatically until canceled.";

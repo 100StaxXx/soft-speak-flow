@@ -13,7 +13,7 @@ collect_frontend() {
 }
 
 collect_internal() {
-  find supabase/functions -type f \( -name '*.ts' -o -name '*.js' \) -print0 \
+  find supabase/functions supabase/production-baseline -type f \( -name '*.ts' -o -name '*.js' \) -print0 \
     | xargs -0 perl -0777 -ne 'while(/functions\/v1\/([a-z0-9-]+)/g){print "$1\n"} while(/invokeInternalFunction\(\s*["\x27]([a-z0-9-]+)["\x27]/sg){print "$1\n"}' \
     | sort -u
 }

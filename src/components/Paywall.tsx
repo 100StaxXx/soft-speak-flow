@@ -52,6 +52,7 @@ import { trackPaywallEvent } from "@/utils/paywallTelemetry";
 import {
   PREMIUM_APPLE_BILLING_DISCLOSURE,
   PREMIUM_PLAN_NOTE,
+  PREMIUM_PROGRESSION_BENEFIT,
   PREMIUM_SUBSCRIPTION_LEGAL_LINKS,
 } from "@/config/premiumBenefits";
 import { DISCORD_INVITE_URL } from "@/constants/community";
@@ -146,8 +147,8 @@ const paywallBenefits: PaywallBenefit[] = [
   },
   {
     icon: Sparkles,
-    title: "100+ levels and 12+ evolutions",
-    text: "Keep the full companion growth arc open, including missions, stories, collection, and growth rewards.",
+    title: PREMIUM_PROGRESSION_BENEFIT,
+    text: "Keep the full companion growth arc open, from your first hatch through each new form and its growth rewards.",
   },
   {
     icon: Crown,

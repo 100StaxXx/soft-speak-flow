@@ -231,98 +231,6 @@ vi.mock("@/components/BottomNav", () => ({
   BottomNav: () => null,
 }));
 
-vi.mock("@/components/DatePillsScroller", async () => {
-  const React = await import("react");
-  let nextMountId = 0;
-
-  return {
-    DatePillsScroller: ({
-      selectedDate,
-      onDateSelect,
-      centerRequestKey,
-      centerRequestDateKey,
-      resetRangeOnCenterRequest,
-      onUserDateInteraction,
-    }: {
-      selectedDate: Date;
-      onDateSelect: (date: Date) => void;
-      centerRequestKey?: number;
-      centerRequestDateKey?: string;
-      resetRangeOnCenterRequest?: boolean;
-      onUserDateInteraction?: () => void;
-    }) => {
-      const [mountId] = React.useState(() => {
-        nextMountId += 1;
-        return nextMountId;
-      });
-      mocks.lastDatePillSelectedDate = selectedDate;
-      mocks.lastDatePillCenterRequestKey = centerRequestKey ?? 0;
-      mocks.lastDatePillCenterRequestDateKey = centerRequestDateKey ?? null;
-      mocks.lastDatePillResetRangeOnCenterRequest = resetRangeOnCenterRequest ?? false;
-      return (
-        <div data-testid="date-pills">
-          <span data-testid="date-pills-mount-id">{mountId}</span>
-          <span data-testid="selected-date-iso">{selectedDate.toISOString()}</span>
-          <span data-testid="center-request-key">{centerRequestKey ?? 0}</span>
-          <span data-testid="center-request-date-key">{centerRequestDateKey ?? ""}</span>
-          <span data-testid="reset-range-on-center-request">{String(resetRangeOnCenterRequest ?? false)}</span>
-          <button
-            type="button"
-            onClick={() => {
-              const nextDate = new Date();
-              const nextHour = nextDate.getHours() === 0 ? 1 : 0;
-              nextDate.setHours(nextHour, 0, 0, 0);
-              onDateSelect(nextDate);
-            }}
-          >
-            set-same-day-non-current
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const staleDate = new Date();
-              staleDate.setDate(staleDate.getDate() - 3);
-              staleDate.setHours(12, 0, 0, 0);
-              onDateSelect(staleDate);
-            }}
-          >
-            set-stale-day
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              onUserDateInteraction?.();
-              const staleDate = new Date();
-              staleDate.setDate(staleDate.getDate() - 3);
-              staleDate.setHours(12, 0, 0, 0);
-              onDateSelect(staleDate);
-            }}
-          >
-            user-set-stale-day
-          </button>
-          <button
-            type="button"
-            onClick={() => onUserDateInteraction?.()}
-          >
-            user-slide-date-pills
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const futureDate = new Date();
-              futureDate.setDate(futureDate.getDate() + 3);
-              futureDate.setHours(12, 0, 0, 0);
-              onDateSelect(futureDate);
-            }}
-          >
-            set-future-day
-          </button>
-        </div>
-      );
-    },
-  };
-});
-
 vi.mock("@/components/AddQuestSheet", () => ({
   AddQuestSheet: (props: {
     autoFillTimeOnFirstTap?: boolean;
@@ -661,7 +569,7 @@ vi.mock("@/hooks/useInboxTasks", () => ({
 
 vi.mock("@/hooks/useCalendarTasks", () => ({
   useCalendarTasks: () => ({
-    tasks: [],
+    tasks: mocks.dailyTasks,
   }),
 }));
 
@@ -801,6 +709,7 @@ describe("Journeys row drag integration", () => {
     vi.clearAllMocks();
     elementScrollToSpy.mockClear();
     localStorageState.store.clear();
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 400 });
     mocks.isTabActive = true;
     mocks.pendingTaskId = null;
     mocks.unsurfacedEpicHabitsCount = 0;
@@ -1041,11 +950,12 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByLabelText("Add quest")).toHaveAttribute("data-tour", "add-quest-fab");
-    expect(mocks.draggableFabRenderCount).toBeGreaterThan(0);
+    expect(await screen.findByLabelText("Add quest")).toHaveAttribute("data-tour", "add-quest-launcher");
+    expect(mocks.draggableFabRenderCount).toBe(0);
   });
 
-  it("builds the FAB Plan Today intent from the visible journeys context", async () => {
+  it("builds the desktop FAB Plan Today intent from the visible journeys context", async () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-05-12T12:00:00"));
     mocks.dailyTasks = [
@@ -1186,6 +1096,8 @@ describe("Journeys row drag integration", () => {
   });
 
   it("passes the selected journeys date into the companion planner modal", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-05-12T12:00:00"));
     mocks.isMacHostedIOSApp = true;
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
@@ -1702,7 +1614,7 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText("See what’s next and shape the day.")).toBeInTheDocument();
+    expect(screen.getByTestId("calendar-toolbar")).toBeInTheDocument();
     const row = await screen.findByTestId("timeline-row-task-1");
 
     act(() => {
@@ -1712,7 +1624,7 @@ describe("Journeys row drag integration", () => {
     });
 
     expect(mocks.updateTask).not.toHaveBeenCalled();
-    expect(screen.getByText("See what’s next and shape the day.")).toBeInTheDocument();
+    expect(screen.getByTestId("calendar-toolbar")).toBeInTheDocument();
   });
 
   it("does not reschedule a quest from a sub-threshold timeline row wiggle on /journeys", async () => {
@@ -1960,7 +1872,7 @@ describe("Journeys row drag integration", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("See what’s next and shape the day.")).toBeInTheDocument();
+      expect(screen.getByTestId("calendar-toolbar")).toBeInTheDocument();
     });
 
     expect(mocks.surfaceAllEpicHabits).not.toHaveBeenCalled();
@@ -2027,774 +1939,85 @@ describe("Journeys row drag integration", () => {
     });
   });
 
-  it("resets stale selected date when returning to the journeys route", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
 
-    const RouteHarness = () => {
-      const navigate = useNavigate();
-      const location = useLocation();
-
-      return (
-        <>
-          <div data-testid="route-path">{location.pathname}</div>
-          <button type="button" onClick={() => navigate("/inbox")}>
-            go-inbox
-          </button>
-          <button type="button" onClick={() => navigate("/journeys")}>
-            go-journeys
-          </button>
-          <Journeys />
-        </>
-      );
-    };
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <RouteHarness />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("route-path").textContent).toBe("/journeys");
-      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
-    });
-
-    const initialSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-    const initialSelectedDate = new Date(initialSelectedDateIso);
-    expect(isSameDay(initialSelectedDate, new Date())).toBe(true);
-
-    fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
-
-    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-    let staleSelectedDate = new Date(staleSelectedDateIso);
-    await waitFor(() => {
-      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      staleSelectedDate = new Date(staleSelectedDateIso);
-      expect(staleSelectedDate.getTime()).not.toBe(initialSelectedDate.getTime());
-      expect(isSameDay(staleSelectedDate, new Date())).toBe(false);
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "go-inbox" }));
-    await waitFor(() => {
-      expect(screen.getByTestId("route-path").textContent).toBe("/inbox");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "go-journeys" }));
-    await waitFor(() => {
-      expect(screen.getByTestId("route-path").textContent).toBe("/journeys");
-    });
-
-    await waitFor(() => {
-      const reenteredDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      const reenteredDate = new Date(reenteredDateIso);
-      expect(reenteredDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(reenteredDate, new Date())).toBe(true);
-    });
-  });
-
-  it("navigates to campaigns from the journeys campaign section label", async () => {
-    mocks.dailyTasks = [
-      {
-        id: "ritual-1",
-        task_text: "Daily campaign ritual",
-        completed: false,
-        xp_reward: 12,
-        task_date: "2026-02-13",
-        scheduled_time: "08:00",
-        difficulty: "medium",
-        is_main_quest: false,
-        habit_source_id: "habit-1",
-        epic_id: "epic-1",
-        epic_title: "Active Campaign",
-      },
-    ];
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    const RouteHarness = () => {
-      const location = useLocation();
-
-      return (
-        <>
-          <div data-testid="route-path">{location.pathname}</div>
-          <Journeys />
-        </>
-      );
-    };
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <RouteHarness />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("route-path").textContent).toBe("/journeys");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Open campaigns page" }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("route-path").textContent).toBe("/campaigns");
-    });
-  });
-
-  it("requests date-pill recentering on journeys route re-entry when the selected date is already today", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    const RouteHarness = () => {
-      const navigate = useNavigate();
-      const location = useLocation();
-
-      return (
-        <>
-          <div data-testid="route-path">{location.pathname}</div>
-          <button type="button" onClick={() => navigate("/inbox")}>
-            go-inbox
-          </button>
-          <button type="button" onClick={() => navigate("/journeys")}>
-            go-journeys
-          </button>
-          <Journeys />
-        </>
-      );
-    };
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <RouteHarness />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("route-path").textContent).toBe("/journeys");
-      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "set-same-day-non-current" }));
-
-    let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-    await waitFor(() => {
-      sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
-    });
-    const centerKeyBeforeReentry = Number(screen.getByTestId("center-request-key").textContent);
-    elementScrollToSpy.mockClear();
-
-    fireEvent.click(screen.getByRole("button", { name: "go-inbox" }));
-    await waitFor(() => {
-      expect(screen.getByTestId("route-path").textContent).toBe("/inbox");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "go-journeys" }));
-    await waitFor(() => {
-      expect(screen.getByTestId("route-path").textContent).toBe("/journeys");
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
-      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeReentry);
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
-      expect(elementScrollToSpy).toHaveBeenCalled();
-    });
-  });
-
-  it("resets stale selected date when the active quests tab requests today", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
-
-    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-    await waitFor(() => {
-      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
-    });
-    const centerKeyBeforeResetRequest = Number(screen.getByTestId("center-request-key").textContent);
-    const scrollerMountIdBeforeResetRequest = screen.getByTestId("date-pills-mount-id").textContent;
-
-    act(() => {
-      window.dispatchEvent(new Event(JOURNEYS_RESET_TO_TODAY_EVENT));
-    });
-
-    await waitFor(() => {
-      const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
-      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
-      expect(screen.getByTestId("reset-range-on-center-request")).toHaveTextContent("true");
-      expect(screen.getByTestId("date-pills-mount-id").textContent).toBe(scrollerMountIdBeforeResetRequest);
-      expect(screen.getByTestId("journeys-mobile-date-strip")).not.toHaveStyle({ opacity: "0" });
-    });
-  });
-
-  it("resets to the effective mission date before the 2 AM day boundary", async () => {
+  // These tests use the real compact toolbar. The removed date-pill mock and
+  // internal centering counters did not exercise the current calendar controls.
+  const selectedDayLabel = () => document.querySelector('[data-testid="journeys-mobile-date-strip"] button[aria-pressed="true"]')?.getAttribute("aria-label");
+  const CalendarHarness = () => {
+    const navigate = useNavigate();
+    const location = useLocation();
+    return <><button onClick={() => navigate("/mentor")}>leave-calendar</button>
+      <button onClick={() => navigate("/journeys")}>return-calendar</button>
+      <button onClick={() => navigate("/journeys?section=calendar")}>calendar-query</button>
+      <span data-testid="calendar-route">{location.pathname}</span><Journeys /></>;
+  };
+  const renderCalendar = (date = "2026-05-12T12:00:00") => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.setSystemTime(new Date("2026-05-12T08:30:00.000Z"));
-    mocks.profileTimezone = "America/Los_Angeles";
+    vi.setSystemTime(new Date(date));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const renderTree = () => <QueryClientProvider client={client}><MemoryRouter initialEntries={["/journeys"]}><CalendarHarness /></MemoryRouter></QueryClientProvider>;
+    return { ...render(renderTree()), renderTree };
+  };
+  const choosePreviousWeek = () => fireEvent.click(screen.getByRole("button", { name: "Previous week" }));
+  const expectToday = () => expect(selectedDayLabel()).toBe("Tuesday, May 12, 2026");
 
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toContain("2026-05-11");
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent("2026-05-11");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
-
-    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-    await waitFor(() => {
-      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(staleSelectedDateIso).not.toContain("2026-05-11");
-    });
-
-    act(() => {
-      window.dispatchEvent(new Event(JOURNEYS_RESET_TO_TODAY_EVENT));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toContain("2026-05-11");
-      expect(screen.getByTestId("selected-date-iso").textContent).not.toBe(staleSelectedDateIso);
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent("2026-05-11");
-    });
+  it("keeps mobile calendar free of campaign sections and floating companion controls", () => {
+    renderCalendar();
+    expect(screen.queryByRole("button", { name: "Open campaigns page" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("draggable-fab")).not.toBeInTheDocument();
+    expect(screen.queryByText("No tasks for this day")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Calendar view" })).toBeInTheDocument();
   });
-
-  it("requests date-pill recentering when the active quests tab requests today and the selected date is already today", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "set-same-day-non-current" }));
-
-    let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-    await waitFor(() => {
-      sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
-    });
-    const centerKeyBeforeResetRequest = Number(screen.getByTestId("center-request-key").textContent);
-    elementScrollToSpy.mockClear();
-
-    act(() => {
-      window.dispatchEvent(new Event(JOURNEYS_RESET_TO_TODAY_EVENT));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
-      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
-      expect(screen.getByTestId("reset-range-on-center-request")).toHaveTextContent("true");
-      expect(elementScrollToSpy).toHaveBeenCalled();
-    });
+  it("navigates weeks and returns to today from the compact toolbar", async () => {
+    renderCalendar(); expectToday(); choosePreviousWeek();
+    expect(selectedDayLabel()).toBe("Tuesday, May 5, 2026");
+    fireEvent.click(screen.getByRole("button", { name: "Today" }));
+    await waitFor(expectToday);
   });
-
-  it("snaps back to today after completing a task when the date has not been manually adjusted", async () => {
-    mocks.toggleTask.mockImplementation((
-      payload: { taskId: string; completed: boolean },
-      options?: { onSuccess?: (result: { completed: boolean; contact: null; autoLogInteraction: boolean }) => void },
-    ) => {
-      options?.onSuccess?.({
-        completed: payload.completed,
-        contact: null,
-        autoLogInteraction: false,
-      });
-    });
-
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
-
-    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-    await waitFor(() => {
-      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
-    });
-    const centerKeyBeforeTaskCompletion = Number(screen.getByTestId("center-request-key").textContent);
-
-    const completeCheckbox = (await screen.findAllByRole("checkbox", { name: /mark task as complete/i }))[0];
-    fireEvent.click(completeCheckbox);
-
-    await waitFor(() => {
-      expect(mocks.toggleTask).toHaveBeenCalledWith(
-        expect.objectContaining({ taskId: "task-1", completed: true }),
-        expect.any(Object),
-      );
-      const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
-      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeTaskCompletion);
-    });
+  it("resets stale selection when returning to the calendar route", async () => {
+    renderCalendar(); choosePreviousWeek();
+    fireEvent.click(screen.getByRole("button", { name: "leave-calendar" }));
+    fireEvent.click(screen.getByRole("button", { name: "return-calendar" }));
+    await waitFor(expectToday);
   });
-
-  it("does not snap back after completing a task when the user manually adjusted the date pills", async () => {
-    mocks.toggleTask.mockImplementation((
-      payload: { taskId: string; completed: boolean },
-      options?: { onSuccess?: (result: { completed: boolean; contact: null; autoLogInteraction: boolean }) => void },
-    ) => {
-      options?.onSuccess?.({
-        completed: payload.completed,
-        contact: null,
-        autoLogInteraction: false,
-      });
-    });
-
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "user-set-stale-day" }));
-
-    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-    await waitFor(() => {
-      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
-    });
-    const centerKeyBeforeTaskCompletion = Number(screen.getByTestId("center-request-key").textContent);
-
-    const completeCheckbox = (await screen.findAllByRole("checkbox", { name: /mark task as complete/i }))[0];
-    fireEvent.click(completeCheckbox);
-
-    await waitFor(() => {
-      expect(mocks.toggleTask).toHaveBeenCalledWith(
-        expect.objectContaining({ taskId: "task-1", completed: true }),
-        expect.any(Object),
-      );
-    });
-
-    expect(screen.getByTestId("selected-date-iso").textContent).toBe(staleSelectedDateIso);
-    expect(Number(screen.getByTestId("center-request-key").textContent)).toBe(centerKeyBeforeTaskCompletion);
+  it("honors reset-to-today events without remounting the date strip", async () => {
+    renderCalendar(); const strip = screen.getByTestId("journeys-mobile-date-strip"); choosePreviousWeek();
+    act(() => window.dispatchEvent(new Event(JOURNEYS_RESET_TO_TODAY_EVENT)));
+    await waitFor(expectToday);
+    expect(screen.getByTestId("journeys-mobile-date-strip")).toBe(strip);
   });
-
-  it("resets stale selected date on journeys query page changes", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    const RouteHarness = () => {
-      const navigate = useNavigate();
-      const location = useLocation();
-
-      return (
-        <>
-          <div data-testid="route-path">{location.pathname}</div>
-          <div data-testid="route-search">{location.search}</div>
-          <button type="button" onClick={() => navigate("/journeys?section=inbox")}>
-            go-inbox-section
-          </button>
-          <Journeys />
-        </>
-      );
-    };
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <RouteHarness />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("route-path").textContent).toBe("/journeys");
-      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
-
-    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-    await waitFor(() => {
-      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "go-inbox-section" }));
-    await waitFor(() => {
-      expect(screen.getByTestId("route-search").textContent).toBe("?section=inbox");
-    });
-
-    await waitFor(() => {
-      const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
-    });
+  it("resets stale selection on foreground visibility and window focus", async () => {
+    renderCalendar(); choosePreviousWeek();
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    await waitFor(expectToday);
+    choosePreviousWeek(); act(() => window.dispatchEvent(new Event("focus")));
+    await waitFor(expectToday);
   });
-
-  it("defers a page-change reset while the add quest sheet is open and applies it when closed", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    const RouteHarness = () => {
-      const navigate = useNavigate();
-      const location = useLocation();
-
-      return (
-        <>
-          <div data-testid="route-path">{location.pathname}</div>
-          <div data-testid="route-search">{location.search}</div>
-          <button type="button" onClick={() => navigate("/journeys?section=inbox")}>
-            go-inbox-section
-          </button>
-          <Journeys />
-        </>
-      );
-    };
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <RouteHarness />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
-      expect(mocks.lastAddQuestSheetProps?.onOpenChange).toBeTypeOf("function");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
-
-    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-    await waitFor(() => {
-      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
-    });
-
-    act(() => {
-      mocks.lastAddQuestSheetProps?.onOpenChange?.(true);
-    });
-    await waitFor(() => {
-      expect(mocks.lastAddQuestSheetProps?.open).toBe(true);
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "go-inbox-section" }));
-    await waitFor(() => {
-      expect(screen.getByTestId("route-search").textContent).toBe("?section=inbox");
-    });
-
-    expect(screen.getByTestId("selected-date-iso").textContent).toBe(staleSelectedDateIso);
-
-    act(() => {
-      mocks.lastAddQuestSheetProps?.onOpenChange?.(false);
-    });
-
-    await waitFor(() => {
-      const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
-    });
+  it("resets the calendar when its tab becomes active again", async () => {
+    const view = renderCalendar(); choosePreviousWeek();
+    mocks.isTabActive = false; view.rerender(view.renderTree());
+    mocks.isTabActive = true; view.rerender(view.renderTree());
+    await waitFor(expectToday);
   });
-
-  it("resets stale selected date when quests tab becomes active again", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    const { rerender } = render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
-
-    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-    let staleSelectedDate = new Date(staleSelectedDateIso);
-    await waitFor(() => {
-      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      staleSelectedDate = new Date(staleSelectedDateIso);
-      expect(isSameDay(staleSelectedDate, new Date())).toBe(false);
-    });
-
-    mocks.isTabActive = false;
-    rerender(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    mocks.isTabActive = true;
-    rerender(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      const activeDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      const activeDate = new Date(activeDateIso);
-      expect(activeDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(activeDate, new Date())).toBe(true);
-    });
+  it("preserves manual day selection when completing a quest", async () => {
+    mocks.toggleTask.mockImplementation((payload, options) => options?.onSuccess?.({ completed: payload.completed, contact: null, autoLogInteraction: false }));
+    renderCalendar(); choosePreviousWeek();
+    fireEvent.click((await screen.findAllByRole("checkbox", { name: /mark task as complete/i }))[0]);
+    await waitFor(() => expect(mocks.toggleTask).toHaveBeenCalled());
+    expect(selectedDayLabel()).toBe("Tuesday, May 5, 2026");
   });
-
-  it("resets stale selected date on app foreground visibility sync", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
-
-    await waitFor(() => {
-      const staleDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
-      expect(isSameDay(staleDate, new Date())).toBe(false);
-    });
-
-    act(() => {
-      document.dispatchEvent(new Event("visibilitychange"));
-    });
-
-    await waitFor(() => {
-      const refreshedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
-      expect(isSameDay(refreshedDate, new Date())).toBe(true);
-    });
+  it("defers query-navigation date resets while a quest sheet is open", async () => {
+    renderCalendar(); choosePreviousWeek();
+    fireEvent.click(screen.getByRole("button", { name: "Add quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "calendar-query" }));
+    expect(selectedDayLabel()).toBe("Tuesday, May 5, 2026");
+    act(() => mocks.lastAddQuestSheetProps?.onOpenChange?.(false));
+    await waitFor(expectToday);
   });
-
-  it("resets a manually selected stale date on app window focus sync", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "user-set-stale-day" }));
-
-    await waitFor(() => {
-      const staleDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
-      expect(isSameDay(staleDate, new Date())).toBe(false);
-    });
-
-    act(() => {
-      window.dispatchEvent(new Event("focus"));
-    });
-
-    await waitFor(() => {
-      const refreshedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
-      expect(isSameDay(refreshedDate, new Date())).toBe(true);
-    });
-  });
-
-  it("requests date-pill recentering on app window focus when the selected date is already today", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
-      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(0);
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "set-same-day-non-current" }));
-
-    let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-    await waitFor(() => {
-      sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
-    });
-    const centerKeyBeforeFocus = Number(screen.getByTestId("center-request-key").textContent);
-
-    act(() => {
-      window.dispatchEvent(new Event("focus"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
-      expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeFocus);
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
-    });
-  });
-
-  it("resets future selected date on app foreground visibility sync", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "set-future-day" }));
-
-    await waitFor(() => {
-      const futureDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      const futureDate = new Date(futureDateIso);
-      expect(futureDate.getTime()).toBeGreaterThan(Date.now());
-      expect(isSameDay(futureDate, new Date())).toBe(false);
-    });
-
-    act(() => {
-      document.dispatchEvent(new Event("visibilitychange"));
-    });
-
-    await waitFor(() => {
-      const refreshedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
-      expect(isSameDay(refreshedDate, new Date())).toBe(true);
-    });
+  it("uses the previous mission date before the 2 AM boundary", async () => {
+    renderCalendar("2026-05-12T01:30:00");
+    act(() => window.dispatchEvent(new Event("focus")));
+    await waitFor(() => expect(selectedDayLabel()).toBe("Monday, May 11, 2026"));
   });
 });

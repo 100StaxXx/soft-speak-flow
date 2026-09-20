@@ -34,7 +34,7 @@ Deno.test("user-owned media writers register uploaded assets in the ledger", asy
   const files = [
     "./generate-companion-image/index.ts",
     "./generate-companion-launcher-image/index.ts",
-    "./generate-companion-evolution/index.ts",
+    "../production-baseline/20260920-companion/supabase/functions/generate-companion-evolution/index.ts",
     "./generate-cosmic-postcard/index.ts",
     "./generate-journey-path/index.ts",
     "./process-companion-animation-job/index.ts",
@@ -113,7 +113,7 @@ Deno.test("companion image bootstrap cleans up hidden stage-one assets and recor
 
 Deno.test("legacy nonconforming storage writers now prefix uploads with the user id", async () => {
   const companionEvolutionSource = await Deno.readTextFile(
-    new URL("./generate-companion-evolution/index.ts", import.meta.url),
+    new URL("../production-baseline/20260920-companion/supabase/functions/generate-companion-evolution/index.ts", import.meta.url),
   );
   const compactCompanionEvolutionSource = companionEvolutionSource.replace(
     /\s+/g,

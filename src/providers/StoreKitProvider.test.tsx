@@ -86,6 +86,7 @@ vi.mock("@revenuecat/purchases-capacitor", () => ({
 }));
 
 vi.mock("@revenuecat/purchases-capacitor-ui", () => ({
+  PAYWALL_RESULT: { NOT_PRESENTED: "NOT_PRESENTED" },
   RevenueCatUI: {
     presentCustomerCenter: vi.fn(),
     presentPaywall: vi.fn(),
@@ -339,8 +340,8 @@ describe("StoreKitProvider", () => {
 
   it("uses the live RevenueCat entitlement key for hosted paywall eligibility", async () => {
     vi.useRealTimers();
-    const { RevenueCatUI } = await import("@revenuecat/purchases-capacitor-ui");
-    vi.mocked(RevenueCatUI.presentPaywallIfNeeded).mockResolvedValue({ result: "NOT_PRESENTED" });
+    const { RevenueCatUI, PAYWALL_RESULT } = await import("@revenuecat/purchases-capacitor-ui");
+    vi.mocked(RevenueCatUI.presentPaywallIfNeeded).mockResolvedValue({ result: PAYWALL_RESULT.NOT_PRESENTED });
 
     render(
       <StoreKitProvider>

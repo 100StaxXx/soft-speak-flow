@@ -98,7 +98,6 @@ function WellbeingSelection({ companionId, currentStage, sourceImageUrl, isVisib
     timer = setTimeout(poll, 8000);
     return () => { cancelled = true; clearTimeout(timer); };
     // Selection and appearance define the request; polling does not automatically play a result.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, pending, isVisible, companionId, currentStage, sourceImageUrl, pollAttempt]);
 
   if (!signedIn || currentStage < 1) return null;

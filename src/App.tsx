@@ -307,9 +307,9 @@ const AppContent = memo(() => {
       if (!detail) return;
 
       if (detail.queueId) {
-        void supabase.rpc("mark_push_notification_opened", {
+        void Promise.resolve(supabase.rpc("mark_push_notification_opened", {
           p_queue_id: detail.queueId,
-        }).then(({ error }) => {
+        })).then(({ error }) => {
           if (error) {
             logger.warn("Failed to mark native push notification opened", { error: error.message });
           }
@@ -561,7 +561,7 @@ const App = () => {
                     <Sonner />
                     <InstallPWA />
                     <UpdateAvailablePrompt />
-                    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <BrowserRouter>
                       <DeepLinkProvider>
                         <ScrollToTop />
                         <AppContent />

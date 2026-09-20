@@ -30,7 +30,7 @@ for (const [directory, tests] of [...testsByDirectory.entries()].sort(([a], [b])
   console.log(`[functions:test] ${path.relative(process.cwd(), directory)} (${tests.length} file${tests.length === 1 ? "" : "s"})`);
   const result = spawnSync(
     "deno",
-    ["test", "--allow-all", ...tests],
+    ["test", "--allow-all", "--sloppy-imports", ...tests],
     { stdio: "inherit", env: { ...process.env } },
   );
 

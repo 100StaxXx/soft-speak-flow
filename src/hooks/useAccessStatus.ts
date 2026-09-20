@@ -132,9 +132,6 @@ export function useAccessStatus(): AccessStatus {
   } else if (accessState.has_access) {
     accessSource = accessState.access_source === 'trial' ? 'trial' : 'subscription';
     hasAccess = true;
-  } else if (trialExpired) {
-    hasAccess = false;
-    gateReason = 'trial_expired';
   }
 
   return {

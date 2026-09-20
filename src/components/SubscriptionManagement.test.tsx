@@ -72,7 +72,7 @@ describe("SubscriptionManagement", () => {
 
     expect(screen.getByText("Unlock unlimited companion chat, quests, and offline access")).toBeInTheDocument();
     expect(screen.getByText("Unlimited companion chat")).toBeInTheDocument();
-    expect(screen.getByText("100+ levels and 12+ evolutions")).toBeInTheDocument();
+    expect(screen.getByText("100 levels and 7 companion forms")).toBeInTheDocument();
     expect(screen.getByText("Unlimited Quests & Epics")).toBeInTheDocument();
     expect(screen.getByText("Offline access to downloaded content")).toBeInTheDocument();
     expect(

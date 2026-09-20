@@ -317,7 +317,7 @@ describe("Paywall creator offer-code eligibility", () => {
     expect(screen.getByRole("button", { name: /start 14-day free trial/i })).toBeInTheDocument();
     expect(screen.getByText("Unlimited companion chat")).toBeInTheDocument();
     expect(screen.getByText("Unlimited quests and campaigns")).toBeInTheDocument();
-    expect(screen.getByText("100+ levels and 12+ evolutions")).toBeInTheDocument();
+    expect(screen.getByText("100 levels and 7 companion forms")).toBeInTheDocument();
     expect(
       screen.getByText("Both monthly and yearly plans include the same Cosmiq features and renew automatically until canceled."),
     ).toBeInTheDocument();

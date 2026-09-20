@@ -9,13 +9,16 @@ on:
   workflow_dispatch:
 
 env:
-  VITE_SUPABASE_URL: https://ci-build.supabase.co
+  # Public product identity stays pinned even in CI. Keys below are inert test
+  # values: these asset-check builds are never signed, uploaded, or distributed.
+  VITE_SUPABASE_URL: https://opbfpbbqvuksuvmtmssd.supabase.co
+  VITE_EXPECTED_SUPABASE_PROJECT_REF: opbfpbbqvuksuvmtmssd
   VITE_SUPABASE_PUBLISHABLE_KEY: ci-public-key
   VITE_GOOGLE_WEB_CLIENT_ID: ci-web-client-id
   VITE_GOOGLE_IOS_CLIENT_ID: ci-ios-client-id
   VITE_GOOGLE_MAPS_API_KEY: ci-maps-key
-  VITE_NATIVE_REDIRECT_BASE: https://ci-build.example.org
-  VITE_REVENUECAT_IOS_API_KEY: ci-revenuecat-key
+  VITE_NATIVE_REDIRECT_BASE: https://app.cosmiq.quest
+  VITE_REVENUECAT_IOS_API_KEY: appl_CIassetchecknotarealkey
 
 jobs:
   frontend:
@@ -24,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
       - uses: denoland/setup-deno@v2
         with:
@@ -50,7 +53,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
       - run: npm ci
       - run: npm run ios:sync:testflight

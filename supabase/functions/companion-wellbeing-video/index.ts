@@ -10,6 +10,8 @@ import {
 } from "../_shared/falKlingVideoClient.ts";
 import { buildWellbeingVideoPrompt, isWellbeingCategory, WELLBEING_PROMPT_VERSION, WELLBEING_VIDEO_SECONDS } from "../../../src/shared/companionWellbeing.ts";
 import { getCurrentVisualStageBoundaryLevel } from "../../../src/config/progression.ts";
+import { fetchAccountEntitlementForUser, isAccountEntitlementActive } from "../_shared/accountEntitlements.ts";
+import { fetchSubscriptionForUser, buildSubscriptionResponse, fetchActivePromoAccessForUser, buildPromoSubscriptionResponse } from "../_shared/appleSubscriptions.ts";
 
 const TABLE = "cosmiq_wellbeing_videos";
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-internal-key" };
@@ -25,9 +27,33 @@ export function trustedSourceImage(value: unknown, supabaseUrl: string): value i
   try {
     const image = new URL(value);
     return image.protocol === "https:" && image.origin === new URL(supabaseUrl).origin
-      && /^\/storage\/v1\/object\/public\/(companion-images|companion-presets)\/.+/.test(image.pathname)
+      && /^\/storage\/v1\/object\/public\/(companion-images|companion-presets|evolution-cards)\/.+/.test(image.pathname)
+      && !image.username && !image.password
       && !image.search && !image.hash;
   } catch { return false; }
+}
+
+// Only bundled companion presets may resolve outside project storage. Never accept
+// a caller-supplied host, traversal, query string, or arbitrary relative path.
+export function resolveWellbeingSourceImage(value: unknown, supabaseUrl: string): string | null {
+  if (trustedSourceImage(value, supabaseUrl)) return value;
+  if (typeof value !== "string" || !/^\/?companion-presets\/[a-z0-9_-]+\/t[1-7]_[a-z0-9_-]+\/[a-z0-9_-]+\/[a-z0-9_-]+\.(png|webp)$/.test(value)) return null;
+  const path = value.replace(/^\//, "");
+  return path.split("/")[2] === "t1_youth"
+    ? `https://app.cosmiq.quest/${path}`
+    : `${new URL(supabaseUrl).origin}/storage/v1/object/public/${path}`;
+}
+
+export async function hasWellbeingVideoAccess(db: any, userId: string) {
+  const entitlement = await fetchAccountEntitlementForUser(db, userId);
+  // App-managed trials are real access, as are verified StoreKit trials/subscriptions.
+  if (isAccountEntitlementActive(entitlement)) return true;
+  if (entitlement?.source !== "subscription") {
+    const subscription = await fetchSubscriptionForUser(db, userId);
+    if (buildSubscriptionResponse(subscription).has_access) return true;
+  }
+  const promo = await fetchActivePromoAccessForUser(db, userId);
+  return Boolean(promo?.granted_until && buildPromoSubscriptionResponse(promo.granted_until).has_access);
 }
 
 export async function imageKey(url: string) {
@@ -49,6 +75,7 @@ const publicClip = (job: any) => {
 export const deps = {
   authenticate: requireUserOrInternalRequest, database: dbClient,
   product: resolveUserProductMode, env: (name: string) => Deno.env.get(name),
+  access: hasWellbeingVideoAccess,
   now: () => Date.now(), fetch: fetch,
   submit: submitFalKlingVideo, status: getFalKlingQueueStatus, result: getFalKlingQueueResult,
   download: downloadFalVideo, ledger: registerUserStorageAsset, guardrails: createCostGuardrailSession,
@@ -83,12 +110,15 @@ async function processOne(db: any, d: Dependencies) {
     if (!apiKey) { await finish({ status: "failed", error_code: "video_unavailable" }); return; }
     const fetchFn: typeof fetch = (input, init) => d.fetch(input, { ...init, signal: AbortSignal.timeout(40_000) });
     if (!job.provider_task_id) {
+      if (!await d.access(db, job.user_id)) {
+        await finish({ status: "failed", error_code: "access_required" }); return;
+      }
       const { data: companion, error } = await db.from("user_companion").select("current_stage,current_image_url,product_mode")
         .eq("id", job.companion_id).eq("user_id", job.user_id).maybeSingle();
       if (error) throw error;
       if (!companion || companion.product_mode === "graceward"
         || getCurrentVisualStageBoundaryLevel(companion.current_stage) !== job.stage
-        || companion.current_image_url !== job.source_image_url) {
+        || resolveWellbeingSourceImage(companion.current_image_url, d.env("SUPABASE_URL")!) !== job.source_image_url) {
         await finish({ status: "failed", error_code: "appearance_changed" }); return;
       }
       const guard = d.guardrails({ supabase: db, userId: job.user_id, endpointKey: "companion-wellbeing-video", featureKey: "cosmiq_wellbeing_video" });
@@ -149,9 +179,10 @@ export async function handleWellbeingVideo(req: Request, d: Dependencies = deps)
     if (!companion) return reply(404, { error: "Companion not found" });
     if (companion.product_mode === "graceward") return reply(403, { error: "This feature belongs to Cosmiq." });
     const stage = getCurrentVisualStageBoundaryLevel(companion.current_stage);
-    if (!stage || stage !== body.stage || companion.current_image_url !== body.sourceImageUrl) return reply(409, { error: "Your companion changed. Reopen this selection." });
-    if (!trustedSourceImage(companion.current_image_url, d.env("SUPABASE_URL")!)) return reply(409, { error: "Your companion portrait is not ready for video yet." });
-    const sourceKey = await imageKey(companion.current_image_url);
+    const sourceImage = resolveWellbeingSourceImage(companion.current_image_url, d.env("SUPABASE_URL")!);
+    if (!stage || stage !== body.stage || sourceImage !== resolveWellbeingSourceImage(body.sourceImageUrl, d.env("SUPABASE_URL")!)) return reply(409, { error: "Your companion changed. Reopen this selection." });
+    if (!sourceImage) return reply(409, { error: "Your companion portrait is not ready for video yet." });
+    const sourceKey = await imageKey(sourceImage);
     const lookup = () => db.from(TABLE).select(STATUS_COLUMNS).eq("user_id", auth.userId).eq("companion_id", companion.id)
       .eq("stage", stage).eq("category", body.category).eq("source_key", sourceKey).eq("prompt_version", WELLBEING_PROMPT_VERSION).maybeSingle();
     const existing = await lookup();
@@ -159,6 +190,7 @@ export async function handleWellbeingVideo(req: Request, d: Dependencies = deps)
     if (existing.data) {
       const mode = retryMode(existing.data);
       if (body.action === "retry" && mode) {
+        if (!await d.access(db, auth.userId)) return reply(403, { error: "An active trial or subscription is required to prepare animations." });
         // Compare-and-swap makes concurrent retry taps a single retry. Poll timeouts
         // retain their provider id; only definitively failed/unsubmitted work can resubmit.
         const { error } = await db.from(TABLE).update({ status: mode, retry_count: 1, error_code: null,
@@ -174,13 +206,14 @@ export async function handleWellbeingVideo(req: Request, d: Dependencies = deps)
     }
     if (body.action === "status") return reply(200, { clip: null });
     if (body.action !== "prepare") return reply(400, { error: "Invalid action" });
+    if (!await d.access(db, auth.userId)) return reply(403, { error: "An active trial or subscription is required to prepare animations." });
     if (!(d.env("FAL_KEY") || d.env("FAL_API_KEY"))) return reply(503, { error: "Animations are temporarily unavailable. Your activities still work." });
     const { count, error: countError } = await db.from(TABLE).select("id", { count: "exact", head: true }).eq("user_id", auth.userId)
       .gte("created_at", new Date(d.now() - 86400_000).toISOString());
     if (countError) throw countError;
     if ((count ?? 0) >= 6) return reply(429, { error: "Your next animations can be prepared tomorrow. Saved clips still play." });
     const { error: insertError } = await db.from(TABLE).upsert({ user_id: auth.userId, companion_id: companion.id,
-      stage, category: body.category, source_image_url: companion.current_image_url, source_key: sourceKey,
+      stage, category: body.category, source_image_url: sourceImage, source_key: sourceKey,
       prompt_version: WELLBEING_PROMPT_VERSION, provider_model: DEFAULT_FAL_KLING_MODEL,
       prompt: buildWellbeingVideoPrompt(stage, body.category, companion.core_element ?? ""),
     }, { onConflict: "companion_id,stage,category,source_key,prompt_version", ignoreDuplicates: true });

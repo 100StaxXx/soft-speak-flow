@@ -21,7 +21,7 @@ const { passthroughProvider, isMainTabPathMock, authMock, profileMock, storageMo
     loading: false,
   },
   storageMock: {
-    getItem: vi.fn(() => null as string | null),
+    getItem: vi.fn((_key: string) => null as string | null),
     setItem: vi.fn(),
     removeItem: vi.fn(),
     clear: vi.fn(),
@@ -232,7 +232,7 @@ vi.mock("@/utils/profileOnboarding", () => ({
 
 vi.mock("@/utils/storage", () => ({
   safeLocalStorage: {
-    getItem: (...args: unknown[]) => storageMock.getItem(...args),
+    getItem: (key: string) => storageMock.getItem(key),
     setItem: (...args: unknown[]) => storageMock.setItem(...args),
     removeItem: (...args: unknown[]) => storageMock.removeItem(...args),
     clear: (...args: unknown[]) => storageMock.clear(...args),

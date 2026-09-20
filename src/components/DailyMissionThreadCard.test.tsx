@@ -52,6 +52,13 @@ vi.mock("@/contexts/TalkPopupContext", () => ({
 }));
 
 const task = {
+  reminder_sent: null,
+  parent_template_id: null,
+  is_bonus: null,
+  is_top_three: null,
+  ai_generated: null,
+  context_id: null,
+  auto_log_interaction: null,
   id: "11111111-1111-4111-8111-111111111111",
   user_id: "user-1",
   task_text: "Send the final launch notes",

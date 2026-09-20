@@ -34,6 +34,7 @@ function createMockSupabase(
   return {
     calls,
     upserts,
+    auth: { admin: { getUserById: async () => ({ data: { user: { app_metadata: { auth_product_mode: "cosmiq" } } }, error: null }) } },
     from(table: string) {
       const operations: Array<[string, ...unknown[]]> = [];
 

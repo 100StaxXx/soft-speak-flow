@@ -549,11 +549,11 @@ const Journeys = () => {
     user?.id,
   ]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     showAddSheetRef.current = showAddSheet;
   }, [showAddSheet]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     showPathfinderRef.current = showPathfinder;
   }, [showPathfinder]);
 

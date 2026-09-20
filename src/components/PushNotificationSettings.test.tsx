@@ -163,6 +163,7 @@ describe("PushNotificationSettings debug panel", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.hasActiveNativePushSubscription.mockResolvedValue(true);
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-03-31T20:00:00.000Z").getTime());
     mocks.profile = { ...mocks.defaultProfile };
 

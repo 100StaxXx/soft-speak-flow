@@ -123,7 +123,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     props.requireScheduledTimeForRecurrence && !hasScheduledTimeValue(props.scheduledTime),
   );
 
-  const reminderPresetValues = useMemo(
+  const reminderPresetValues = useMemo<number[]>(
     () => QUEST_REMINDER_PRESET_OPTIONS.map((option) => option.value),
     [],
   );
