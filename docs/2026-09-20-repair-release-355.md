@@ -71,4 +71,8 @@ Deleted the three explicitly approved regenerable caches for device smoke testin
 
 ## TestFlight availability
 
-Upload succeeded; Apple processing and tester availability are being verified separately.
+Upload succeeded; Apple processed build 355 and automatically attached the existing internal Test Group 1 (two testers). No external beta review or App Store review submission was made.
+
+## Clean-install follow-up
+
+The first remote CI run exposed an orphaned patch for the removed `@capgo/native-purchases` package. Local incremental installs had not surfaced this missing-package failure. Removed that obsolete patch; active purchases use RevenueCat and its existing native integration. This changes installation tooling only, not the uploaded app bundle. Remote CI is being rerun; local passing checks above are not a claim that remote checks have finished.
