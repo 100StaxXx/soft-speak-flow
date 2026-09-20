@@ -10,10 +10,10 @@ SELECT test_security.seed_fixtures();
 
 UPDATE public.user_companion
 SET
-  current_stage = 2,
-  current_xp = 30,
+  current_stage = 5,
+  current_xp = 100,
   core_element = 'fire',
-  current_image_url = 'https://example.com/security-user-a-invalid-stage2.png',
+  current_image_url = 'https://example.com/security-user-a-invalid-stage5.png',
   initial_image_url = 'https://example.com/security-user-a-egg.png',
   updated_at = NOW()
 WHERE id = '22000000-0000-0000-0000-000000000001';
@@ -45,9 +45,9 @@ VALUES
   ),
   (
     '22000000-0000-0000-0000-000000000001',
-    2,
-    'https://example.com/security-user-a-invalid-stage2.png',
-    29,
+    5,
+    'https://example.com/security-user-a-invalid-stage5.png',
+    99,
     NOW() - INTERVAL '1 minute'
   );
 
@@ -123,8 +123,8 @@ SELECT test_security.set_auth('authenticated', '10000000-0000-0000-0000-00000000
 
 SELECT is(
   public.get_highest_valid_claimed_companion_stage('22000000-0000-0000-0000-000000000001'::uuid),
-  2,
-  'highest valid claimed stage includes legitimate evolution rows at the threshold'
+  1,
+  'highest valid claimed stage ignores intermediate levels even when their XP threshold is met'
 );
 
 INSERT INTO public.companion_evolutions (
