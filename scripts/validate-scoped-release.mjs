@@ -5,6 +5,8 @@ import { pathToFileURL } from "node:url";
 const reviewedFunctions = new Set([
   "companion-wellbeing-video", "generate-companion-evolution",
   "process-companion-evolution-job", "generate-companion-stat-analysis",
+  // Live v22 and its dependency closure reconciled before release 359.
+  "process-companion-cinema-event",
 ]);
 
 export function validateScopedRelease(expected, live) {

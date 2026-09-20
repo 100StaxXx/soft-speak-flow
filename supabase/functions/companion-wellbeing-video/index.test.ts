@@ -4,6 +4,23 @@ const BASE = "https://testproject.supabase.co";
 const IMAGE = `${BASE}/storage/v1/object/public/companion-images/user-1/one.png`;
 const body = { action: "prepare", companionId: "companion-1", category: "mind", stage: 5, sourceImageUrl: IMAGE };
 
+Deno.test("runtime smoke check is service-only and never touches jobs or paid generation", async () => {
+  let verified = 0;
+  const d = { ...deps,
+    authenticateService: async () => new Response(null, { status: 403 }) as any,
+    database: () => { throw new Error("Must not access customer data"); },
+    verifySceneRuntime: async () => { verified++; return { habitats: 42, composedBytes: 20000 }; },
+  };
+  const request = () => new Request(`${BASE}/companion-wellbeing-video/runtime-check`, { method: "POST" });
+  assertEquals((await handleWellbeingVideo(request(), d)).status, 403);
+  assertEquals(verified, 0);
+  d.authenticateService = async () => ({ userId: "service_role" });
+  const success = await handleWellbeingVideo(request(), d);
+  assertEquals(await success.json(), { ok: true, habitats: 42, composedBytes: 20000 });
+  d.verifySceneRuntime = async () => { throw new Error("missing WASM"); };
+  assertEquals((await handleWellbeingVideo(request(), d)).status, 503);
+});
+
 function fixture() {
   const jobs: any[] = [];
   const companion: any = { id: "companion-1", user_id: "user-1", current_stage: 8, current_image_url: IMAGE, core_element: "storm", product_mode: "cosmiq" };

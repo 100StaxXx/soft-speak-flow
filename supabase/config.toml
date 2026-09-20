@@ -413,3 +413,7 @@ verify_jwt = false
 [functions.companion-wellbeing-video]
 verify_jwt = false
 static_files = ["./functions/companion-wellbeing-video/habitats/*.webp"]
+
+# Preserve live gateway behavior: this worker validates its internal secret itself.
+[functions.process-companion-cinema-event]
+verify_jwt = false

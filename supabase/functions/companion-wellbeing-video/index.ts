@@ -1,10 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { requireUserOrInternalRequest, jsonResponse } from "../_shared/auth.ts";
+import { requireUserOrInternalRequest, requireServiceRoleAuth, jsonResponse } from "../_shared/auth.ts";
 import { resolveUserProductMode } from "../_shared/notificationProduct.ts";
 import { createCostGuardrailSession, isCostGuardrailBlockedError } from "../_shared/costGuardrails.ts";
 import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
-import { prepareWellbeingScene } from "../_shared/companionWellbeingScene.ts";
+import { prepareWellbeingScene, verifyWellbeingSceneRuntime } from "../_shared/companionWellbeingScene.ts";
 import {
   submitFalKlingVideo, getFalKlingQueueStatus, getFalKlingQueueResult, downloadFalVideo,
   COMPANION_ANIMATION_VIDEO_BUCKET, DEFAULT_FAL_KLING_MODEL,
@@ -76,6 +76,7 @@ const publicClip = (job: any) => {
 
 export const deps = {
   authenticate: requireUserOrInternalRequest, database: dbClient,
+  authenticateService: requireServiceRoleAuth, verifySceneRuntime: verifyWellbeingSceneRuntime,
   product: resolveUserProductMode, env: (name: string) => Deno.env.get(name),
   access: hasWellbeingVideoAccess,
   scene: prepareWellbeingScene,
@@ -167,6 +168,12 @@ async function processOne(db: any, d: Dependencies) {
 export async function handleWellbeingVideo(req: Request, d: Dependencies = deps): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return reply(405, { error: "Method not allowed" });
+  if (new URL(req.url).pathname.endsWith("/runtime-check")) {
+    const serviceAuth = await d.authenticateService(req, cors);
+    if (serviceAuth instanceof Response) return serviceAuth;
+    try { return reply(200, { ok: true, ...await d.verifySceneRuntime() }); }
+    catch { return reply(503, { ok: false, code: "scene_runtime_unavailable" }); }
+  }
   const auth = await d.authenticate(req, cors);
   if (auth instanceof Response) return auth;
   try {

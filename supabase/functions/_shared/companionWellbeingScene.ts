@@ -1,7 +1,26 @@
 import {
   ImageMagick, initializeImageMagick, MagickFormat, Gravity, CompositeOperator, ResourceLimits,
 } from "npm:@imagemagick/magick-wasm@0.0.43";
-import { getCompanionHabitatPath } from "../../../src/shared/companionHabitat.ts";
+import { COMPANION_HABITATS, getCompanionHabitatPath } from "../../../src/shared/companionHabitat.ts";
+
+/** Deployment smoke check: bundled assets/WASM only; no user data, writes or paid calls. */
+export async function verifyWellbeingSceneRuntime() {
+  const paths = new Set<string>();
+  for (const element of Object.keys(COMPANION_HABITATS)) {
+    for (const stage of [1, 5, 13, 21, 36, 56, 81]) {
+      paths.add(getCompanionHabitatPath(element, stage)!);
+    }
+  }
+  let sample: Uint8Array | undefined;
+  for (const path of paths) {
+    const bytes = await Deno.readFile(new URL(`../companion-wellbeing-video/habitats/${path.split("/").pop()}`, import.meta.url));
+    if (!isRaster(bytes)) throw new Error("Invalid bundled habitat");
+    sample = bytes;
+  }
+  if (!sample) throw new Error("No bundled habitats");
+  const composed = await composeWellbeingScene(sample, sample);
+  return { habitats: paths.size, composedBytes: composed.length };
+}
 import { registerUserStorageAsset } from "./storageAssetLedger.ts";
 
 let initialization: Promise<void> | undefined;
