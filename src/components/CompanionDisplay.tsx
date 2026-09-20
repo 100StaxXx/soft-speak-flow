@@ -1,7 +1,7 @@
 import { Card, outerShellCardClassName } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { PawPrint, RotateCcw, Sparkles } from "lucide-react";
+import { PawPrint, Sparkles } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useReferrals } from "@/hooks/useReferrals";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
@@ -19,8 +19,10 @@ import { EvolveButton } from "@/components/companion/EvolveButton";
 import { EvolutionPathBadge } from "@/components/companion/EvolutionPathBadge";
 import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
 import { CompanionInteractionBubble } from "@/components/companion/CompanionInteractionBubble";
-import { DailyAdventurePanel } from "@/components/companion/DailyAdventurePanel";
+import { CompanionWellbeing, type WellbeingPlayback } from "@/components/companion/CompanionWellbeing";
+import { WellbeingVideoPlayer } from "@/components/companion/WellbeingVideoPlayer";
 import { CompanionMotionSurface } from "@/components/companion/motion/CompanionMotionSurface";
+import { CompanionHabitat } from "@/components/companion/CompanionHabitat";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { CompanionImage } from "@/components/CompanionImage";
 import {
@@ -216,6 +218,10 @@ export const CompanionDisplay = memo(({
   const [hatchDialogOpen, setHatchDialogOpen] = useState(false);
   const [companionChatOpen, setCompanionChatOpen] = useState(false);
   const [inlineEvolutionReplay, setInlineEvolutionReplay] = useState<InlineEvolutionReplayState | null>(null);
+  const [wellbeingPlayback, setWellbeingPlayback] = useState<WellbeingPlayback | null>(null);
+  const closeWellbeingPlayback = useCallback(() => setWellbeingPlayback(null), []);
+  const [isReplayLoading, setIsReplayLoading] = useState(false);
+  const replayRequestInFlight = useRef(false);
   const isDesktop = layoutMode === "desktop";
   const { profile, signals } = useMotionProfile();
   const { activeEvent } = useCompanionMotionSafe();
@@ -270,6 +276,9 @@ export const CompanionDisplay = memo(({
     currentStage: displayCompanion?.current_stage ?? 0,
     prefersReducedMotion,
   });
+  useEffect(() => {
+    setWellbeingPlayback(null);
+  }, [displayCompanion?.id, displayCompanion?.current_image_url, displayCompanion?.current_stage, isVisible, signals.isBackgrounded, inlineEvolutionReplay, isPendingRevealDisplay]);
   const displayRequiresHatchSelection = Boolean(
     displayCompanion
     && displayCompanion.current_stage === 0
@@ -294,23 +303,30 @@ export const CompanionDisplay = memo(({
   }, []);
 
   const handleReplayEvolution = useCallback(async () => {
-    if (!displayCompanion || inlineEvolutionReplay) return;
-
-    const replay =
-      currentEvolutionReplay ??
-      (await refetchCurrentEvolutionReplay()).data ??
-      null;
-
-    if (replay?.videoUrl) {
-      setInlineEvolutionReplay({
-        videoUrl: replay.videoUrl,
-        posterUrl: replay.imageUrl ?? inlineReplayPosterUrlRef.current,
-        stage: replay.stage,
-      });
-      return;
+    if (!displayCompanion || inlineEvolutionReplay || replayRequestInFlight.current) return;
+    replayRequestInFlight.current = true;
+    setIsReplayLoading(true);
+    try {
+      const result = currentEvolutionReplay
+        ? { data: currentEvolutionReplay, error: null }
+        : await refetchCurrentEvolutionReplay();
+      if (result.error) throw result.error;
+      const replay = result.data;
+      if (replay?.videoUrl) {
+        setInlineEvolutionReplay({
+          videoUrl: replay.videoUrl,
+          posterUrl: replay.imageUrl ?? inlineReplayPosterUrlRef.current,
+          stage: replay.stage,
+        });
+        return;
+      }
+      toast.info("No evolution replay is available yet.");
+    } catch {
+      toast.info("Couldn't load your animation. Check your connection and try again.");
+    } finally {
+      replayRequestInFlight.current = false;
+      setIsReplayLoading(false);
     }
-
-    toast.info("No evolution replay is available yet.");
   }, [
     currentEvolutionReplay,
     displayCompanion,
@@ -733,8 +749,11 @@ export const CompanionDisplay = memo(({
       concerned: "animate-companion-droop",
       sleepy: "animate-companion-slow-breathe",
     } as const)[expressionState.mood];
-  const activePortraitAnimationClass = expressionAnimationClass || animationClass;
+  const activePortraitAnimationClass = prefersReducedMotion || !isVisible || inlineEvolutionReplay
+    ? ""
+    : expressionAnimationClass || animationClass;
   const shouldAnimateIdleDrift = !prefersReducedMotion
+    && isVisible
     && imageLoaded
     && !imageError
     && !inlineEvolutionReplay
@@ -893,33 +912,8 @@ export const CompanionDisplay = memo(({
           <div
             className="flex flex-col items-center justify-center py-2 relative group"
           >
-            {/* Cosmiq orbital glow effect */}
-            <div 
-              className={`absolute inset-0 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : 'animate-orbit'}`}
-              style={{
-                background: `radial-gradient(circle, hsl(var(--celestial-blue) / ${(displayCompanion.vitality ?? 300) / 600}), hsl(var(--nebula-pink) / ${(displayCompanion.vitality ?? 300) / 600}), transparent)`,
-              }}
-              aria-hidden="true" 
-            />
-            <div className={`absolute inset-0 bg-gradient-to-r from-celestial-blue/20 via-nebula-pink/20 to-cosmiq-glow/20 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : ''}`} aria-hidden="true" />
             <div className="relative select-none rounded-2xl">
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                className="absolute right-2 top-2 z-40 h-9 w-9 rounded-full border-white/20 bg-black/40 text-white shadow-lg backdrop-blur-md hover:bg-black/55"
-                onMouseDown={(event) => event.stopPropagation()}
-                onTouchStart={(event) => event.stopPropagation()}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void handleReplayEvolution();
-                }}
-                aria-label="Replay latest evolution"
-                title="Replay latest evolution"
-              >
-                <RotateCcw className="h-4 w-4" aria-hidden="true" />
-              </Button>
-              {!imageError && !inlineEvolutionReplay ? (
+              {!imageError && !inlineEvolutionReplay && !wellbeingPlayback ? (
                 <button
                   type="button"
                   className="absolute inset-0 z-20 cursor-pointer touch-pan-y rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
@@ -943,15 +937,10 @@ export const CompanionDisplay = memo(({
                   </span>
                 </button>
               ) : null}
-              {/* Twinkling star particles around companion */}
-              <div className={`absolute inset-0 rounded-2xl ${!prefersReducedMotion ? 'star-shimmer' : ''}`} aria-hidden="true" />
-              <div className={`absolute inset-0 bg-gradient-to-br from-nebula-pink/30 to-celestial-blue/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-pulse' : ''}`} aria-hidden="true" />
               <div
                 className={cn(
                   "relative overflow-hidden rounded-2xl",
                   portraitFrameSizeClass,
-                  companionInteractions.activeBehaviorClassName,
-                  shouldAnimateIdleDrift && "animate-companion-idle-drift",
                 )}
                 style={portraitFrameStyle}
                 data-testid="companion-image-shell"
@@ -962,7 +951,9 @@ export const CompanionDisplay = memo(({
                 data-companion-expression-reason={expressionState.reason}
                 data-companion-behavior={companionInteractions.activeBehaviorId ?? "idle"}
               >
+                <CompanionHabitat element={displayCompanion.core_element} stage={displayCompanion.current_stage} />
                 <CompanionMotionSurface
+                  showEffects={false}
                   variant="companion"
                   stage={displayCompanion.current_stage}
                   element={displayCompanion.core_element}
@@ -1010,14 +1001,19 @@ export const CompanionDisplay = memo(({
                     <div
                       data-testid="companion-primary-image-frame"
                       className={cn(
-                        "relative h-full w-full overflow-hidden rounded-2xl ring-4 shadow-2xl transition-all duration-500 group-hover:scale-105",
+                        "relative h-full w-full overflow-hidden rounded-2xl",
                         imageLoaded ? "opacity-100" : "opacity-0 absolute inset-0",
-                        usesGeneratedSceneShell && "bg-black",
-                        "ring-primary/30",
-                        activePortraitAnimationClass,
                       )}
                     >
-                      <div className={cn("h-full w-full", portraitSceneContentClassName)}>
+                      <div
+                        data-testid="companion-animal-motion"
+                        className={cn(
+                          "h-full w-full origin-bottom",
+                          portraitSceneContentClassName,
+                          !prefersReducedMotion && isVisible && !inlineEvolutionReplay && companionInteractions.activeBehaviorClassName,
+                          !companionInteractions.activeBehaviorId && (shouldAnimateIdleDrift ? "animate-companion-idle-drift" : activePortraitAnimationClass),
+                        )}
+                      >
                         <CompanionImage
                           key={imageKey}
                           src={effectiveImageUrl}
@@ -1048,6 +1044,10 @@ export const CompanionDisplay = memo(({
                     </div>
                   </>
                 </CompanionMotionSurface>
+                {wellbeingPlayback && isVisible && !signals.isBackgrounded && !inlineEvolutionReplay && !isPendingRevealDisplay
+                  && wellbeingPlayback.sourceImageUrl === displayCompanion.current_image_url ? (
+                  <WellbeingVideoPlayer key={wellbeingPlayback.url} clip={wellbeingPlayback} onClose={closeWellbeingPlayback} />
+                ) : null}
                 {inlineEvolutionReplay ? (
                   <div
                     className="absolute inset-0 z-30 overflow-hidden rounded-2xl bg-black shadow-2xl ring-4 ring-primary/30"
@@ -1060,10 +1060,14 @@ export const CompanionDisplay = memo(({
                       autoPlay
                       muted
                       playsInline
+                      controls
                       data-testid="companion-inline-evolution-video"
                       aria-label={`${getVisualStageDisplay(inlineEvolutionReplay.stage)} evolution replay`}
                       onEnded={finishInlineEvolutionReplay}
-                      onError={finishInlineEvolutionReplay}
+                      onError={() => {
+                        finishInlineEvolutionReplay();
+                        toast.info("Couldn't play your animation. Tap Replay to try again.");
+                      }}
                     />
                     <Button
                       type="button"
@@ -1086,19 +1090,33 @@ export const CompanionDisplay = memo(({
             <CompanionInteractionBubble
               companionName={displayedCreatureName}
               message={companionInteractions.bubble?.message ?? null}
-              prompt={companionInteractions.bubble?.prompt ?? null}
+              prompt={null}
               prefersReducedMotion={prefersReducedMotion}
-              onAnswer={companionInteractions.answerPrompt}
+              onAnswer={() => {}}
               onDismiss={companionInteractions.dismissBubble}
             />
-            <p className="relative z-10 mt-2 text-center text-[11px] font-medium tracking-wide text-muted-foreground/80">
-              Tap to connect <span aria-hidden="true">•</span> Swipe to pet <span aria-hidden="true">•</span> Hold for a quiet moment
-            </p>
-            {!isPreHatchDisplay && !isPendingRevealDisplay ? (
-              <DailyAdventurePanel
-                companionName={displayedCreatureName}
+            <div className="mt-1 flex items-center justify-center gap-3 text-xs text-muted-foreground">
+              <span>Tap to connect</span>
+              {displayCompanion.current_stage > 0 && (
+                <button
+                  type="button"
+                  className="min-h-11 rounded px-1 underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+                  disabled={isReplayLoading || Boolean(inlineEvolutionReplay) || Boolean(wellbeingPlayback)}
+                  onClick={() => void handleReplayEvolution()}
+                  aria-label="Replay latest evolution"
+                >
+                  {isReplayLoading ? "Loading…" : displayCompanion.current_stage < 5 ? "Replay hatch" : "Replay evolution"}
+                </button>
+              )}
+            </div>
+            {!isPreHatchDisplay && !isPendingRevealDisplay && displayCompanion.current_stage > 0 ? (
+              <CompanionWellbeing
+                companionId={displayCompanion.id}
                 currentStage={displayCompanion.current_stage}
-                onReaction={companionInteractions.reactToAdventureChoice}
+                sourceImageUrl={displayCompanion.current_image_url ?? ""}
+                isVisible={isVisible && !signals.isBackgrounded && !inlineEvolutionReplay}
+                prefersReducedMotion={prefersReducedMotion}
+                onPlay={setWellbeingPlayback}
               />
             ) : null}
           </div>
@@ -1145,6 +1163,22 @@ export const CompanionDisplay = memo(({
               />
             </div>
             
+            {/* Keep the action with readiness, before Color / Spirit / Element. */}
+            <div data-tutorial-avoid="true">
+              <AnimatePresence>
+                {displayCanEvolve && (
+                  <EvolveButton
+                    onEvolve={handleEvolvePress}
+                    isEvolving={isEvolutionBusy || isPendingRevealPreparing}
+                    revealReady={isPendingRevealReady}
+                    actionLabel={isPendingRevealReady ? "REVEAL" : isStageZeroEgg ? "HATCH" : "EVOLVE"}
+                    loadingLabel={isPendingRevealDisplay ? "PREPARING..." : isStageZeroEgg ? "HATCHING..." : "EVOLVING..."}
+                    durationLabel={isPendingRevealDisplay ? "Rendering the reveal video. This can take a few minutes." : undefined}
+                  />
+                )}
+              </AnimatePresence>
+            </div>
+
             <div className="grid grid-cols-3 gap-3 pt-2">
               <div className="text-center p-3 rounded-xl bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/10 hover:border-primary/30 transition-all">
                 <p className="text-xs text-muted-foreground mb-1">Color</p>
@@ -1194,20 +1228,6 @@ export const CompanionDisplay = memo(({
             canEvolveOverride={displayCanEvolve}
           />
 
-          {/* Evolve Button - shows when ready */}
-          <div data-tutorial-avoid="true">
-            <AnimatePresence>
-              {displayCanEvolve && (
-                <EvolveButton
-                  onEvolve={handleEvolvePress}
-                  isEvolving={isEvolutionBusy || isPendingRevealPreparing}
-                  actionLabel={isPendingRevealReady ? "REVEAL" : isStageZeroEgg ? "HATCH" : "EVOLVE"}
-                  loadingLabel={isPendingRevealDisplay ? "PREPARING..." : isStageZeroEgg ? "HATCHING..." : "EVOLVING..."}
-                  durationLabel={isPendingRevealDisplay ? "Rendering the reveal video. This can take a few minutes." : undefined}
-                />
-              )}
-            </AnimatePresence>
-          </div>
         </div>
       </Card>
 

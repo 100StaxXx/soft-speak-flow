@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { safeNavigate } from "@/utils/nativeNavigation";
 import { Button } from "@/components/ui/button";
@@ -16,12 +16,17 @@ const ResetPassword = () => {
   const [showFallback, setShowFallback] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-    // Check for error parameters first (Supabase sends these for expired/invalid tokens)
+    let disposed = false;
+    let settled = false;
+    setValidToken(false);
+    setShowFallback(false);
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const error = hashParams.get('error');
-    const errorDescription = hashParams.get('error_description');
+    const queryParams = new URLSearchParams(window.location.search);
+    const error = hashParams.get('error') ?? queryParams.get('error');
+    const errorDescription = hashParams.get('error_description') ?? queryParams.get('error_description');
     
     if (error) {
       toast({
@@ -34,21 +39,14 @@ const ResetPassword = () => {
     }
 
     const accessToken = hashParams.get('access_token');
+    const refreshToken = hashParams.get('refresh_token');
     const type = hashParams.get('type');
-    
-    if (!accessToken || type !== 'recovery') {
-      toast({
-        variant: "destructive",
-        title: "Invalid Link",
-        description: "This password reset link is invalid or has expired. Please request a new one.",
-      });
-      safeNavigate(navigate, "/auth");
-      return;
-    }
+    const code = queryParams.get('code');
 
     // Set up timeout to prevent infinite loading
     const verificationTimeout = setTimeout(() => {
-      if (!validToken) {
+      if (!settled && !disposed) {
+        settled = true;
         toast({
           variant: "destructive",
           title: "Verification Timeout",
@@ -63,40 +61,67 @@ const ResetPassword = () => {
       setShowFallback(true);
     }, 5000);
 
-    // Wait for Supabase to process the recovery token via onAuthStateChange
+    const finishVerification = (hasSession: boolean) => {
+      if (disposed || settled) return;
+      settled = true;
+      clearTimeout(verificationTimeout);
+      clearTimeout(fallbackTimer);
+      if (hasSession) {
+        setValidToken(true);
+        // Remove credentials after establishing the recovery session.
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.hash = '';
+        cleanUrl.searchParams.delete('code');
+        window.history.replaceState(window.history.state, '', `${cleanUrl.pathname}${cleanUrl.search}`);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Invalid Link",
+          description: "This password reset link is invalid or has expired. Please request a new one.",
+        });
+        safeNavigate(navigate, "/auth");
+      }
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
-        clearTimeout(verificationTimeout);
-        clearTimeout(fallbackTimer);
-        if (session) {
-          setValidToken(true);
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Session Error",
-            description: "Unable to establish password reset session. Please request a new link.",
-          });
-          safeNavigate(navigate, "/auth");
-        }
+        finishVerification(Boolean(session));
       }
     });
 
-    // Also check if session already exists (in case event already fired)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        clearTimeout(verificationTimeout);
-        clearTimeout(fallbackTimer);
-        setValidToken(true);
+    // URL detection only runs at client initialization. A link opened in an
+    // already-running native app must explicitly establish its new session.
+    void (async () => {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (disposed || settled) return;
+      if (accessToken || refreshToken || type) {
+        if (!accessToken || !refreshToken || type !== 'recovery') {
+          finishVerification(false);
+          return;
+        }
+        if (!sessionError && session?.access_token === accessToken) {
+          finishVerification(true);
+          return;
+        }
+        const result = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        finishVerification(!result.error && Boolean(result.data.session));
+      } else if (code) {
+        const result = await supabase.auth.exchangeCodeForSession(code);
+        finishVerification(!result.error && Boolean(result.data.session));
+      } else {
+        // Supabase may already have consumed and removed the recovery hash.
+        finishVerification(!sessionError && Boolean(session));
       }
-    });
+    })().catch(() => finishVerification(false));
 
     return () => {
+      disposed = true;
       subscription.unsubscribe();
       clearTimeout(verificationTimeout);
       clearTimeout(fallbackTimer);
     };
      
-  }, [navigate]); // toast is stable from useToast hook
+  }, [navigate, toast, location.key]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -348,6 +348,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   const entitlementBootstrapUserIdRef = useRef<string | null>(null);
   const entitlementSyncAttemptUserIdRef = useRef<string | null>(null);
   const purchaseRecoveryPromiseRef = useRef<Promise<StoreKitTransaction | null> | null>(null);
+  const activeEntitlementRefreshesRef = useRef(0);
   const packagesRef = useRef<PurchasesPackage[]>([]);
   const storeProductsRef = useRef<Map<string, PurchasesStoreProduct>>(new Map());
 
@@ -490,6 +491,20 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
       storeProductsRef.current = new Map(allProducts.map((product) => [product.identifier, product]));
 
       const mappedProducts = mergeProducts(allProducts);
+      try {
+        const eligibility = await withTimeout(
+          () => Purchases.checkTrialOrIntroductoryPriceEligibility({
+            productIdentifiers: mappedProducts.map((product) => product.identifier),
+          }),
+          { timeoutMs: CUSTOMER_INFO_TIMEOUT_MS, operation: "Introductory offer eligibility", timeoutCode: "REVENUECAT_TIMEOUT" },
+        );
+        for (const product of mappedProducts) {
+          product.introductoryOfferEligible = eligibility[product.identifier]?.status === 2;
+        }
+      } catch {
+        // Unknown eligibility must use standard pricing; Apple owns the final offer.
+        for (const product of mappedProducts) product.introductoryOfferEligible = false;
+      }
       setProducts(mappedProducts);
 
       if (!mappedProducts.length) {
@@ -518,6 +533,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   const refreshEntitlement = useCallback(async () => {
     if (!isAvailable) return;
 
+    activeEntitlementRefreshesRef.current += 1;
     setEntitlementLoading(true);
     try {
       const configured = await ensureConfigured();
@@ -547,6 +563,8 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
           await fetchCustomerInfo();
         } catch (syncError) {
           console.warn("[RevenueCat] Silent existing-purchase sync failed", syncError);
+          setEntitlementError(true);
+          return;
         }
       }
       setEntitlementError(false);
@@ -554,7 +572,8 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
       setEntitlementError(true);
       console.error("[RevenueCat] Failed to get customer info:", error);
     } finally {
-      setEntitlementLoading(false);
+      activeEntitlementRefreshesRef.current -= 1;
+      setEntitlementLoading(activeEntitlementRefreshesRef.current > 0);
     }
   }, [ensureConfigured, fetchCustomerInfo, isAvailable, user?.id]);
 
@@ -567,6 +586,10 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
       setProductsError(null);
       return;
     }
+
+    // A token refresh can temporarily report recovering for the same signed-in
+    // user. Keep their known entitlement instead of clearing it mid-session.
+    if (status === "recovering" && user?.id === configuredAppUserIdRef.current) return;
 
     if (status !== "authenticated" || !user?.id) {
       entitlementBootstrapUserIdRef.current = null;

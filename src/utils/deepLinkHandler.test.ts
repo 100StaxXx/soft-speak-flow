@@ -2,6 +2,24 @@ import { describe, expect, it } from "vitest";
 import { parseDeepLink } from "./deepLinkHandler";
 
 describe("parseDeepLink", () => {
+  it.each([
+    "https://app.cosmiq.quest/auth?code=apple-code",
+    "cosmiq://auth?code=apple-code",
+    "com.darrylgraham.revolution://auth?code=apple-code",
+  ])("recognizes Apple callback links: %s", (url) => {
+    expect(parseDeepLink(url)).toEqual({ type: "auth_callback", path: "/auth?code=apple-code", rawUrl: url });
+  });
+
+  it.each([
+    "https://app.cosmiq.quest/auth/reset-password?code=recovery-code",
+    "cosmiq://auth/reset-password?code=recovery-code",
+  ])("recognizes recovery code links: %s", (url) => {
+    expect(parseDeepLink(url)).toEqual({ type: "auth_recovery", path: "/auth/reset-password?code=recovery-code", rawUrl: url });
+  });
+
+  it("does not accept auth links from an unrelated host", () => {
+    expect(parseDeepLink("https://example.com/auth?code=untrusted").type).toBe("unknown");
+  });
   it("parses task deep links", () => {
     const parsed = parseDeepLink("cosmiq://task/task-123?from=widget");
     expect(parsed).toEqual({

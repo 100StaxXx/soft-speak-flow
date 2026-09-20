@@ -76,7 +76,7 @@ describe("external calendar event normalization", () => {
     }, "google", "Work")!;
 
     expect(externalCalendarEventToCalendarTask(event)).toMatchObject({
-      id: "external:google:meeting-1",
+      id: "external:google:::meeting-1",
       source: "external_calendar",
       completed: false,
       xp_reward: 0,

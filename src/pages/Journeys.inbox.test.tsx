@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Journeys from "./Journeys";
 import { JOURNEYS_RESET_TO_TODAY_EVENT } from "@/pages/journeysDateSync";
@@ -522,6 +522,7 @@ vi.mock("@/utils/platformTargets", () => ({
   isMacSession: () => false,
 }));
 
+const LocationProbe = () => { const location = useLocation(); return <span data-testid="location">{location.pathname}{location.search}</span>; };
 const renderJourneys = (initialEntry = "/journeys") => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -533,6 +534,7 @@ const renderJourneys = (initialEntry = "/journeys") => {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialEntry]}>
+        <LocationProbe />
         <Journeys />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -597,44 +599,30 @@ describe("Journeys inbox integration", () => {
     );
   });
 
-  it("keeps the agenda above the secondary inbox when unscheduled quests exist", async () => {
-    mocks.inboxTasks = [
-      {
-        id: "inbox-1",
-        task_text: "Email Alex",
-        completed: false,
-        task_date: null,
-        scheduled_time: null,
-      },
-    ];
-
+  it("keeps unscheduled quests out of the calendar", () => {
+    mocks.inboxTasks = [{ id: "inbox-1", task_text: "Email Alex", completed: false, task_date: null }];
     renderJourneys();
-
-    expect(screen.getByTestId("journeys-inbox-section")).toBeInTheDocument();
-    expect(screen.getByText("Inbox")).toBeInTheDocument();
-    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.getByTestId("todays-agenda")).toBeInTheDocument();
+    expect(screen.queryByTestId("journeys-inbox-section")).not.toBeInTheDocument();
     expect(screen.queryByText("Email Alex")).not.toBeInTheDocument();
-
-    const orderedSections = Array.from(
-      document.querySelectorAll('[data-testid="journeys-inbox-section"], [data-testid="todays-agenda"]'),
-    ).map((node) => node.getAttribute("data-testid"));
-
-    expect(orderedSections).toEqual(["todays-agenda", "journeys-inbox-section"]);
-
-    fireEvent.click(screen.getByRole("button", { name: /expand inbox section/i }));
-
-    expect(screen.getByText("Email Alex")).toBeInTheDocument();
   });
 
-  it("shows and focuses the embedded inbox section for legacy inbox links", async () => {
+  it("switches the mobile calendar between the four compact views while preserving its scenic background", () => {
+    renderJourneys();
+    expect(screen.getByTestId("calendar-toolbar")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "open-companion-fab" })).not.toBeInTheDocument();
+    for (const [label, testId] of [["Agenda", "calendar-agenda-view"], ["3-Day", "calendar-three-day-view"], ["Month", "calendar-month-view"], ["Day", "todays-agenda"]]) {
+      fireEvent.keyDown(screen.getByRole("button", { name: "Calendar view" }), { key: "ArrowDown" });
+      fireEvent.click(screen.getByRole("menuitemradio", { name: label }));
+      expect(screen.getByTestId(testId)).toBeInTheDocument();
+      expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-preset", "quests");
+    }
+  });
+
+  it("does not embed the inbox for legacy inbox links", async () => {
     renderJourneys("/journeys?section=inbox");
-
-    expect(screen.getByTestId("journeys-inbox-section")).toBeInTheDocument();
-    expect(screen.getByTestId("journeys-inbox-empty")).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(mocks.scrollIntoView).toHaveBeenCalled();
-    });
+    expect(screen.queryByTestId("journeys-inbox-section")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/campaigns?section=inbox"));
   });
 
   it("opens a notification-linked scheduled quest from the taskId URL", async () => {
@@ -777,11 +765,10 @@ describe("Journeys inbox integration", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("edit-quest-dialog")).toHaveTextContent("Email Alex");
-      expect(mocks.scrollIntoView).toHaveBeenCalled();
     });
   });
 
-  it("adds inbox quests into the embedded section immediately", async () => {
+  it("saves unscheduled quests without adding an inbox panel to Calendar", async () => {
     renderJourneys();
 
     expect(screen.queryByTestId("journeys-inbox-section")).not.toBeInTheDocument();
@@ -791,8 +778,7 @@ describe("Journeys inbox integration", () => {
 
     await waitFor(() => {
       expect(mocks.addTask).toHaveBeenCalled();
-      expect(screen.getByTestId("journeys-inbox-section")).toBeInTheDocument();
-      expect(screen.getByText("Draft roadmap")).toBeInTheDocument();
+      expect(screen.queryByTestId("journeys-inbox-section")).not.toBeInTheDocument();
     });
   });
 

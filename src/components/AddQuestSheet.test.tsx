@@ -40,6 +40,10 @@ vi.mock("@/hooks/useAuth", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useSmartScheduling", () => ({
+  useSmartScheduling: () => ({ suggestedSlots: [], isLoading: false, error: null, getSuggestedSlots: vi.fn(), clearSuggestions: vi.fn() }),
+}));
+
 vi.mock("@/hooks/useCompanion", () => ({
   useCompanion: () => ({
     companion: { favorite_color: mocks.companionFavoriteColor },
@@ -190,6 +194,14 @@ describe("AddQuestSheet", () => {
       templateOrigin: "personal_explicit",
       sourceCommonTemplateId: "work-deep-work-block",
     }));
+  });
+
+  it("keeps the Mind Body Soul category when an optional idea is saved to the inbox", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+    render(<AddQuestSheet open onOpenChange={vi.fn()} selectedDate={selectedDate} onAdd={onAdd}
+      prefillKey="wellbeing-soul" prefillDraft={{ text: "Notice something you appreciate", estimatedDuration: 2, category: "soul" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add to Inbox instead" }));
+    await waitFor(() => expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ category: "soul", text: "Notice something you appreciate", taskDate: null, estimatedDuration: 2 })));
   });
 
   it("renders simplified add quest controls without step instructions", () => {

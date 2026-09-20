@@ -7,6 +7,13 @@ import type {
 } from './NativeCalendarTypes';
 
 export class NativeCalendarWeb extends WebPlugin implements NativeCalendarPlugin {
+  async findOrCreateReminder(): Promise<{ task: null }> { throw new Error('Apple Reminders requires the iOS app'); }
+  async requestReminderPermissions() { return { granted: false }; }
+  async listReminderLists() { return { lists: [] }; }
+  async listReminders() { return { tasks: [] }; }
+  async getReminder() { throw new Error('Apple Reminders requires the iOS app'); return { task: null }; }
+  async updateReminder() { throw new Error('Apple Reminders requires the iOS app'); }
+  async getEvent(): Promise<{ event: NativeCalendarEventDescriptor | null }> { throw new Error('Apple Calendar requires the iOS app'); }
   async isAvailable(): Promise<{ available: boolean }> {
     return { available: false };
   }

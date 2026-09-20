@@ -37,6 +37,7 @@ const isQuestDraftSnapshot = (value: unknown): value is QuestDraftSnapshot => {
 
   return (
     typeof candidate.text === "string"
+    && (candidate.category === undefined || candidate.category === "mind" || candidate.category === "body" || candidate.category === "soul")
     && (candidate.taskDate === null || typeof candidate.taskDate === "string")
     && (candidate.difficulty === "easy" || candidate.difficulty === "medium" || candidate.difficulty === "hard")
     && (candidate.scheduledTime === null || typeof candidate.scheduledTime === "string")

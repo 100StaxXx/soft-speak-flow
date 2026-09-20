@@ -2,6 +2,7 @@ import type { NotificationType } from "../_shared/notificationsV2.ts";
 import {
   composeNotificationCopy,
   type CompanionNotificationContext,
+  type NotificationProductMode,
 } from "../_shared/notificationComposer.ts";
 
 export interface QueueDeliverySourceRow {
@@ -87,23 +88,30 @@ function shouldRefreshCompanionLedCopy(notificationType: NotificationType): bool
 export function resolveDeliveryCopy(
   row: QueueDeliveryCopyRow,
   companion?: CompanionNotificationContext | null,
+  productMode: NotificationProductMode = "cosmiq",
 ): { title: string; body: string } {
   if (!shouldRefreshCompanionLedCopy(row.notification_type)) {
-    return {
-      title: row.title,
-      body: row.body,
-    };
+    const usesProductTemplate = [
+      "task_start", "task_reminder", "habit_reminder",
+      "checkin_morning_reminder", "checkin_evening_reminder",
+    ].includes(row.notification_type);
+    if (!usesProductTemplate) return { title: row.title, body: row.body };
+    // Rebuild system templates at delivery too, including rows queued before
+    // product isolation. User-authored titles remain in their original payload.
+    return composeNotificationCopy({ type: row.notification_type, payload: row.payload ?? {}, productMode, companion });
   }
 
   const copy = composeNotificationCopy({
     type: row.notification_type,
+    productMode,
     payload: row.payload ?? {},
     companion,
   });
 
   return {
     title: copy.title,
-    body: typeof row.body === "string" && row.body.trim().length > 0 ? row.body : copy.body,
+    body: typeof row.body === "string" && row.body.trim().length > 0
+      && (row.payload?.summary || row.payload?.message) ? row.body : copy.body,
   };
 }
 

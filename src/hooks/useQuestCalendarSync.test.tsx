@@ -41,7 +41,11 @@ vi.mock("@/plugins/NativeCalendarPlugin", () => ({
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
+    rpc: vi.fn(async () => ({ data: null, error: null })),
     from: (table: string) => {
+      if (table === 'calendar_quest_imports') {
+        return { select: () => ({ eq: () => ({ eq: async () => ({ data: [], error: null }) }) }) };
+      }
       if (table === "quest_calendar_links") {
         return {
           select: () => ({
@@ -89,6 +93,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import { useQuestCalendarSync } from "./useQuestCalendarSync";
+import { supabase } from '@/integrations/supabase/client';
 
 const recurrenceColumnsMissingError = {
   code: "PGRST204",
@@ -142,6 +147,16 @@ describe("useQuestCalendarSync", () => {
     expect(mocks.useCalendarIntegrationsMock).toHaveBeenCalledWith({ enabled: false });
     expect(mocks.questLinksEqMock).not.toHaveBeenCalled();
     expect(result.current.links).toEqual([]);
+  });
+
+  it('registers only the exact successfully sent destination', async () => {
+    mocks.dailyTaskSingleMock.mockResolvedValue({ data: { id: 'task-1', task_text: 'Walk', task_date: '2026-09-19', scheduled_time: '10:00', estimated_duration: 30 }, error: null });
+    mocks.functionsInvokeMock.mockResolvedValue({ data: { link: { externalEventId: 'new-event', externalCalendarId: 'primary-calendar' } }, error: null });
+    const { result } = renderHook(() => useQuestCalendarSync(), { wrapper: createWrapper() });
+    await act(async () => { await result.current.sendTaskToCalendar.mutateAsync({ taskId: 'task-1' }); });
+    expect(supabase.rpc).toHaveBeenCalledWith('register_sent_calendar_quest', expect.objectContaining({
+      p_task_id: 'task-1', p_connection_id: 'conn-1', p_external_id: 'new-event', p_kind: 'event',
+    }));
   });
 
   it("throws TASK_DATE_REQUIRED when sending a task with no date", async () => {
@@ -461,7 +476,7 @@ describe("useQuestCalendarSync", () => {
         syncMode: "send_only",
       },
     });
-    expect(sendResult).toEqual({
+    expect(sendResult).toMatchObject({
       provider: "outlook",
       providerLabel: "Outlook",
       destinationKind: "calendar",

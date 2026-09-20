@@ -49,11 +49,13 @@ interface AccessStatus {
   trialEndsAt: Date | null;
   /** Loading state */
   loading: boolean;
+  error?: boolean;
+  retry?: () => Promise<void>;
 }
 
 export function useAccessStatus(): AccessStatus {
-  const { profile, loading: profileLoading } = useProfile();
-  const { accessState, isLoading: accessLoading } = useAccessState();
+  const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile();
+  const { accessState, isLoading: accessLoading, error: accessError, refetch: refetchAccess } = useAccessState();
   const isSubscribed = accessState.subscribed;
 
   const loading = profileLoading || accessLoading;
@@ -77,7 +79,7 @@ export function useAccessStatus(): AccessStatus {
 
   // Profile data is part of the access decision. A missing profile must not
   // become an implicit entitlement.
-  if (!profile) {
+  if ((!profile || accessError) && !accessState.has_access) {
     return {
       hasAccess: false,
       isSubscribed,
@@ -85,15 +87,17 @@ export function useAccessStatus(): AccessStatus {
       trialExpired: false,
       trialDaysRemaining: 0,
       accessSource: isSubscribed ? 'subscription' : 'none',
-      gateReason: 'pre_trial_signup' as AccessGateReason,
+      gateReason: 'none' as AccessGateReason,
       trialEndsAt: null,
       loading: false,
+      error: true,
+      retry: async () => { await Promise.all([refetchProfile(), refetchAccess()]); },
     };
   }
 
   const tutorialCompleted =
-    hasGuidedTutorialCompleted(profile.onboarding_data) ||
-    hasLocalGuidedTutorialCompleted(profile.id);
+    hasGuidedTutorialCompleted(profile?.onboarding_data) ||
+    hasLocalGuidedTutorialCompleted(profile?.id);
 
   const trialEndsAt = accessState.trial_ends_at ? new Date(accessState.trial_ends_at) : null;
 
@@ -119,6 +123,9 @@ export function useAccessStatus(): AccessStatus {
   if (isSubscribed) {
     accessSource = accessState.access_source === 'promo_code' ? 'promo_code' : 'subscription';
     hasAccess = true;
+  } else if (trialExpired || (!accessState.has_access && accessState.access_source === 'subscription')) {
+    hasAccess = false;
+    gateReason = 'trial_expired';
   } else if (needsPreTrialSignup) {
     hasAccess = false;
     gateReason = 'pre_trial_signup';

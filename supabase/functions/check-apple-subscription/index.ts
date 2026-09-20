@@ -22,7 +22,7 @@ type ProfileAccessSnapshot = {
 
 const completedOnboardingNoAccessResponse = {
   has_access: false,
-  access_source: "manual" as const,
+  access_source: "none" as const,
   trial_ends_at: null,
   subscribed: false,
   status: "inactive" as const,
@@ -81,6 +81,7 @@ export async function handleCheckAppleSubscription(req: Request) {
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false, autoRefreshToken: false } },
     );
 
     const authHeader = req.headers.get("Authorization") ?? "";
@@ -90,7 +91,8 @@ export async function handleCheckAppleSubscription(req: Request) {
     } = await supabaseClient.auth.getUser(authHeader.replace("Bearer ", ""));
 
     if (authError || !user) {
-      return jsonResponse(req, buildAccessStateResponse(null));
+      // An expired session or auth outage is not a verified lack of entitlement.
+      return errorResponse(req, "Unable to verify subscription session", 401);
     }
 
     const entitlement = await fetchAccountEntitlementForUser(

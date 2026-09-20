@@ -63,6 +63,7 @@ interface ActiveEpic {
 }
 
 interface DesktopWeekPlannerProps {
+  calendarOnly?: boolean;
   selectedDate: Date;
   tasks: DailyTask[];
   readableQuestCardsEnabled?: boolean;
@@ -381,6 +382,7 @@ function WeekPlannerTaskCard({
 }
 
 export function DesktopWeekPlanner({
+  calendarOnly = false,
   selectedDate,
   tasks,
   readableQuestCardsEnabled = false,
@@ -692,7 +694,7 @@ export function DesktopWeekPlanner({
 
   return (
     <div
-      className={cn(COMPANION_FROSTED_PLANNER_DARK_CLASS, "grid grid-cols-[minmax(0,1fr)_320px] items-start gap-5")}
+      className={cn(COMPANION_FROSTED_PLANNER_DARK_CLASS, "grid items-start gap-5", !calendarOnly && "grid-cols-[minmax(0,1fr)_320px]")}
       data-testid="desktop-week-planner"
       style={companionFrostedThemeStyle}
     >
@@ -1021,7 +1023,7 @@ export function DesktopWeekPlanner({
         </div>
       </div>
 
-      <aside className="flex flex-col gap-4">
+      {!calendarOnly ? <aside className="flex flex-col gap-4">
         <section className={desktopRailCardClass}>
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -1147,7 +1149,7 @@ export function DesktopWeekPlanner({
             </p>
           </div>
         </section>
-      </aside>
+      </aside> : null}
     </div>
   );
 }

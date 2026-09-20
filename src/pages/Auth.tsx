@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { exchangeAppleIdentityToken } from "@/utils/appleSignInExchange";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 import { safeNavigate } from "@/utils/nativeNavigation";
 import { SignInWithApple, SignInWithAppleResponse } from '@capacitor-community/apple-sign-in';
 import type { Session } from "@supabase/supabase-js";
@@ -23,7 +25,6 @@ import {
 import { retryWithBackoff } from "@/utils/retry";
 import {
   clearPendingSocialAuthAttempt,
-  getSocialAccountNotFoundMessage,
   getSocialAuthIntent,
   readPendingSocialAuthAttempt,
   storePendingSocialAuthAttempt,
@@ -50,11 +51,6 @@ const AUTH_GATEWAY_OUTAGE_CODES = new Set([
   "ABUSE_CHECK_FAILED",
   "AUTH_GATEWAY_FAILED",
 ]);
-const SOCIAL_AUTH_OUTAGE_CODES = new Set([
-  "ABUSE_CHECK_FAILED",
-  "APPLE_AUTH_UNAVAILABLE",
-  "GOOGLE_AUTH_UNAVAILABLE",
-]);
 const AUTH_TEMPORARY_OUTAGE_MESSAGE =
   "Authentication is temporarily unavailable. Please try again in a moment.";
 const APPLE_AUTH_TEMPORARY_OUTAGE_MESSAGE =
@@ -80,7 +76,8 @@ const hasOAuthCallbackParams = (): boolean => {
   if (typeof window === "undefined") return false;
 
   const url = new URL(window.location.href);
-  return Boolean(url.searchParams.get("code") || url.hash.includes("access_token"));
+  const hash = new URLSearchParams(url.hash.substring(1));
+  return Boolean(url.searchParams.get("code") || url.searchParams.get("error") || hash.get("access_token") || hash.get("error"));
 };
 
 const emailSchema = z.string()
@@ -134,6 +131,13 @@ const getAppleErrorDescription = (error: unknown): string => {
 
   if (normalized.includes("nonce") || normalized.includes("security check")) {
     return "Apple Sign-In security verification failed. Please try again.";
+  }
+
+  if (
+    normalized.includes("provider is not enabled") ||
+    normalized.includes("unsupported provider")
+  ) {
+    return APPLE_AUTH_TEMPORARY_OUTAGE_MESSAGE;
   }
 
   if (normalized.includes("session")) {
@@ -220,45 +224,6 @@ const getAuthGatewayErrorMessage = async (
   });
 };
 
-const getAppleAuthActionDescription = (intent: SocialAuthIntent): string =>
-  intent === "sign_in" ? "sign you in with Apple" : "create your account with Apple";
-
-const getAppleAuthErrorMessage = async (
-  error: unknown,
-  intent: SocialAuthIntent,
-): Promise<string> => {
-  const parsed = await parseFunctionInvokeError(error);
-  logAuthFunctionError("[Auth Apple] Social auth request failed", parsed, {
-    intent,
-  });
-  const errorCode = getParsedFunctionErrorCode(parsed);
-
-  if (errorCode && SOCIAL_AUTH_OUTAGE_CODES.has(errorCode)) {
-    return APPLE_AUTH_TEMPORARY_OUTAGE_MESSAGE;
-  }
-
-  if (
-    typeof parsed.backendMessage === "string" &&
-    parsed.backendMessage.trim() &&
-    !isFunctionTransportErrorMessage(parsed.backendMessage)
-  ) {
-    return parsed.backendMessage;
-  }
-
-  const directMessage = getErrorMessage(error).trim();
-  if (
-    directMessage &&
-    !isFunctionTransportErrorMessage(directMessage) &&
-    !directMessage.toLowerCase().includes("functionsfetcherror")
-  ) {
-    return directMessage;
-  }
-
-  return toUserFacingFunctionError(parsed, {
-    action: getAppleAuthActionDescription(intent),
-  });
-};
-
 interface AuthGatewayPayload {
   action: AuthGatewayAction;
   email?: string;
@@ -295,20 +260,6 @@ const invokeAuthGateway = async (payload: AuthGatewayPayload) => {
   }
 };
 
-const readFunctionErrorContext = async (error: unknown) => {
-  const maybeErrorWithContext = error as { context?: { json?: () => Promise<Record<string, unknown>> } };
-  if (!maybeErrorWithContext.context?.json) {
-    return null;
-  }
-
-  try {
-    return await maybeErrorWithContext.context.json();
-  } catch {
-    return null;
-  }
-};
-
-
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -335,6 +286,7 @@ const Auth = () => {
   const pendingPostAuthNavigationContextRef = useRef<
     (PostAuthNavigationContext & { userId: string }) | null
   >(null);
+  const directSocialAuthInProgressRef = useRef(false);
   const setPendingPostAuthNavigationContext = useCallback(
     (userId: string, context: PostAuthNavigationContext) => {
       pendingPostAuthNavigationContextRef.current = {
@@ -539,26 +491,6 @@ const Auth = () => {
 
   const [appleNativeReady, setAppleNativeReady] = useState(false);
 
-  const blockSocialSignIn = useCallback(
-    async (attempt: PendingSocialAuthAttempt, source: string) => {
-      logger.warn(`[Auth ${source}] Blocking social sign-in with no returning account match`, attempt);
-      clearPendingSocialAuthAttempt();
-      clearPendingPostAuthNavigationContext();
-
-      try {
-        await supabase.auth.signOut();
-      } catch (error) {
-        logger.warn(`[Auth ${source}] Failed to clear blocked social auth session`, { error });
-      }
-
-      hasRedirected.current = false;
-      setIsLogin(true);
-      setIsForgotPassword(false);
-      setInlineError(getSocialAccountNotFoundMessage(attempt.provider));
-    },
-    [clearPendingPostAuthNavigationContext],
-  );
-
   const handleResolvedSocialAuth = useCallback(
     async (session: Session | null, source: string, attempt: PendingSocialAuthAttempt | null) => {
       if (!session) {
@@ -578,20 +510,12 @@ const Auth = () => {
         return;
       }
 
-      try {
-        const path = await getAuthRedirectPath(session.user.id);
-        if (path === POST_AUTH_DEFAULT_PATH) {
-          await blockSocialSignIn(attempt, source);
-          return;
-        }
-      } catch (error) {
-        logger.warn(`[Auth ${source}] Failed to preflight social sign-in redirect, continuing`, { error });
-      }
-
+      // A verified session is a successful login, even if setup is unfinished.
+      // Let the normal profile routing send that account through onboarding.
       clearPendingSocialAuthAttempt();
       await handlePostAuthNavigation(session, source);
     },
-    [blockSocialSignIn, handlePostAuthNavigation],
+    [handlePostAuthNavigation],
   );
 
   // If we ever land back on /auth, allow redirects to run again
@@ -640,33 +564,51 @@ const Auth = () => {
 
   // Handle OAuth callback parameters that return the user to /auth with a valid code/token
   useEffect(() => {
+    // A native return link can arrive while this screen is already mounted.
+    if (hasOAuthCallbackParams()) {
+      oauthCallbackInProgress.current = true;
+      hasRedirected.current = false;
+    }
     const handleOAuthCallback = async () => {
       if (typeof window === "undefined" || hasRedirected.current || !oauthCallbackInProgress.current) return;
 
       const url = new URL(window.location.href);
       const hasAccessToken = url.hash.includes("access_token");
       const code = url.searchParams.get("code");
+      const hashParams = new URLSearchParams(url.hash.substring(1));
+      const callbackError = url.searchParams.get("error") ?? hashParams.get("error");
       const pendingAttempt = readPendingSocialAuthAttempt();
 
       // Only run when coming back from an OAuth provider
-      if (!code && !hasAccessToken) return;
+      if (!code && !hasAccessToken && !callbackError) return;
 
       try {
+        if (callbackError) {
+          throw new Error("Apple sign-in wasn't completed. Please try again.");
+        }
         // If Supabase didn't automatically exchange the code, do it manually
         if (code) {
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
           await handleResolvedSocialAuth(data.session, "oauthCodeExchange", pendingAttempt);
         } else {
-          // Hash-based tokens (implicit flow)
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            await handleResolvedSocialAuth(session, "oauthHashSession", pendingAttempt);
-          }
+          // On warm native returns, URL processing did not run at client startup.
+          const accessToken = hashParams.get("access_token");
+          const refreshToken = hashParams.get("refresh_token");
+          if (!accessToken || !refreshToken) throw new Error("Apple sign-in did not return session tokens.");
+          const { data: { session: existingSession } } = await supabase.auth.getSession();
+          const result = existingSession?.access_token === accessToken
+            ? { data: { session: existingSession }, error: null }
+            : await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+          if (result.error) throw result.error;
+          const session = result.data.session;
+          if (!session) throw new Error("Apple sign-in did not return a session.");
+          await handleResolvedSocialAuth(session, "oauthHashSession", pendingAttempt);
         }
       } catch (error) {
         clearPendingSocialAuthAttempt();
         logger.error("[OAuth Callback] Failed to complete OAuth login", { error });
+        setInlineError("Apple sign-in wasn't completed. Please try again.");
         toast({
           title: "Error",
           description: "Something went wrong signing you in. Please try again.",
@@ -678,7 +620,11 @@ const Auth = () => {
           url.searchParams.delete("code");
           const cleanedUrl = `${url.pathname}${url.search}${url.hash}`;
           window.history.replaceState(window.history.state, "", cleanedUrl);
-        } else if (hasAccessToken) {
+        } else if (hasAccessToken || callbackError) {
+          url.searchParams.delete("error");
+          url.searchParams.delete("error_description");
+          url.searchParams.delete("error_code");
+          window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
           window.location.hash = "";
         }
 
@@ -687,10 +633,12 @@ const Auth = () => {
     };
 
     handleOAuthCallback();
-  }, [handleResolvedSocialAuth, toast]);
+  }, [handleResolvedSocialAuth, toast, location.key]);
 
   // Separate effect for session check and auth state listener
   useEffect(() => {
+    let disposed = false;
+    let authNavigationTimeout: ReturnType<typeof setTimeout> | null = null;
     const checkSession = async () => {
       if (oauthCallbackInProgress.current) {
         logger.debug("[Auth checkSession] Deferring session redirect while OAuth callback is processing");
@@ -698,16 +646,21 @@ const Auth = () => {
       }
 
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
+      if (session && !disposed && !directSocialAuthInProgressRef.current && !oauthCallbackInProgress.current) {
         await handlePostAuthNavigation(session, 'checkSession');
       }
     };
 
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       // Handle all sign-in events including setSession() which triggers TOKEN_REFRESHED
       if (['SIGNED_IN', 'TOKEN_REFRESHED', 'INITIAL_SESSION'].includes(event) && session) {
+        if (directSocialAuthInProgressRef.current) {
+          logger.debug(`[Auth onAuthStateChange] Deferring ${event} while direct social auth is resolving`);
+          return;
+        }
+
         if (oauthCallbackInProgress.current) {
           logger.debug(`[Auth onAuthStateChange] Deferring ${event} while OAuth callback is processing`);
           return;
@@ -721,12 +674,20 @@ const Auth = () => {
         
         const timestamp = Date.now();
         logger.info(`[Auth onAuthStateChange] Event: ${event} at ${timestamp}, redirecting...`);
-        await new Promise(resolve => setTimeout(resolve, 100));
-        await handlePostAuthNavigation(session, `onAuthStateChange:${event}`);
+        // Supabase awaits listeners while holding its auth lock. Database work
+        // must start after this callback returns, or web logins can deadlock.
+        if (authNavigationTimeout) clearTimeout(authNavigationTimeout);
+        authNavigationTimeout = setTimeout(() => {
+          authNavigationTimeout = null;
+          if (disposed || directSocialAuthInProgressRef.current || oauthCallbackInProgress.current) return;
+          void handlePostAuthNavigation(session, `onAuthStateChange:${event}`);
+        }, 0);
       }
     });
 
     return () => {
+      disposed = true;
+      if (authNavigationTimeout) clearTimeout(authNavigationTimeout);
       subscription.unsubscribe();
       if (appleFallbackTimeout.current) {
         clearTimeout(appleFallbackTimeout.current);
@@ -795,6 +756,7 @@ const Auth = () => {
         });
 
         if (sessionError) throw sessionError;
+        if (!session) throw new Error("We couldn't start your session. Please try signing in again.");
 
         await handlePostAuthNavigation(session, 'passwordSignIn');
       } else {
@@ -816,6 +778,7 @@ const Auth = () => {
           });
 
           if (sessionError) throw sessionError;
+          if (!session) throw new Error("We couldn't start your session. Please try signing in again.");
 
           await handlePostAuthNavigation(session, 'signUpImmediate');
         } else {
@@ -902,7 +865,7 @@ const Auth = () => {
         const applePostAuthNavigationContext: PostAuthNavigationContext = {
           provider: "apple",
           intent: socialAuthIntent,
-          preferGuardedLanding: socialAuthIntent === "sign_in",
+          preferGuardedLanding: false,
         };
         console.log('[Apple OAuth] Initiating native Apple sign-in');
         
@@ -943,86 +906,31 @@ const Auth = () => {
           throw new Error('Apple Sign-In failed - no identity token returned');
         }
 
-        console.log('[Apple OAuth] Calling apple-native-auth edge function');
+        const nativeAttempt: PendingSocialAuthAttempt = {
+          provider: 'apple',
+          intent: socialAuthIntent,
+        };
+        storedPendingSocialAuth = storePendingSocialAuthAttempt(nativeAttempt);
+        directSocialAuthInProgressRef.current = true;
 
-        // Call our edge function to handle native Apple auth
-        const edgeInvokeStart = Date.now();
-        const { data: sessionData, error: functionError } = await supabase.functions.invoke('apple-native-auth', {
-          body: {
-            identityToken: result.response.identityToken,
-            rawNonce,
-            intent: socialAuthIntent,
-          }
-        });
-        const functionErrorBody = functionError ? await readFunctionErrorContext(functionError) : null;
-        console.log(`[Apple OAuth] apple-native-auth completed in ${Date.now() - edgeInvokeStart}ms`);
+        console.log('[Apple OAuth] Exchanging the Apple ID token with Supabase Auth');
+        const idTokenExchangeStart = Date.now();
+        const {
+          data: { session: sessionToUse },
+          error: idTokenError,
+        } = await exchangeAppleIdentityToken(() => supabase.auth.signInWithIdToken({
+          provider: 'apple',
+          token: result.response.identityToken,
+          nonce: rawNonce,
+        }));
+        console.log(`[Apple OAuth] Supabase ID-token exchange completed in ${Date.now() - idTokenExchangeStart}ms`);
 
-        console.log('[Apple OAuth] Edge function response:', { 
-          hasAccessToken: !!sessionData?.access_token,
-          hasRefreshToken: !!sessionData?.refresh_token,
-          error: functionErrorBody?.error || functionError?.message,
-          errorCode: functionErrorBody?.code
-        });
-
-        if (functionError) {
-          if (functionErrorBody?.code === 'ACCOUNT_NOT_FOUND') {
-            setInlineError(getSocialAccountNotFoundMessage('apple'));
-            setIsLogin(true);
-            setIsForgotPassword(false);
-            return;
-          }
-
-          if (functionErrorBody?.code === 'APPLE_EMAIL_MISSING') {
-            console.warn('[Apple OAuth] Missing email for Apple ID, prompting user to re-register');
-            setInlineError("We couldn’t create an account with your Apple ID. Open Settings, remove Revolution from Sign in with Apple, then try again and share your email.");
-            setIsLogin(true);
-            setIsForgotPassword(false);
-            return;
-          }
-
-          if (functionErrorBody?.code === 'APPLE_NONCE_MISSING' || functionErrorBody?.code === 'APPLE_NONCE_MISMATCH') {
-            throw new Error('Apple Sign-In security check failed. Please try again.');
-          }
-
-          throw new Error(await getAppleAuthErrorMessage(functionError, socialAuthIntent));
+        if (idTokenError) {
+          throw idTokenError;
         }
-        if (!sessionData?.access_token || !sessionData?.refresh_token) {
-          clearPendingPostAuthNavigationContext();
-          throw new Error('Failed to get session tokens from edge function');
-        }
-
-        const nativeAppleSessionUserId =
-          sessionData?.user && typeof sessionData.user === "object" && "id" in sessionData.user
-            ? (sessionData.user.id as string | undefined)
-            : undefined;
-
-        if (nativeAppleSessionUserId) {
-          setPendingPostAuthNavigationContext(
-            nativeAppleSessionUserId,
-            applePostAuthNavigationContext,
-          );
-        }
-
-        // Set the session with tokens from edge function
-        const setSessionStart = Date.now();
-        const { error: sessionError, data: { session: newSession } } = await supabase.auth.setSession({
-          access_token: sessionData.access_token,
-          refresh_token: sessionData.refresh_token,
-        });
-        console.log(`[Apple OAuth] setSession completed in ${Date.now() - setSessionStart}ms`);
-
-        if (sessionError) {
-          clearPendingPostAuthNavigationContext(nativeAppleSessionUserId);
-          throw sessionError;
-        }
-
-        // Ensure Supabase client state reflects the session before navigating
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        const sessionToUse = newSession ?? currentSession;
 
         if (!sessionToUse) {
-          clearPendingPostAuthNavigationContext(nativeAppleSessionUserId);
-          throw new Error('Failed to establish Supabase session after Apple sign-in');
+          throw new Error('Apple Sign-In completed without a Supabase session');
         }
 
         setPendingPostAuthNavigationContext(
@@ -1032,12 +940,15 @@ const Auth = () => {
 
         const sessionSetTime = Date.now();
         console.log(`[Apple OAuth] Session set successfully at ${sessionSetTime}, proceeding to navigation`);
-        console.log('[Apple OAuth] Triggering post-auth navigation');
-        void handlePostAuthNavigation(
+        console.log('[Apple OAuth] Resolving post-auth navigation');
+        clearPendingSocialAuthAttempt();
+        storedPendingSocialAuth = false;
+        await handlePostAuthNavigation(
           sessionToUse,
           'appleNative',
           applePostAuthNavigationContext,
         );
+        directSocialAuthInProgressRef.current = false;
         console.log(`[Apple OAuth] Total native flow completed in ${Date.now() - appleFlowStart}ms`);
 
         // Fallback: manually redirect if onAuthStateChange doesn't fire (increased to 800ms to avoid race conditions)
@@ -1082,6 +993,7 @@ const Auth = () => {
         provider,
         options: {
           redirectTo: getRedirectUrlWithPath('/auth'),
+          ...(isNative ? { skipBrowserRedirect: true } : {}),
         },
       });
 
@@ -1092,6 +1004,10 @@ const Auth = () => {
       });
 
       if (error) throw error;
+      if (isNative) {
+        if (!oauthData?.url) throw new Error("Apple sign-in did not return a login URL.");
+        await Browser.open({ url: oauthData.url });
+      }
     } catch (error) {
       clearPendingPostAuthNavigationContext();
       if (storedPendingSocialAuth) {
@@ -1114,6 +1030,7 @@ const Auth = () => {
 
       setInlineError(getAppleErrorDescription(error));
     } finally {
+      directSocialAuthInProgressRef.current = false;
       setOauthLoading(null);
     }
   };

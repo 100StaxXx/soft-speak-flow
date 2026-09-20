@@ -1,10 +1,10 @@
 import { memo, useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { useEvolution } from "@/contexts/EvolutionContext";
 
 interface EvolveButtonProps {
   onEvolve: () => void;
   isEvolving: boolean;
+  revealReady?: boolean;
   actionLabel?: string;
   loadingLabel?: string;
   durationLabel?: string;
@@ -15,12 +15,14 @@ const LONG_RUNNING_MESSAGE_DELAY_MS = 75_000;
 export const EvolveButton = memo(({
   onEvolve,
   isEvolving,
+  revealReady = false,
   actionLabel = "EVOLVE",
   loadingLabel = "EVOLVING...",
   durationLabel = "This can take a few minutes",
 }: EvolveButtonProps) => {
   const { isEvolvingLoading } = useEvolution();
-  const isProcessing = isEvolving || isEvolvingLoading;
+  // A persisted playable reveal takes precedence over late job/loading updates.
+  const isProcessing = !revealReady && (isEvolving || isEvolvingLoading);
   const [showLongRunningMessage, setShowLongRunningMessage] = useState(false);
 
   useEffect(() => {
@@ -34,143 +36,34 @@ export const EvolveButton = memo(({
       setShowLongRunningMessage(true);
     }, LONG_RUNNING_MESSAGE_DELAY_MS);
 
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
+    return () => window.clearTimeout(timeoutId);
   }, [isProcessing]);
 
   const handleClick = () => {
-    if (!isProcessing) {
-      onEvolve();
-    }
+    if (!isProcessing) onEvolve();
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -10, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -10, scale: 0.98 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      className="pt-4"
-    >
+    <div className="pt-2">
       <button
+        type="button"
         onClick={handleClick}
         disabled={isProcessing}
+        aria-busy={isProcessing}
         data-tour="evolve-companion-button"
         data-tour-shape="rounded-rect"
-        className="
-          relative w-full py-5 rounded-xl
-          font-heading font-black text-3xl sm:text-4xl tracking-[0.35em]
-          uppercase overflow-hidden
-          transition-all duration-300
-          hover:scale-[1.02] active:scale-[0.98]
-          disabled:cursor-not-allowed disabled:opacity-70
-          border border-white/20
-        "
-        style={{
-          background: `linear-gradient(90deg, 
-            rgba(255,0,0,0.2), 
-            rgba(255,64,0,0.2),
-            rgba(255,128,0,0.2), 
-            rgba(255,192,0,0.2),
-            rgba(255,255,0,0.2), 
-            rgba(128,255,0,0.2),
-            rgba(0,255,0,0.2), 
-            rgba(0,255,128,0.2),
-            rgba(0,255,255,0.2), 
-            rgba(0,128,255,0.2), 
-            rgba(0,0,255,0.2),
-            rgba(128,0,255,0.2), 
-            rgba(255,0,255,0.2),
-            rgba(255,0,128,0.2), 
-            rgba(255,0,0,0.2)
-          )`,
-          backgroundSize: "300% 100%",
-          animation: "rainbow-slide 3s linear infinite",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-        }}
+        className="min-h-11 w-full rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-semibold tracking-wide text-foreground transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {/* Metallic sheen overlay */}
-        <div 
-          className="absolute inset-0 rounded-xl pointer-events-none"
-          style={{
-            background: "linear-gradient(135deg, rgba(255,255,255,0.3) 0%, transparent 40%, transparent 60%, rgba(255,255,255,0.15) 100%)",
-          }}
-        />
-
-        {/* Shimmer sweep effect */}
-        <div 
-          className="absolute inset-0 rounded-xl pointer-events-none overflow-hidden"
-        >
-          <div 
-            className="absolute inset-0"
-            style={{
-              background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)",
-              animation: "shimmer-sweep 2s ease-in-out infinite",
-            }}
-          />
-        </div>
-
-        {/* Star sparkle particles */}
-        <div className="absolute inset-0 rounded-xl pointer-events-none overflow-hidden">
-          <div className="absolute w-3 h-3 bg-white star-sparkle-4 animate-sparkle-1" style={{ top: '20%', left: '15%' }} />
-          <div className="absolute w-4 h-4 bg-white star-sparkle-4 animate-sparkle-2" style={{ top: '60%', left: '75%' }} />
-          <div className="absolute w-3 h-3 bg-white star-sparkle-4 animate-sparkle-3" style={{ top: '40%', left: '45%' }} />
-          <div className="absolute w-2 h-2 bg-white star-sparkle-4 animate-sparkle-4" style={{ top: '70%', left: '25%' }} />
-          <div className="absolute w-3 h-3 bg-white star-sparkle-4 animate-sparkle-5" style={{ top: '30%', left: '85%' }} />
-        </div>
-
-        {/* Rainbow border glow */}
-        <div 
-          className="absolute inset-0 -z-10 rounded-xl opacity-60"
-          style={{
-            background: "linear-gradient(90deg, #ff0000, #ff4000, #ff8000, #ffc000, #ffff00, #80ff00, #00ff00, #00ff80, #00ffff, #0080ff, #0000ff, #8000ff, #ff00ff, #ff0080, #ff0000)",
-            backgroundSize: "300% 100%",
-            animation: "rainbow-slide 3s linear infinite",
-            filter: "blur(8px)",
-            transform: "scale(1.02)",
-          }}
-        />
-        
-        {/* Content */}
-        <div className="relative z-10 h-[1.2em]">
-          {isProcessing ? (
-            <motion.span 
-              className="absolute inset-0 flex items-center justify-center text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]"
-              style={{
-                textShadow: "0 0 20px rgba(255,255,255,0.5), 0 0 40px rgba(255,255,255,0.3)",
-              }}
-              animate={{ opacity: [1, 0.5, 1] }}
-              transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-            >
-              {loadingLabel}
-            </motion.span>
-          ) : (
-            <span 
-              className="absolute inset-0 flex items-center justify-center text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]"
-              style={{
-                textShadow: "0 0 20px rgba(255,255,255,0.5), 0 0 40px rgba(255,255,255,0.3)",
-              }}
-            >
-              {actionLabel}
-            </span>
-          )}
-        </div>
+        {isProcessing ? loadingLabel : actionLabel}
       </button>
       {isProcessing && (
-        <div className="mt-2 space-y-1 text-center">
-          <p className="text-sm text-muted-foreground">
-            {showLongRunningMessage
-              ? "Still working. Reveal videos can take several minutes."
-              : durationLabel}
-          </p>
-          <p className="text-xs text-muted-foreground/80">
-            You can leave this screen and come back when it is ready.
-          </p>
-        </div>
+        <p role="status" className="mt-2 text-center text-xs leading-relaxed text-muted-foreground">
+          {showLongRunningMessage
+            ? "Still preparing your video. You can leave and come back."
+            : durationLabel}
+        </p>
       )}
-    </motion.div>
+    </div>
   );
 });
 

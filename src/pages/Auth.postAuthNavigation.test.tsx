@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
   const getSessionMock = vi.fn();
   const onAuthStateChangeMock = vi.fn();
   const invokeMock = vi.fn();
+  const signInWithIdTokenMock = vi.fn();
   const setSessionMock = vi.fn();
   const appleAuthorizeMock = vi.fn();
   const maybeSingleMock = vi.fn();
@@ -31,6 +32,7 @@ const mocks = vi.hoisted(() => {
     getSessionMock,
     onAuthStateChangeMock,
     invokeMock,
+    signInWithIdTokenMock,
     setSessionMock,
     appleAuthorizeMock,
     maybeSingleMock,
@@ -108,6 +110,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       signUp: vi.fn(),
       resetPasswordForEmail: vi.fn(),
       signInWithOAuth: vi.fn(),
+      signInWithIdToken: mocks.signInWithIdTokenMock,
       setSession: mocks.setSessionMock,
     },
     from: mocks.fromMock,
@@ -161,15 +164,7 @@ const primeNativeAppleFlow = () => {
       user: "apple-user-1",
     },
   });
-  mocks.invokeMock.mockResolvedValue({
-    data: {
-      access_token: "access-token",
-      refresh_token: "refresh-token",
-      user: signedInSession.user,
-    },
-    error: null,
-  });
-  mocks.setSessionMock.mockResolvedValue({
+  mocks.signInWithIdTokenMock.mockResolvedValue({
     data: {
       session: signedInSession,
     },
@@ -200,8 +195,9 @@ describe("Auth post-auth navigation", () => {
     });
 
     mocks.getAuthRedirectPathMock.mockResolvedValue("/tasks");
+    mocks.setSessionMock.mockResolvedValue({ data: { session: signedInSession }, error: null });
     mocks.getProfileAwareAuthFallbackPathMock.mockResolvedValue("/tasks");
-    mocks.setSessionMock.mockResolvedValue({
+    mocks.signInWithIdTokenMock.mockResolvedValue({
       data: {
         session: signedInSession,
       },
@@ -266,6 +262,47 @@ describe("Auth post-auth navigation", () => {
 
     expect(screen.queryByRole("button", { name: /continue as guest/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^sign in$/i })).toBeInTheDocument();
+  });
+
+  it("finishes email sign-in without holding the auth listener open for database work", async () => {
+    mocks.getSessionMock.mockResolvedValue({ data: { session: null } });
+    mocks.invokeMock.mockResolvedValue({ data: { access_token: "access", refresh_token: "refresh" }, error: null });
+    let authLockHeld = false;
+    mocks.getAuthRedirectPathMock.mockImplementation(async () => {
+      expect(authLockHeld).toBe(false);
+      return "/tasks";
+    });
+    mocks.setSessionMock.mockImplementation(async () => {
+      authLockHeld = true;
+      const listener = mocks.onAuthStateChangeMock.mock.calls[0][0];
+      const result = listener("SIGNED_IN", signedInSession);
+      expect(result).toBeUndefined();
+      authLockHeld = false;
+      return { data: { session: signedInSession }, error: null };
+    });
+    renderAuth();
+    await flushMicrotasks();
+    fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: " USER@EXAMPLE.COM " } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "Password123" } });
+    fireEvent.submit(screen.getByRole("button", { name: /^sign in$/i }).closest("form")!);
+    await waitFor(() => expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/tasks"));
+    expect(mocks.invokeMock).toHaveBeenCalledWith("auth-gateway", {
+      body: { action: "sign_in_password", email: "user@example.com", password: "Password123", productMode: "cosmiq" },
+    });
+    expect(mocks.setSessionMock).toHaveBeenCalledWith({ access_token: "access", refresh_token: "refresh" });
+  });
+
+  it("does not silently succeed when password login returns no session", async () => {
+    mocks.getSessionMock.mockResolvedValue({ data: { session: null } });
+    mocks.invokeMock.mockResolvedValue({ data: { access_token: "access", refresh_token: "refresh" }, error: null });
+    mocks.setSessionMock.mockResolvedValue({ data: { session: null }, error: null });
+    renderAuth();
+    await flushMicrotasks();
+    fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: "user@example.com" } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "Password123" } });
+    fireEvent.submit(screen.getByRole("button", { name: /^sign in$/i }).closest("form")!);
+    expect(await screen.findByRole("alert")).toHaveTextContent("couldn't start your session");
+    expect(mocks.safeNavigateMock).not.toHaveBeenCalled();
   });
 
   it("lets account creation users reveal and hide password fields", async () => {
@@ -644,7 +681,7 @@ describe("Auth post-auth navigation", () => {
     );
   });
 
-  it("routes native Apple sign-in timeout fallbacks to / instead of /onboarding", async () => {
+  it("routes incomplete Apple accounts through onboarding after timeout", async () => {
     vi.useFakeTimers();
     primeNativeAppleFlow();
     mocks.getAuthRedirectPathMock.mockImplementation(() => new Promise(() => {}));
@@ -658,18 +695,18 @@ describe("Auth post-auth navigation", () => {
     await flushMicrotasks();
     await flushMicrotasks();
 
-    expect(mocks.setSessionMock).toHaveBeenCalledTimes(1);
+    expect(mocks.signInWithIdTokenMock).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);
     });
     await flushMicrotasks();
 
-    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/");
+    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/onboarding");
     expect(mocks.safeNavigateMock).toHaveBeenCalledTimes(1);
   });
 
-  it("routes native Apple sign-in core redirects to / instead of /onboarding", async () => {
+  it("routes incomplete Apple accounts directly to onboarding", async () => {
     primeNativeAppleFlow();
     mocks.getAuthRedirectPathMock.mockResolvedValue("/onboarding");
 
@@ -679,7 +716,7 @@ describe("Auth post-auth navigation", () => {
     fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
 
     await waitFor(() => {
-      expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/");
+      expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/onboarding");
     });
   });
 

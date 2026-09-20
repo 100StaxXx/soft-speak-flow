@@ -3,32 +3,9 @@
  * Handles private browsing mode and storage disabled scenarios
  */
 
-const isLocalStorageAvailable = (): boolean => {
-  try {
-    const test = '__storage_test__';
-    localStorage.setItem(test, test);
-    localStorage.removeItem(test);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-const isSessionStorageAvailable = (): boolean => {
-  try {
-    const test = '__storage_test__';
-    sessionStorage.setItem(test, test);
-    sessionStorage.removeItem(test);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 export const safeLocalStorage = {
   getItem: (key: string): string | null => {
     try {
-      if (!isLocalStorageAvailable()) return null;
       return localStorage.getItem(key);
     } catch {
       return null;
@@ -37,7 +14,6 @@ export const safeLocalStorage = {
 
   setItem: (key: string, value: string): boolean => {
     try {
-      if (!isLocalStorageAvailable()) return false;
       localStorage.setItem(key, value);
       return true;
     } catch {
@@ -47,7 +23,6 @@ export const safeLocalStorage = {
 
   removeItem: (key: string): boolean => {
     try {
-      if (!isLocalStorageAvailable()) return false;
       localStorage.removeItem(key);
       return true;
     } catch {
@@ -57,7 +32,6 @@ export const safeLocalStorage = {
 
   clear: (): boolean => {
     try {
-      if (!isLocalStorageAvailable()) return false;
       localStorage.clear();
       return true;
     } catch {
@@ -69,7 +43,6 @@ export const safeLocalStorage = {
 export const safeSessionStorage = {
   getItem: (key: string): string | null => {
     try {
-      if (!isSessionStorageAvailable()) return null;
       return sessionStorage.getItem(key);
     } catch {
       return null;
@@ -78,7 +51,6 @@ export const safeSessionStorage = {
 
   setItem: (key: string, value: string): boolean => {
     try {
-      if (!isSessionStorageAvailable()) return false;
       sessionStorage.setItem(key, value);
       return true;
     } catch {
@@ -88,7 +60,6 @@ export const safeSessionStorage = {
 
   removeItem: (key: string): boolean => {
     try {
-      if (!isSessionStorageAvailable()) return false;
       sessionStorage.removeItem(key);
       return true;
     } catch {
@@ -98,7 +69,6 @@ export const safeSessionStorage = {
 
   clear: (): boolean => {
     try {
-      if (!isSessionStorageAvailable()) return false;
       sessionStorage.clear();
       return true;
     } catch {

@@ -525,6 +525,7 @@ const CompanionEvolutionContent = ({
   const [animationVideoReady, setAnimationVideoReady] = useState(Boolean(animationVideoUrl));
   const [animationVideoFailed, setAnimationVideoFailed] = useState(false);
   const [animationVideoEnded, setAnimationVideoEnded] = useState(false);
+  const [animationNeedsPlay, setAnimationNeedsPlay] = useState(false);
 
   const isFirstEvolution = newStage === 1;
   const { profile, capabilities, signals } = useMotionProfile();
@@ -669,6 +670,7 @@ const CompanionEvolutionContent = ({
     setAnimationVideoReady(Boolean(animationVideoUrl));
     setAnimationVideoFailed(false);
     setAnimationVideoEnded(false);
+    setAnimationNeedsPlay(false);
 
     const videoElement = animationVideoRef.current;
     if (videoElement) {
@@ -732,9 +734,26 @@ const CompanionEvolutionContent = ({
     }
   }, [animationVideoUrl, shouldPrepareAnimationVideo]);
 
+  const handleAnimationPlayError = useCallback((error: unknown) => {
+    const name = error && typeof error === "object" && "name" in error ? error.name : null;
+    // iOS can require a fresh gesture after app switching or in Low Power Mode.
+    // That is not a failed render: keep the finished video available to play.
+    if (name === "NotAllowedError" || name === "AbortError") {
+      setAnimationNeedsPlay(true);
+      return;
+    }
+    log.warn("Evolution animation video playback failed", {
+      animationVideoUrl,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    setAnimationVideoFailed(true);
+    onAnimationError?.();
+  }, [animationVideoUrl, onAnimationError]);
+
   useEffect(() => {
     const videoElement = animationVideoRef.current;
     if (!showAnimationVideo || !videoElement) return;
+    let active = true;
 
     videoElement.muted = true;
     videoElement.playsInline = true;
@@ -745,14 +764,10 @@ const CompanionEvolutionContent = ({
     }
 
     void videoElement.play().catch((error) => {
-      log.warn("Evolution animation video playback failed", {
-        animationVideoUrl,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      setAnimationVideoFailed(true);
-      onAnimationError?.();
+      if (active) handleAnimationPlayError(error);
     });
-  }, [animationVideoUrl, onAnimationError, showAnimationVideo]);
+    return () => { active = false; };
+  }, [handleAnimationPlayError, showAnimationVideo]);
 
   useEffect(() => {
     if (!isEvolving) {
@@ -1633,6 +1648,10 @@ const CompanionEvolutionContent = ({
                     data-animation-visible={showAnimationVideo ? "true" : "false"}
                     onCanPlay={() => setAnimationVideoReady(true)}
                     onLoadedData={() => setAnimationVideoReady(true)}
+                    onPlaying={() => setAnimationNeedsPlay(false)}
+                    onPause={(event) => {
+                      if (!event.currentTarget.ended) setAnimationNeedsPlay(true);
+                    }}
                     onEnded={() => setAnimationVideoEnded(true)}
                     onError={() => {
                       log.warn("Evolution animation video failed during reveal", {
@@ -1653,6 +1672,20 @@ const CompanionEvolutionContent = ({
                           : "none",
                     }}
                   />
+                )}
+
+                {showAnimationVideo && animationNeedsPlay && (
+                  <button
+                    type="button"
+                    className="absolute inset-x-8 bottom-8 z-10 min-h-12 rounded-full border border-white/40 bg-black/80 px-5 py-3 font-semibold text-white shadow-lg"
+                    onTouchStart={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void animationVideoRef.current?.play().catch(handleAnimationPlayError);
+                    }}
+                  >
+                    Play animation
+                  </button>
                 )}
 
                 {(phase === "reveal" || phase === "settle") && (

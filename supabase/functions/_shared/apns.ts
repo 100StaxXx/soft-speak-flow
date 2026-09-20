@@ -24,10 +24,14 @@ interface APNSConfig {
 
 let cachedJwt: { token: string; expiresAt: number } | null = null;
 
-function readAPNSConfig(): APNSConfig {
+export function notificationTopicForProduct(productMode: "cosmiq" | "graceward"): string {
+  return productMode === "graceward" ? "com.darrylgraham.graceward" : "com.darrylgraham.revolution";
+}
+
+function readAPNSConfig(productMode?: "cosmiq" | "graceward"): APNSConfig {
   const keyId = Deno.env.get("APNS_KEY_ID");
   const teamId = Deno.env.get("APNS_TEAM_ID");
-  const bundleId = Deno.env.get("APNS_BUNDLE_ID");
+  const bundleId = productMode ? notificationTopicForProduct(productMode) : Deno.env.get("APNS_BUNDLE_ID");
   const authKey = Deno.env.get("APNS_AUTH_KEY");
   const environment = Deno.env.get("APNS_ENVIRONMENT") === "production" ? "production" : "sandbox";
 
@@ -184,6 +188,7 @@ export function buildAPNSNotificationBody(payload: APNSNotificationPayload): Rec
 export async function sendAPNSNotification(
   deviceToken: string,
   payload: APNSNotificationPayload,
+  productMode?: "cosmiq" | "graceward",
 ): Promise<APNSDeliveryResult> {
   if (!isValidDeviceToken(deviceToken)) {
     return {
@@ -196,7 +201,7 @@ export async function sendAPNSNotification(
     };
   }
 
-  const config = readAPNSConfig();
+  const config = readAPNSConfig(productMode);
   const primary = await sendWithEnvironment(config, config.environment, deviceToken, payload);
 
   // Support both debug (sandbox) and production tokens without manual secret flips.

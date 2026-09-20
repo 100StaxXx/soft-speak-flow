@@ -1244,11 +1244,29 @@ All colors MUST be HSL.
     -webkit-touch-callout: none;
   }
 
-  /* Inputs/selectable fields */
+  /* Inputs remain normally editable and selectable on the web. */
   input,
   textarea,
   [contenteditable="true"],
   [contenteditable="true"] * {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    -webkit-touch-callout: default !important;
+  }
+
+  /* Native task fields accept typing and cursor taps without Safari's long-press menu. */
+  body.platform-native-ios input,
+  body.platform-native-ios textarea,
+  body.platform-native-ios [contenteditable="true"],
+  body.platform-native-ios [contenteditable="true"] * {
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+  }
+
+  /* Rare native fields can explicitly opt back into selection when essential. */
+  body.platform-native-ios [data-native-text-selection="allow"],
+  body.platform-native-ios [data-native-text-selection="allow"] * {
     -webkit-user-select: text !important;
     user-select: text !important;
     -webkit-touch-callout: default !important;

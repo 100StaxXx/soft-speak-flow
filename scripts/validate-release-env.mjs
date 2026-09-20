@@ -1,10 +1,17 @@
 #!/usr/bin/env node
 
+import { fileURLToPath } from "node:url";
+import { loadEnv } from "vite";
+
+// Validate exactly the configuration Vite will use, including .env.local and
+// production overrides. Shell variables still take precedence.
+const projectRoot = fileURLToPath(new URL("../", import.meta.url));
+const releaseEnv = loadEnv("production", projectRoot, "VITE_");
+
 const requiredVariables = [
   "VITE_SUPABASE_URL",
   "VITE_SUPABASE_PUBLISHABLE_KEY",
-  "VITE_GOOGLE_WEB_CLIENT_ID",
-  "VITE_GOOGLE_IOS_CLIENT_ID",
+  "VITE_EXPECTED_SUPABASE_PROJECT_REF",
   "VITE_GOOGLE_MAPS_API_KEY",
   "VITE_NATIVE_REDIRECT_BASE",
   "VITE_REVENUECAT_IOS_API_KEY",
@@ -15,7 +22,7 @@ const missing = [];
 const placeholders = [];
 
 for (const name of requiredVariables) {
-  const value = process.env[name]?.trim() ?? "";
+  const value = releaseEnv[name]?.trim() ?? "";
   if (!value) {
     missing.push(name);
   } else if (placeholderPattern.test(value)) {
@@ -34,10 +41,24 @@ if (missing.length > 0 || placeholders.length > 0) {
 }
 
 try {
-  new URL(process.env.VITE_SUPABASE_URL);
-  new URL(process.env.VITE_NATIVE_REDIRECT_BASE);
+  const supabaseUrl = new URL(releaseEnv.VITE_SUPABASE_URL);
+  const nativeRedirectUrl = new URL(releaseEnv.VITE_NATIVE_REDIRECT_BASE);
+  if (
+    supabaseUrl.hostname !== "opbfpbbqvuksuvmtmssd.supabase.co" ||
+    releaseEnv.VITE_EXPECTED_SUPABASE_PROJECT_REF !== "opbfpbbqvuksuvmtmssd"
+  ) {
+    throw new Error("wrong Supabase project");
+  }
+  if (nativeRedirectUrl.origin !== "https://app.cosmiq.quest") {
+    throw new Error("wrong native redirect");
+  }
 } catch {
-  console.error("[release:env] Supabase and native redirect values must be valid URLs.");
+  console.error("[release:env] Cosmiq release values must use the dedicated Cosmiq Supabase project and redirect origin.");
+  process.exit(1);
+}
+
+if (!/^appl_[A-Za-z0-9]+$/.test(releaseEnv.VITE_REVENUECAT_IOS_API_KEY)) {
+  console.error("[release:env] TestFlight and App Store builds require a RevenueCat Apple/iOS public SDK key starting with appl_; development Test Store keys are not supported.");
   process.exit(1);
 }
 

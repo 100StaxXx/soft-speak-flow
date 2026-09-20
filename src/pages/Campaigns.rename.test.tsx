@@ -115,3 +115,4 @@ describe("Campaigns rename wiring", () => {
     expect(completedCallProps.onRename).toBeUndefined();
   });
 });
+vi.mock("@/components/GoalsActivity", () => ({ GoalsActivity: () => <div data-testid="goals-activity" /> }));

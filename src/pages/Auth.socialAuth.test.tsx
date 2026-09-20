@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => {
   const onAuthStateChangeMock = vi.fn();
   const exchangeCodeForSessionMock = vi.fn();
   const invokeMock = vi.fn();
+  const signInWithIdTokenMock = vi.fn();
   const setSessionMock = vi.fn();
   const signOutMock = vi.fn();
   const signInWithOAuthMock = vi.fn();
@@ -26,10 +27,12 @@ const mocks = vi.hoisted(() => {
     onAuthStateChangeMock,
     exchangeCodeForSessionMock,
     invokeMock,
+    signInWithIdTokenMock,
     setSessionMock,
     signOutMock,
     signInWithOAuthMock,
     appleAuthorizeMock,
+    browserOpenMock: vi.fn(),
     isNativePlatform: false,
     platform: "web",
     applePluginAvailable: false,
@@ -86,6 +89,8 @@ vi.mock("@capacitor-community/apple-sign-in", () => ({
   },
 }));
 
+vi.mock("@capacitor/browser", () => ({ Browser: { open: mocks.browserOpenMock } }));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
@@ -96,6 +101,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       signUp: vi.fn(),
       resetPasswordForEmail: vi.fn(),
       signInWithOAuth: mocks.signInWithOAuthMock,
+      signInWithIdToken: mocks.signInWithIdTokenMock,
       setSession: mocks.setSessionMock,
       signOut: mocks.signOutMock,
     },
@@ -149,6 +155,7 @@ describe("Auth social auth intent guard", () => {
     mocks.isNativePlatform = false;
     mocks.platform = "web";
     mocks.applePluginAvailable = false;
+    mocks.browserOpenMock.mockResolvedValue(undefined);
 
     mocks.getSessionMock.mockResolvedValue({
       data: {
@@ -177,13 +184,14 @@ describe("Auth social auth intent guard", () => {
       },
       error: null,
     });
-    mocks.setSessionMock.mockResolvedValue({
+    mocks.signInWithIdTokenMock.mockResolvedValue({
       data: {
         session: signedInSession,
       },
       error: null,
     });
     mocks.signOutMock.mockResolvedValue(undefined);
+    mocks.setSessionMock.mockResolvedValue({ data: { session: signedInSession }, error: null });
     mocks.signInWithOAuthMock.mockResolvedValue({
       data: {
         url: "https://example.com/oauth",
@@ -216,6 +224,77 @@ describe("Auth social auth intent guard", () => {
     expect(screen.queryByRole("button", { name: /sign up with google/i })).not.toBeInTheDocument();
   });
 
+  it("uses Apple web login on the web", async () => {
+    renderAuth();
+    await flushMicrotasks();
+    fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
+    await waitFor(() => expect(mocks.signInWithOAuthMock).toHaveBeenCalledWith({
+      provider: "apple", options: { redirectTo: `${window.location.origin}/auth` },
+    }));
+    expect(mocks.appleAuthorizeMock).not.toHaveBeenCalled();
+  });
+
+  it("opens the external browser when native Apple authorization is unavailable", async () => {
+    mocks.isNativePlatform = true;
+    mocks.platform = "ios";
+    vi.stubEnv("VITE_NATIVE_REDIRECT_BASE", "https://app.cosmiq.quest");
+    renderAuth();
+    await flushMicrotasks();
+    fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
+    await waitFor(() => expect(mocks.browserOpenMock).toHaveBeenCalledWith({ url: "https://example.com/oauth" }));
+    expect(mocks.signInWithOAuthMock).toHaveBeenCalledWith({
+      provider: "apple", options: { redirectTo: "https://app.cosmiq.quest/auth", skipBrowserRedirect: true },
+    });
+    vi.unstubAllEnvs();
+  });
+
+  it("treats Apple cancellation as cancellation and allows another attempt", async () => {
+    mocks.isNativePlatform = true;
+    mocks.platform = "ios";
+    mocks.applePluginAvailable = true;
+    mocks.appleAuthorizeMock.mockRejectedValueOnce(new Error("Authorization cancelled (1001)"));
+    renderAuth();
+    await flushMicrotasks();
+    fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /sign in with apple/i })).toBeEnabled());
+    expect(mocks.signInWithIdTokenMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
+    await waitFor(() => expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/tasks"));
+  });
+
+  it("matches Apple's hashed nonce to the raw nonce exchanged with Supabase", async () => {
+    mocks.isNativePlatform = true;
+    mocks.platform = "ios";
+    mocks.applePluginAvailable = true;
+    renderAuth();
+    await flushMicrotasks();
+    fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
+    await waitFor(() => expect(mocks.signInWithIdTokenMock).toHaveBeenCalled());
+    const raw = mocks.signInWithIdTokenMock.mock.calls[0][0].nonce;
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+    const hash = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+    expect(mocks.appleAuthorizeMock.mock.calls[0][0].nonce).toBe(hash);
+    expect(mocks.invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("reports Apple callback failures and clears the pending attempt", async () => {
+    window.history.replaceState({}, "", "/auth?error=access_denied");
+    storePendingSocialAuthAttempt({ provider: "apple", intent: "sign_in" });
+    renderAuth();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Apple sign-in wasn't completed");
+    expect(window.sessionStorage.getItem("pending_social_auth_attempt")).toBeNull();
+    expect(mocks.safeNavigateMock).not.toHaveBeenCalled();
+  });
+
+  it("establishes the session from a native Apple return link", async () => {
+    window.history.replaceState({}, "", "/auth#access_token=apple-access&refresh_token=apple-refresh");
+    renderAuth();
+    await waitFor(() => expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/tasks"));
+    expect(mocks.setSessionMock).toHaveBeenCalledWith({ access_token: "apple-access", refresh_token: "apple-refresh" });
+    expect(window.location.hash).toBe("");
+  });
+
   it("opens signup mode when requested by the auth query string", async () => {
     renderAuth("/auth?mode=signup");
     await flushMicrotasks();
@@ -226,21 +305,21 @@ describe("Auth social auth intent guard", () => {
     expect(screen.getByRole("button", { name: /already have an account\? sign in/i })).toBeInTheDocument();
   });
 
-  it("sends sign_in intent for Apple in login mode and blocks account-not-found logins", async () => {
+  it("accepts a valid Apple session for an account created moments ago", async () => {
     mocks.isNativePlatform = true;
     mocks.platform = "ios";
     mocks.applePluginAvailable = true;
-    mocks.invokeMock.mockResolvedValue({
-      data: null,
-      error: {
-        message: "Function failed",
-        context: {
-          json: vi.fn().mockResolvedValue({
-            code: "ACCOUNT_NOT_FOUND",
-            error: "No account",
-          }),
+    mocks.signInWithIdTokenMock.mockResolvedValue({
+      data: {
+        session: {
+          ...signedInSession,
+          user: {
+            ...signedInSession.user,
+            created_at: new Date().toISOString(),
+          },
         },
       },
+      error: null,
     });
 
     renderAuth();
@@ -249,29 +328,50 @@ describe("Auth social auth intent guard", () => {
     fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
 
     await waitFor(() => {
-      expect(mocks.invokeMock).toHaveBeenCalledWith("apple-native-auth", {
-        body: expect.objectContaining({
-          identityToken: "apple-identity-token",
-          intent: "sign_in",
-        }),
+      expect(mocks.signInWithIdTokenMock).toHaveBeenCalledWith({
+        provider: "apple",
+        token: "apple-identity-token",
+        nonce: expect.any(String),
       });
     });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "We couldn't find an existing account for Apple sign-in.",
+    await waitFor(() => expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/tasks"));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(mocks.signOutMock).not.toHaveBeenCalled();
+  });
+
+  it("shows a friendly inline error when native Apple auth cannot reach Supabase Auth", async () => {
+    mocks.isNativePlatform = true;
+    mocks.platform = "ios";
+    mocks.applePluginAvailable = true;
+    mocks.signInWithIdTokenMock.mockResolvedValue({
+      data: { session: null },
+      error: {
+        name: "AuthRetryableFetchError",
+        message: "Failed to fetch",
+      },
+    });
+
+    renderAuth();
+    await flushMicrotasks();
+
+    fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
+
+    expect(await screen.findByRole("alert", {}, { timeout: 4000 })).toHaveTextContent(
+      "Network issue while signing in with Apple. Check your connection and try again.",
     );
     expect(mocks.safeNavigateMock).not.toHaveBeenCalled();
   });
 
-  it("shows a friendly inline error when native Apple auth cannot reach the edge function", async () => {
+  it("shows an actionable outage message when the Apple provider is unavailable", async () => {
     mocks.isNativePlatform = true;
     mocks.platform = "ios";
     mocks.applePluginAvailable = true;
-    mocks.invokeMock.mockResolvedValue({
-      data: null,
+    mocks.signInWithIdTokenMock.mockResolvedValue({
+      data: { session: null },
       error: {
-        name: "FunctionsFetchError",
-        message: "Failed to send a request to the Edge Function",
+        name: "AuthApiError",
+        message: "Unsupported provider: provider is not enabled",
       },
     });
 
@@ -281,12 +381,11 @@ describe("Auth social auth intent guard", () => {
     fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "We couldn't reach the server to sign you in with Apple. Check your connection and try again.",
+      "Sign in with Apple is temporarily unavailable. Please try again in a moment.",
     );
-    expect(mocks.safeNavigateMock).not.toHaveBeenCalled();
   });
 
-  it("routes native Apple sign-in timeout fallbacks to guarded home instead of onboarding", async () => {
+  it("routes incomplete Apple accounts to onboarding after a profile timeout", async () => {
     vi.useFakeTimers();
     mocks.isNativePlatform = true;
     mocks.platform = "ios";
@@ -302,14 +401,14 @@ describe("Auth social auth intent guard", () => {
     await flushMicrotasks();
     await flushMicrotasks();
 
-    expect(mocks.setSessionMock).toHaveBeenCalledTimes(1);
+    expect(mocks.signInWithIdTokenMock).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);
     });
     await flushMicrotasks();
 
-    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/");
+    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/onboarding");
     expect(mocks.safeNavigateMock).toHaveBeenCalledTimes(1);
   });
 
@@ -327,11 +426,10 @@ describe("Auth social auth intent guard", () => {
     fireEvent.click(screen.getByRole("button", { name: /sign up with apple/i }));
 
     await waitFor(() => {
-      expect(mocks.invokeMock).toHaveBeenCalledWith("apple-native-auth", {
-        body: expect.objectContaining({
-          identityToken: "apple-identity-token",
-          intent: "sign_up",
-        }),
+      expect(mocks.signInWithIdTokenMock).toHaveBeenCalledWith({
+        provider: "apple",
+        token: "apple-identity-token",
+        nonce: expect.any(String),
       });
     });
 
@@ -340,7 +438,7 @@ describe("Auth social auth intent guard", () => {
     });
   });
 
-  it("blocks redirect-based social sign-in callbacks that resolve to onboarding", async () => {
+  it("lets verified Apple callback sessions finish onboarding", async () => {
     window.history.replaceState({}, "", "/auth?code=oauth-code");
     storePendingSocialAuthAttempt({
       provider: "apple",
@@ -352,12 +450,10 @@ describe("Auth social auth intent guard", () => {
     await flushMicrotasks();
     await flushMicrotasks();
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "We couldn't find an existing account for Apple sign-in.",
-    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(mocks.exchangeCodeForSessionMock).toHaveBeenCalledWith("oauth-code");
-    expect(mocks.signOutMock).toHaveBeenCalledTimes(1);
-    expect(mocks.safeNavigateMock).not.toHaveBeenCalled();
+    expect(mocks.signOutMock).not.toHaveBeenCalled();
+    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/onboarding");
     expect(window.sessionStorage.getItem("pending_social_auth_attempt")).toBeNull();
   });
 });

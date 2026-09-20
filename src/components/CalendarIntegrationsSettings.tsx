@@ -13,6 +13,7 @@ import {
 } from '@/hooks/useCalendarIntegrations';
 import { getCalendarOAuthRedirectUri, getCalendarOAuthSource } from '@/utils/calendarOAuthRedirect';
 import { parseCalendarOAuthUrl } from '@/utils/calendarOAuthUrl';
+import { CalendarLinkStatus } from '@/components/calendar/CalendarLinkStatus';
 
 const PROVIDERS: Array<{ key: CalendarProvider; label: string; web: boolean; ios: boolean }> = [
   { key: 'google', label: 'Google Calendar', web: true, ios: true },
@@ -32,6 +33,7 @@ export function CalendarIntegrationsSettings() {
   const { toast } = useToast();
   const {
     connections,
+    settings,
     integrationVisible,
     defaultProvider,
     connectedByProvider,
@@ -51,7 +53,7 @@ export function CalendarIntegrationsSettings() {
   } = useCalendarIntegrations();
 
   const [calendarOptionsByProvider, setCalendarOptionsByProvider] = useState<
-    Partial<Record<CalendarProvider, Array<{ id: string; name: string }>>>
+    Partial<Record<CalendarProvider, Array<{ id: string; name: string; readOnly?: boolean }>>>
   >({});
   const [taskListOptionsByProvider, setTaskListOptionsByProvider] = useState<
     Partial<Record<CalendarProvider, Array<{ id: string; name: string }>>>
@@ -113,7 +115,7 @@ export function CalendarIntegrationsSettings() {
     const calendars = await listProviderCalendars.mutateAsync(provider);
     setCalendarOptionsByProvider((prev) => ({
       ...prev,
-      [provider]: calendars.map((calendar) => ({ id: calendar.id, name: calendar.name })),
+      [provider]: calendars.map((calendar) => ({ id: calendar.id, name: calendar.name, readOnly: calendar.readOnly })),
     }));
 
     const connection = connectedByProvider[provider];
@@ -121,7 +123,7 @@ export function CalendarIntegrationsSettings() {
       return calendars;
     }
 
-    const preferred = calendars.find((calendar) => calendar.isPrimary) ?? calendars[0];
+    const preferred = calendars.find((calendar) => calendar.isPrimary && !calendar.readOnly) ?? calendars.find((calendar) => !calendar.readOnly);
     if (!preferred) return calendars;
 
     try {
@@ -474,6 +476,21 @@ export function CalendarIntegrationsSettings() {
                   </div>
 
                   {calendars.length > 0 && (
+                    <fieldset className="space-y-2 text-xs">
+                      <legend className="mb-2 text-muted-foreground">Calendars to show</legend>
+                      {calendars.map((calendar) => <label key={calendar.id} className="flex min-h-9 items-center gap-2">
+                        <input type="checkbox" disabled={upsertSettings.isPending}
+                          checked={(settings?.visible_calendars?.[provider.key] ?? [connection.primary_calendar_id]).includes(calendar.id)}
+                          onChange={(event) => {
+                            const selected = settings?.visible_calendars?.[provider.key] ?? (connection.primary_calendar_id ? [connection.primary_calendar_id] : []);
+                            const ids = event.target.checked ? [...new Set([...selected, calendar.id])] : selected.filter((id) => id !== calendar.id);
+                            void upsertSettings.mutateAsync({ visible_calendars: { ...settings?.visible_calendars, [provider.key]: ids } })
+                              .catch(() => toast({ title: 'Could not save calendar visibility', variant: 'destructive' }));
+                          }} />{calendar.name}{calendar.readOnly ? ' · read-only' : ''}
+                      </label>)}
+                    </fieldset>
+                  )}
+                  {calendars.length > 0 && (
                     <Select
                       value={connection.primary_calendar_id || ''}
                       onValueChange={(value) => {
@@ -493,7 +510,7 @@ export function CalendarIntegrationsSettings() {
                         <SelectValue placeholder="Primary destination calendar" />
                       </SelectTrigger>
                       <SelectContent>
-                        {calendars.map((calendar) => (
+                        {calendars.filter((calendar) => !calendar.readOnly).map((calendar) => (
                           <SelectItem key={calendar.id} value={calendar.id}>
                             {calendar.name}
                           </SelectItem>
@@ -535,6 +552,7 @@ export function CalendarIntegrationsSettings() {
             </div>
           );
         })}
+        <CalendarLinkStatus />
       </CardContent>
     </Card>
   );

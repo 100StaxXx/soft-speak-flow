@@ -369,3 +369,4 @@ describe("CalendarIntegrationsSettings", () => {
     expect(screen.queryByRole("button", { name: /use outlook for planning/i })).not.toBeInTheDocument();
   });
 });
+vi.mock('@/components/calendar/CalendarLinkStatus', () => ({ CalendarLinkStatus: () => null }));

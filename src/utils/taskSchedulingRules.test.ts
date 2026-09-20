@@ -103,3 +103,7 @@ describe("taskSchedulingRules", () => {
     expect(normalized.normalizedToInbox).toBe(false);
   });
 });
+it("keeps imported all-day events and due-date-only tasks on their date", () => {
+  expect(normalizeTaskSchedulingState({ task_date: "2026-09-19", scheduled_time: null, habit_source_id: null, source: "calendar_link" }))
+    .toMatchObject({ task_date: "2026-09-19", normalizedToInbox: false, source: "calendar_link" });
+});

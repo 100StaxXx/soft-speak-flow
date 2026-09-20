@@ -103,6 +103,8 @@ import { createPlanDayCompanionLaunchIntent } from "@/utils/companionPlannerLaun
 import type { Habit } from "@/features/habits/types";
 import { durationMinutesToPixels } from "@/utils/taskDurationLayout";
 import type { ExternalCalendarEvent } from "@/types/externalCalendar";
+import { externalCalendarEventKey } from "@/types/externalCalendar";
+import { ExternalEventDetails } from "@/components/calendar/ExternalEventDetails";
 import { calendarProviderDisplayName } from "@/utils/calendarDestinationOptions";
 
 // Helper to calculate days remaining
@@ -226,6 +228,8 @@ const patchSubtaskCompletionInTaskList = <T extends { id: string; subtasks?: Tas
 };
 
 interface TodaysAgendaProps {
+  calendarOnly?: boolean;
+  compactCalendar?: boolean;
   tasks: Task[];
   primaryMissionTaskId?: string | null;
   externalEvents?: ExternalCalendarEvent[];
@@ -530,6 +534,8 @@ const getLaneOffsetPx = (laneIndex: number, overlapCount: number) => {
 };
 
 export const TodaysAgenda = memo(function TodaysAgenda({
+  calendarOnly = false,
+  compactCalendar = false,
   tasks,
   primaryMissionTaskId = null,
   externalEvents = [],
@@ -1069,11 +1075,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     };
   }, [tasks, sortBy, keepInPlace]);
 
+  const [selectedExternalEvent, setSelectedExternalEvent] = useState<ExternalCalendarEvent | null>(null);
   const externalTimedItems = useMemo(
     () => externalEvents
       .filter((event) => !event.isAllDay && !!event.scheduledTime)
       .map((event): Task => ({
-        id: `external:${event.provider}:${event.id}`,
+        id: `external:${externalCalendarEventKey(event)}`,
         task_text: event.title,
         completed: false,
         xp_reward: 0,
@@ -2270,17 +2277,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         </div>
       );
 
-      return task.external_calendar_url ? (
-        <a
-          href={task.external_calendar_url}
-          target="_blank"
-          rel="noreferrer"
-          className="block h-full min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-celestial-blue/60"
-          aria-label={`Open ${task.task_text} in ${providerName} Calendar`}
-        >
-          {card}
-        </a>
-      ) : card;
+      return <button type="button" className="block h-full w-full min-w-0 text-left focus-visible:ring-2 focus-visible:ring-primary"
+        aria-label={`View ${task.task_text} details`}
+        onClick={() => setSelectedExternalEvent(externalEvents.find((event) => `external:${externalCalendarEventKey(event)}` === task.id) ?? null)}>{card}</button>;
     }
 
     const handleCheckboxClick = (e: React.MouseEvent) => {
@@ -2918,7 +2917,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     </aside>
   ) : null;
 
-  const scheduledPaneStyle: CSSProperties | undefined = timelineBodyHeightPx
+  const scheduledPaneStyle: CSSProperties | undefined = compactCalendar ? undefined : timelineBodyHeightPx
     ? isDesktopLayout
       ? { height: `${timelineBodyHeightPx}px` }
       : {
@@ -2929,7 +2928,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       ? { scrollPaddingBottom: mobileFabScrollClearance }
       : undefined;
 
-  const scheduledTimelineContentStyle: CSSProperties | undefined = isDesktopLayout
+  const scheduledTimelineContentStyle: CSSProperties | undefined = isDesktopLayout || compactCalendar
     ? undefined
     : { paddingBottom: mobileFabScrollClearance };
   const mobileDetailTaskXP = mobileDetailTask
@@ -2946,18 +2945,19 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       className={cn(
         COMPANION_FROSTED_PLANNER_DARK_CLASS,
         "relative",
-        isDesktopLayout && "grid grid-cols-[minmax(0,1fr)_340px] items-start gap-6",
+        compactCalendar && "flex h-full min-h-0 flex-col",
+        isDesktopLayout && !calendarOnly && "grid grid-cols-[minmax(0,1fr)_340px] items-start gap-6",
       )}
       data-testid="todays-agenda"
       style={companionFrostedThemeStyle}
     >
       <div
         className={cn(
-          "relative px-2 py-2 overflow-visible",
+          compactCalendar ? "relative flex min-h-0 flex-1 flex-col" : "relative px-2 py-2 overflow-visible",
           isDesktopLayout && "journeys-desktop-shell flex min-h-0 flex-col rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,21,39,0.95),rgba(13,11,23,0.92))] px-5 py-5 shadow-[0_28px_54px_rgba(0,0,0,0.24)]",
         )}
       >
-        {!isDesktopLayout ? (
+        {compactCalendar ? null : !isDesktopLayout ? (
           <header
             className="mb-2 rounded-[20px] border border-white/10 bg-slate-950/55 p-2 shadow-[0_12px_28px_rgba(0,0,0,0.18)] backdrop-blur-xl"
             data-testid="agenda-mobile-header"
@@ -2985,7 +2985,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             </div>
 
             <div className="mt-1 flex min-w-0 items-center gap-1.5 border-t border-white/[0.07] pt-2">
-              {totalCount > 0 ? (
+              {!calendarOnly && totalCount > 0 ? (
                 <div
                   className="flex h-8 items-center gap-1.5 rounded-[14px] bg-white/[0.045] px-2"
                   aria-label={`${completedCount} of ${totalCount} agenda items complete`}
@@ -2994,14 +2994,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   <span className="text-xs font-semibold text-foreground">{completedCount}/{totalCount}</span>
                 </div>
               ) : null}
-              <div
+              {!calendarOnly ? <div
                 className="flex h-8 items-center gap-1 rounded-[14px] bg-white/[0.045] px-2 text-xs"
                 aria-label={`${totalXP} experience points available`}
               >
                 <Trophy className={cn("h-3.5 w-3.5", allComplete ? "text-stardust-gold" : "text-stardust-gold/70")} />
                 <span className="font-semibold text-stardust-gold">{totalXP}</span>
                 <span className="text-muted-foreground">XP</span>
-              </div>
+              </div> : null}
               {onManageCalendars ? (
                 <Button
                   type="button"
@@ -3064,14 +3064,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   {safeFormat(selectedDate, "MMM d, yyyy", "Invalid date")}
                 </span>
               </button>
-              {currentStreak > 0 ? (
+              {!calendarOnly && currentStreak > 0 ? (
                 <div className="flex items-center gap-1 rounded-full bg-orange-500/10 px-2 py-1 text-xs font-medium text-orange-400">
                   <Flame className="h-3.5 w-3.5" />
                   {currentStreak}
                 </div>
               ) : null}
             </div>
-            <div className="flex items-center gap-3">
+            {!calendarOnly ? <div className="flex items-center gap-3">
               {totalCount > 0 ? (
                 <div className="flex items-center gap-2 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
                   <ProgressRing percent={progressPercent} size={24} strokeWidth={2.5} />
@@ -3082,7 +3082,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 <Trophy className={cn("h-4 w-4", allComplete ? "text-stardust-gold" : "text-stardust-gold/70")} />
                 <span className="font-semibold text-stardust-gold">{totalXP}</span>
               </div>
-            </div>
+            </div> : null}
           </div>
         )}
 
@@ -3201,7 +3201,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         ) : null}
 
         <AnimatePresence>
-          {comboCount > 1 && (
+          {!calendarOnly && comboCount > 1 && (
             <motion.div
               key="combo-banner"
               initial={useLiteAnimations ? { opacity: 1 } : { opacity: 0, y: 8, scale: 0.96 }}
@@ -3239,10 +3239,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         </AnimatePresence>
 
         {/* Timeline Content */}
-        <div className={cn(isDesktopLayout && "flex min-h-0 flex-1 flex-col")}>
-          <div className={cn("mb-2 flex flex-wrap items-center justify-between gap-2", isDesktopLayout && "mb-3")}>
+        <div className={cn((isDesktopLayout || compactCalendar) && "flex min-h-0 flex-1 flex-col")}>
+          <div className={cn("mb-2 flex flex-wrap items-center justify-between gap-2", isDesktopLayout && "mb-3", compactCalendar && (anytimeItems.length ? "mb-0 shrink-0 px-2 py-1" : "hidden"))}>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              {tasks.length > 0 && (
+              {!compactCalendar && tasks.length > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
@@ -3388,25 +3388,21 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     </span>
                   );
 
-                  return event.htmlLink ? (
-                    <a
-                      key={`${event.provider}:${event.id}`}
-                      href={event.htmlLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={`Open ${event.title} in ${calendarProviderDisplayName(event.provider)} Calendar`}
+                  return (
+                    <button type="button"
+                      key={externalCalendarEventKey(event)}
+                      onClick={() => setSelectedExternalEvent(event)}
+                      aria-label={`View ${event.title} details`}
                     >
                       {label}
-                    </a>
-                  ) : (
-                    <span key={`${event.provider}:${event.id}`}>{label}</span>
+                    </button>
                   );
                 })}
               </div>
             </div>
           ) : null}
 
-          {tasks.length === 0 && externalEvents.length === 0 ? (
+          {!calendarOnly && tasks.length === 0 && externalEvents.length === 0 ? (
             <div
               className={cn(
                 "mb-3 rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] px-6 py-8 text-center",
@@ -3437,11 +3433,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             </div>
           ) : null}
 
-          <div className={cn(isDesktopLayout && "flex min-h-0 flex-1 flex-col")}>
+          <div className={cn((isDesktopLayout || compactCalendar) && "flex min-h-0 flex-1 flex-col")}>
             <div
               ref={setScheduledPaneNode}
               className={cn(
-                "overflow-y-auto overflow-x-hidden overscroll-contain pr-1",
+                "overflow-y-auto overflow-x-hidden overscroll-contain",
+                compactCalendar ? "min-h-0 flex-1" : "pr-1",
                 isDesktopLayout && "min-h-0",
               )}
               style={scheduledPaneStyle}
@@ -3452,7 +3449,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 style={scheduledTimelineContentStyle}
               >
                 <div
-                  className="relative overflow-hidden rounded-[20px] border border-white/15 bg-slate-950/55 shadow-[0_14px_32px_rgba(0,0,0,0.2)] backdrop-blur-md"
+                  className={cn("relative overflow-hidden border border-white/15 bg-slate-950/55 backdrop-blur-md", !compactCalendar && "rounded-[20px] shadow-[0_14px_32px_rgba(0,0,0,0.2)]")}
                   data-testid="journeys-day-grid"
                   style={{ height: `${timelineHeightPx}px` }}
                 >
@@ -3498,7 +3495,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       style={{ top: `${getTimelineTopPx(nowMarkerMinute)}px` }}
                     >
                       <div
-                        className="pr-2 text-right text-xs font-semibold text-stardust-gold"
+                        className={cn("pr-2 text-right text-xs font-semibold", compactCalendar ? "text-primary" : "text-stardust-gold")}
                         style={{ width: `${OUTLOOK_TIMELINE_GUTTER_WIDTH_PX}px` }}
                       >
                         <span aria-hidden="true">{formatCurrentTimeLabel(nowMarkerMinute)}</span>
@@ -3506,8 +3503,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                           {minuteToTime(nowMarkerMinute)}
                         </span>
                       </div>
-                      <div className="h-2 w-2 rounded-full bg-stardust-gold shadow-[0_0_10px_hsl(var(--stardust-gold)/0.7)]" />
-                      <div className="h-px flex-1 bg-stardust-gold/80" />
+                      <div className={cn("h-1.5 w-1.5 rounded-full", compactCalendar ? "bg-primary" : "bg-stardust-gold shadow-[0_0_10px_hsl(var(--stardust-gold)/0.7)]")} />
+                      <div className={cn("h-px flex-1", compactCalendar ? "bg-primary/80" : "bg-stardust-gold/80")} />
                     </div>
                   ) : null}
 
@@ -3645,7 +3642,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     })}
                   </div>
                 </div>
-                {!isDesktopLayout ? renderCampaignSection() : null}
+                {!isDesktopLayout && !calendarOnly ? renderCampaignSection() : null}
               </div>
             </div>
           </div>
@@ -3654,7 +3651,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         {/* Inbox section removed - now has its own tab */}
       </div>
 
-      {desktopRail}
+      {!calendarOnly ? desktopRail : null}
 
       {!isDesktopLayout && mobileDetailTask ? (
         <Drawer
@@ -3748,6 +3745,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           )
         : null}
 
+      {selectedExternalEvent && <ExternalEventDetails event={selectedExternalEvent} events={externalEvents} quests={[...(weekTasks ?? []), ...tasks]} onClose={() => setSelectedExternalEvent(null)} />}
       {timelineZoomRail ? <DragTimeZoomRail rail={timelineZoomRail} /> : null}
     </div>
   );

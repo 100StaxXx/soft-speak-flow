@@ -12,6 +12,8 @@ const accessState = vi.hoisted(() => ({
   hasAccess: true,
   gateReason: "none" as "none" | "pre_trial_signup" | "trial_expired",
   loading: false,
+  error: false,
+  retry: vi.fn(),
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -57,6 +59,7 @@ describe("ProtectedRoute", () => {
     accessState.hasAccess = true;
     accessState.gateReason = "none";
     accessState.loading = false;
+    accessState.error = false;
   });
 
   it("renders protected content while auth is recovering with a cached user", () => {
@@ -69,6 +72,27 @@ describe("ProtectedRoute", () => {
     expect(screen.getByText("Protected Content")).toBeInTheDocument();
     expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
     expect(screen.queryByText("Welcome Page")).not.toBeInTheDocument();
+  });
+
+  it("shows a retry screen rather than a paywall when the initial access check fails", () => {
+    authState.user = { id: "user-1" };
+    authState.status = "authenticated";
+    accessState.hasAccess = false;
+    accessState.error = true;
+    renderProtectedRoute();
+    expect(screen.getByText("We couldn’t check your access")).toBeInTheDocument();
+    expect(screen.queryByText(/Paywall:/)).not.toBeInTheDocument();
+  });
+
+  it("does not interrupt an already verified user on a failed background check", () => {
+    authState.user = { id: "user-1" };
+    authState.status = "authenticated";
+    const view = renderProtectedRoute();
+    accessState.hasAccess = false;
+    accessState.error = true;
+    view.rerender(ProtectedRouteTree());
+    expect(screen.getByText("Protected Content")).toBeInTheDocument();
+    expect(screen.queryByText(/Paywall:/)).not.toBeInTheDocument();
   });
 
   it("does not redirect while auth is recovering without a cached user", () => {
@@ -173,7 +197,7 @@ describe("ProtectedRoute", () => {
     expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
   });
 
-  it("leaves auth loading and redirects to welcome if auth never resolves", async () => {
+  it("offers recovery without logging out when auth takes too long", async () => {
     vi.useFakeTimers();
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     authState.status = "loading";
@@ -190,7 +214,9 @@ describe("ProtectedRoute", () => {
         await Promise.resolve();
       });
 
-      expect(screen.getByText("Welcome Page")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Retry sign-in check" })).toBeInTheDocument();
+      expect(screen.queryByText("Welcome Page")).not.toBeInTheDocument();
+      expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
     } finally {
       warnSpy.mockRestore();
       vi.useRealTimers();

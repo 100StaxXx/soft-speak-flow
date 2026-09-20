@@ -126,7 +126,7 @@ const paywallStorySections: PaywallStorySection[] = [
     id: "paywall-companion",
     eyebrow: "Built for growth",
     title: "Your companion grows when you follow through.",
-    body: "XP, Daily Chapters, evolutions, stories, collection, and memories turn ordinary consistency into a world worth returning to.",
+    body: "XP, evolutions, stories, collection, and memories turn ordinary progress into a world worth returning to.",
     background: paywallBackdrops.companion,
     icon: Sparkles,
     imagePosition: "50% 48%",
@@ -255,6 +255,8 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const pendingAppleRedemptionRecoveryRef = useRef(false);
   const initialProductLoadAttemptedRef = useRef(false);
+  const purchaseInFlightRef = useRef(false);
+  const [purchaseInFlight, setPurchaseInFlight] = useState(false);
 
   const {
     handlePurchase,
@@ -316,6 +318,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
   }, [hasOfferCode, variant]);
 
   const handleSubscribe = async () => {
+    if (purchaseInFlightRef.current || loading || recoveringExistingSubscription || isRedeemingAppleCode || accessStatusLoading || hasAccess) return;
     if (!selectedProduct) {
       await reloadProducts();
       return;
@@ -327,9 +330,14 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
       productId: selectedProductId,
       hasOfferCode,
     });
-    const success = await handlePurchase(selectedProductId, "paywall");
-    if (success) {
-      navigate("/premium/success");
+    purchaseInFlightRef.current = true;
+    setPurchaseInFlight(true);
+    try {
+      const success = await handlePurchase(selectedProductId, "paywall");
+      if (success) navigate("/premium/success");
+    } finally {
+      purchaseInFlightRef.current = false;
+      setPurchaseInFlight(false);
     }
   };
 
@@ -801,7 +809,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
       }
     : {
         checkoutEyebrow: "Start Cosmiq",
-        title: "Start the trial. Keep the story moving.",
+        title: freeTrialLabel ? "Start the trial. Keep the story moving." : "Keep the story moving with Cosmiq.",
         subtitle: "Unlock the full experience: plan with your companion, follow your quests, and watch the world grow from real progress.",
         cta: hasSelectedCreatorYearlyOffer
           ? "Redeem Discount with Apple"
@@ -814,30 +822,32 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
             ? `Eligible new subscribers receive a ${freeTrialLabel}. Your Apple ID account will be charged when the trial ends unless canceled at least 24 hours before the end of the trial.`
             : "Payment will be charged to your Apple ID account at confirmation of purchase.",
         heroBadge: freeTrialLabel ?? "Cosmiq Pro",
-        shortcutLabel: "Start trial",
+        shortcutLabel: freeTrialLabel ? "Start trial" : "View plans",
       };
   const ctaLabel = hasSelectedCreatorYearlyOffer
     ? (offerCodePurchaseReady ? "Subscribe Yearly" : "Redeem Discount with Apple")
     : copy.cta;
-  const purchaseActionDisabled = !isAvailable || !selectedProduct || loading || productsLoading || recoveringExistingSubscription || isRedeemingAppleCode;
+  const purchaseActionDisabled = !isAvailable || !selectedProduct || loading || purchaseInFlight || productsLoading || recoveringExistingSubscription || isRedeemingAppleCode || accessStatusLoading;
 
   if (!accessStatusLoading && hasAccess) {
     return null;
   }
 
   return (
-    <div data-testid="paywall-overlay" className="fixed inset-0 z-[120] overflow-hidden bg-[#05080d] text-white">
+    <div data-testid="paywall-overlay" className="fixed inset-0 z-[120] flex flex-col overflow-hidden bg-[#05080d] text-white">
+      <header className="shrink-0 flex justify-end border-b border-white/10 bg-[#05080d] px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]">
       <button
         type="button"
         onClick={scrollToCheckout}
-        className="fixed right-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-[130] inline-flex h-10 items-center gap-2 border border-white/18 bg-black/32 px-4 text-xs font-semibold uppercase tracking-[0.18em] text-white/84 backdrop-blur-xl transition hover:border-white/36 hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100"
+        className="inline-flex h-10 items-center gap-2 border border-white/18 bg-black/32 px-4 text-xs font-semibold uppercase tracking-[0.18em] text-white/84 transition hover:bg-white/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100"
         aria-label="View Cosmiq plans"
       >
         {copy.shortcutLabel}
         <ArrowDown className="h-3.5 w-3.5" />
       </button>
+      </header>
 
-      <main className="h-full snap-y snap-mandatory overflow-y-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {paywallStorySections.map((section, index) => {
           const Icon = section.icon;
 
@@ -1072,7 +1082,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                       )}
                     >
                       {plans[plan].savings && (
-                        <span className="absolute right-2 top-2 bg-cyan-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-950">
+                        <span className="mb-2 inline-block bg-cyan-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-950">
                           {plans[plan].savings}
                         </span>
                       )}
@@ -1170,7 +1180,7 @@ export const Paywall = ({ variant = "pre_trial_signup" }: PaywallProps) => {
                 <Button
                   variant="ghost"
                   onClick={() => { void handleRestore("paywall"); }}
-                  disabled={loading || recoveringExistingSubscription}
+                  disabled={!isAvailable || loading || purchaseInFlight || recoveringExistingSubscription || isRedeemingAppleCode || accessStatusLoading}
                   className="w-full text-white/64 hover:bg-white/8 hover:text-white"
                 >
                   <RefreshCw className="mr-2 h-4 w-4" />

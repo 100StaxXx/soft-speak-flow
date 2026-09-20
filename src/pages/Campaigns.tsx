@@ -6,6 +6,7 @@ import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { CampaignCard } from "@/components/CampaignCard";
+import { GoalsActivity } from "@/components/GoalsActivity";
 import { Pathfinder } from "@/components/Pathfinder";
 import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
 import { Button } from "@/components/ui/button";
@@ -154,12 +155,14 @@ const Campaigns = () => {
               <PageInfoButton onClick={() => setShowPageInfo(true)} />
             </div>
             <h1 className="mt-1 bg-gradient-to-r from-celestial-blue via-sky-300 to-cyan-100 bg-clip-text text-3xl font-semibold tracking-tight text-transparent">
-              Campaigns
+              Goals
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Build long-range momentum with rituals, milestones, and campaign progress in one place.
+              Your quests and bigger goals, at your own pace.
             </p>
           </motion.div>
+
+          {isTabActive ? <GoalsActivity /> : null}
 
           <motion.div
             initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}

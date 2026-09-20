@@ -83,6 +83,7 @@ export const getPurchaseProductIdForPlan = (
 };
 
 export const getFreeTrialLabel = (product: StoreKitProduct | null | undefined): string | null => {
+  if (product?.introductoryOfferEligible !== true) return null;
   const intro = product?.introductoryPrice;
   if (!intro || intro.price !== 0 || intro.cycles < 1) return null;
 
@@ -93,5 +94,8 @@ export const getFreeTrialLabel = (product: StoreKitProduct | null | undefined): 
   const unit = normalizedUnit.endsWith("s") ? normalizedUnit.slice(0, -1) : normalizedUnit;
   if (!["day", "week", "month", "year"].includes(unit)) return null;
 
-  return `${unitCount}-${unit} free trial`;
+  // Apple represents a 14-day introductory offer as two weeks.
+  return unit === "week" && unitCount === 2
+    ? "14-day free trial"
+    : `${unitCount}-${unit} free trial`;
 };

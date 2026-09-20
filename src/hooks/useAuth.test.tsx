@@ -24,6 +24,10 @@ const mocks = vi.hoisted(() => {
     unsubscribeMock,
     fromMock,
     clearAuthScopedClientStateMock,
+    isNative: vi.fn(() => false),
+    startAutoRefresh: vi.fn(),
+    stopAutoRefresh: vi.fn(),
+    appListener: vi.fn(),
   };
 });
 
@@ -33,6 +37,8 @@ vi.mock("@/integrations/supabase/client", () => ({
       getSession: mocks.getSessionMock,
       onAuthStateChange: mocks.onAuthStateChangeMock,
       signOut: mocks.signOutMock,
+      startAutoRefresh: mocks.startAutoRefresh,
+      stopAutoRefresh: mocks.stopAutoRefresh,
     },
     from: mocks.fromMock,
   },
@@ -40,13 +46,13 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 vi.mock("@capacitor/core", () => ({
   Capacitor: {
-    isNativePlatform: () => false,
+    isNativePlatform: mocks.isNative,
   },
 }));
 
 vi.mock("@capacitor/app", () => ({
   App: {
-    addListener: vi.fn(),
+    addListener: mocks.appListener,
   },
 }));
 
@@ -81,6 +87,7 @@ const createWrapper = (queryClient?: QueryClient) => {
 describe("useAuth provider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.isNative.mockReturnValue(false);
     authStateChangeCallback = null;
     mocks.onAuthStateChangeMock.mockImplementation((callback: (event: string, session: Session | null) => void) => {
       authStateChangeCallback = callback;
@@ -89,6 +96,63 @@ describe("useAuth provider", () => {
       };
     });
     mocks.signOutMock.mockResolvedValue(undefined);
+  });
+
+  it("ignores a stale session read after a newer sign-in", async () => {
+    let resolveRead!: (result: unknown) => void;
+    mocks.getSessionMock.mockImplementationOnce(() => new Promise((resolve) => { resolveRead = resolve; }));
+    const { result } = renderHook(() => useAuth(), { wrapper: createWrapper() });
+    await act(async () => {
+      authStateChangeCallback?.("SIGNED_IN", { user: { id: "fresh-user" } } as Session);
+      resolveRead({ data: { session: null }, error: null });
+    });
+    expect(result.current.user?.id).toBe("fresh-user");
+    expect(result.current.status).toBe("authenticated");
+  });
+
+  it("keeps a failed cold-start session read recoverable despite an empty SDK notification", async () => {
+    vi.useFakeTimers();
+    mocks.getSessionMock.mockRejectedValue(new Error("Secure session storage is temporarily unavailable"));
+    try {
+      const { result } = renderHook(() => useAuth(), { wrapper: createWrapper() });
+      await act(async () => {
+        authStateChangeCallback?.("INITIAL_SESSION", null);
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+      expect(result.current.status).toBe("recovering");
+      expect(mocks.clearAuthScopedClientStateMock).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("does not resurrect a signed-out user from an older session read", async () => {
+    let resolveRead!: (result: unknown) => void;
+    mocks.getSessionMock.mockImplementationOnce(() => new Promise((resolve) => { resolveRead = resolve; }));
+    const { result } = renderHook(() => useAuth(), { wrapper: createWrapper() });
+    await act(async () => {
+      authStateChangeCallback?.("SIGNED_OUT", null);
+      resolveRead({ data: { session: { user: { id: "old-user" } } }, error: null });
+    });
+    expect(result.current.user).toBeNull();
+    expect(result.current.status).toBe("unauthenticated");
+  });
+
+  it("pauses token refresh in the background and resumes without signing out", async () => {
+    mocks.isNative.mockReturnValue(true);
+    const session = { user: { id: "native-user" } } as Session;
+    mocks.getSessionMock.mockResolvedValue({ data: { session }, error: null });
+    const remove = vi.fn().mockResolvedValue(undefined);
+    mocks.appListener.mockResolvedValue({ remove });
+    const { result, unmount } = renderHook(() => useAuth(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.status).toBe("authenticated"));
+    const listener = mocks.appListener.mock.calls[0][1];
+    await act(async () => { listener({ isActive: false }); });
+    expect(mocks.stopAutoRefresh).toHaveBeenCalledTimes(1);
+    expect(result.current.user?.id).toBe("native-user");
+    await act(async () => { listener({ isActive: true }); });
+    expect(mocks.startAutoRefresh).toHaveBeenCalledTimes(2);
+    expect(mocks.signOutMock).not.toHaveBeenCalled();
+    unmount();
+    expect(remove).toHaveBeenCalledTimes(1);
   });
 
   it("creates one auth subscription for multiple consumers", async () => {

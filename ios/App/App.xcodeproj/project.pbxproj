@@ -26,6 +26,7 @@
 		EV1000001000000000000001 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = EV2000001000000000000001 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.swift */; };
 		EV1000001000000000000002 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = EV2000001000000000000002 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m */; };
 		NC1000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = NC2000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift */; };
+		AS1000001000000000000001 /* AuthSessionStoragePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AS2000001000000000000001 /* AuthSessionStoragePlugin.swift */; };
 		NC1000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */; };
 		NP1000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = NP2000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift */; };
 		NP1000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = NP2000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m */; };
@@ -89,6 +90,7 @@
 		EV2000001000000000000002 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 		NC2000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/NativeCalendar/NativeCalendarPlugin.swift; sourceTree = "<group>"; };
+		AS2000001000000000000001 /* AuthSessionStoragePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/AuthSessionStorage/AuthSessionStoragePlugin.swift; sourceTree = "<group>"; };
 		NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/NativeCalendar/NativeCalendarPlugin.m; sourceTree = "<group>"; };
 		NP2000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift; sourceTree = "<group>"; };
 		NP2000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m; sourceTree = "<group>"; };
@@ -156,6 +158,7 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				SC2000001000000000000001 /* SceneDelegate.swift */,
 				NC2000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift */,
+				AS2000001000000000000001 /* AuthSessionStoragePlugin.swift */,
 				NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */,
 				NP2000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift */,
 				NP2000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m */,
@@ -445,6 +448,7 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				SC1000001000000000000001 /* SceneDelegate.swift in Sources */,
 				NC1000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift in Sources */,
+				AS1000001000000000000001 /* AuthSessionStoragePlugin.swift in Sources */,
 				NC1000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m in Sources */,
 				NP1000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift in Sources */,
 				NP1000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m in Sources */,
@@ -627,7 +631,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 341;
+				CURRENT_PROJECT_VERSION = 353;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = App/Info.plist;
@@ -658,7 +662,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 341;
+				CURRENT_PROJECT_VERSION = 353;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = App/Info.plist;
@@ -687,7 +691,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 341;
+				CURRENT_PROJECT_VERSION = 353;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
@@ -716,7 +720,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 341;
+				CURRENT_PROJECT_VERSION = 353;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;

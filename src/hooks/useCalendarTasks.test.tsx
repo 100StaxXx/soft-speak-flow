@@ -90,6 +90,15 @@ describe("useCalendarTasks", () => {
     mocks.supabaseOrderSecondMock.mockResolvedValue({ data: [], error: null });
   });
 
+  it("includes the full seven-day agenda when the selection is at the end of a month", async () => {
+    mocks.getAllLocalTasksForUserMock.mockResolvedValue([
+      { id: "next-month", task_text: "Included", task_date: "2026-10-06", scheduled_time: "09:00" },
+      { id: "outside", task_text: "Outside", task_date: "2026-10-07", scheduled_time: "09:00" },
+    ]);
+    const { result } = renderHook(() => useCalendarTasks(new Date("2026-09-30T12:00:00"), "month"), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.tasks.map(task => task.id)).toEqual(["next-month"]));
+  });
+
   it("loads calendar tasks from local storage and filters them to the selected range", async () => {
     mocks.getAllLocalTasksForUserMock.mockResolvedValue([
       {

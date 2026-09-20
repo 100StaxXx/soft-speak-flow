@@ -3,6 +3,11 @@ import type { CalendarTask } from "@/types/quest";
 export type ExternalCalendarProvider = "google" | "outlook" | "apple";
 
 export interface RawExternalCalendarEvent {
+  connectionId?: unknown;
+  notes?: unknown;
+  meetingUrl?: unknown;
+  isRecurring?: unknown;
+  availability?: unknown;
   id?: unknown;
   title?: unknown;
   startDate?: unknown;
@@ -15,6 +20,11 @@ export interface RawExternalCalendarEvent {
 }
 
 export interface ExternalCalendarEvent {
+  connectionId?: string | null;
+  notes?: string | null;
+  meetingUrl?: string | null;
+  isRecurring?: boolean;
+  availability?: string | null;
   id: string;
   provider: ExternalCalendarProvider;
   title: string;
@@ -56,8 +66,8 @@ const localTimeKey = (date: Date): string =>
   `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 
 export const externalCalendarEventKey = (
-  event: Pick<ExternalCalendarEvent, "provider" | "id">,
-): string => `${event.provider}:${event.id}`;
+  event: Pick<ExternalCalendarEvent, "provider" | "id"> & Partial<Pick<ExternalCalendarEvent, "connectionId" | "calendarId">>,
+): string => [event.provider, event.connectionId ?? "", event.calendarId ?? "", event.id].map(encodeURIComponent).join(":");
 
 export function normalizeExternalCalendarEvent(
   raw: RawExternalCalendarEvent,
@@ -72,12 +82,18 @@ export function normalizeExternalCalendarEvent(
   const isAllDay = raw.isAllDay === true;
   const title = readString(raw.title) ?? "Busy";
   const calendarName = readString(raw.calendarName) ?? fallbackCalendarName;
+  const details = {
+    connectionId: readString(raw.connectionId), notes: readString(raw.notes),
+    meetingUrl: readExternalUrl(raw.meetingUrl), isRecurring: raw.isRecurring === true,
+    availability: readString(raw.availability),
+  };
 
   if (isAllDay) {
     const taskDate = rawStartDate.slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(taskDate)) return null;
 
     return {
+      ...details,
       id,
       provider,
       title,
@@ -90,7 +106,7 @@ export function normalizeExternalCalendarEvent(
       location: readString(raw.location),
       calendarId: readString(raw.calendarId),
       calendarName,
-      htmlLink: readString(raw.htmlLink),
+      htmlLink: readExternalUrl(raw.htmlLink),
     };
   }
 
@@ -103,6 +119,7 @@ export function normalizeExternalCalendarEvent(
   ) return null;
 
   return {
+    ...details,
     id,
     provider,
     title,
@@ -117,6 +134,33 @@ export function normalizeExternalCalendarEvent(
     calendarName,
     htmlLink: readExternalUrl(raw.htmlLink),
   };
+}
+
+/** Intersect the source interval with a local day, including exclusive all-day ends.
+ * Never change the source ID: conversion and synchronization must address the original event.
+ */
+export function externalEventsForDay(events: ExternalCalendarEvent[], date: Date): ExternalCalendarEvent[] {
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const next = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+  const key = localDateKey(day);
+  return events.flatMap((event) => {
+    if (event.isAllDay) {
+      return key >= event.startDate.slice(0, 10) && key < event.endDate.slice(0, 10)
+        ? [{ ...event, taskDate: key }] : [];
+    }
+    const start = Math.max(Date.parse(event.startDate), day.getTime());
+    const end = Math.min(Date.parse(event.endDate), next.getTime());
+    return end > start ? [{ ...event, taskDate: key, scheduledTime: localTimeKey(new Date(start)),
+      estimatedDuration: Math.round((end - start) / 60000) }] : [];
+  });
+}
+
+export function findEventConflicts(event: ExternalCalendarEvent, events: ExternalCalendarEvent[]): ExternalCalendarEvent[] {
+  if (event.isAllDay || event.availability === "free") return [];
+  return events.filter((other) => externalCalendarEventKey(other) !== externalCalendarEventKey(event)
+    && !other.isAllDay && other.availability !== "free"
+    && Date.parse(other.startDate) < Date.parse(event.endDate)
+    && Date.parse(other.endDate) > Date.parse(event.startDate));
 }
 
 export function dedupeExternalCalendarEvents(

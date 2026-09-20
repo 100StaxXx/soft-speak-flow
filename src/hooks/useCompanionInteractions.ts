@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   COMPANION_BEHAVIORS,
   getCompanionAmbientBehavior,
   getCompanionInteractionMoment,
-  getCompanionInteractionPrompt,
   type CompanionBehaviorId,
   type CompanionGesture,
   type CompanionInteractionPrompt,
@@ -32,25 +31,6 @@ const getLocalDateKey = () => {
   return `${year}-${month}-${day}`;
 };
 
-const getPromptStorageKey = (companionId: string, promptKey: string) =>
-  `cosmiq-companion-prompt:${companionId}:${getLocalDateKey()}:${promptKey}`;
-
-const hasStoredPromptAnswer = (companionId: string, promptKey: string) => {
-  try {
-    return window.localStorage.getItem(getPromptStorageKey(companionId, promptKey)) !== null;
-  } catch {
-    return false;
-  }
-};
-
-const storePromptAnswer = (companionId: string, promptKey: string, answerKey: string) => {
-  try {
-    window.localStorage.setItem(getPromptStorageKey(companionId, promptKey), answerKey);
-  } catch {
-    // Persistence is an enhancement; interaction remains available without it.
-  }
-};
-
 export const useCompanionInteractions = ({
   companionId,
   currentStage,
@@ -61,13 +41,9 @@ export const useCompanionInteractions = ({
   prefersReducedMotion: boolean;
 }) => {
   const { triggerEvent } = useCompanionMotionSafe();
-  const prompt = useMemo(() => getCompanionInteractionPrompt(currentStage), [currentStage]);
   const [activeBehaviorId, setActiveBehaviorId] = useState<CompanionBehaviorId | null>(null);
   const [bubble, setBubble] = useState<CompanionInteractionBubble | null>(null);
   const [interactionCount, setInteractionCount] = useState(0);
-  const [promptOffered, setPromptOffered] = useState(() => (
-    companionId ? hasStoredPromptAnswer(companionId, prompt.key) : true
-  ));
   const ambientCycleRef = useRef(0);
   const behaviorTimerRef = useRef<number | null>(null);
   const bubbleTimerRef = useRef<number | null>(null);
@@ -141,40 +117,9 @@ export const useCompanionInteractions = ({
   }, [companionId, currentStage]);
 
   useEffect(() => {
-    const hasLocalAnswer = companionId ? hasStoredPromptAnswer(companionId, prompt.key) : true;
-    setPromptOffered(hasLocalAnswer);
     setBubble(null);
     setInteractionCount(0);
-
-    if (!companionId || hasLocalAnswer) return;
-
-    let cancelled = false;
-    void supabase
-      .from("companion_interaction_memory")
-      .select("answer_key")
-      .eq("companion_id", companionId)
-      .eq("interaction_kind", "answer")
-      .eq("prompt_key", prompt.key)
-      .eq("interaction_day", getLocalDateKey())
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) {
-          log.debug("Daily companion answer lookup was unavailable", { error: error.message });
-          return;
-        }
-        if (!data?.answer_key) return;
-
-        storePromptAnswer(companionId, prompt.key, data.answer_key);
-        setPromptOffered(true);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [companionId, prompt.key]);
+  }, [companionId, currentStage]);
 
   useEffect(() => {
     if (prefersReducedMotion || !companionId || document.visibilityState === "hidden") return;
@@ -225,40 +170,15 @@ export const useCompanionInteractions = ({
     });
     recordInteraction({ kind: gesture });
 
-    if ((gesture === "tap" || gesture === "keyboard") && !promptOffered) {
-      setPromptOffered(true);
-      showBubble({ message: prompt.question, prompt });
-      return;
-    }
-
     showBubble({ message: moment.message, prompt: null });
   }, [
     currentStage,
     interactionCount,
     playBehavior,
-    prompt,
-    promptOffered,
     recordInteraction,
     showBubble,
     triggerEvent,
   ]);
-
-  const answerPrompt = useCallback((answerKey: string) => {
-    const option = prompt.options.find((candidate) => candidate.key === answerKey);
-    if (!option || !companionId) return;
-
-    storePromptAnswer(companionId, prompt.key, option.key);
-    playBehavior(option.behaviorId);
-    haptics.success();
-    triggerEvent({
-      type: "play",
-      intensity: "medium",
-      stage: currentStage,
-      reason: option.response,
-    });
-    recordInteraction({ kind: "answer", promptKey: prompt.key, answerKey: option.key });
-    showBubble({ message: option.response, prompt: null });
-  }, [companionId, currentStage, playBehavior, prompt, recordInteraction, showBubble, triggerEvent]);
 
   const reactToAdventureChoice = useCallback(({
     promptKey,
@@ -293,7 +213,6 @@ export const useCompanionInteractions = ({
       : "",
     bubble,
     interact,
-    answerPrompt,
     reactToAdventureChoice,
     dismissBubble: () => {
       clearBubbleTimer();

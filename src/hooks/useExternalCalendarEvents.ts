@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { addDays, endOfMonth, endOfWeek, startOfMonth, startOfWeek } from "date-fns";
+import { addDays, endOfMonth, endOfWeek, startOfDay, startOfMonth, startOfWeek } from "date-fns";
 
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -17,6 +17,7 @@ import {
   type RawExternalCalendarEvent,
 } from "@/types/externalCalendar";
 import { calendarProviderDisplayName } from "@/utils/calendarDestinationOptions";
+import { parseFunctionInvokeError, toUserFacingFunctionError } from "@/utils/supabaseFunctionErrors";
 
 const EXTERNAL_CALENDAR_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -42,10 +43,11 @@ const getConnectionCalendarName = (connection: ConnectedCalendar): string =>
 
 const getRange = (selectedDate: Date) => {
   const rangeStart = startOfWeek(startOfMonth(selectedDate), { weekStartsOn: 0 });
-  const rangeEndExclusive = addDays(
+  const monthEndExclusive = addDays(
     endOfWeek(endOfMonth(selectedDate), { weekStartsOn: 0 }),
     1,
   );
+  const rangeEndExclusive = new Date(Math.max(monthEndExclusive.getTime(), addDays(startOfDay(selectedDate), 7).getTime()));
 
   return {
     startDate: rangeStart.toISOString(),
@@ -78,10 +80,11 @@ async function loadConnectionEvents(
     rawEvents = result.events;
   } else {
     const { data, error } = await supabase.functions.invoke(
-      `${connection.provider}-calendar-events`,
+      "calendar-read-events",
       {
         body: {
           action: "listEvents",
+          provider: connection.provider,
           startDate: range.startDate,
           endDate: range.endDate,
           calendarId: connection.primary_calendar_id ?? undefined,
@@ -90,7 +93,11 @@ async function loadConnectionEvents(
     );
 
     if (error) {
-      throw new Error(error.message || `Failed to sync ${fallbackCalendarName}`);
+      const parsed = await parseFunctionInvokeError(error);
+      if (parsed.status === 409) {
+        throw new Error(`Reconnect ${calendarProviderDisplayName(connection.provider)} in Preferences, then retry calendar sync.`);
+      }
+      throw new Error(toUserFacingFunctionError(parsed, { action: `sync ${fallbackCalendarName}` }));
     }
 
     rawEvents = Array.isArray(data?.events) ? data.events : [];
@@ -98,7 +105,7 @@ async function loadConnectionEvents(
 
   return rawEvents
     .map((event) => normalizeExternalCalendarEvent(
-      event,
+      { ...event, connectionId: connection.id },
       connection.provider,
       fallbackCalendarName,
     ))
@@ -113,6 +120,7 @@ export function useExternalCalendarEvents(
   const { enabled = true } = options;
   const {
     connections,
+    settings,
     isLoading: integrationsLoading,
   } = useCalendarIntegrations({ enabled });
   const range = useMemo(
@@ -125,10 +133,11 @@ export function useExternalCalendarEvents(
         connection.id,
         connection.provider,
         connection.primary_calendar_id ?? "primary",
+        (settings?.visible_calendars?.[connection.provider] ?? []).join(","),
       ].join(":"))
       .sort()
       .join("|"),
-    [connections],
+    [connections, settings?.visible_calendars],
   );
 
   const query = useQuery({
@@ -141,21 +150,21 @@ export function useExternalCalendarEvents(
     ],
     enabled: enabled && !!user?.id && connections.length > 0,
     queryFn: async (): Promise<ExternalCalendarQueryResult> => {
-      const settled = await Promise.allSettled(
-        connections.map(async (connection) => ({
-          provider: connection.provider,
-          events: await loadConnectionEvents(connection, range),
-        })),
-      );
+      const calendars = connections.flatMap((connection) => [...new Set(settings?.visible_calendars?.[connection.provider]
+        ?? [connection.primary_calendar_id ?? ''])].map((calendarId) => ({ ...connection,
+          primary_calendar_id: calendarId, primary_calendar_name: calendarId === connection.primary_calendar_id ? connection.primary_calendar_name : null,
+        })));
+      // A removed/shared calendar must not hide the other calendars on this account.
+      const settled = await Promise.allSettled(calendars.map((connection) => loadConnectionEvents(connection, range)));
       const events: ExternalCalendarEvent[] = [];
       const errors: ExternalCalendarSyncError[] = [];
 
       settled.forEach((result, index) => {
-        const connection = connections[index];
+        const connection = calendars[index];
         if (!connection) return;
 
         if (result.status === "fulfilled") {
-          events.push(...result.value.events);
+          events.push(...result.value);
           return;
         }
 

@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
     subscribed: false,
   },
   accessLoading: false,
+  accessError: null as Error | null,
 }));
 
 const localStorageState = vi.hoisted(() => ({
@@ -28,6 +29,7 @@ vi.mock("./useAccessState", () => ({
   useAccessState: () => ({
     accessState: mocks.accessState,
     isLoading: mocks.accessLoading,
+    error: mocks.accessError,
   }),
 }));
 
@@ -68,6 +70,7 @@ describe("useAccessStatus", () => {
     localStorageState.store.clear();
     mocks.profileLoading = false;
     mocks.accessLoading = false;
+    mocks.accessError = null;
     mocks.accessState = {
       has_access: false,
       access_source: "none",
@@ -93,7 +96,8 @@ describe("useAccessStatus", () => {
     const { result } = renderHook(() => useAccessStatus());
 
     expect(result.current.hasAccess).toBe(false);
-    expect(result.current.gateReason).toBe("pre_trial_signup");
+    expect(result.current.gateReason).toBe("none");
+    expect(result.current.error).toBe(true);
   });
 
   it("does not trigger the pre-trial gate from bare tutorial completion", () => {
@@ -107,6 +111,33 @@ describe("useAccessStatus", () => {
 
     expect(result.current.hasAccess).toBe(true);
     expect(result.current.gateReason).toBe("none");
+  });
+
+  it("does not sell a subscription when access verification failed", () => {
+    mocks.profile = createProfile({ onboarding_data: { guided_tutorial: {
+      completed: true, milestonesCompleted: ["mentor_closeout_message"],
+    } } });
+    mocks.accessError = new Error("Network unavailable");
+    const { result } = renderHook(() => useAccessStatus());
+    expect(result.current.hasAccess).toBe(false);
+    expect(result.current.error).toBe(true);
+    expect(result.current.gateReason).toBe("none");
+  });
+
+  it("honors verified subscription access even if the profile is temporarily missing", () => {
+    mocks.profile = null;
+    mocks.accessState = { has_access: true, access_source: "subscription", subscribed: true, trial_ends_at: null };
+    const { result } = renderHook(() => useAccessStatus());
+    expect(result.current.hasAccess).toBe(true);
+  });
+
+  it("does not offer a new trial to an expired trial after tutorial closeout", () => {
+    mocks.profile = createProfile({ onboarding_data: { guided_tutorial: {
+      completed: true, milestonesCompleted: ["mentor_closeout_message"],
+    } } });
+    mocks.accessState.trial_ends_at = "2020-01-01T00:00:00Z";
+    const { result } = renderHook(() => useAccessStatus());
+    expect(result.current.gateReason).toBe("trial_expired");
   });
 
   it("returns pre-trial signup gate after final tutorial closeout when trial has not started", () => {

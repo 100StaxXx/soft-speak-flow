@@ -153,15 +153,16 @@ describe("appleIAP StoreKit 2 utilities", () => {
     it("uses the introductory offer returned by the App Store", () => {
       expect(getFreeTrialLabel({
         ...mockProducts[1],
+        introductoryOfferEligible: true,
         introductoryPrice: {
           price: 0,
           displayPrice: "$0.00",
           cycles: 1,
-          period: "P3D",
-          periodUnit: "DAY",
-          periodNumberOfUnits: 3,
+          period: "P2W",
+          periodUnit: "WEEK",
+          periodNumberOfUnits: 2,
         },
-      })).toBe("3-day free trial");
+      })).toBe("14-day free trial");
     });
 
     it("does not advertise a trial when the product has no free introductory offer", () => {

@@ -66,7 +66,13 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>We save photos to your library only if you choose to download images from the app.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>We use calendar access to let you optionally send quests to your Apple Calendar and keep linked events in sync.</string>
+	<string>Cosmiq uses your calendars to show your schedule and sync quests you choose to link.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Cosmiq reads and updates only the reminders you choose to link to quests.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Cosmiq reads your reminder lists and updates only the reminders you choose to link to quests.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Show your calendar events in Cosmiq and add or update the quests you choose to send to your calendar.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

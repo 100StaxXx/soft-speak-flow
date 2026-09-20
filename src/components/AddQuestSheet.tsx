@@ -68,6 +68,7 @@ import {
 import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 
 export interface AddQuestData {
+  category?: "mind" | "body" | "soul";
   text: string;
   taskDate: string | null;
   difficulty: "easy" | "medium" | "hard";
@@ -144,6 +145,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [sheetView, setSheetView] = useState<"editor" | "templates">("editor");
   const [templateBrowserInitialTab, setTemplateBrowserInitialTab] = useState<QuestTemplateBrowserTab>("common");
   const [taskText, setTaskText] = useState("");
+  const [category, setCategory] = useState<"mind" | "body" | "soul" | undefined>();
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [scheduledTime, setScheduledTime] = useState<string | null>(prefilledTime ?? null);
@@ -223,6 +225,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       reminderOffsetsMinutes: snapshot.reminderOffsetsMinutes,
     });
     setTaskText(snapshot.text);
+    setCategory(snapshot.category);
     setDifficulty(snapshot.difficulty);
     setScheduledTime(snapshot.scheduledTime);
     setEstimatedDuration(snapshot.estimatedDuration);
@@ -307,6 +310,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       setSheetView("editor");
       setTemplateBrowserInitialTab("common");
       setTaskText("");
+      setCategory(undefined);
       setDifficulty("medium");
       setShowAdvanced(false);
       setScheduledTime(null);
@@ -349,6 +353,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
     lastPrefillKeyRef.current = prefillKey;
     setTaskText(prefillDraft.text ?? "");
+    setCategory(prefillDraft.category);
     setDifficulty(prefillDraft.difficulty ?? "medium");
     setScheduledTime(prefillDraft.scheduledTime ?? null);
     setEstimatedDuration(prefillDraft.estimatedDuration ?? 30);
@@ -456,6 +461,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   }), [taskText, difficulty, estimatedDuration, moreInformation, subtasks]);
   const currentQuestDraftSnapshot = useMemo<QuestDraftSnapshot>(() => ({
     text: taskText,
+    category,
     taskDate,
     difficulty,
     scheduledTime,
@@ -497,6 +503,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     subtasks,
     taskDate,
     taskText,
+    category,
   ]);
   const hasTemplateCustomizations = useMemo(
     () => selectedTemplate
@@ -586,6 +593,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
   const applyTemplatePrefill = useCallback((template: QuestTemplatePrefill) => {
     setTaskText(template.title);
+    setCategory(undefined);
     setDifficulty(template.difficulty);
     setEstimatedDuration(template.estimatedDuration);
     setMoreInformation(template.notes);
@@ -648,6 +656,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
     await onAdd({
       text: taskText,
+      category,
       taskDate: intent === "inbox" ? null : taskDate,
       difficulty,
       scheduledTime: intent === "inbox" ? null : scheduledTime,
@@ -673,7 +682,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     });
     clearQuestDraftSnapshot(user?.id);
     onOpenChange(false);
-  }, [taskText, recurrencePattern, creationSource, scheduledTime, onAdd, taskDate, difficulty, estimatedDuration, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, reminderOffsetsMinutes, moreInformation, location, sendToCalendar, canShowCalendarSendOption, selectedCalendarSendTarget, subtasks, attachments, onOpenChange, user?.id]);
+  }, [taskText, category, recurrencePattern, creationSource, scheduledTime, onAdd, taskDate, difficulty, estimatedDuration, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, reminderOffsetsMinutes, moreInformation, location, sendToCalendar, canShowCalendarSendOption, selectedCalendarSendTarget, subtasks, attachments, onOpenChange, user?.id]);
 
   const submitWithTemplateHandling = useCallback(async (intent: SubmitIntent) => {
     if (selectedTemplate && hasTemplateCustomizations) {

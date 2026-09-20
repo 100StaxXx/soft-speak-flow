@@ -396,3 +396,22 @@ verify_jwt = false
 
 [functions.cost-guardrail-monitor]
 verify_jwt = false
+
+# Validates the bearer token with auth.getUser before reading the owner's connection.
+[functions.calendar-read-events]
+verify_jwt = false
+
+# These handlers verify the bearer token with auth.getUser and scope every link/connection to its owner.
+[functions.calendar-linked-event]
+verify_jwt = false
+
+[functions.calendar-task-items]
+verify_jwt = false
+
+# Internal scheduler secret required; disabled by database control until rollout.
+[functions.calendar-sync-worker]
+verify_jwt = false
+
+# Handler validates user bearer tokens; queue processing requires the internal secret.
+[functions.companion-wellbeing-video]
+verify_jwt = false

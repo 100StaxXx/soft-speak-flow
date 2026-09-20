@@ -60,7 +60,7 @@ describe("useCompanionInteractions", () => {
     mocks.maybeSingle.mockResolvedValue({ data: null, error: null });
   });
 
-  it("offers a daily stage question, records the answer, and remembers it locally", async () => {
+  it("keeps tap reactions without a daily stage or mood questionnaire", async () => {
     const { result, unmount } = renderHook(() => useCompanionInteractions({
       companionId: "companion-1",
       currentStage: 21,
@@ -68,21 +68,17 @@ describe("useCompanionInteractions", () => {
     }));
 
     act(() => result.current.interact("tap"));
-    expect(result.current.bubble?.prompt?.key).toBe("guardian-protect-v1");
+    expect(result.current.bubble?.prompt).toBeNull();
+    expect(result.current.bubble?.message).toBeTruthy();
     expect(mocks.haptics.light).toHaveBeenCalledOnce();
     expect(mocks.triggerEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "touch" }));
-
-    act(() => result.current.answerPrompt("rest"));
-    expect(result.current.bubble?.message).toBe("Consider it protected.");
-    expect(mocks.haptics.success).toHaveBeenCalledOnce();
-    expect(mocks.triggerEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "play" }));
 
     await waitFor(() => {
       expect(mocks.rpc).toHaveBeenCalledWith("record_companion_interaction", expect.objectContaining({
         p_companion_id: "companion-1",
-        p_kind: "answer",
-        p_prompt_key: "guardian-protect-v1",
-        p_answer_key: "rest",
+        p_kind: "tap",
+        p_prompt_key: null,
+        p_answer_key: null,
         p_stage: 21,
         p_local_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       }));
@@ -90,11 +86,11 @@ describe("useCompanionInteractions", () => {
 
     expect(
       Object.keys(window.localStorage).some((key) => key.includes("guardian-protect-v1")),
-    ).toBe(true);
+    ).toBe(false);
     unmount();
   });
 
-  it("checks server memory so the daily prompt can follow the user across devices", async () => {
+  it("does not load retired daily answers even if server memory exists", async () => {
     mocks.maybeSingle.mockResolvedValue({ data: { answer_key: "focus" }, error: null });
     const { result, unmount } = renderHook(() => useCompanionInteractions({
       companionId: "companion-1",
@@ -102,17 +98,7 @@ describe("useCompanionInteractions", () => {
       prefersReducedMotion: true,
     }));
 
-    await waitFor(() => {
-      expect(mocks.maybeSingle).toHaveBeenCalled();
-      expect(mocks.chain.eq).toHaveBeenCalledWith(
-        "interaction_day",
-        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-      );
-      expect(
-        Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index))
-          .some((key) => key?.includes("guardian-protect-v1")),
-      ).toBe(true);
-    });
+    expect(mocks.from).not.toHaveBeenCalled();
     act(() => result.current.interact("tap"));
 
     expect(result.current.bubble?.prompt).toBeNull();

@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAccessStatus, type AccessGateReason } from "@/hooks/useAccessStatus";
 import { Progress } from "@/components/ui/progress";
 import { Paywall } from "@/components/Paywall";
+import { AccessCheckError } from "@/components/AccessCheckError";
+import { Button } from "@/components/ui/button";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -18,13 +20,13 @@ export const ProtectedRoute = ({
   requireMentor: _requireMentor = true,
   requireAccess = true,
 }: ProtectedRouteProps) => {
-  const { user, loading: authLoading, status } = useAuth();
-  const { hasAccess, gateReason, loading: accessLoading } = useAccessStatus();
+  const { user, loading: authLoading, status, refreshSession } = useAuth();
+  const { hasAccess, gateReason, loading: accessLoading, error: accessError, retry } = useAccessStatus();
   const navigate = useNavigate();
   const location = useLocation();
   const [progress, setProgress] = useState(0);
   const [authGateTimedOut, setAuthGateTimedOut] = useState(false);
-  const authGateTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const authGateTimerRef = useRef<number | null>(null);
   const [resolvedAccessDecision, setResolvedAccessDecision] = useState<{
     userId: string;
     requireAccess: boolean;
@@ -47,7 +49,7 @@ export const ProtectedRoute = ({
       resolvedAccessDecision.requireAccess === requireAccess,
   );
   const effectiveAccessDecision =
-    requireAccess && accessLoading && hasResolvedAccessForCurrentRoute && resolvedAccessDecision
+    requireAccess && (accessLoading || accessError) && hasResolvedAccessForCurrentRoute && resolvedAccessDecision
         ? resolvedAccessDecision
         : { hasAccess, gateReason };
   const shouldShowAccessLoading = Boolean(
@@ -99,7 +101,7 @@ export const ProtectedRoute = ({
 
   useEffect(() => {
     // Redirect to welcome page if not logged in (for App Store compliance)
-    if (!shouldShowAuthLoading && (authStatus === 'unauthenticated' || !user)) {
+    if (authStatus === 'unauthenticated') {
       navigate("/welcome", { replace: true });
     }
   }, [authStatus, navigate, shouldShowAuthLoading, user]);
@@ -128,7 +130,7 @@ export const ProtectedRoute = ({
 
   useEffect(() => {
     if (!userId || !hasCachedUser || shouldShowAuthLoading) return;
-    if (requireAccess && accessLoading) return;
+    if (requireAccess && (accessLoading || accessError)) return;
 
     if (requireAccess) {
       setResolvedAccessDecision((previous) => {
@@ -145,6 +147,7 @@ export const ProtectedRoute = ({
     }
   }, [
     accessLoading,
+    accessError,
     gateReason,
     hasAccess,
     hasCachedUser,
@@ -156,6 +159,19 @@ export const ProtectedRoute = ({
   // Never render protected content before the first entitlement decision for
   // this user. A resolved same-user decision may remain visible during a
   // background refresh, but it is never reused for a different account.
+  if (isAuthPending && authGateTimedOut) {
+    return <div className="min-h-screen flex items-center justify-center bg-background p-6">
+      <div role="alert" className="max-w-sm space-y-4 text-center">
+        <h1 className="text-xl font-semibold">Your sign-in is taking longer than expected</h1>
+        <p className="text-muted-foreground">Check your connection and retry. Your saved session has not been cleared.</p>
+        <Button onClick={() => {
+          setAuthGateTimedOut(false);
+          void refreshSession().catch(() => setAuthGateTimedOut(true));
+        }}>Retry sign-in check</Button>
+      </div>
+    </div>;
+  }
+
   if (shouldShowGateLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -174,6 +190,10 @@ export const ProtectedRoute = ({
 
   // Don't render children until auth is confirmed
   if (authStatus === 'unauthenticated' || !user) return null;
+
+  if (requireAccess && accessError && !(hasResolvedAccessForCurrentRoute && resolvedAccessDecision?.hasAccess)) {
+    return <AccessCheckError retry={retry} />;
+  }
 
   // Show hard paywall if no access.
   if (requireAccess && !effectiveAccessDecision.hasAccess) {

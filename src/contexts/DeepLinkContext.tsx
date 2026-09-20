@@ -25,7 +25,8 @@ export const DeepLinkProvider = ({ children }: { children: ReactNode }) => {
   const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
 
   const handleDeepLink = useCallback((data: DeepLinkData) => {
-    logger.log('[DeepLinkProvider] Received deep link:', data);
+    logger.log('[DeepLinkProvider] Received deep link:', { type: data.type });
+
     
     if (data.type === 'task' && data.taskId) {
       setPendingTaskId(data.taskId);
@@ -55,12 +56,13 @@ export const DeepLinkProvider = ({ children }: { children: ReactNode }) => {
 
     if (
       (data.type === 'auth_recovery' ||
+        data.type === 'auth_callback' ||
         data.type === 'calendar_oauth_callback' ||
         data.type === 'join_epic' ||
         data.type === 'journeys') &&
       data.path
     ) {
-      if (data.type === 'calendar_oauth_callback') {
+      if (data.type === 'calendar_oauth_callback' || data.type === 'auth_callback') {
         closeOAuthBrowser();
       }
       window.dispatchEvent(new CustomEvent('deep-link-navigation', {

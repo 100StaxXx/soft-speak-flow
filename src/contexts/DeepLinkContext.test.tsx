@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => {
   let deepLinkHandler:
     | ((data: {
-      type: "auth_recovery" | "task" | "calendar_oauth" | "calendar_oauth_callback" | "join_epic" | "journeys" | "unknown";
+      type: "auth_recovery" | "auth_callback" | "task" | "calendar_oauth" | "calendar_oauth_callback" | "join_epic" | "journeys" | "unknown";
       path?: string;
       rawUrl: string;
       taskId?: string;
@@ -85,6 +85,16 @@ describe("DeepLinkProvider", () => {
     expect(event.detail).toEqual({
       path: "/auth/reset-password#access_token=token&refresh_token=refresh&type=recovery",
     });
+  });
+
+  it("closes the Apple browser and routes its callback into the running app", () => {
+    render(<DeepLinkProvider><div>child</div></DeepLinkProvider>);
+    act(() => mocks.getHandler()?.({
+      type: "auth_callback", path: "/auth?code=apple-code", rawUrl: "https://app.cosmiq.quest/auth?code=apple-code",
+    }));
+    expect(mocks.browserCloseMock).toHaveBeenCalledTimes(1);
+    const event = dispatchSpy.mock.calls[0][0] as CustomEvent;
+    expect(event.detail.path).toBe("/auth?code=apple-code");
   });
 
   it("dispatches calendar oauth callback navigation events", () => {

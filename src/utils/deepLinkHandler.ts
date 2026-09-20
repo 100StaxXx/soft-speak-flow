@@ -14,7 +14,7 @@ const APP_SCHEME_PROTOCOLS = new Set(['cosmiq:', 'com.darrylgraham.revolution:']
 const CALENDAR_CALLBACK_ORIGIN_PARAM = 'calendar_callback_origin';
 
 export interface DeepLinkData {
-  type: 'task' | 'calendar_oauth' | 'calendar_oauth_callback' | 'auth_recovery' | 'join_epic' | 'journeys' | 'unknown';
+  type: 'task' | 'calendar_oauth' | 'calendar_oauth_callback' | 'auth_recovery' | 'auth_callback' | 'join_epic' | 'journeys' | 'unknown';
   taskId?: string;
   provider?: CalendarOAuthProvider;
   status?: CalendarOAuthStatus;
@@ -38,7 +38,7 @@ const isNativeAuthRecoveryLink = (parsed: URL): boolean => {
     )
   );
 
-  return (isWebRecoveryLink || isSchemeRecoveryLink) && parsed.hash.includes('type=recovery');
+  return isWebRecoveryLink || isSchemeRecoveryLink;
 };
 
 const isHostedCalendarOAuthCallbackLink = (parsed: URL): boolean => (
@@ -124,6 +124,15 @@ export const parseDeepLink = (url: string): DeepLinkData => {
     }
 
     const parsed = new URL(url);
+    const isAuthCallbackPath = (
+      isHostedAppLink(parsed) && parsed.pathname === '/auth'
+    ) || (
+      APP_SCHEME_PROTOCOLS.has(parsed.protocol) &&
+      ((parsed.hostname === 'auth' && (parsed.pathname === '' || parsed.pathname === '/')) || parsed.pathname === '/auth')
+    );
+    if (isAuthCallbackPath) {
+      return { type: 'auth_callback', path: `/auth${parsed.search}${parsed.hash}`, rawUrl: url };
+    }
     const taskId = readTaskId(parsed);
     if (taskId) {
       return { type: 'task', taskId, rawUrl: url };
@@ -185,7 +194,7 @@ export const initializeDeepLinkHandler = (
   // Handle app opened with URL (cold start)
   App.getLaunchUrl().then((result) => {
     if (result?.url) {
-      logger.log('[DeepLink] App launched with URL:', result.url);
+      logger.log('[DeepLink] App launched with a deep link');
       const data = parseDeepLink(result.url);
       onDeepLink(data);
     }
@@ -193,7 +202,7 @@ export const initializeDeepLinkHandler = (
 
   // Handle URL opened while app is running (warm start)
   App.addListener('appUrlOpen', (event: URLOpenListenerEvent) => {
-    logger.log('[DeepLink] App URL opened:', event.url);
+    logger.log('[DeepLink] App opened with a deep link');
     const data = parseDeepLink(event.url);
     onDeepLink(data);
   }).then((handle) => {

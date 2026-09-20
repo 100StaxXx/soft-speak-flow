@@ -51,6 +51,7 @@ import { ResilienceStatusBanner } from "@/components/resilience/ResilienceStatus
 import { MentorConnectionProvider, useMentorConnection } from "@/contexts/MentorConnectionContext";
 import { WallpaperManifestProvider } from "@/contexts/WallpaperManifestContext";
 import { GlobalWidgetSyncBridge } from "@/components/GlobalWidgetSyncBridge";
+import { CalendarQuestSyncBridge } from "@/components/calendar/CalendarQuestSyncBridge";
 import { StoreKitProvider } from "@/providers/StoreKitProvider";
 import { EVENING_REFLECTION_CANONICAL_PATH } from "@/utils/eveningReflectionNavigation";
 import { useReferralSync } from "@/hooks/useReferralSync";
@@ -184,7 +185,9 @@ const RootRoute = memo(() => {
   const { user, loading, status } = useAuth();
   const authStatus = status ?? (loading ? 'loading' : user ? 'authenticated' : 'unauthenticated');
 
-  if (!user || authStatus === 'unauthenticated') {
+  // A pending or temporarily unreadable saved session is not a confirmed logout.
+  // ProtectedRoute owns loading/recovery and only exposes Home after authentication.
+  if (authStatus === 'unauthenticated') {
     return <Welcome />;
   }
 
@@ -452,6 +455,7 @@ const AppContent = memo(() => {
             userTimezone={profile?.timezone ?? null}
           >
             <GlobalWidgetSyncBridge enabled={Boolean(session?.user)} />
+            <CalendarQuestSyncBridge />
             <ResilienceStatusBanner />
             <ViewModeProvider>
               <CompanionMotionProvider>

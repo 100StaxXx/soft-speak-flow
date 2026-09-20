@@ -1301,6 +1301,15 @@ export const GlobalEvolutionListener = () => {
       missingEvolutionLog,
     }: EvolutionPresentationRequest) => {
       const key = buildEvolutionKey(companionId, level);
+      const currentReveal = pendingEvolutionRevealRef.current;
+      if (
+        currentReveal?.status === "ready" &&
+        currentReveal.companionId === companionId &&
+        currentReveal.newStage === level
+      ) {
+        setIsEvolvingLoading(false);
+        return false;
+      }
       if (!isTierBoundaryLevel(level)) {
         logger.warn(
           "Evolution listener: Skipping animation reveal for non-boundary stage",
@@ -1835,6 +1844,7 @@ export const GlobalEvolutionListener = () => {
         currentPending?.companionId === companionId &&
         currentPending.newStage === currentStage;
       if (currentPendingMatches && currentPending.status === "ready") {
+        setIsEvolvingLoading(false);
         return;
       }
 
@@ -1947,9 +1957,9 @@ export const GlobalEvolutionListener = () => {
         const previousImageForPreload = currentPendingMatches && currentPending
           ? currentPending.previousImageUrl
           : resolvedPreviousImageUrl;
-        const currentImageForPreload = currentPendingMatches && currentPending
-          ? currentPending.newImageUrl
-          : resolvedCurrentImageUrl;
+        // A queued job may have populated newImageUrl with the egg placeholder.
+        // The persisted completed evolution owns the final portrait.
+        const currentImageForPreload = resolvedCurrentImageUrl;
         const presetIdForPreload = currentPendingMatches && currentPending
           ? currentPending.presetId ?? undefined
           : typeof companionRecord?.preset_id === "string"
@@ -1998,6 +2008,7 @@ export const GlobalEvolutionListener = () => {
     buildEvolutionKey,
     clearPendingRevealForEvolution,
     markPendingRevealReady,
+    setIsEvolvingLoading,
     user?.id,
   ]);
 
@@ -2007,8 +2018,6 @@ export const GlobalEvolutionListener = () => {
 
   const setPreparingStateForEvolutionJob = useCallback(
     async (job: PersistedEvolutionJobMetadata) => {
-      setIsEvolvingLoading(true);
-
       if (!isTierBoundaryLevel(job.requestedStage)) {
         return;
       }
@@ -2019,8 +2028,11 @@ export const GlobalEvolutionListener = () => {
         currentPending.companionId === job.companionId &&
         currentPending.newStage === job.requestedStage
       ) {
+        setIsEvolvingLoading(false);
         return;
       }
+
+      setIsEvolvingLoading(true);
 
       const { data: companion, error } = await supabase
         .from("user_companion")
@@ -2098,27 +2110,28 @@ export const GlobalEvolutionListener = () => {
         return;
       }
 
-      setPendingRevealState((current) => {
-        if (
-          current?.status === "ready" &&
-          current.companionId === job.companionId &&
-          current.newStage === job.requestedStage
-        ) {
-          return current;
-        }
+      // The completed reveal can arrive while the companion read is in flight.
+      const latestPending = pendingEvolutionRevealRef.current;
+      if (
+        latestPending?.status === "ready" &&
+        latestPending.companionId === job.companionId &&
+        latestPending.newStage === job.requestedStage
+      ) {
+        setIsEvolvingLoading(false);
+        return;
+      }
 
-        return {
-          status: "preparing",
-          evolutionId: null,
-          companionId: job.companionId,
-          previousStage,
-          newStage: job.requestedStage,
-          previousImageUrl,
-          newImageUrl: pendingImageUrl,
-          animationVideoUrl: null,
-          presetId,
-          element: element ?? null,
-        };
+      setPendingRevealState({
+        status: "preparing",
+        evolutionId: null,
+        companionId: job.companionId,
+        previousStage,
+        newStage: job.requestedStage,
+        previousImageUrl,
+        newImageUrl: pendingImageUrl,
+        animationVideoUrl: null,
+        presetId,
+        element: element ?? null,
       });
     },
     [setIsEvolvingLoading, setPendingRevealState],

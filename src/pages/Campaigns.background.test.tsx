@@ -93,3 +93,4 @@ describe("Campaigns background", () => {
     expect(screen.getByTestId("campaigns-empty-state-panel").className).toContain("shadow-none");
   });
 });
+vi.mock("@/components/GoalsActivity", () => ({ GoalsActivity: () => <div data-testid="goals-activity" /> }));

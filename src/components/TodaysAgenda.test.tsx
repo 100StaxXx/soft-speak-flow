@@ -391,6 +391,26 @@ beforeEach(() => {
 });
 
 describe("TodaysAgenda subtasks", () => {
+  it("gives the compact calendar a scrolling full-day grid without the date or empty-state cards", () => {
+    render(<TodaysAgenda calendarOnly compactCalendar layoutMode="mobile" tasks={[]} selectedDate={new Date("2026-09-19T12:00:00")}
+      completedCount={0} totalCount={0} onToggle={vi.fn()} onAddQuest={vi.fn()} />, { wrapper: createWrapper(new QueryClient()) });
+    expect(screen.queryByTestId("agenda-mobile-header")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("empty-state-pane")).not.toBeInTheDocument();
+    expect(screen.getByTestId("scheduled-timeline-pane")).toHaveClass("overflow-y-auto", "min-h-0", "flex-1");
+    expect(screen.getByTestId("scheduled-timeline-pane").style.maxHeight).toBe("");
+    expect(screen.getByTestId("scheduled-timeline-content").style.paddingBottom).toBe("");
+    expect(screen.getByTestId("journeys-day-grid")).toBeInTheDocument();
+  });
+  it("shows calendar controls without campaign or progress decoration in calendar-only mode", () => {
+    const queryClient = new QueryClient();
+    render(<TodaysAgenda calendarOnly tasks={[]} selectedDate={new Date("2026-09-19T12:00:00")}
+      completedCount={2} totalCount={3} currentStreak={7} onToggle={vi.fn()} onAddQuest={vi.fn()}
+      onManageCalendars={vi.fn()} />, { wrapper: createWrapper(queryClient) });
+    expect(screen.getByTestId("todays-agenda")).toBeInTheDocument();
+    expect(screen.queryByLabelText("2 of 3 agenda items complete")).not.toBeInTheDocument();
+    expect(screen.queryByText("XP")).not.toBeInTheDocument();
+    expect(screen.queryByText("Campaigns")).not.toBeInTheDocument();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.timelineDragState.draggingTaskId = null;
@@ -4463,7 +4483,7 @@ describe("TodaysAgenda external calendar overlay", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getByTestId("external-calendar-event-external:google:meeting-1")).toHaveTextContent(
+    expect(screen.getByTestId("external-calendar-event-external:google::primary:meeting-1")).toHaveTextContent(
       "Project review",
     );
     expect(screen.getByTestId("external-calendar-all-day-events")).toHaveTextContent("Holiday");

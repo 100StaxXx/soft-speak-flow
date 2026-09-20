@@ -9,6 +9,7 @@ export interface StoreKitProduct {
   pricePerYearString?: string | null;
   subscriptionPeriodUnit?: number;
   subscriptionPeriodValue?: number;
+  introductoryOfferEligible?: boolean;
   introductoryPrice?: {
     price: number;
     displayPrice: string;

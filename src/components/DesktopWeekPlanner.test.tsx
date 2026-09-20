@@ -76,6 +76,15 @@ const baseTask = (overrides: Partial<DailyTask> = {}): DailyTask => ({
 });
 
 describe("DesktopWeekPlanner", () => {
+  it("keeps Calendar full-width without progress or campaign panels", () => {
+    render(<DesktopWeekPlanner calendarOnly selectedDate={selectedDate} tasks={[]} currentStreak={5}
+      onDateSelect={vi.fn()} onToggle={vi.fn()} onAddQuest={vi.fn()} />);
+    expect(screen.getByTestId("desktop-week-planner")).not.toHaveClass("grid-cols-[minmax(0,1fr)_320px]");
+    expect(screen.queryByText("This Week")).not.toBeInTheDocument();
+    expect(screen.queryByText("Streak")).not.toBeInTheDocument();
+    expect(screen.queryByText("Rituals this week")).not.toBeInTheDocument();
+    expect(screen.getByTestId("desktop-week-planner-grid")).toBeInTheDocument();
+  });
   it("renders all seven days plus compact desktop header controls", () => {
     const onPlannerModeChange = vi.fn();
     const companionFrostedThemeStyle = {

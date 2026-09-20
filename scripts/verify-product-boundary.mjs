@@ -64,6 +64,7 @@ for (const productFacingFile of [
 
 requireText("src/pages/Welcome.tsx", "Cosmiq Quest");
 requireText("src/pages/Auth.tsx", "I agree to Cosmiq");
+requireText("src/integrations/supabase/client.ts", "opbfpbbqvuksuvmtmssd");
 rejectText("src/pages/HelpCenter.tsx", "Guilds & Community");
 
 if (failures.length > 0) {

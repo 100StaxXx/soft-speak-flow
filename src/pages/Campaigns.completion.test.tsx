@@ -249,3 +249,4 @@ describe("Campaigns populated layout", () => {
     expect(mocks.lastPathfinderProps?.resumeDraftKey).toBe("resume-2026-05-01T12:00:00.000Z");
   });
 });
+vi.mock("@/components/GoalsActivity", () => ({ GoalsActivity: () => <div data-testid="goals-activity" /> }));

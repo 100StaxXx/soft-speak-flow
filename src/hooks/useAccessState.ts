@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { queryKeys } from "@/lib/queryKeys";
@@ -60,6 +60,7 @@ export function useAccessState() {
     currentEntitlement,
     entitlementError,
     isLoading: storeKitLoading,
+    refreshEntitlement,
   } = useStoreKit();
 
   const currentStoreKitAccessState = useMemo<AccessState | null>(() => {
@@ -107,6 +108,9 @@ export function useAccessState() {
         const { data, error } = await supabase.functions.invoke("check-apple-subscription");
         if (error) throw error;
 
+        if (!data || typeof data.has_access !== "boolean" || typeof data.subscribed !== "boolean") {
+          throw new Error("Subscription status could not be confirmed.");
+        }
         const response = {
           ...DEFAULT_ACCESS_STATE,
           ...((data ?? {}) as Partial<AccessState>),
@@ -144,6 +148,7 @@ export function useAccessState() {
   const accessState =
     graceAccessState ??
     query.data ??
+    currentStoreKitAccessState ??
     (canUseFreshLocalActivationAccessForRender ? freshLocalActivationAccessState : null) ??
     (canUseRememberedLocalAccessForRender ? rememberedLocalAccessState : null) ??
     DEFAULT_ACCESS_STATE;
@@ -243,6 +248,10 @@ export function useAccessState() {
     user?.id,
   ]);
 
+  const refetch = useCallback(async () => {
+    await Promise.all([query.refetch(), refreshEntitlement?.()]);
+  }, [query.refetch, refreshEntitlement]);
+
   return {
     accessState,
     isLoading: authLoading ||
@@ -250,7 +259,10 @@ export function useAccessState() {
         query.isLoading ||
         waitingForStoreKitFallback
       )),
-    error: query.error,
-    refetch: query.refetch,
+    // A failed check is unknown, not proof that the customer needs to buy again.
+    error: accessState.has_access ? null : query.error ?? (
+      entitlementError ? new Error("App Store access could not be confirmed.") : null
+    ),
+    refetch,
   };
 }

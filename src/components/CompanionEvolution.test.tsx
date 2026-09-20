@@ -522,6 +522,26 @@ describe("CompanionEvolution", () => {
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 
+  it.each(["NotAllowedError", "AbortError"])("offers manual playback instead of restarting preparation on %s", async (name) => {
+    const play = vi.fn().mockRejectedValueOnce(new DOMException("Playback interrupted", name)).mockResolvedValue(undefined);
+    Object.defineProperty(HTMLMediaElement.prototype, "play", { configurable: true, value: play, writable: true });
+    const props = { ...buildProps(), animationVideoUrl: "https://example.com/evolution.mp4" };
+    render(<CompanionEvolution {...props} />);
+    await prepareEvolution();
+    await flushTimers(FULL_SEQUENCE_MS.hold + FULL_SEQUENCE_MS.charge + FULL_SEQUENCE_MS.conceal + FULL_SEQUENCE_MS.strobe + FULL_SEQUENCE_MS.apex);
+    await flushTimers();
+    expect(props.onAnimationError).not.toHaveBeenCalled();
+    expect(props.onComplete).not.toHaveBeenCalled();
+    const video = screen.getByTestId("evolution-animation-video");
+    expect(video).toHaveAttribute("data-animation-visible", "true");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Play animation" })); });
+    expect(play).toHaveBeenCalledTimes(2);
+    fireEvent.playing(video);
+    expect(screen.queryByRole("button", { name: "Play animation" })).not.toBeInTheDocument();
+    fireEvent.pause(video);
+    expect(screen.getByRole("button", { name: "Play animation" })).toBeInTheDocument();
+  });
+
   it("still renders the Kling evolution animation video at the reduced-motion reveal", async () => {
     mocks.profile = "reduced";
     mocks.prefersReducedMotion = true;

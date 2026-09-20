@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback, useLayoutEffect } from "react";
-import { format, addDays, isSameDay, parseISO } from "date-fns";
+import { format, addDays, isSameDay, parseISO, eachDayOfInterval, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
 import { motion, useReducedMotion } from "framer-motion";
 import { CalendarDays, Compass } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
@@ -9,11 +9,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { PageTransition } from "@/components/PageTransition";
 import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { TodaysAgenda } from "@/components/TodaysAgenda";
-import { DailyMissionThreadCard } from "@/components/DailyMissionThreadCard";
 import { DesktopWeekPlanner } from "@/components/DesktopWeekPlanner";
 import { cn } from "@/lib/utils";
 
-import { DatePillsScroller } from "@/components/DatePillsScroller";
+import { CalendarToolbar, type CalendarView } from "@/components/calendar/CalendarToolbar";
+import { CalendarAlternateViews } from "@/components/calendar/CalendarAlternateViews";
 import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -55,6 +55,7 @@ import { InteractionLogModal } from "@/components/tasks/InteractionLogModal";
 import { getCalendarSendSuccessCopy, useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { useExternalCalendarEvents } from "@/hooks/useExternalCalendarEvents";
+import { useCalendarQuestImports } from "@/hooks/useCalendarQuestImports";
 import {
   buildCalendarSendTargetOptions,
   isCalendarSendTargetAvailable,
@@ -77,7 +78,6 @@ import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { useJourneysLayoutMode } from "@/hooks/useJourneysLayoutMode";
 import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 import { isMacDesignedForIPadIOSApp, isMacSession } from "@/utils/platformTargets";
-import { QuestInboxSection } from "@/components/QuestInboxSection";
 import { QUEST_ACTION_TOAST_DURATION_MS } from "@/constants/questToast";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 import { normalizeUuidLikeId } from "@/utils/offlineId";
@@ -100,6 +100,7 @@ import { getEffectiveMissionDate } from "@/utils/timezone";
 import { createPlanDayCompanionLaunchIntent } from "@/utils/companionPlannerLaunchContext";
 import {
   externalCalendarEventKey,
+  externalEventsForDay,
   externalCalendarEventToCalendarTask,
 } from "@/types/externalCalendar";
 
@@ -250,8 +251,8 @@ const Journeys = () => {
   const [isPlannerQuestEditHandoffActive, setIsPlannerQuestEditHandoffActive] = useState(false);
   const [plannerLaunchIntent, setPlannerLaunchIntent] = useState<CompanionPlannerLaunchIntent | null>(null);
   const [showMonthView, setShowMonthView] = useState(false);
+  const [calendarView, setCalendarView] = useState<CalendarView>("day");
   const [desktopPlannerMode, setDesktopPlannerMode] = useState<DesktopPlannerMode>("week");
-  const [primaryMissionTaskId, setPrimaryMissionTaskId] = useState<string | null>(null);
 
   const [prefilledTime, setPrefilledTime] = useState<string | null>(null);
   const [questSheetPrefillDraft, setQuestSheetPrefillDraft] = useState<QuestComposerPrefillDraft | null>(null);
@@ -300,6 +301,11 @@ const Journeys = () => {
     [location.search],
   );
   const isJourneysRouteActive = isTabActive && location.pathname === JOURNEYS_ROUTE;
+  useEffect(() => {
+    if (isJourneysRouteActive && isInboxRequested && !requestedTaskId) {
+      navigate("/campaigns?section=inbox", { replace: true });
+    }
+  }, [isJourneysRouteActive, isInboxRequested, requestedTaskId, navigate]);
   const journeysLocationSignature = `${location.pathname}${location.search}`;
 
   // Auth and profile for onboarding
@@ -610,11 +616,6 @@ const Journeys = () => {
     resetSelectedDateToToday({ deferIfAddSheetOpen: true });
   }, [effectiveTodayDateKey, isJourneysRouteActive, resetSelectedDateToToday]);
 
-  const handleUserDateInteraction = useCallback(() => {
-    notificationTaskDatePinnedRef.current = false;
-    hasUserDateInteractionRef.current = true;
-  }, []);
-
   const handleUserDateSelect = useCallback((date: Date) => {
     notificationTaskDatePinnedRef.current = false;
     hasUserDateInteractionRef.current = true;
@@ -763,9 +764,11 @@ const Journeys = () => {
     isFetching: isExternalCalendarSyncing,
     refresh: refreshExternalCalendars,
   } = useExternalCalendarEvents(selectedDate, { enabled: isTabActive });
+  const { links: importedCalendarLinks } = useCalendarQuestImports(isTabActive);
   const linkedExternalCalendarEventKeys = useMemo(
-    () => new Set(calendarLinks.map((link) => `${link.provider}:${link.external_event_id}`)),
-    [calendarLinks],
+    () => new Set([...calendarLinks.map((link) => externalCalendarEventKey({ provider: link.provider, id: link.external_event_id, connectionId: link.connection_id, calendarId: link.external_calendar_id })),
+      ...importedCalendarLinks.filter((link) => link.resource_kind === 'event').map((link) => externalCalendarEventKey({ provider: link.provider, id: link.external_id, connectionId: link.connection_id, calendarId: link.calendar_id }))]),
+    [calendarLinks, importedCalendarLinks],
   );
   const externalCalendarEvents = useMemo(
     () => fetchedExternalCalendarEvents.filter(
@@ -774,8 +777,7 @@ const Journeys = () => {
     [fetchedExternalCalendarEvents, linkedExternalCalendarEventKeys],
   );
   const selectedDateExternalCalendarEvents = useMemo(() => {
-    const selectedDateKey = format(selectedDate, "yyyy-MM-dd");
-    return externalCalendarEvents.filter((event) => event.taskDate === selectedDateKey);
+    return externalEventsForDay(externalCalendarEvents, selectedDate);
   }, [externalCalendarEvents, selectedDate]);
   const externalCalendarSyncError = externalCalendarErrors.length > 0
     ? externalCalendarErrors
@@ -898,9 +900,11 @@ const Journeys = () => {
   const calendarTasksWithExternalEvents = useMemo(
     () => [
       ...allCalendarTasks,
-      ...externalCalendarEvents.map(externalCalendarEventToCalendarTask),
+      ...eachDayOfInterval({ start: startOfWeek(startOfMonth(selectedDate)), end: new Date(Math.max(endOfWeek(endOfMonth(selectedDate)).getTime(), addDays(selectedDate, 6).getTime())) })
+        .flatMap((day) => externalEventsForDay(externalCalendarEvents, day))
+        .map((event) => ({ ...externalCalendarEventToCalendarTask(event), externalEvent: event, id: `external:${externalCalendarEventKey(event)}:${event.taskDate}` })),
     ],
-    [allCalendarTasks, externalCalendarEvents],
+    [allCalendarTasks, externalCalendarEvents, selectedDate],
   );
   const isSelectedDateToday = isSameDay(selectedDate, effectiveTodayDate);
   const fabPlanDayLabel = isSelectedDateToday ? "Plan Today" : "Plan Day";
@@ -923,6 +927,7 @@ const Journeys = () => {
   ]);
   const showJourneysPlannerFab = (
     COMPANION_FLOATING_ACTION_BUTTON_ENABLED
+    && isDesktopLayout
     && !isMacHostedIOSApp
     && isJourneysRouteActive
   );
@@ -951,13 +956,29 @@ const Journeys = () => {
   useEffect(() => {
     const routeState = (location.state as {
       companionPlannerLaunchIntent?: CompanionPlannerLaunchIntent | null;
-      journeysCreateQuestRequest?: { id?: string | null } | null;
+      journeysCreateQuestRequest?: {
+        id?: string | null;
+        prefill?: { title: string; durationMinutes: number; category?: "mind" | "body" | "soul" };
+        missionDate?: string;
+      } | null;
     } | null) ?? null;
     const nextCreateQuestRequest = routeState?.journeysCreateQuestRequest ?? null;
     if (nextCreateQuestRequest?.id) {
       setPlannerLaunchIntent(null);
       setIsCompanionPlannerPinned(false);
-      openAddQuestSheet();
+      const prefill = nextCreateQuestRequest.prefill;
+      openAddQuestSheet(prefill ? {
+        date: nextCreateQuestRequest.missionDate
+          ? parseDateKeyAtNoon(nextCreateQuestRequest.missionDate) : undefined,
+        prefillDraft: {
+          text: prefill.title,
+          taskDate: nextCreateQuestRequest.missionDate ?? effectiveTodayDateKey,
+          estimatedDuration: prefill.durationMinutes,
+          category: prefill.category,
+          creationSource: "manual",
+        },
+        prefillKey: nextCreateQuestRequest.id,
+      } : undefined);
 
       const nextState = {
         ...(routeState ?? {}),
@@ -1497,6 +1518,7 @@ const Journeys = () => {
 
     const createdTask = await addTask({
       taskText: data.text,
+      category: data.category,
       difficulty: data.difficulty,
       source: data.creationSource,
       taskDate: taskDate,
@@ -1884,11 +1906,6 @@ const Journeys = () => {
     closeEditingRitual();
   }, [user?.id, queryClient, closeEditingRitual]);
 
-  // Handle date pill click - just navigate to that day
-  const handleDatePillClick = useCallback((date: Date) => {
-    setSelectedDate(date);
-  }, []);
-
 
   // Handle swipe-to-delete quest with undo
   const handleSwipeDeleteQuest = useCallback(async (taskId: string) => {
@@ -1928,40 +1945,21 @@ const Journeys = () => {
     window.dispatchEvent(new CustomEvent(CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT));
   }, []);
 
-  const inboxSection = isInboxRequested || inboxCount > 0 ? (
-    <motion.div
-      initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: prefersReducedMotion ? 0 : 0.08, duration: prefersReducedMotion ? 0 : 0.2 }}
-      className="mb-4"
-    >
-      <QuestInboxSection
-        tasks={inboxTasks}
-        isLoading={inboxLoading}
-        isExpanded={isInboxExpanded}
-        onExpandedChange={setIsInboxExpanded}
-        onToggleQuest={handleToggleInboxQuest}
-        onEditQuest={handleEditQuest}
-        onDeleteQuest={handleDeleteInboxQuest}
-        sectionRef={inboxSectionRef}
-      />
-    </motion.div>
-  ) : null;
 
   return (
     <PageTransition mode="instant">
       <CinematicPageBackground preset="quests" />
       <div
         className={cn(
-          "min-h-screen pb-nav-safe pt-safe px-3 relative z-10",
-          isDesktopLayout && "px-6",
+          "pt-safe relative z-10",
+          isDesktopLayout ? "min-h-screen pb-nav-safe px-6" : "flex h-[100dvh] min-h-0 flex-col overflow-hidden pb-[var(--bottom-nav-runtime-offset,var(--bottom-nav-safe-offset))]",
         )}
         style={companionFrostedThemeStyle}
         data-testid="journeys-theme-scope"
       >
-        <div className="mx-auto w-full max-w-[1360px]">
+        <div className={cn("mx-auto w-full max-w-[1360px]", !isDesktopLayout && "flex min-h-0 flex-1 flex-col")}>
           {/* Hero Header */}
-          <motion.div
+          {isDesktopLayout ? <motion.div
             initial={prefersReducedMotion ? false : { opacity: 0, y: -14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.22 }}
@@ -1998,41 +1996,50 @@ const Journeys = () => {
                   isDesktopLayout && "mb-1",
                 )}
               >
-                Agenda
+                Calendar
               </h1>
               <p className={cn("text-sm text-muted-foreground/90", !isDesktopLayout && "hidden")}>See what’s next and shape the day.</p>
             </div>
-          </motion.div>
+          </motion.div> : <CalendarToolbar
+            selectedDate={selectedDate}
+            view={calendarView}
+            onViewChange={setCalendarView}
+            onDateSelect={handleUserDateSelect}
+            onToday={() => {
+              notificationTaskDatePinnedRef.current = false;
+              resetSelectedDateToToday();
+            }}
+            onAdd={() => openAddQuestSheet()}
+            onManageCalendars={handleOpenCalendarPreferences}
+            onRefresh={() => { void refreshExternalCalendars(); }}
+            onInfo={() => setShowPageInfo(true)}
+            onVoiceAdd={isVoiceAddSupported ? toggleVoiceAddRecording : undefined}
+            isSyncing={isExternalCalendarSyncing}
+            syncError={externalCalendarSyncError}
+            tasksPerDay={tasksPerDay}
+          />}
 
         <QuestsErrorBoundary>
-          {!isDesktopLayout ? (
-            <div
-              data-testid="journeys-mobile-date-strip"
-              className="relative z-10 mb-2 min-h-[52px]"
-            >
-              <DatePillsScroller
-                selectedDate={selectedDate}
-                onDateSelect={handleDatePillClick}
-                onUserDateInteraction={handleUserDateInteraction}
-                tasksPerDay={tasksPerDay}
-                isActive={isJourneysRouteActive}
-                centerRequestKey={datePillCenterRequestKey}
-                centerRequestDateKey={datePillCenterRequestDateKey}
-                resetRangeOnCenterRequest
-              />
-            </div>
-          ) : null}
-
-          {isInboxRequested ? inboxSection : null}
-
           {/* Main Content Area */}
           <motion.div
+            className={!isDesktopLayout ? "min-h-0 flex-1 overflow-hidden" : undefined}
             initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: prefersReducedMotion ? 0 : 0.1, duration: prefersReducedMotion ? 0 : 0.2 }}
           >
-            {isDesktopLayout && desktopPlannerMode === "week" ? (
+            {!isDesktopLayout && calendarView !== "day" ? <CalendarAlternateViews
+              view={calendarView}
+              centerNowRequestKey={agendaCenterNowRequestKey}
+              selectedDate={selectedDate}
+              tasks={calendarTasksWithExternalEvents}
+              externalEvents={externalCalendarEvents}
+              onDateSelect={handleUserDateSelect}
+              onOpenDay={(date) => { handleUserDateSelect(date); setCalendarView("day"); }}
+              onTaskClick={(task) => { void handleEditQuest(allCalendarTasks.find(item => item.id === task.id) ?? task); }}
+              onAdd={(date, time) => openAddQuestSheet({ date, time })}
+            /> : isDesktopLayout && desktopPlannerMode === "week" ? (
               <DesktopWeekPlanner
+                calendarOnly
                 selectedDate={selectedDate}
                 tasks={weekCalendarTasks}
                 readableQuestCardsEnabled={profile?.readable_quest_cards_enabled ?? false}
@@ -2066,8 +2073,9 @@ const Journeys = () => {
               />
             ) : (
               <TodaysAgenda
+                calendarOnly
+                compactCalendar={!isDesktopLayout}
                 tasks={dailyTasks}
-                primaryMissionTaskId={primaryMissionTaskId}
                 externalEvents={selectedDateExternalCalendarEvents}
                 connectedCalendarCount={connectedExternalCalendarCount}
                 isExternalCalendarSyncing={isExternalCalendarSyncing}
@@ -2119,27 +2127,6 @@ const Journeys = () => {
             )}
           </motion.div>
 
-          {!isInboxRequested ? inboxSection : null}
-
-          {isSelectedDateToday ? (
-            <DailyMissionThreadCard
-              missionDate={effectiveTodayDateKey}
-              tasks={dailyTasks}
-              externalEvents={selectedDateExternalCalendarEvents}
-              connectedCalendarCount={connectedExternalCalendarCount}
-              onAddQuest={(prefill) => openAddQuestSheet(prefill ? {
-                date: selectedDate,
-                prefillDraft: {
-                  text: prefill.title,
-                  taskDate: effectiveTodayDateKey,
-                  estimatedDuration: prefill.durationMinutes,
-                  creationSource: "manual",
-                },
-                prefillKey: `daily-mission-${effectiveTodayDateKey}`,
-              } : undefined)}
-              onPrimaryTaskIdChange={setPrimaryMissionTaskId}
-            />
-          ) : null}
         </QuestsErrorBoundary>
 
         <JourneysCompanionPlannerModal

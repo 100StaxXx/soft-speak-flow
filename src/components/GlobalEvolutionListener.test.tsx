@@ -521,6 +521,69 @@ describe("GlobalEvolutionListener", () => {
     }
   });
 
+  it("does not let a stale processing event disable a ready custom hatch", async () => {
+    mocks.state.pendingEvolutionReveal = {
+      status: "ready", companionId: "companion-1", evolutionId: "evo-1",
+      previousStage: 0, newStage: 1,
+      previousImageUrl: "https://example.com/egg.png",
+      newImageUrl: "https://example.com/hatchling.png",
+      animationVideoUrl: "https://example.com/custom-hatch.mp4",
+    };
+    renderListener();
+    await flushMicrotasks();
+    mocks.setIsEvolvingLoadingMock.mockClear();
+
+    await act(async () => {
+      await mocks.state.jobCallback?.({ new: {
+        id: "hatch-job", companion_id: "companion-1",
+        requested_stage: 1, status: "processing",
+      } });
+    });
+
+    expect(mocks.setIsEvolvingLoadingMock).not.toHaveBeenCalledWith(true);
+    expect(mocks.state.pendingEvolutionReveal?.status).toBe("ready");
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(COMPANION_HATCH_STARTED_EVENT, {
+        detail: {
+          companionId: "companion-1", previousStage: 0, newStage: 1,
+          previousImageUrl: "https://example.com/egg.png",
+          newImageUrl: "https://example.com/hatchling.png",
+        },
+      }));
+      await flushMicrotasks();
+    });
+    expect(mocks.state.pendingEvolutionReveal?.status).toBe("ready");
+    expect(mocks.setIsEvolvingLoadingMock).not.toHaveBeenCalledWith(true);
+    await requestReadyEvolutionReveal();
+    expect(screen.getByTestId("companion-evolution")).toHaveAttribute(
+      "data-animation-video-url", "https://example.com/custom-hatch.mp4",
+    );
+  });
+
+  it("replaces the preparing egg placeholder with the persisted hatchling portrait", async () => {
+    mocks.state.pendingEvolutionReveal = {
+      status: "preparing", companionId: "companion-1",
+      previousStage: 0, newStage: 1,
+      previousImageUrl: "https://example.com/egg.png",
+      newImageUrl: "https://example.com/egg.png", animationVideoUrl: null,
+    };
+    mocks.state.userCompanionLookup = {
+      id: "companion-1", current_stage: 1,
+      current_image_url: "https://example.com/hatchling.png",
+      initial_image_url: "https://example.com/egg.png",
+    };
+    mocks.companionEvolutionLookupResponses.push({ data: {
+      id: "evo-1", image_url: "https://example.com/hatchling.png",
+      animation_status: "succeeded",
+      animation_video_url: "https://example.com/custom-hatch.mp4",
+      animation_presented_at: null,
+    }, error: null });
+    renderListener();
+    await waitFor(() => expect(mocks.state.pendingEvolutionReveal).toEqual(
+      expect.objectContaining({ status: "ready", newImageUrl: "https://example.com/hatchling.png" }),
+    ));
+  });
+
   it("hydrates an active queued evolution job on mount", async () => {
     mocks.state.userCompanionLookup = {
       id: "companion-1",

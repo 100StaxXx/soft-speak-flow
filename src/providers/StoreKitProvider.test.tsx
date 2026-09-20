@@ -3,6 +3,7 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  authStatus: "authenticated",
   addAppListener: vi.fn(),
   addCustomerInfoUpdateListener: vi.fn(),
   configure: vi.fn(),
@@ -15,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   restorePurchases: vi.fn(),
   setLogLevel: vi.fn(),
   syncPurchases: vi.fn(),
+  checkTrialEligibility: vi.fn(),
 }));
 
 const inactiveCustomerInfo = {
@@ -27,7 +29,7 @@ const inactiveCustomerInfo = {
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     user: { id: "11111111-1111-4111-8111-111111111111" },
-    status: "authenticated",
+    status: mocks.authStatus,
   }),
 }));
 
@@ -66,6 +68,7 @@ vi.mock("@revenuecat/purchases-capacitor", () => ({
     STOREKIT_2: "STOREKIT_2",
   },
   Purchases: {
+    checkTrialOrIntroductoryPriceEligibility: (...args: unknown[]) => mocks.checkTrialEligibility(...args),
     addCustomerInfoUpdateListener: (...args: unknown[]) => (
       mocks.addCustomerInfoUpdateListener(...args) ?? Promise.resolve("listener-1")
     ),
@@ -110,6 +113,7 @@ const Probe = () => {
       </span>
       <span data-testid="entitlement-sandbox">{String(storeKit.currentEntitlement?.isSandbox)}</span>
       <span data-testid="product-count">{String(storeKit.products.length)}</span>
+      <span data-testid="trial-eligible">{String(storeKit.products[0]?.introductoryOfferEligible)}</span>
       <span data-testid="product-ids">{storeKit.products.map((product) => product.identifier).join(",")}</span>
       <span data-testid="purchase-transaction-id">{purchaseTransactionId}</span>
       <button
@@ -164,6 +168,7 @@ describe("StoreKitProvider", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    mocks.authStatus = "authenticated";
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(console, "info").mockImplementation(() => {});
     vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -173,6 +178,7 @@ describe("StoreKitProvider", () => {
     mocks.getCustomerInfo.mockResolvedValue({ customerInfo: inactiveCustomerInfo });
     mocks.getOfferings.mockResolvedValue({ current: null, all: {} });
     mocks.getProducts.mockResolvedValue({ products: [] });
+    mocks.checkTrialEligibility.mockResolvedValue({});
     mocks.logIn.mockResolvedValue({ customerInfo: inactiveCustomerInfo });
     mocks.purchaseStoreProduct.mockResolvedValue({
       productIdentifier: "cosmiq_premium_yearly",
@@ -535,6 +541,41 @@ describe("StoreKitProvider", () => {
     });
 
     expect(screen.getByTestId("products-loading")).toHaveTextContent("false");
+  });
+
+  it.each([0, 1, 2])("uses Apple's introductory eligibility status %s", async (status) => {
+    vi.useRealTimers();
+    mocks.checkTrialEligibility.mockResolvedValue({ cosmiq_premium_monthly: { status } });
+    mocks.getProducts.mockResolvedValue({ products: [{
+      identifier: "cosmiq_premium_monthly", title: "Monthly", description: "Monthly access",
+      price: 9.99, priceString: "$9.99", productType: "AUTO_RENEWABLE_SUBSCRIPTION", subscriptionPeriod: "P1M",
+    }] });
+    render(<StoreKitProvider><Probe /></StoreKitProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh Products" }));
+    await waitFor(() => expect(screen.getByTestId("trial-eligible")).toHaveTextContent(String(status === 2)));
+  });
+
+  it("reports a failed silent purchase sync as unknown rather than confirmed unsubscribed", async () => {
+    vi.useRealTimers();
+    mocks.syncPurchases.mockRejectedValue(new Error("Offline"));
+    render(<StoreKitProvider><Probe /></StoreKitProvider>);
+    await waitFor(() => expect(screen.getByTestId("entitlement-error")).toHaveTextContent("true"));
+  });
+
+  it("preserves a current entitlement through same-user authentication recovery", async () => {
+    vi.useRealTimers();
+    mocks.getCustomerInfo.mockResolvedValue({ customerInfo: {
+      ...inactiveCustomerInfo,
+      entitlements: { active: { cosmiq_pro: {
+        isActive: true, productIdentifier: "cosmiq_premium_yearly",
+        latestPurchaseDate: "2026-09-19T00:00:00Z", expirationDate: "2099-01-01T00:00:00Z",
+      } }, all: {} },
+    } });
+    const view = render(<StoreKitProvider><Probe /></StoreKitProvider>);
+    await waitFor(() => expect(screen.getByTestId("entitlement-product")).toHaveTextContent("cosmiq_premium_yearly"));
+    mocks.authStatus = "recovering";
+    view.rerender(<StoreKitProvider><Probe /></StoreKitProvider>);
+    expect(screen.getByTestId("entitlement-product")).toHaveTextContent("cosmiq_premium_yearly");
   });
 
   it("keeps direct products when offerings fail", async () => {

@@ -15,6 +15,7 @@ interface CompanionMotionSurfaceProps {
   contentClassName?: string;
   backdropClassName?: string;
   foregroundClassName?: string;
+  showEffects?: boolean;
   children: ReactNode;
 }
 
@@ -29,13 +30,14 @@ export const CompanionMotionSurface = ({
   contentClassName,
   backdropClassName,
   foregroundClassName,
+  showEffects = true,
   children,
 }: CompanionMotionSurfaceProps) => (
   <div
     className={cn("relative isolate", className)}
     data-testid="companion-motion-surface"
   >
-    <CompanionMotionLayer
+    {showEffects && <CompanionMotionLayer
       variant={variant}
       plane="backdrop"
       stage={stage}
@@ -44,14 +46,14 @@ export const CompanionMotionSurface = ({
       primaryColor={primaryColor}
       secondaryColor={secondaryColor}
       className={cn("absolute inset-0 z-0 rounded-2xl", backdropClassName)}
-    />
+    />}
     <div
       className={cn("relative z-10 h-full w-full", contentClassName)}
       data-testid="companion-motion-surface-content"
     >
       {children}
     </div>
-    <CompanionMotionLayer
+    {showEffects && <CompanionMotionLayer
       variant={variant}
       plane="foreground"
       stage={stage}
@@ -60,6 +62,6 @@ export const CompanionMotionSurface = ({
       primaryColor={primaryColor}
       secondaryColor={secondaryColor}
       className={cn("absolute inset-0 z-20 rounded-2xl", foregroundClassName)}
-    />
+    />}
   </div>
 );
