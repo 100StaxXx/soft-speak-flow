@@ -11,6 +11,22 @@ beforeEach(() => {
   mocks.get.mockResolvedValue({ value: null }); mocks.set.mockResolvedValue(undefined); mocks.remove.mockResolvedValue(undefined);
 });
 describe("secure session persistence", () => {
+  it("bounds unresponsive secure writes and removals without erasing the legacy copy", async () => {
+    vi.useFakeTimers();
+    try {
+      localStorage.setItem(key, "legacy");
+      mocks.set.mockImplementation(() => new Promise(() => {}));
+      const save = expect(authSessionStorage.setItem(key, "new")).rejects.toMatchObject({ code: "AUTH_STORAGE_WRITE_TIMEOUT" });
+      await vi.advanceTimersByTimeAsync(AUTH_STORAGE_READ_TIMEOUT_MS);
+      await save;
+      expect(localStorage.getItem(key)).toBe("legacy");
+      mocks.remove.mockImplementation(() => new Promise(() => {}));
+      const remove = expect(authSessionStorage.removeItem(key)).rejects.toMatchObject({ code: "AUTH_STORAGE_REMOVE_TIMEOUT" });
+      await vi.advanceTimersByTimeAsync(AUTH_STORAGE_READ_TIMEOUT_MS);
+      await remove;
+      expect(localStorage.getItem(key)).toBe("legacy");
+    } finally { vi.useRealTimers(); }
+  });
   it("bounds an unresponsive native read without falling back or erasing credentials", async () => {
     vi.useFakeTimers();
     try {

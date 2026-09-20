@@ -610,7 +610,7 @@ describe("Journeys inbox integration", () => {
   it("switches the mobile calendar between the four compact views while preserving its scenic background", () => {
     renderJourneys();
     expect(screen.getByTestId("calendar-toolbar")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "open-companion-fab" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "open-companion-fab" })).toBeInTheDocument();
     for (const [label, testId] of [["Agenda", "calendar-agenda-view"], ["3-Day", "calendar-three-day-view"], ["Month", "calendar-month-view"], ["Day", "todays-agenda"]]) {
       fireEvent.keyDown(screen.getByRole("button", { name: "Calendar view" }), { key: "ArrowDown" });
       fireEvent.click(screen.getByRole("menuitemradio", { name: label }));

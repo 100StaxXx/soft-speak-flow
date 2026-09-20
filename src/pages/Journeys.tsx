@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 
 import { CalendarToolbar, type CalendarView } from "@/components/calendar/CalendarToolbar";
 import { CalendarAlternateViews } from "@/components/calendar/CalendarAlternateViews";
+import { QuestSummary, type QuestSummaryTask } from "@/components/calendar/QuestSummary";
 import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -35,6 +36,7 @@ import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
 import { useRecurringTaskSpawner } from "@/hooks/useRecurringTaskSpawner";
 import { useAuth } from "@/hooks/useAuth";
+import { useAccountPreference } from "@/hooks/useAccountPreference";
 import { useProfile } from "@/hooks/useProfile";
 import { useStreakAtRisk } from "@/hooks/useStreakAtRisk";
 
@@ -196,6 +198,7 @@ const buildPlannerQuestPrefill = (
 
   return {
     text: title,
+    category: payload.category === "mind" || payload.category === "body" || payload.category === "soul" ? payload.category : undefined,
     taskDate: readPlannerString(payload.taskDate),
     difficulty,
     scheduledTime: readPlannerString(payload.scheduledTime),
@@ -216,7 +219,7 @@ const buildPlannerQuestPrefill = (
     moreInformation: readPlannerString(payload.notes) ?? readPlannerString(payload.moreInformation),
     location: readPlannerString(payload.location),
     subtasks: readPlannerStringArray(payload.subtasks),
-    creationSource: "nlp",
+    creationSource: payload.draftDestination === "inbox" ? "inbox" : "nlp",
   };
 };
 
@@ -251,7 +254,10 @@ const Journeys = () => {
   const [isPlannerQuestEditHandoffActive, setIsPlannerQuestEditHandoffActive] = useState(false);
   const [plannerLaunchIntent, setPlannerLaunchIntent] = useState<CompanionPlannerLaunchIntent | null>(null);
   const [showMonthView, setShowMonthView] = useState(false);
-  const [calendarView, setCalendarView] = useState<CalendarView>("day");
+  const { user } = useAuth();
+  const [calendarView, setCalendarView] = useAccountPreference<CalendarView>(
+    user?.id, "calendar-view", "day", ["day", "agenda", "three-day", "month"],
+  );
   const [desktopPlannerMode, setDesktopPlannerMode] = useState<DesktopPlannerMode>("week");
 
   const [prefilledTime, setPrefilledTime] = useState<string | null>(null);
@@ -309,7 +315,6 @@ const Journeys = () => {
   const journeysLocationSignature = `${location.pathname}${location.search}`;
 
   // Auth and profile for onboarding
-  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { queueAction, shouldQueueWrites, retryNow } = useResilience();
   const { profile, loading: profileLoading } = useProfile();
@@ -927,9 +932,10 @@ const Journeys = () => {
   ]);
   const showJourneysPlannerFab = (
     COMPANION_FLOATING_ACTION_BUTTON_ENABLED
-    && isDesktopLayout
-    && !isMacHostedIOSApp
     && isJourneysRouteActive
+    && !showCompanionPlanner
+    && !isCompanionPlannerBlocked
+    && !showAddSheet
   );
 
   useEffect(() => {
@@ -1135,6 +1141,7 @@ const Journeys = () => {
   );
   useOnboardingTaskCleanup(user?.id, cleanupEligible, profileLoading);
 
+  const [summaryTask, setSummaryTask] = useState<QuestSummaryTask | null>(null);
   const handleEditQuest = useCallback(async (task: {
     id: string;
     task_text: string;
@@ -1670,9 +1677,14 @@ const Journeys = () => {
     const nextTaskUpdate = previousTaskUpdate
       .catch(() => undefined)
       .then(async () => {
-        await updateTask({ taskId, updates: { scheduled_time: newTime } });
-        if (hasLinkedEvent(taskId)) {
-          await syncLinkedTask.mutateAsync({ taskId });
+        const result = await updateTask({ taskId, updates: { scheduled_time: newTime } });
+        if (!result?.queued && hasLinkedEvent(taskId)) {
+          try {
+            await syncLinkedTask.mutateAsync({ taskId });
+          } catch (error) {
+            logger.warn("Quest moved but linked calendar sync failed", { taskId, error });
+            toast.error("Quest moved, but its linked calendar couldn’t update. Try syncing again when connected.");
+          }
         }
       })
       .catch((error) => {
@@ -1680,6 +1692,7 @@ const Journeys = () => {
           taskId,
           error: error instanceof Error ? error.message : String(error),
         });
+        toast.error("Couldn’t finish moving this quest. Check its time and try again.");
       })
       .finally(() => {
         if (scheduledTimeUpdateQueueRef.current.get(taskId) === nextTaskUpdate) {
@@ -1956,8 +1969,10 @@ const Journeys = () => {
         )}
         style={companionFrostedThemeStyle}
         data-testid="journeys-theme-scope"
+        data-agenda-adventure="true"
       >
         <div className={cn("mx-auto w-full max-w-[1360px]", !isDesktopLayout && "flex min-h-0 flex-1 flex-col")}>
+          <div className="agenda-atmosphere" aria-hidden="true"><span /><span /><span /></div>
           {/* Hero Header */}
           {isDesktopLayout ? <motion.div
             initial={prefersReducedMotion ? false : { opacity: 0, y: -14 }}
@@ -2035,10 +2050,12 @@ const Journeys = () => {
               externalEvents={externalCalendarEvents}
               onDateSelect={handleUserDateSelect}
               onOpenDay={(date) => { handleUserDateSelect(date); setCalendarView("day"); }}
-              onTaskClick={(task) => { void handleEditQuest(allCalendarTasks.find(item => item.id === task.id) ?? task); }}
+              onTaskClick={(task) => setSummaryTask(allCalendarTasks.find(item => item.id === task.id) ?? task)}
+              onTaskReschedule={handleTimelineScheduledTimeUpdate}
               onAdd={(date, time) => openAddQuestSheet({ date, time })}
             /> : isDesktopLayout && desktopPlannerMode === "week" ? (
               <DesktopWeekPlanner
+                onTaskReschedule={handleTimelineScheduledTimeUpdate}
                 calendarOnly
                 selectedDate={selectedDate}
                 tasks={weekCalendarTasks}
@@ -2089,7 +2106,7 @@ const Journeys = () => {
                 layoutMode={journeysLayoutMode}
                 hideDesktopRailAddButton={isMacHostedIOSApp}
                 isVisible={location.pathname === JOURNEYS_ROUTE}
-                disableTimelineDrag
+                onViewQuest={setSummaryTask}
                 onToggle={handleToggleTask}
                 onAddQuest={() => openAddQuestSheet()}
                 onOpenCompanionPlanner={openCompanionPlanner}
@@ -2146,6 +2163,7 @@ const Journeys = () => {
 
         {showJourneysPlannerFab ? (
           <DraggableFAB
+            openChatDirectly
             onOpenCompanionPlanner={openCompanionPlanner}
             onCreateQuest={() => openAddQuestSheet()}
             createPlanDayLaunchIntent={createFabPlanDayLaunchIntent}
@@ -2170,6 +2188,11 @@ const Journeys = () => {
           onCreateCampaign={() => openCampaignBuilder()}
           companionFrostedThemeStyle={companionFrostedThemeStyle}
         />
+
+        {summaryTask && <QuestSummary task={summaryTask} onClose={() => setSummaryTask(null)} onEdit={() => {
+          void handleEditQuest(allCalendarTasks.find(task => task.id === summaryTask.id) ?? summaryTask);
+          setSummaryTask(null);
+        }} />}
 
         {/* Edit Quest Dialog (for regular quests) */}
         <EditQuestDialog

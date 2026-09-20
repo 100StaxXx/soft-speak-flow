@@ -77,7 +77,9 @@ describe("Campaigns background", () => {
 
     expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-preset", "campaigns");
     expect(screen.queryByText("Campaign command center")).not.toBeInTheDocument();
-    expect(screen.getByTestId("campaigns-empty-state-button")).toHaveClass("bg-celestial-blue/14");
+    expect(screen.getByTestId("campaigns-empty-state-button")).toHaveAttribute("aria-label", "Create campaign");
+    expect(screen.getByTestId("campaigns-empty-state-button")).toHaveClass("h-11", "w-11");
+    expect(screen.getByTestId("campaigns-empty-state-button")).not.toHaveTextContent("Launch campaign builder");
     expect(screen.queryByTestId("campaigns-create-button")).not.toBeInTheDocument();
     expect(screen.queryByTestId("campaigns-stat-active")).not.toBeInTheDocument();
     expect(screen.queryByTestId("campaigns-stat-completed")).not.toBeInTheDocument();

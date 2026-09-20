@@ -7,6 +7,7 @@ import { Paywall } from "@/components/Paywall";
 import { AccessCheckError } from "@/components/AccessCheckError";
 import { Button } from "@/components/ui/button";
 import { restartAuthRecovery } from "@/utils/authRecovery";
+import { returnToSignIn } from "@/utils/authSignInRecovery";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -45,7 +46,8 @@ export const ProtectedRoute = ({
       authLoading ||
       authStatus === 'recovering'
     );
-  const shouldShowAuthLoading = isAuthPending && !authGateTimedOut;
+  const authNeedsRecovery = isAuthPending && authStatus === 'recovering';
+  const shouldShowAuthLoading = isAuthPending && !authGateTimedOut && !authNeedsRecovery;
   const hasResolvedAccessForCurrentRoute = Boolean(
     userId &&
       resolvedAccessDecision?.userId === userId &&
@@ -75,7 +77,7 @@ export const ProtectedRoute = ({
       authGateTimerRef.current = null;
     }
 
-    if (!isAuthPending || authGateTimedOut) {
+    if (!isAuthPending || authGateTimedOut || authNeedsRecovery) {
       return undefined;
     }
 
@@ -98,6 +100,7 @@ export const ProtectedRoute = ({
   }, [
     authStatus,
     authGateTimedOut,
+    authNeedsRecovery,
     isAuthPending,
     location.pathname,
   ]);
@@ -162,16 +165,17 @@ export const ProtectedRoute = ({
   // Never render protected content before the first entitlement decision for
   // this user. A resolved same-user decision may remain visible during a
   // background refresh, but it is never reused for a different account.
-  if (isAuthPending && authGateTimedOut) {
+  if (isAuthPending && (authGateTimedOut || authNeedsRecovery)) {
     return <div className="min-h-screen flex items-center justify-center bg-background p-6">
       <div role="alert" className="max-w-sm space-y-4 text-center">
         <h1 className="text-xl font-semibold">{recoveryIssue === "secure_storage"
           ? "Your saved sign-in couldn’t be opened"
-          : "Your sign-in is taking longer than expected"}</h1>
+          : "We couldn’t restore your sign-in"}</h1>
         <p className="text-muted-foreground">{recoveryIssue === "secure_storage"
           ? "Keep your phone unlocked and retry. Your saved sign-in and account data have not been cleared."
-          : "Retry to restart the connection. This keeps your saved sign-in and account data."}</p>
+          : "Your saved sign-in check didn’t finish. Retry, or return to sign-in and use the same Apple account. Your account and progress won’t be deleted."}</p>
         <Button onClick={restartAuthRecovery}>Retry sign-in check</Button>
+        <Button variant="outline" onClick={returnToSignIn}>Back to sign in</Button>
       </div>
     </div>;
   }
@@ -187,6 +191,7 @@ export const ProtectedRoute = ({
             </p>
           </div>
           <Progress value={progress} className="w-full" />
+          {shouldShowAuthLoading && <Button variant="ghost" className="w-full" onClick={returnToSignIn}>Back to sign in</Button>}
         </div>
       </div>
     );

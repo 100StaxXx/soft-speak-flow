@@ -412,3 +412,4 @@ verify_jwt = false
 # Handler validates user bearer tokens; queue processing requires the internal secret.
 [functions.companion-wellbeing-video]
 verify_jwt = false
+static_files = ["./functions/companion-wellbeing-video/habitats/*.webp"]

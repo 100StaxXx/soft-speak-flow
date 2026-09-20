@@ -25,6 +25,7 @@ interface DraggableFABProps {
   createPlanDayLaunchIntent?: () => CompanionPlannerLaunchIntent;
   planDayLabel?: string;
   onTap?: () => void;
+  openChatDirectly?: boolean;
 }
 
 const FLOATING_LAUNCHER_SIZE_PX = 96;
@@ -52,6 +53,7 @@ export const DraggableFAB = ({
   createPlanDayLaunchIntent,
   planDayLabel,
   onTap,
+  openChatDirectly = false,
 }: DraggableFABProps) => {
   const { user } = useAuth();
   const suppressTapRef = useRef(false);
@@ -293,14 +295,14 @@ export const DraggableFAB = ({
       <JourneysCompanionLauncher
         variant="floating"
         floatingSize="hero"
-        faceDirection={isMenuOpen ? "front" : "away"}
+        faceDirection={openChatDirectly || isMenuOpen ? "front" : "away"}
         imageUrlOverride={launcherImageUrlOverride}
         imageFocalXOverride={launcherFocalXOverride}
         imageFocalYOverride={launcherFocalYOverride}
         usesPortraitShellOverride={launcherUsesPortraitShellOverride}
         allowImageFallback={!shouldUseStrictLauncherArt}
         requireHeroCutout={isGeneratedCompanion && !launcherAwayHasTransparentBackground}
-        aria-label="Open companion quick actions"
+        aria-label={openChatDirectly ? `Chat with ${companionLabel}` : "Open companion quick actions"}
         data-tour="add-quest-fab"
         data-planner-tour="companion-quick-actions"
         data-testid="journeys-companion-launcher-floating"
@@ -315,6 +317,10 @@ export const DraggableFAB = ({
             return;
           }
           if (canTriggerTap) {
+            if (openChatDirectly) {
+              onOpenCompanionPlanner();
+              return;
+            }
             if (!isMenuOpen) {
               popupOpenTimerRef.current = startCompanionLatencyTimer(
                 "companion_fab_popup_visible",
@@ -326,7 +332,7 @@ export const DraggableFAB = ({
             setIsMenuOpen((previous) => !previous);
           }
         }}
-        className="touch-none select-none"
+        className={cn("touch-none select-none", openChatDirectly && !isDragging && "agenda-companion-beacon")}
       />
     </motion.div>
   );

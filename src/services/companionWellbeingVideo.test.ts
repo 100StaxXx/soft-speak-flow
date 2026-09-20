@@ -11,6 +11,7 @@ describe("Video preparation responses", () => {
   });
   it.each([
     [403, "access_required", /active trial or subscription/],
+    [403, null, /isn’t available for this account/],
     [429, "rate_limited", /tomorrow/],
     [409, "appearance_changed", /companion has changed/],
     [503, "service_unavailable", /temporarily unavailable/],

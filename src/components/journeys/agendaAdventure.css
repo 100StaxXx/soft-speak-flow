@@ -1,0 +1,57 @@
+/* The scenery stays visible; motion is brief and never moves calendar hit targets. */
+[data-agenda-adventure] .journeys-quest-card-shell,
+[data-agenda-adventure] .agenda-event-card {
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-left: 3px solid hsl(var(--primary) / .75);
+  background: linear-gradient(115deg, hsl(var(--primary) / .12), transparent 65%), rgba(18,24,35,.9);
+  box-shadow: 0 3px 12px rgba(0,0,0,.14);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease;
+}
+[data-agenda-adventure] .journeys-quest-card-shell::after { display: none; }
+[data-agenda-adventure] .journeys-quest-card-shell:focus-within,
+[data-agenda-adventure] .agenda-event-card:focus-visible {
+  outline: 2px solid hsl(var(--primary) / .8);
+  outline-offset: 2px;
+}
+[data-agenda-adventure] [data-quest-complete="true"] {
+  border-left-color: #6ee7b7;
+  animation: agenda-complete .65s ease-out both;
+}
+[data-agenda-adventure] [data-quest-dragging="true"] {
+  box-shadow: 0 10px 28px rgba(0,0,0,.32), 0 0 18px hsl(var(--primary) / .25);
+}
+.agenda-companion-beacon { animation: agenda-arrive .65s ease-out both; }
+.agenda-companion-beacon::after {
+  content: "";
+  position: absolute;
+  right: 5px;
+  top: 8px;
+  width: 13px;
+  height: 11px;
+  border-radius: 7px 7px 7px 1px;
+  border: 1px solid rgba(255,255,255,.55);
+  background: rgba(25,31,45,.9);
+  box-shadow: 0 0 10px rgba(167,139,250,.2);
+}
+.agenda-chat { color-scheme: dark; --foreground: 210 20% 96%; --muted-foreground: 215 16% 68%; }
+.agenda-chat-welcome { animation: agenda-arrive .28s ease-out both; }
+.agenda-atmosphere { pointer-events: none; position: absolute; inset: 0; overflow: hidden; }
+.agenda-atmosphere span {
+  position: absolute; top: 12%; width: 3px; height: 3px; border-radius: 50%;
+  background: #c4b5fd; opacity: 0; box-shadow: 0 0 8px #c4b5fd;
+  animation: agenda-firefly 7s ease-in-out 2;
+}
+.agenda-atmosphere span:nth-child(1) { left: 12%; }
+.agenda-atmosphere span:nth-child(2) { left: 76%; animation-delay: 1.5s; }
+.agenda-atmosphere span:nth-child(3) { left: 43%; animation-delay: 3s; }
+@keyframes agenda-arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes agenda-firefly { 0%,100% { opacity: 0; transform: translateY(12px); } 45% { opacity: .4; } 80% { transform: translateY(-45px); } }
+@keyframes agenda-complete { 0% { box-shadow: 0 0 0 0 rgba(110,231,183,.28); } 100% { box-shadow: 0 0 0 9px rgba(110,231,183,0); } }
+@media (prefers-reduced-motion: reduce) {
+  .agenda-companion-beacon, .agenda-chat-welcome,
+  [data-agenda-adventure] [data-quest-complete="true"], .agenda-atmosphere span { animation: none; }
+  .agenda-atmosphere { display: none; }
+}

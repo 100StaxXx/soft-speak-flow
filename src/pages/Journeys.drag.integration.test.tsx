@@ -902,7 +902,7 @@ describe("Journeys row drag integration", () => {
     expect(mocks.lastAddQuestSheetProps?.autoFillTimeOnFirstTap).toBe(true);
   });
 
-  it("renders the desktop companion launcher CTA and suppresses the floating FAB on Mac-hosted iOS", async () => {
+  it("restores companion chat alongside the desktop launcher on Mac-hosted iOS", async () => {
     mocks.isMacHostedIOSApp = true;
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
@@ -928,8 +928,8 @@ describe("Journeys row drag integration", () => {
     const launcher = await screen.findByRole("button", { name: /Plan (Today|Day)/i });
     expect(launcher).toBeInTheDocument();
     expect(launcher).toHaveAttribute("data-tour", "add-quest-launcher");
-    expect(screen.queryByTestId("draggable-fab")).not.toBeInTheDocument();
-    expect(mocks.draggableFabRenderCount).toBe(0);
+    expect(screen.queryByTestId("draggable-fab")).toBeInTheDocument();
+    expect(mocks.draggableFabRenderCount).toBeGreaterThan(0);
     expect(mocks.lastAddQuestSheetProps?.presentation).toBe("desktop-panel");
     expect(mocks.lastCompanionPlannerModalProps?.presentation).toBe("dialog");
   });
@@ -951,7 +951,7 @@ describe("Journeys row drag integration", () => {
     );
 
     expect(await screen.findByLabelText("Add quest")).toHaveAttribute("data-tour", "add-quest-launcher");
-    expect(mocks.draggableFabRenderCount).toBe(0);
+    expect(mocks.draggableFabRenderCount).toBeGreaterThan(0);
   });
 
   it("builds the desktop FAB Plan Today intent from the visible journeys context", async () => {
@@ -1961,10 +1961,10 @@ describe("Journeys row drag integration", () => {
   const choosePreviousWeek = () => fireEvent.click(screen.getByRole("button", { name: "Previous week" }));
   const expectToday = () => expect(selectedDayLabel()).toBe("Tuesday, May 12, 2026");
 
-  it("keeps mobile calendar free of campaign sections and floating companion controls", () => {
+  it("restores the mobile companion while keeping campaign sections off the calendar", () => {
     renderCalendar();
     expect(screen.queryByRole("button", { name: "Open campaigns page" })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("draggable-fab")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("draggable-fab")).toBeInTheDocument();
     expect(screen.queryByText("No tasks for this day")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Calendar view" })).toBeInTheDocument();
   });

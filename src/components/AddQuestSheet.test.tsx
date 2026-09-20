@@ -1943,4 +1943,14 @@ describe("AddQuestSheet", () => {
     expect(screen.queryByText("Restore saved quest draft?")).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Voice wins");
   });
+
+  it("saves an assistant inbox draft without silently scheduling it on the selected date", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+    render(<AddQuestSheet open onOpenChange={vi.fn()} selectedDate={selectedDate} onAdd={onAdd}
+      prefillKey="assistant-inbox-1" prefillDraft={{ text: "Explore a new trail", taskDate: null, creationSource: "inbox" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Save to Inbox" }));
+    await waitFor(() => expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({
+      text: "Explore a new trail", taskDate: null, sendToInbox: true,
+    })));
+  });
 });

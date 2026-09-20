@@ -7,7 +7,7 @@ const body = { action: "prepare", companionId: "companion-1", category: "mind", 
 function fixture() {
   const jobs: any[] = [];
   const companion: any = { id: "companion-1", user_id: "user-1", current_stage: 8, current_image_url: IMAGE, core_element: "storm", product_mode: "cosmiq" };
-  const calls = { submit: [] as any[], upload: 0, ledger: 0, product: "cosmiq", internal: false, denied: false, access: true, poll: "COMPLETED", throws: false };
+  const calls = { submit: [] as any[], scenes: [] as any[], sceneFailure: false, upload: 0, ledger: 0, product: "cosmiq", internal: false, denied: false, access: true, poll: "COMPLETED", throws: false };
   const db: any = {
     rpc: () => {
       const job = jobs.find((row) => ["queued", "submitting", "processing"].includes(row.status) && !row.lease_token);
@@ -47,6 +47,11 @@ function fixture() {
     authenticate: async () => calls.denied ? new Response("Unauthorized", { status: 401 }) : calls.internal ? { isInternal: true } : { userId: "user-1", isInternal: false },
     product: async () => calls.product as "cosmiq" | "graceward",
     access: async () => calls.access,
+    scene: async (args) => {
+      calls.scenes.push(args);
+      if (calls.sceneFailure) throw new Error("Habitat unavailable");
+      return `${BASE}/storage/v1/object/public/companion-images/user-1/wellbeing-scenes/${args.job.id}.jpg`;
+    },
     env: (key) => key === "SUPABASE_URL" ? BASE : "fake-test-key", now: () => Date.now(),
     guardrails: (() => ({ wrapFetch: (fetcher: any) => fetcher })) as any,
     submit: async (args) => { calls.submit.push(args); if (calls.throws) throw new Error("Timeout after submit"); return { requestId: "fal-one", statusUrl: "", responseUrl: "", cancelUrl: "" }; },
@@ -80,7 +85,8 @@ Deno.test("fresh cinema portraits and legacy bundled portraits can prepare and s
     assertEquals((await f.request({ ...body, sourceImageUrl: portrait })).status, 200);
     f.calls.internal = true; await f.request({});
     assertEquals(f.calls.submit.length, 1);
-    assertEquals(f.calls.submit[0].imageUrl, resolveWellbeingSourceImage(portrait, BASE));
+    assertEquals(f.calls.scenes[0].job.source_image_url, resolveWellbeingSourceImage(portrait, BASE));
+    assert(f.calls.submit[0].imageUrl.includes("/wellbeing-scenes/"));
   }
 });
 Deno.test("relative remote presets match their normalized client URLs without permitting arbitrary hosts", async () => {
@@ -107,6 +113,23 @@ Deno.test("a valid 14-day app trial is honored without requiring a paid subscrip
   const row = { user_id: "user-1", source: "trial", is_active: true, trial_started_at: new Date(now - 13 * 86400_000).toISOString(), trial_ends_at: new Date(now + 86400_000).toISOString() };
   const query: any = { select: () => query, eq: () => query, maybeSingle: async () => ({ data: row, error: null }) };
   assertEquals(await hasWellbeingVideoAccess({ from: (table: string) => { assertEquals(table, "account_entitlements"); return query; } }, "user-1"), true);
+});
+
+Deno.test("unsubmitted access-blocked jobs resume only after access is restored", async () => {
+  const f = fixture(); await f.request();
+  f.calls.access = false; f.calls.internal = true; await f.request({});
+  assertEquals(f.jobs[0].error_code, "access_required");
+  f.calls.internal = false;
+  assertEquals((await f.request()).status, 403);
+  assertEquals(f.jobs[0].status, "failed");
+  f.calls.access = true;
+  await Promise.all([f.request(), f.request()]);
+  assertEquals(f.jobs.length, 1);
+  assertEquals(f.jobs[0].status, "queued");
+  assertEquals(f.jobs[0].retry_count, 1);
+  f.calls.internal = true; await f.request({});
+  assertEquals(f.calls.submit.length, 1);
+  assertEquals(retryMode({ status: "failed", error_code: "access_required", provider_task_id: "already-submitted" }), null);
 });
 Deno.test("status checks never enqueue, repeated prepare calls reuse one saved job", async () => {
   const f = fixture();
@@ -149,7 +172,9 @@ Deno.test("worker submits exactly three seconds once, saves provider id, then st
   await f.request({});
   assertEquals(f.calls.submit.length, 1);
   assertEquals(f.calls.submit[0].durationSeconds, 3);
-  assertEquals(f.calls.submit[0].imageUrl, IMAGE);
+  assert(f.calls.submit[0].imageUrl.includes("/wellbeing-scenes/"));
+  assertEquals(f.calls.scenes[0].element, "storm");
+  assertEquals(f.calls.scenes[0].job.source_image_url, IMAGE);
   assertEquals(f.jobs[0].provider_task_id, "fal-one");
   await f.request({});
   assertEquals(f.calls.submit.length, 1);
@@ -165,6 +190,28 @@ Deno.test("does not resubmit after ambiguous provider failure or worker crash", 
   await f.request({});
   assertEquals(f.calls.submit.length, 1);
   assertEquals(f.jobs[0].status, "failed");
+});
+
+Deno.test("missing habitat never submits a backgroundless paid video", async () => {
+  const f = fixture(); await f.request();
+  f.calls.internal = true; f.calls.sceneFailure = true;
+  await f.request({});
+  assertEquals(f.calls.submit.length, 0);
+  assertEquals(f.jobs[0].status, "queued");
+  f.calls.sceneFailure = false; await f.request({});
+  assertEquals(f.calls.submit.length, 1);
+  assert(f.calls.submit[0].imageUrl.includes("/wellbeing-scenes/"));
+});
+
+Deno.test("new scene version replaces the lookup for backgroundless clips without deleting them", async () => {
+  const f = fixture(); await f.request();
+  f.jobs[0].prompt_version = 1;
+  f.jobs[0].status = "succeeded"; f.jobs[0].video_url = "old-backgroundless.mp4";
+  const response = await (await f.request()).json();
+  assertEquals(f.jobs.length, 2);
+  assertEquals(f.jobs[0].video_url, "old-backgroundless.mp4");
+  assertEquals(f.jobs[1].prompt_version, 2);
+  assertEquals(response.clip.status, "queued");
 });
 Deno.test("pending provider work is polled without a new generation and times out cleanly", async () => {
   const f = fixture(); await f.request(); f.calls.internal = true; await f.request({});

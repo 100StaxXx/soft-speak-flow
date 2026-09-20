@@ -2,7 +2,8 @@ import { getCurrentVisualStageBoundaryLevel } from "../config/progression.ts";
 
 export const WELLBEING_CATEGORIES = ["mind", "body", "soul"] as const;
 export type WellbeingCategory = typeof WELLBEING_CATEGORIES[number];
-export const WELLBEING_PROMPT_VERSION = 1;
+// v2 receives the actual portrait + habitat composite, not a transparent cutout.
+export const WELLBEING_PROMPT_VERSION = 2;
 export const WELLBEING_VIDEO_SECONDS = 3;
 export const isWellbeingCategory = (value: unknown): value is WellbeingCategory =>
   typeof value === "string" && WELLBEING_CATEGORIES.includes(value as WellbeingCategory);
@@ -50,6 +51,7 @@ export function buildWellbeingVideoPrompt(level: number, category: WellbeingCate
   return [
     "Exactly three seconds, silent, one continuous shot. Use the supplied image as the exact first frame.",
     "Preserve this unique companion's identity, species, markings, colors, proportions, existing limbs and current evolution form. Preserve its elemental background and framing.",
+    "Keep the supplied landscape, ground, horizon and scenery visible throughout all three seconds, including after the companion moves out of frame. Never replace the habitat with a solid color, glow, studio backdrop or empty background.",
     ACTIONS[stage][category],
     "Use anatomy-appropriate movement: walk, swim, slither or fly only when supported by the original creature. Finish a single simple action within three seconds.",
     ELEMENT_DETAILS[element.toLowerCase()] ?? "Keep the existing background calm and unchanged.",

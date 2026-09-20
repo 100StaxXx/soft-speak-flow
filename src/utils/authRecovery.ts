@@ -1,4 +1,22 @@
 export const AUTH_REQUEST_TIMEOUT_MS = 15_000;
+export const AUTH_SESSION_CHECK_TIMEOUT_MS = 35_000;
+
+/** A waiting SDK queue must not keep the app's bootstrap promise alive forever. */
+export const checkSessionWithDeadline = async <T>(check: () => Promise<T>): Promise<T> => {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      check(),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(Object.assign(
+          new Error("Saved sign-in check did not finish"), { code: "AUTH_SESSION_CHECK_TIMEOUT" },
+        )), AUTH_SESSION_CHECK_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
+};
 
 export type AuthRecoveryIssue = "secure_storage" | "connection";
 export const getAuthRecoveryIssue = (error: unknown): AuthRecoveryIssue => {

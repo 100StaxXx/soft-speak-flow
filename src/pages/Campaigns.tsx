@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Plus, Sparkles, Target, Trophy } from "lucide-react";
+import { Plus, Target, Trophy } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
 import { CinematicPageBackground } from "@/components/CinematicPageBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -33,7 +33,7 @@ interface CreatedCampaignData {
   habits: Array<{ title: string }>;
 }
 
-const CAMPAIGN_CTA_CLASS = "gap-2 border-celestial-blue/32 bg-celestial-blue/14 text-cyan-50 shadow-[0_14px_32px_rgba(16,75,130,0.2)] backdrop-blur-xl hover:bg-celestial-blue/20 hover:border-celestial-blue/42 hover:text-white";
+const CAMPAIGN_CTA_CLASS = "h-11 w-11 shrink-0 rounded-full text-foreground hover:bg-white/10";
 const CAMPAIGN_PANEL_CLASS = cn(
   "rounded-[32px] border border-celestial-blue/18",
   clearShellCardClassName,
@@ -193,15 +193,15 @@ const Campaigns = () => {
                 </p>
                 <Button
                   type="button"
-                  variant="outline"
-                  size="lg"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Create campaign"
                   data-testid="campaigns-empty-state-button"
                   data-tour="campaign-builder-launcher"
                   className={cn("mt-6", CAMPAIGN_CTA_CLASS)}
                   onClick={openCampaignBuilder}
                 >
-                  <Sparkles className="h-4 w-4" />
-                  Launch campaign builder
+                  <Plus className="h-5 w-5" aria-hidden="true" />
                 </Button>
               </div>
             ) : (
@@ -210,32 +210,26 @@ const Campaigns = () => {
                   <div className="mb-4 space-y-3">
                     <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wide text-muted-foreground">
                       <Target className="h-4 w-4 text-celestial-blue" />
-                      Existing campaigns
-                    </div>
-                    <div className="flex flex-col items-start gap-3">
+                      <span className="flex-1">Existing campaigns</span>
                       <Button
                         type="button"
-                        size="lg"
-                        variant="outline"
+                        size="icon"
+                        variant="ghost"
+                        aria-label="Create campaign"
                         data-testid="campaigns-create-button"
                         data-tour="campaign-builder-launcher"
                         className={CAMPAIGN_CTA_CLASS}
                         disabled={hasReachedLimit}
                         onClick={openCampaignBuilder}
                       >
-                        <Plus className="h-4 w-4" />
-                        Create campaign
+                        <Plus className="h-5 w-5" aria-hidden="true" />
                       </Button>
+                    </div>
                       {hasReachedLimit ? (
                         <p className="text-sm text-muted-foreground">
                           {ACTIVE_CAMPAIGN_LIMIT_MESSAGE}
                         </p>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">
-                          Use campaigns to turn bigger goals into repeatable rituals.
-                        </p>
-                      )}
-                    </div>
+                      ) : null}
                   </div>
                   <div className="space-y-4">
                     {activeEpics.length > 0 ? (

@@ -1087,14 +1087,14 @@ describe("JourneysCompanionPlannerModal", () => {
 
     expect(
       screen.getByTestId("journeys-companion-planner-drawer-content"),
-    ).toHaveStyle({ bottom: "0px" });
+    ).toHaveStyle({ bottom: "88px" });
   });
 
   it.each([
-    ["390x844", 844, 736],
-    ["393x852", 852, 736],
-    ["430x932", 932, 736],
-    ["375x667", 667, 621],
+    ["390x844", 844, 574],
+    ["393x852", 852, 579],
+    ["430x932", 932, 620],
+    ["375x667", 667, 454],
   ])(
     "keeps the self-sized mobile planner drawer within a %s viewport",
     (_label, viewportHeight, expectedShellHeight) => {

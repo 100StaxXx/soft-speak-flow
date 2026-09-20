@@ -208,6 +208,9 @@ export function useAccessState() {
             recoveryTimersRef.current.forEach((pendingTimer) => clearTimeout(pendingTimer));
             recoveryTimersRef.current = [];
             await queryClient.invalidateQueries({ queryKey: queryKeys.access.detail(user.id) });
+            // A video request may have arrived before the verified Apple access
+            // reached the server. Recheck those durable jobs after reconciliation.
+            await queryClient.invalidateQueries({ queryKey: ["companion-video-preparation", user.id] });
             return;
           }
 

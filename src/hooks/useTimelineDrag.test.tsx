@@ -185,6 +185,53 @@ describe("useTimelineDrag", () => {
     expect(mocks.hapticImpactMock).toHaveBeenCalledWith({ style: "MEDIUM" });
   });
 
+  it("uses the real grid scale and suppresses the release click without changing duration", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop, pixelsPerMinute: 1.2 }));
+    act(() => {
+      result.current.getRowDragProps("quest", "09:00").onPointerDown(createPointerDownEvent(100));
+      dispatchPointerMove(172);
+      dispatchPointerUp();
+    });
+    expect(onDrop).toHaveBeenCalledExactlyOnceWith("quest", "10:00");
+    expect(result.current.shouldSuppressClick()).toBe(true);
+  });
+
+  it("does not save a cancelled pointer or touch gesture", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
+    act(() => {
+      result.current.getRowDragProps("quest", "09:00").onPointerDown(createPointerDownEvent(100));
+      dispatchPointerMove(172);
+      window.dispatchEvent(new Event("pointercancel"));
+      dispatchPointerUp();
+    });
+    expect(onDrop).not.toHaveBeenCalled();
+    act(() => {
+      result.current.getRowDragProps("quest", "09:00").onTouchStart(createTouchEvent(100));
+      dispatchTouchMove(172);
+      document.dispatchEvent(new Event("touchcancel"));
+      dispatchTouchEnd();
+    });
+    expect(onDrop).not.toHaveBeenCalled();
+    expect(result.current.isDragging).toBe(false);
+  });
+
+  it("never turns a normal scroll into a drag after the hold timer expires", () => {
+    vi.useFakeTimers();
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop, touchActivationPolicy: "longPressThenMove" }));
+    act(() => {
+      result.current.getRowDragProps("quest", "09:00").onTouchStart(createTouchEvent(100));
+      dispatchTouchMove(125);
+      vi.advanceTimersByTime(600);
+      dispatchTouchMove(200);
+      dispatchTouchEnd();
+    });
+    expect(onDrop).not.toHaveBeenCalled();
+    expect(result.current.longPressTaskId).toBeNull();
+  });
+
   it("maps a full-screen drag to multi-hour movement", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() => useTimelineDrag({
@@ -703,7 +750,7 @@ describe("useTimelineDrag", () => {
     const rowProps = result.current.getRowDragProps("task-touch-pointer-long-press", "09:00");
     act(() => {
       rowProps.onPointerDown(createPointerDownEvent(100, undefined, "touch"));
-      dispatchPointerMove(130);
+      dispatchPointerMove(104);
     });
     expect(result.current.draggingTaskId).toBeNull();
 

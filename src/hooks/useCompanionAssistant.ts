@@ -29,6 +29,7 @@ import {
   stopCompanionSpeech,
 } from "@/services/companionSpeech";
 import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
+import { pendingActionToQuestDraft } from "@/shared/agendaCompanionChat";
 import { getRandomCompanionChatOpeningLine } from "@/shared/companionChatOpeners";
 import {
   analyzeSchedulingIntent,
@@ -1757,7 +1758,7 @@ export function useCompanionAssistant({
   );
 
   const resolvePendingAction = useCallback(
-    async (mode: "confirm" | "cancel") => {
+    async (mode: "confirm" | "cancel" | "edit") => {
       if (useLegacyFallback) {
         if (mode === "confirm") {
           await legacyAssistant.confirmPendingAction();
@@ -1767,8 +1768,8 @@ export function useCompanionAssistant({
         return;
       }
 
-      if (!pendingAction || isResolvingAction || isSubmitting) return;
-      if (!(await ensureFunctionSession())) return;
+      if (!pendingAction || isResolvingAction || isSubmitting) return false;
+      if (!(await ensureFunctionSession())) return false;
 
       setIsResolvingAction(true);
       try {
@@ -1778,7 +1779,7 @@ export function useCompanionAssistant({
             body: {
               sessionId: activeSessionIdRef.current,
               actionId: pendingAction.id,
-              action: mode,
+              action: mode === "edit" ? "cancel" : mode,
             },
           },
         );
@@ -1786,6 +1787,9 @@ export function useCompanionAssistant({
         if (error) throw error;
 
         const response = data as CompanionAgentResponse;
+        if (mode === "edit" && (response.receipt?.status !== "cancelled" || response.receipt.actionId !== pendingAction.id)) {
+          throw new Error("Quest draft could not be transferred to the editor");
+        }
         const nextStructuredResponse =
           response.structuredResponse === undefined
             ? (structuredResponse ?? null)
@@ -1794,10 +1798,10 @@ export function useCompanionAssistant({
         setPendingAction(null);
         setMessages((previous) => [
           ...previous,
-          createMessage("user", mode === "confirm" ? "Confirm" : "Cancel", {
+          createMessage("user", mode === "edit" ? "Review quest draft" : mode === "confirm" ? "Confirm" : "Cancel", {
             source: "agent",
           }),
-          createMessage("assistant", stripMarkdown(response.reply), {
+          createMessage("assistant", mode === "edit" ? "Your draft is ready to review. You can adjust the details before saving." : stripMarkdown(response.reply), {
             source: "agent",
             understandingState: response.understandingState,
             followUp: response.followUp ?? null,
@@ -1842,18 +1846,20 @@ export function useCompanionAssistant({
             void queryClient.invalidateQueries({ queryKey: [queryKey] });
           }
         }
-        void speakAssistantReply(
+        if (mode !== "edit") void speakAssistantReply(
           response.reply,
           response.threadState.sessionId,
         );
         void invalidateThreads();
+        return true;
       } catch (error) {
         console.error(`Failed to ${mode} pending action:`, error);
         toast.error(
-          mode === "confirm"
+          mode === "edit" ? "I couldn't open the quest editor yet. Please try again." : mode === "confirm"
             ? "I couldn't confirm that action right now."
             : "I couldn't cancel that action right now.",
         );
+        return false;
       } finally {
         setIsResolvingAction(false);
       }
@@ -2191,6 +2197,7 @@ export function useCompanionAssistant({
       pendingActionCount: legacyAssistant.pendingActionCount,
       readyPendingActionCount: legacyAssistant.readyPendingActionCount,
       editableQuestProposal: legacyAssistant.editableQuestProposal,
+      prepareQuestEditor: async (_proposalId: string) => true,
       completeEditableQuestProposal: legacyAssistant.completeEditableQuestProposal,
       rejectEditableQuestProposal: legacyAssistant.rejectEditableQuestProposal,
       draftInput,
@@ -2254,9 +2261,15 @@ export function useCompanionAssistant({
     pendingAction,
     pendingActionCount: pendingAction ? 1 : 0,
     readyPendingActionCount: pendingAction ? 1 : 0,
-    editableQuestProposal: null,
-    completeEditableQuestProposal: async () => undefined,
-    rejectEditableQuestProposal: async () => undefined,
+    editableQuestProposal: surface === "journeys" ? pendingActionToQuestDraft(pendingAction) : null,
+    prepareQuestEditor: async (proposalId: string) => {
+      if (pendingAction?.id !== proposalId || pendingAction.actionType !== "task_create") return false;
+      return resolvePendingAction("edit");
+    },
+    completeEditableQuestProposal: async (_proposalId: string, result?: { savedTitle?: string | null }) => {
+      setMessages((previous) => [...previous, createMessage("assistant", `${result?.savedTitle || "Your quest"} is saved. What else is on your mind?`, { source: "agent" })]);
+    },
+    rejectEditableQuestProposal: async () => { await resolvePendingAction("cancel"); },
     draftInput,
     setDraftInput,
     interimText,

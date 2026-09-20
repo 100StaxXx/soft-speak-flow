@@ -33,7 +33,7 @@ export async function requestWellbeingClip(input: {
     if (code === "portrait_pending") return { status: "awaiting_portrait", video_url: null };
     const message = WELLBEING_MESSAGES[code]
       ?? (status === 401 ? "Your session is reconnecting. Try checking the animation again in a moment."
-        : status === 403 ? WELLBEING_MESSAGES.access_required
+        : status === 403 ? "Video preparation isn’t available for this account right now. Your activities are still available."
         : status === 429 ? WELLBEING_MESSAGES.rate_limited
         : status === 409 ? WELLBEING_MESSAGES.appearance_changed
         : "Couldn't check video preparation. Check your connection and try again. Your activities are still available.");

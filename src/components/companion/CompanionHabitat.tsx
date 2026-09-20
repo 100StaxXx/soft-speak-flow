@@ -1,22 +1,12 @@
 import type { CompanionElementId } from "@/config/companionCatalog";
 import { getProgressionTier } from "@/config/progression";
-
-export const COMPANION_HABITATS: Record<CompanionElementId, string> = {
-  fire: "/companion-habitats/fire.webp",
-  ice: "/companion-habitats/ice.webp",
-  storm: "/companion-habitats/storm.webp",
-  nature: "/companion-habitats/nature.webp",
-  void: "/companion-habitats/void.webp",
-  light: "/companion-habitats/light.webp",
-};
+import { COMPANION_HABITATS, getCompanionHabitatPath } from "@/shared/companionHabitat";
+export { COMPANION_HABITATS } from "@/shared/companionHabitat";
 
 export function CompanionHabitat({ element, stage }: { element?: string | null; stage: number }) {
   const key = element?.trim().toLowerCase();
   const tier = getProgressionTier(stage);
-  const src = key && Object.prototype.hasOwnProperty.call(COMPANION_HABITATS, key)
-    ? tier === "hatchling" ? COMPANION_HABITATS[key as CompanionElementId]
-      : `/companion-habitats/${key}-${tier}.webp`
-    : null;
+  const src = getCompanionHabitatPath(element, stage);
 
   // Eggs already have their own scene. Preserve that until the hatch reveal.
   if (!Number.isFinite(stage) || stage < 1 || !src) return null;

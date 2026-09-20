@@ -1,4 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useAccountPreference } from "@/hooks/useAccountPreference";
 import { useNavigate } from "react-router-dom";
 import { QuestInboxSection } from "@/components/QuestInboxSection";
 import { useTasksQuery } from "@/hooks/useTasksQuery";
@@ -11,13 +13,14 @@ import { ConnectedTasks } from "@/components/calendar/ConnectedTasks";
 /** Goal progress belongs here; Calendar remains focused on scheduling. */
 export function GoalsActivity() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { profile } = useProfile();
   const missionDate = getEffectiveMissionDate(profile?.timezone ?? undefined);
   const today = useMemo(() => new Date(`${missionDate}T12:00:00`), [missionDate]);
   const { completedCount, totalCount } = useTasksQuery(today);
   const { currentStreak } = useStreakMultiplier();
   const { inboxTasks, isLoading, toggleInboxTask, deleteInboxTask } = useInboxTasks();
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useAccountPreference(user?.id, "inbox-expanded", true, [true, false]);
 
   return (
     <div className="mb-6 space-y-5" data-testid="goals-activity">

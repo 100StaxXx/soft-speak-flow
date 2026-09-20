@@ -336,6 +336,30 @@ describe("useCompanionAssistant", () => {
     expect(result.current.pendingAction?.id).toBe("action-1");
   });
 
+  it.each([true, false])("transfers a quest draft only after its server proposal is retired (success=%s)", async (success) => {
+    mocks.loadPendingAction.mockResolvedValue({
+      id: "draft-1", status: "pending", intent: "schedule_task", actionType: "task_create",
+      summary: "Take a trail walk", confirmationMessage: null,
+      normalizedPayload: { title: "Trail walk", task_date: "2026-09-22", scheduled_time: "15:30", estimated_duration: 45 },
+      affectedEntities: null, expiresAt: "2026-09-23T20:00:00Z", createdAt: "2026-09-20T08:00:00Z",
+    });
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }), { wrapper });
+    await waitFor(() => expect(result.current.editableQuestProposal?.id).toBe("draft-1"));
+    mocks.supabaseInvoke.mockResolvedValueOnce(success ? {
+      data: { reply: "Cancelled", receipt: { actionId: "draft-1", status: "cancelled" },
+        threadState: { sessionId: "persisted-session" } }, error: null,
+    } : { data: null, error: new Error("Offline") });
+    let transferred: unknown;
+    await act(async () => { transferred = await result.current.prepareQuestEditor("draft-1"); });
+    expect(transferred).toBe(success);
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith("companion-agent-action", expect.objectContaining({
+      body: { sessionId: "persisted-session", actionId: "draft-1", action: "cancel" },
+    }));
+    if (success) expect(result.current.pendingAction).toBeNull();
+    else expect(result.current.pendingAction?.id).toBe("draft-1");
+  });
+
   it("restores persisted planner cards after a full reload", async () => {
     mocks.loadThreadMessages.mockResolvedValue([
       {

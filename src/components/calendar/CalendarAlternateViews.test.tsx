@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CalendarAlternateViews, type CalendarDisplayTask } from "./CalendarAlternateViews";
 import type { ExternalCalendarEvent } from "@/types/externalCalendar";
@@ -6,6 +6,37 @@ vi.mock("./ExternalEventDetails", () => ({ ExternalEventDetails: ({ event }: { e
 const task = (id: string, time: string | null, date = "2026-09-30"): CalendarDisplayTask => ({ id, task_text: id, task_date: date, scheduled_time: time, estimated_duration: 60, completed: false, xp_reward: 10, difficulty: "easy", is_main_quest: false });
 const props = (tasks: CalendarDisplayTask[] = []) => ({ selectedDate: new Date("2026-09-30T12:00:00"), tasks, externalEvents: [], onDateSelect: vi.fn(), onOpenDay: vi.fn(), onTaskClick: vi.fn(), onAdd: vi.fn() });
 describe("Calendar alternate views", () => {
+  it("hold-drags a quest by one grid hour without opening its summary on release", () => {
+    vi.useFakeTimers();
+    try {
+      const handlers = props([task("Focus", "09:00")]);
+      const onTaskReschedule = vi.fn();
+      const { unmount } = render(<CalendarAlternateViews view="three-day" {...handlers} onTaskReschedule={onTaskReschedule} />);
+      const card = screen.getByRole("button", { name: "Open Focus" });
+      fireEvent.touchStart(card, { touches: [{ clientY: 100 }] });
+      act(() => vi.advanceTimersByTime(500));
+      fireEvent.touchMove(document, { touches: [{ clientY: 172 }] });
+      fireEvent.touchEnd(document);
+      fireEvent.click(card);
+      expect(onTaskReschedule).toHaveBeenCalledExactlyOnceWith("Focus", "10:00");
+      expect(handlers.onTaskClick).not.toHaveBeenCalled();
+      expect(handlers.tasks[0].estimated_duration).toBe(60);
+      act(() => vi.advanceTimersByTime(750));
+      fireEvent.click(card);
+      expect(handlers.onTaskClick).toHaveBeenCalledWith(handlers.tasks[0]);
+      unmount();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("does not reschedule external events or completed quests", () => {
+    const handlers = props([{ ...task("Done", "09:00"), completed: true }]);
+    const onTaskReschedule = vi.fn();
+    render(<CalendarAlternateViews view="three-day" {...handlers} onTaskReschedule={onTaskReschedule} />);
+    fireEvent.touchStart(screen.getByRole("button", { name: "Open Done" }), { touches: [{ clientY: 100 }] });
+    fireEvent.touchMove(document, { touches: [{ clientY: 172 }] });
+    fireEvent.touchEnd(document);
+    expect(onTaskReschedule).not.toHaveBeenCalled();
+  });
   it("renders three full days across a month boundary and keeps all 144 half-hour slots accessible", () => {
     const handlers = props([task("October appointment", "23:30", "2026-10-02")]);
     render(<CalendarAlternateViews view="three-day" {...handlers} />);

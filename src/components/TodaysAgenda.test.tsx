@@ -400,6 +400,9 @@ describe("TodaysAgenda subtasks", () => {
     expect(screen.getByTestId("scheduled-timeline-pane").style.maxHeight).toBe("");
     expect(screen.getByTestId("scheduled-timeline-content").style.paddingBottom).toBe("");
     expect(screen.getByTestId("journeys-day-grid")).toBeInTheDocument();
+    // Only individual cards/controls may frost the scenic wallpaper.
+    expect(screen.getByTestId("journeys-day-grid").className).not.toMatch(/backdrop-blur/);
+    expect(screen.getByTestId("journeys-day-grid")).toHaveClass("bg-slate-950/25");
   });
   it("shows calendar controls without campaign or progress decoration in calendar-only mode", () => {
     const queryClient = new QueryClient();
@@ -2304,6 +2307,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(mocks.useTimelineDragMock).toHaveBeenCalledWith(
       expect.objectContaining({
         ...SHARED_TIMELINE_DRAG_INTERACTION_PROFILE,
+        postActivationDeadzonePx: 0,
       }),
     );
   });
@@ -2341,7 +2345,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(mocks.getRowDragPropsMock).not.toHaveBeenCalled();
   });
 
-  it("does not forward row pointer down to row drag handler", () => {
+  it("forwards row pointer down to row drag handler", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -2372,8 +2376,8 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const row = screen.getByTestId("timeline-row-task-scheduled-1");
     fireEvent.pointerDown(row, { pointerType: "mouse", button: 0, clientY: 100 });
 
-    expect(mocks.rowPointerDownCaptureSpy).not.toHaveBeenCalled();
-    expect(mocks.rowPointerDownSpy).not.toHaveBeenCalled();
+    expect(mocks.rowPointerDownCaptureSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.rowPointerDownSpy).toHaveBeenCalledTimes(1);
     expect(mocks.handlePointerDownCaptureSpy).not.toHaveBeenCalled();
     expect(mocks.handlePointerDownSpy).not.toHaveBeenCalled();
   });
@@ -2415,7 +2419,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(mocks.handleTouchStartSpy).not.toHaveBeenCalled();
   });
 
-  it("keeps pointer starts off row drag wiring and touch starts off handle-only drag wiring", () => {
+  it("routes pointer and touch starts through row drag rather than a separate handle", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -2447,8 +2451,8 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     fireEvent.pointerDown(row, { pointerType: "mouse", button: 0, clientY: 100 });
     fireEvent.touchStart(row, { touches: [{ clientX: 0, clientY: 100 }] });
 
-    expect(mocks.rowPointerDownCaptureSpy).not.toHaveBeenCalled();
-    expect(mocks.rowPointerDownSpy).not.toHaveBeenCalled();
+    expect(mocks.rowPointerDownCaptureSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.rowPointerDownSpy).toHaveBeenCalledTimes(1);
     expect(mocks.rowTouchStartCaptureSpy).toHaveBeenCalledTimes(1);
     expect(mocks.rowTouchStartSpy).toHaveBeenCalledTimes(1);
     expect(mocks.handlePointerDownCaptureSpy).not.toHaveBeenCalled();
@@ -3892,7 +3896,20 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(readableShell).not.toHaveClass("bg-primary/[0.08]");
   });
 
-  it("does not wire desktop scheduled rows for drag", () => {
+  it("opens a quest summary from the title without toggling completion", () => {
+    const task = { id: "summary", task_text: "Read", completed: false, xp_reward: 10, scheduled_time: "09:00" };
+    const onViewQuest = vi.fn(); const onToggle = vi.fn();
+    render(<TodaysAgenda tasks={[task]} selectedDate={new Date("2026-09-24T12:00:00")} onToggle={onToggle} onAddQuest={vi.fn()} completedCount={0} totalCount={1} onViewQuest={onViewQuest} />,
+      { wrapper: createWrapper(new QueryClient({ defaultOptions: { queries: { retry: false } } })) });
+    fireEvent.click(screen.getByRole("button", { name: "View Read summary" }));
+    expect(onViewQuest).toHaveBeenCalledWith(task);
+    expect(onToggle).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(onToggle).toHaveBeenCalledOnce();
+    expect(onViewQuest).toHaveBeenCalledOnce();
+  });
+
+  it("wires desktop scheduled rows for drag", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -3921,7 +3938,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(mocks.getRowDragPropsMock).not.toHaveBeenCalled();
+    expect(mocks.getRowDragPropsMock).toHaveBeenCalledWith("task-scheduled-1", "08:00");
   });
 
   it("renders a full 24-hour half-hour grid", () => {

@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import type { Database } from './types';
 import { authSessionStorage } from '@/utils/authSessionStorage';
 import { createAuthRecoveryFetch } from '@/utils/authRecovery';
+import { createRecoverableAuthStorage } from '@/utils/authSignInRecovery';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -59,7 +60,7 @@ const authLock = Capacitor.isNativePlatform() ? processLock : undefined;
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   global: { fetch: createAuthRecoveryFetch(SUPABASE_URL) },
   auth: {
-    storage: authSessionStorage,
+    storage: createRecoverableAuthStorage(authSessionStorage),
     persistSession: true,
     autoRefreshToken: true,
     lock: authLock,

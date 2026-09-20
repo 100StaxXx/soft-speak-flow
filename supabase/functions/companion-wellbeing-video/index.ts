@@ -4,6 +4,7 @@ import { requireUserOrInternalRequest, jsonResponse } from "../_shared/auth.ts";
 import { resolveUserProductMode } from "../_shared/notificationProduct.ts";
 import { createCostGuardrailSession, isCostGuardrailBlockedError } from "../_shared/costGuardrails.ts";
 import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
+import { prepareWellbeingScene } from "../_shared/companionWellbeingScene.ts";
 import {
   submitFalKlingVideo, getFalKlingQueueStatus, getFalKlingQueueResult, downloadFalVideo,
   COMPANION_ANIMATION_VIDEO_BUCKET, DEFAULT_FAL_KLING_MODEL,
@@ -64,6 +65,7 @@ export async function imageKey(url: string) {
 export function retryMode(job: { status: string; retry_count?: number; error_code?: string; provider_task_id?: string | null }): "queued" | "processing" | null {
   if (job.status !== "failed" || (job.retry_count ?? 0) >= 1) return null;
   if (job.error_code === "preparation_timed_out" && job.provider_task_id) return "processing";
+  if (job.error_code === "access_required" && !job.provider_task_id) return "queued";
   if (["provider_failed", "video_unavailable", "budget_blocked"].includes(job.error_code ?? "")) return "queued";
   return null;
 }
@@ -76,6 +78,7 @@ export const deps = {
   authenticate: requireUserOrInternalRequest, database: dbClient,
   product: resolveUserProductMode, env: (name: string) => Deno.env.get(name),
   access: hasWellbeingVideoAccess,
+  scene: prepareWellbeingScene,
   now: () => Date.now(), fetch: fetch,
   submit: submitFalKlingVideo, status: getFalKlingQueueStatus, result: getFalKlingQueueResult,
   download: downloadFalVideo, ledger: registerUserStorageAsset, guardrails: createCostGuardrailSession,
@@ -113,7 +116,7 @@ async function processOne(db: any, d: Dependencies) {
       if (!await d.access(db, job.user_id)) {
         await finish({ status: "failed", error_code: "access_required" }); return;
       }
-      const { data: companion, error } = await db.from("user_companion").select("current_stage,current_image_url,product_mode")
+      const { data: companion, error } = await db.from("user_companion").select("current_stage,current_image_url,product_mode,core_element")
         .eq("id", job.companion_id).eq("user_id", job.user_id).maybeSingle();
       if (error) throw error;
       if (!companion || companion.product_mode === "graceward"
@@ -122,10 +125,13 @@ async function processOne(db: any, d: Dependencies) {
         await finish({ status: "failed", error_code: "appearance_changed" }); return;
       }
       const guard = d.guardrails({ supabase: db, userId: job.user_id, endpointKey: "companion-wellbeing-video", featureKey: "cosmiq_wellbeing_video" });
+      // Compose before the paid-submission boundary. Missing scenery must never
+      // silently fall back to generating another backgroundless video.
+      const sceneImageUrl = await d.scene({ db, job, element: companion.core_element, fetchFn });
       await save({ status: "submitting" });
       job.status = "submitting";
       const submitted = await d.submit({ fetchFn: guard.wrapFetch(fetchFn), apiKey, model: job.provider_model,
-        imageUrl: job.source_image_url, prompt: job.prompt, durationSeconds: WELLBEING_VIDEO_SECONDS });
+        imageUrl: sceneImageUrl, prompt: job.prompt, durationSeconds: WELLBEING_VIDEO_SECONDS });
       // Persist the task id before any subsequent network work.
       await finish({ status: "processing", provider_task_id: submitted.requestId,
         next_poll_at: new Date(d.now() + 30_000).toISOString() });
@@ -191,7 +197,9 @@ export async function handleWellbeingVideo(req: Request, d: Dependencies = deps)
     if (existing.error) throw existing.error;
     if (existing.data) {
       const mode = retryMode(existing.data);
-      if (body.action === "retry" && mode) {
+      const restoredAccessPreparation = body.action === "prepare" &&
+        existing.data.error_code === "access_required" && !existing.data.provider_task_id;
+      if ((body.action === "retry" || restoredAccessPreparation) && mode) {
         if (!await d.access(db, auth.userId)) return reply(403, { code: "access_required", error: "An active trial or subscription is required to prepare animations." });
         // Compare-and-swap makes concurrent retry taps a single retry. Poll timeouts
         // retain their provider id; only definitively failed/unsubmitted work can resubmit.

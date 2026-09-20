@@ -9,8 +9,9 @@ const authState = vi.hoisted(() => ({
   recoveryIssue: null as "secure_storage" | "connection" | null,
 }));
 
-const recovery = vi.hoisted(() => ({ restart: vi.fn() }));
+const recovery = vi.hoisted(() => ({ restart: vi.fn(), signIn: vi.fn() }));
 vi.mock("@/utils/authRecovery", () => ({ restartAuthRecovery: recovery.restart }));
+vi.mock("@/utils/authSignInRecovery", () => ({ returnToSignIn: recovery.signIn }));
 
 const accessState = vi.hoisted(() => ({
   hasAccess: true,
@@ -58,6 +59,7 @@ const renderProtectedRoute = (props?: Partial<React.ComponentProps<typeof Protec
 describe("ProtectedRoute", () => {
   beforeEach(() => {
     recovery.restart.mockClear();
+    recovery.signIn.mockClear();
     authState.user = null;
     authState.loading = false;
     authState.status = "unauthenticated";
@@ -108,7 +110,9 @@ describe("ProtectedRoute", () => {
 
     renderProtectedRoute();
 
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    expect(screen.getByText("We couldn’t restore your sign-in")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back to sign in" })).toBeInTheDocument();
+    expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
     expect(screen.queryByText("Welcome Page")).not.toBeInTheDocument();
   });
 
@@ -214,6 +218,8 @@ describe("ProtectedRoute", () => {
       renderProtectedRoute();
 
       expect(screen.getByText("Loading...")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Back to sign in" }));
+      expect(recovery.signIn).toHaveBeenCalledTimes(1);
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(PROTECTED_ROUTE_AUTH_STALL_MS);
@@ -223,6 +229,8 @@ describe("ProtectedRoute", () => {
       expect(screen.getByRole("button", { name: "Retry sign-in check" })).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Retry sign-in check" }));
       expect(recovery.restart).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole("button", { name: "Back to sign in" }));
+      expect(recovery.signIn).toHaveBeenCalledTimes(2);
       expect(screen.queryByText("Welcome Page")).not.toBeInTheDocument();
       expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
     } finally {

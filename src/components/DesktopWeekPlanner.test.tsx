@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { format } from "date-fns";
 import { describe, expect, it, vi } from "vitest";
 
@@ -76,6 +76,23 @@ const baseTask = (overrides: Partial<DailyTask> = {}): DailyTask => ({
 });
 
 describe("DesktopWeekPlanner", () => {
+  it("reschedules a held quest by one hour without opening its summary", () => {
+    vi.useFakeTimers();
+    try {
+      const onTaskReschedule = vi.fn();
+      const { unmount } = render(<DesktopWeekPlanner selectedDate={selectedDate} tasks={[baseTask()]} onDateSelect={vi.fn()} onToggle={vi.fn()} onAddQuest={vi.fn()} onTaskReschedule={onTaskReschedule} />);
+      const card = screen.getByTestId("desktop-week-task-button-task-1");
+      fireEvent.touchStart(card, { touches: [{ clientY: 100 }] });
+      act(() => vi.advanceTimersByTime(500));
+      fireEvent.touchMove(document, { touches: [{ clientY: 184 }] });
+      fireEvent.touchEnd(document);
+      fireEvent.click(card);
+      act(() => vi.advanceTimersByTime(250));
+      expect(onTaskReschedule).toHaveBeenCalledExactlyOnceWith("task-1", "10:00");
+      expect(screen.queryByTestId("desktop-quest-popover-task-1")).not.toBeInTheDocument();
+      unmount();
+    } finally { vi.useRealTimers(); }
+  });
   it("keeps Calendar full-width without progress or campaign panels", () => {
     render(<DesktopWeekPlanner calendarOnly selectedDate={selectedDate} tasks={[]} currentStreak={5}
       onDateSelect={vi.fn()} onToggle={vi.fn()} onAddQuest={vi.fn()} />);

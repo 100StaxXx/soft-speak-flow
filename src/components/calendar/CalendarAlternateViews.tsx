@@ -7,21 +7,33 @@ import type { CalendarTask } from "@/types/quest";
 import type { ExternalCalendarEvent } from "@/types/externalCalendar";
 import { buildTaskTimelineFlow } from "@/utils/taskTimelineFlow";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
+import { useTimelineDrag } from "@/hooks/useTimelineDrag";
+import { SHARED_TIMELINE_DRAG_INTERACTION_PROFILE } from "./dragSnap";
 
 export type CalendarDisplayTask = CalendarTask & { externalEvent?: ExternalCalendarEvent };
 const HOUR_HEIGHT = 72;
 const timeLabel = (minute: number) => format(new Date(2000, 0, 1, 0, minute), "h:mm a");
 
-export function CalendarAlternateViews({ view, selectedDate, tasks, externalEvents, onDateSelect, onOpenDay, onTaskClick, onAdd, centerNowRequestKey }: {
+export function CalendarAlternateViews({ view, selectedDate, tasks, externalEvents, onDateSelect, onOpenDay, onTaskClick, onAdd, centerNowRequestKey, onTaskReschedule }: {
   view: Exclude<CalendarView, "day">; selectedDate: Date; tasks: CalendarDisplayTask[];
   externalEvents: ExternalCalendarEvent[]; onDateSelect: (date: Date) => void;
   onOpenDay: (date: Date) => void; onTaskClick: (task: CalendarTask) => void;
   onAdd: (date: Date, time: string) => void;
   centerNowRequestKey?: number;
+  onTaskReschedule?: (taskId: string, time: string) => void;
 }) {
   const [event, setEvent] = useState<ExternalCalendarEvent | null>(null);
   const [now, setNow] = useState(() => new Date());
   const scrollRef = useRef<HTMLDivElement>(null);
+  const drag = useTimelineDrag({
+    containerRef: scrollRef,
+    enabled: view === "three-day" && !!onTaskReschedule,
+    ...SHARED_TIMELINE_DRAG_INTERACTION_PROFILE,
+    pixelsPerMinute: HOUR_HEIGHT / 60,
+    postActivationDeadzonePx: 0,
+    onDrop: (id, time) => onTaskReschedule?.(id, time),
+  });
   const dateKey = format(selectedDate, "yyyy-MM-dd");
   const days = useMemo(() => Array.from({ length: view === "three-day" ? 3 : 7 }, (_, i) => addDays(selectedDate, i)), [selectedDate, view]);
   const grouped = useMemo(() => days.map(date => {
@@ -43,7 +55,8 @@ export function CalendarAlternateViews({ view, selectedDate, tasks, externalEven
   }, [dateKey, view, centerNowRequestKey]);
   const openTask = (task: CalendarDisplayTask) => task.externalEvent ? setEvent(task.externalEvent) : onTaskClick(task);
   const taskButton = (task: CalendarDisplayTask) => <button key={task.id} onClick={() => openTask(task)}
-    className={cn("min-h-11 w-full rounded-md border-l-2 border-primary bg-primary/15 px-2 py-2 text-left text-xs", task.completed && "opacity-60")}
+    className={cn("agenda-event-card min-h-11 w-full px-3 py-2.5 text-left text-sm", task.completed && "opacity-60")}
+    data-quest-complete={task.completed}
     aria-label={`Open ${task.task_text}`}>
     <span className={cn("block break-words font-medium", task.completed && "line-through")}>{task.task_text}</span>
     {task.externalEvent && <span className="block text-[10px] text-foreground/65">{task.externalEvent.calendarName}</span>}
@@ -77,13 +90,25 @@ export function CalendarAlternateViews({ view, selectedDate, tasks, externalEven
             {timed.map(task => {
               const position = flow.byTaskId.get(task.id);
               if (!position) return null;
-              return <button key={task.id} onClick={() => openTask(task)} aria-label={`Open ${task.task_text}`}
-                className={cn("absolute z-10 overflow-hidden rounded border-l-2 border-primary bg-slate-900/95 px-1 py-1 text-left text-[11px]", task.completed && "opacity-60 line-through")}
+              const isDragging = drag.draggingTaskId === task.id;
+              const engaged = isDragging || drag.longPressTaskId === task.id;
+              return <motion.button key={task.id}
+                {...(!task.externalEvent && !task.completed && task.scheduled_time && onTaskReschedule ? drag.getRowDragProps(task.id, task.scheduled_time) : {})}
+                onContextMenu={event => event.preventDefault()}
+                onClick={event => {
+                  if (drag.shouldSuppressClick()) { event.preventDefault(); return; }
+                  openTask(task);
+                }} aria-label={`Open ${task.task_text}`}
+                className={cn("agenda-event-card absolute z-10 overflow-hidden px-2 py-1 text-left text-[11px]", task.completed && "opacity-60 line-through")}
+                data-quest-dragging={isDragging}
+                data-quest-complete={task.completed}
                 data-testid={`three-day-event-${task.id}`}
                 style={{ top: position.startMinute * HOUR_HEIGHT / 60, height: Math.min(1440 - position.startMinute, Math.max(22, position.endMinute - position.startMinute)) * HOUR_HEIGHT / 60,
-                  left: `${position.laneIndex * 100 / position.laneCount}%`, width: `${100 / position.laneCount}%` }}>
-                <span className="block font-medium">{task.task_text}</span><span className="text-[9px] text-foreground/65">{timeLabel(position.startMinute)}</span>
-              </button>;
+                  left: `${position.laneIndex * 100 / position.laneCount}%`, width: `${100 / position.laneCount}%`,
+                  y: isDragging ? drag.dragOffsetY : 0, zIndex: engaged ? 30 : 10,
+                  touchAction: engaged ? "none" : "pan-y", userSelect: "none", WebkitTouchCallout: "none" }}>
+                <span className="block font-medium">{task.task_text}</span><span className="text-[9px] text-foreground/65">{isDragging ? drag.previewTime : timeLabel(position.startMinute)}</span>
+              </motion.button>;
             })}
             {isSameDay(date, now) && <div data-testid="three-day-now" className="pointer-events-none absolute inset-x-0 z-20 border-t border-primary" style={{ top: (now.getHours() * 60 + now.getMinutes()) * HOUR_HEIGHT / 60 }} />}
           </div>)}

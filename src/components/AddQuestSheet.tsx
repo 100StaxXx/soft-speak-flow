@@ -372,7 +372,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     setMoreInformation(prefillDraft.moreInformation ?? null);
     setLocation(prefillDraft.location ?? null);
     setSubtasks(prefillDraft.subtasks ?? []);
-    setTaskDate(prefillDraft.taskDate ?? format(selectedDate, "yyyy-MM-dd"));
+    setTaskDate(prefillDraft.creationSource === "inbox" ? null : prefillDraft.taskDate ?? format(selectedDate, "yyyy-MM-dd"));
     setCreationSource(prefillDraft.creationSource ?? "manual");
     setCalendarSendTarget(null);
     setSelectedTemplate(null);
@@ -449,6 +449,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const hasRecurrence = hasRecurrencePattern(recurrencePattern);
   const canCreateTask = !!trimmedTaskText && hasDateAndTime;
   const canAddToInbox = !!trimmedTaskText && !hasRecurrence;
+  const isInboxDraft = creationSource === "inbox" && !taskDate;
+  const canSavePrimary = isInboxDraft ? canAddToInbox : canCreateTask;
   const reviewDateLabel = taskDate ? format(dateObj, "EEE, MMM d") : "Inbox";
   const reviewTimeLabel = scheduledTime ? formatTime12(scheduledTime) : "Select a time";
   const reviewTitle = trimmedTaskText || "Name your quest";
@@ -695,8 +697,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   }, [executeSubmit, hasTemplateCustomizations, selectedTemplate]);
 
   const handleSubmit = useCallback(async () => {
-    await submitWithTemplateHandling("scheduled");
-  }, [submitWithTemplateHandling]);
+    await submitWithTemplateHandling(creationSource === "inbox" && !taskDate ? "inbox" : "scheduled");
+  }, [submitWithTemplateHandling, creationSource, taskDate]);
 
   const handleAddToInbox = useCallback(async () => {
     await submitWithTemplateHandling("inbox");
@@ -1389,16 +1391,16 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             <Button
               onClick={handleSubmit}
               data-tour="add-quest-create-button"
-              disabled={isAdding || !canCreateTask}
+              disabled={isAdding || !canSavePrimary}
               className={cn(
                 isDesktopPanel ? "h-14" : "h-12",
                 "w-full rounded-xl font-body text-[1.05rem] tracking-[0.01em] disabled:opacity-100",
-                canCreateTask ? colors.primaryButton : colors.primaryButtonDisabled,
+                canSavePrimary ? colors.primaryButton : colors.primaryButtonDisabled,
               )}
             >
-              {isAdding ? "Adding..." : "Add Quest"}
+              {isAdding ? "Adding..." : isInboxDraft ? "Save to Inbox" : "Add Quest"}
             </Button>
-            <Button
+            {!isInboxDraft && <Button
               variant="outline"
               onClick={handleAddToInbox}
               disabled={isAdding || !canAddToInbox}
@@ -1410,7 +1412,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             >
               <Inbox className="mr-2 h-4 w-4" />
               Add to Inbox instead
-            </Button>
+            </Button>}
             {isDesktopPanel && hasRecurrence && (
               <p className={cn("text-center", QUEST_FORM_STYLES.helperText)}>
                 Recurring quests must stay scheduled with a time.

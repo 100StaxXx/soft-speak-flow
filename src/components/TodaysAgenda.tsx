@@ -258,6 +258,7 @@ interface TodaysAgendaProps {
   currentStreak?: number;
   onUndoToggle?: (taskId: string, xpReward: number) => void;
   onEditQuest?: (task: Task) => void;
+  onViewQuest?: (task: Task) => void;
   weekTasks?: CalendarTask[];
   activeEpics?: Array<{
     id: string;
@@ -566,6 +567,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   currentStreak = 0,
   onUndoToggle,
   onEditQuest,
+  onViewQuest,
   weekTasks = [],
   activeEpics = [],
   isCampaignsLoading = false,
@@ -657,7 +659,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, []);
   const useLiteAnimations = isNativeIOS || Boolean(prefersReducedMotion) || !capabilities.allowBackgroundAnimation;
   const isTimelineDragEnabled = !disableTimelineDrag;
-  const isDesktopTimelineDragEnabled = isTimelineDragEnabled && !isDesktopLayout;
+  const isDesktopTimelineDragEnabled = isTimelineDragEnabled;
   const mobileFabScrollClearance = isDesktopLayout ? undefined : `${MOBILE_FAB_SCROLL_CLEARANCE_PX}px`;
   const { profile } = useProfile();
   const queryClient = useQueryClient();
@@ -1135,6 +1137,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     enabled: isDesktopTimelineDragEnabled,
     snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
     ...SHARED_TIMELINE_DRAG_INTERACTION_PROFILE,
+    pixelsPerMinute: timelinePxPerMinute,
+    postActivationDeadzonePx: 0,
     onDrop: (taskId, newTime) => {
       const overlapCount = getTaskConflictSetForTask(taskId, draggableTimelineItems, { [taskId]: newTime }).size;
       onUpdateScheduledTime?.(taskId, newTime);
@@ -2246,7 +2250,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     const canRenderInlineDetails = !isScheduledTimelineItem;
     const isInlineExpanded = canRenderInlineDetails && isExpanded;
     const hasDetails = hasExpandableDetails(task);
-    const canOpenQuestDetails = isScheduledTimelineItem || hasDetails;
+    const canOpenQuestDetails = !!onViewQuest || isScheduledTimelineItem || hasDetails;
     const isMobileDetailOpen = isScheduledTimelineItem && mobileDetailTaskId === task.id;
 
     if (task.is_external_calendar_event) {
@@ -2326,6 +2330,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       return (
         <div
           data-quest-card-shell="true"
+          data-quest-complete={isComplete}
+          data-quest-dragging={isDragging}
           className={cn(
             JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
             "group flex h-full items-stretch gap-2 rounded-[18px] p-2",
@@ -2437,6 +2443,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         <div
           data-quest-card-shell="true"
           data-scheduled-timeline-card={isScheduledTimelineItem ? "true" : undefined}
+          data-quest-complete={isComplete}
+          data-quest-dragging={isDragging}
           data-compact-timeline-card={isCompactTimelineItem ? "true" : undefined}
           data-timeline-card-height-px={timelineContext?.heightPx ?? undefined}
           className={cn(
@@ -2561,6 +2569,20 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 <div
                   className="flex min-w-0 w-full items-center gap-2"
                   data-testid={`mobile-quest-title-row-${task.id}`}
+                  role={onViewQuest || isScheduledTimelineItem ? "button" : undefined}
+                  tabIndex={onViewQuest || isScheduledTimelineItem ? 0 : undefined}
+                  aria-label={onViewQuest || isScheduledTimelineItem ? `View ${task.task_text} summary` : undefined}
+                  onClick={() => {
+                    if (onViewQuest) onViewQuest(task);
+                    else if (isScheduledTimelineItem) setMobileDetailTaskId(task.id);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      if (onViewQuest) onViewQuest(task);
+                      else if (isScheduledTimelineItem) setMobileDetailTaskId(task.id);
+                    }
+                  }}
                 >
                   {isRitual && (
                     <Repeat className={cn("w-4 h-4 flex-shrink-0", isCampaignRitual ? "text-primary" : "text-accent")} />
@@ -2707,6 +2729,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     data-testid={`mobile-quest-detail-toggle-${task.id}`}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (onViewQuest) {
+                        onViewQuest(task);
+                        return;
+                      }
                       if (isScheduledTimelineItem) {
                         setMobileDetailTaskId(task.id);
                         return;
@@ -2739,6 +2765,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     primaryMissionTaskId,
     onUndoToggle,
     onEditQuest,
+    onViewQuest,
     onSendToCalendar,
     hasCalendarLink,
     onDeleteQuest,
@@ -3449,7 +3476,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 style={scheduledTimelineContentStyle}
               >
                 <div
-                  className={cn("relative overflow-hidden border border-white/15 bg-slate-950/55 backdrop-blur-md", !compactCalendar && "rounded-[20px] shadow-[0_14px_32px_rgba(0,0,0,0.2)]")}
+                  className={cn("relative overflow-hidden border border-white/15 bg-slate-950/25", !compactCalendar && "rounded-[20px] shadow-[0_14px_32px_rgba(0,0,0,0.2)]")}
                   data-testid="journeys-day-grid"
                   style={{ height: `${timelineHeightPx}px` }}
                 >
@@ -3529,8 +3556,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         : undefined;
                       const timelineRowDragProps = baseTimelineRowDragProps
                         ? {
-                            // Keep touch hold-to-reschedule, but skip pointer row drag so
-                            // clicks/trackpad drags do not hijack normal quest interactions.
+                            onPointerDownCapture: baseTimelineRowDragProps.onPointerDownCapture,
+                            onPointerDown: baseTimelineRowDragProps.onPointerDown,
                             onTouchStartCapture: (
                               event: Parameters<NonNullable<typeof baseTimelineRowDragProps.onTouchStartCapture>>[0],
                             ) => {
@@ -3599,6 +3626,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                           data-top-px={entry.topPx}
                           data-duration-height-px={entry.heightPx}
                           onContextMenu={suppressNativeContextMenu}
+                          onClickCapture={(event) => {
+                            if (timelineDrag.shouldSuppressClick?.()) {
+                              event.preventDefault();
+                              event.stopPropagation();
+                            }
+                          }}
+                          onClick={(event) => {
+                            if (!isDesktopLayout && onViewQuest && !task.is_external_calendar_event && !(event.target as Element).closest('button, [role="button"], a, input')) {
+                              onViewQuest(task);
+                            }
+                          }}
                           {...(timelineRowDragProps ?? {})}
                           style={{
                             ...rowStyle,

@@ -65,6 +65,7 @@ vi.mock("@/services/authScopedClientState", () => ({
 }));
 
 import { AuthProvider, useAuth } from "./useAuth";
+import { AUTH_SESSION_CHECK_TIMEOUT_MS } from "@/utils/authRecovery";
 
 let authStateChangeCallback: ((event: string, session: Session | null) => void) | null = null;
 
@@ -96,6 +97,21 @@ describe("useAuth provider", () => {
       };
     });
     mocks.signOutMock.mockResolvedValue(undefined);
+  });
+
+  it("settles a stuck bootstrap without clearing the saved account or queuing repeated reads", async () => {
+    vi.useFakeTimers();
+    mocks.getSessionMock.mockImplementation(() => new Promise(() => {}));
+    try {
+      const { result, unmount } = renderHook(() => useAuth(), { wrapper: createWrapper() });
+      await act(async () => { await vi.advanceTimersByTimeAsync(AUTH_SESSION_CHECK_TIMEOUT_MS); });
+      expect(result.current.status).toBe("recovering");
+      expect(result.current.recoveryIssue).toBe("connection");
+      expect(mocks.getSessionMock).toHaveBeenCalledTimes(1);
+      expect(mocks.signOutMock).not.toHaveBeenCalled();
+      expect(mocks.clearAuthScopedClientStateMock).not.toHaveBeenCalled();
+      unmount();
+    } finally { vi.useRealTimers(); }
   });
 
   it("ignores a stale session read after a newer sign-in", async () => {

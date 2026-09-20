@@ -17,7 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { clearAuthScopedClientState } from "@/services/authScopedClientState";
 import { getUserTimezone } from "@/utils/timezone";
 import { isNetworkLikeError } from "@/utils/networkErrors";
-import { getAuthRecoveryIssue, type AuthRecoveryIssue } from "@/utils/authRecovery";
+import { checkSessionWithDeadline, getAuthRecoveryIssue, type AuthRecoveryIssue } from "@/utils/authRecovery";
 
 const SESSION_RETRY_DELAYS_MS = [0, 250, 750, 1500] as const;
 const RESUME_REFRESH_COOLDOWN_MS = 4000;
@@ -133,13 +133,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         if (refreshRevision !== authRevisionRef.current) return;
-        const { data: { session: fetchedSession }, error } = await supabase.auth.getSession()
+        const { data: { session: fetchedSession }, error } = await checkSessionWithDeadline(() => supabase.auth.getSession())
           .catch((error: unknown) => ({ data: { session: null }, error }));
         // A newer sign-in, token refresh or explicit sign-out wins over this read.
         if (refreshRevision !== authRevisionRef.current) return;
 
         if (error) {
           lastError = error;
+          // Don't enqueue four more reads behind a non-settling SDK operation.
+          if (typeof error === "object" && error !== null && "code" in error && error.code === "AUTH_SESSION_CHECK_TIMEOUT") break;
           continue;
         }
 

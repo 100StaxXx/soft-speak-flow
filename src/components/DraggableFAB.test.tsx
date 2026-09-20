@@ -258,6 +258,13 @@ describe("DraggableFAB", () => {
     expect(mocks.onOpenCompanionPlanner).not.toHaveBeenCalled();
   });
 
+  it("opens a conversation directly when used as the Agenda chat button", () => {
+    render(<DraggableFAB openChatDirectly onOpenCompanionPlanner={mocks.onOpenCompanionPlanner} />);
+    fireEvent.click(screen.getByRole("button", { name: "Chat with Nova" }));
+    expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith();
+    expect(screen.queryByRole("button", { name: /Free talk/i })).not.toBeInTheDocument();
+  });
+
   it("requests AI launcher art without rendering scene art before the transparent cutout exists", () => {
     mocks.visual = {
       companionId: "companion-ai",

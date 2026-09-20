@@ -8,6 +8,7 @@ vi.mock("@capacitor/core", () => ({
   registerPlugin: () => ({ getItem: native.get, setItem: native.set, removeItem: native.remove }),
 }));
 import { authSessionStorage } from "./authSessionStorage";
+import { createRecoverableAuthStorage } from "./authSignInRecovery";
 
 const key = "sb-opbfpbbqvuksuvmtmssd-auth-token";
 const secure = new Map<string, string>();
@@ -43,6 +44,61 @@ afterEach(async () => {
 });
 
 describe("upgrade restoration using the real Supabase SDK and native storage adapter", () => {
+  it("can sign in with Apple again without reading or deleting the stuck saved token", async () => {
+    secure.set(key, JSON.stringify(oldSession()));
+    native.get.mockImplementation(async ({ key: requestedKey }) => {
+      if (requestedKey === key) throw new Error("old token must not be read during explicit recovery");
+      return { value: null };
+    });
+    const request = vi.fn().mockImplementation(async () => new Response(JSON.stringify(freshSession()), { status: 200 }));
+    const client = createClient("https://auth-recovery.example.test", "test-public-key", {
+      auth: { storageKey: key, storage: createRecoverableAuthStorage(authSessionStorage, true), lock: processLock, autoRefreshToken: false },
+      global: { fetch: createAuthRecoveryFetch("https://auth-recovery.example.test", request) },
+    });
+    clients.push(client);
+    expect((await client.auth.getSession()).data.session).toBeNull();
+    expect(JSON.parse(secure.get(key)!).refresh_token).toBe("test-old-refresh");
+    const result = await client.auth.signInWithIdToken({ provider: "apple", token: "isolated-test-token", nonce: "test-nonce" });
+    expect(result.error).toBeNull();
+    expect(result.data.user?.id).toBe("upgrade-user");
+    expect(JSON.parse(secure.get(key)!).refresh_token).toBe("test-fresh-refresh");
+    expect(native.remove).not.toHaveBeenCalledWith({ key });
+  });
+  it("does not hang forever when migrating an older install into secure storage", async () => {
+    vi.useFakeTimers();
+    localStorage.setItem(key, JSON.stringify(oldSession()));
+    native.set.mockImplementation(() => new Promise(() => {}));
+    const result = vi.fn();
+    const rejected = vi.fn();
+    void makeClient(vi.fn()).auth.getSession().then(result, rejected);
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(rejected).toHaveBeenCalledWith(expect.objectContaining({ code: "AUTH_STORAGE_WRITE_TIMEOUT" }));
+    expect(result).not.toHaveBeenCalled();
+    expect(localStorage.getItem(key)).not.toBeNull();
+    expect(native.remove).not.toHaveBeenCalled();
+  });
+  it("restores an expired session with foreground refresh and immediate auth subscribers", async () => {
+    vi.useFakeTimers();
+    secure.set(key, JSON.stringify(oldSession()));
+    const request = vi.fn().mockImplementation(async () => {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      return new Response(JSON.stringify(freshSession()), { status: 200 });
+    });
+    const client = createClient("https://auth-recovery.example.test", "test-public-key", {
+      auth: { storageKey: key, storage: authSessionStorage, lock: processLock, persistSession: true, autoRefreshToken: true },
+      global: { fetch: createAuthRecoveryFetch("https://auth-recovery.example.test", request) },
+    });
+    clients.push(client);
+    const listener = vi.fn();
+    const subscription = client.auth.onAuthStateChange(listener);
+    void client.auth.startAutoRefresh();
+    const loaded = vi.fn();
+    void client.auth.getSession().then(loaded);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(loaded).toHaveBeenCalledWith(expect.objectContaining({ data: { session: expect.objectContaining({ user: expect.objectContaining({ id: "upgrade-user" }) }) } }));
+    expect(request).toHaveBeenCalledTimes(1);
+    subscription.data.subscription.unsubscribe();
+  });
   it("keeps a timed-out lock waiter from releasing another session operation early", async () => {
     vi.useFakeTimers();
     let rejectFirst!: (error: Error) => void;
