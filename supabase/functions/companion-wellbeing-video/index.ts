@@ -9,14 +9,14 @@ import {
   submitFalKlingVideo, getFalKlingQueueStatus, getFalKlingQueueResult, downloadFalVideo,
   COMPANION_ANIMATION_VIDEO_BUCKET, DEFAULT_FAL_KLING_MODEL,
 } from "../_shared/falKlingVideoClient.ts";
-import { buildWellbeingVideoPrompt, isWellbeingCategory, WELLBEING_PROMPT_VERSION, WELLBEING_VIDEO_SECONDS } from "../../../src/shared/companionWellbeing.ts";
+import { buildWellbeingVideoPrompt, isCompanionVideoCategory, companionVideoSeconds, COMPANION_VIDEO_DAILY_LIMIT, WELLBEING_PROMPT_VERSION } from "../../../src/shared/companionWellbeing.ts";
 import { getCurrentVisualStageBoundaryLevel } from "../../../src/config/progression.ts";
 import { fetchAccountEntitlementForUser, isAccountEntitlementActive } from "../_shared/accountEntitlements.ts";
 import { fetchSubscriptionForUser, buildSubscriptionResponse, fetchActivePromoAccessForUser, buildPromoSubscriptionResponse } from "../_shared/appleSubscriptions.ts";
 
 const TABLE = "cosmiq_wellbeing_videos";
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-internal-key" };
-const PUBLIC_COLUMNS = "id,status,video_url,category,stage,source_image_url,error_code";
+const PUBLIC_COLUMNS = "id,status,video_url,category,stage,source_image_url,scene_image_url,prompt_version,error_code";
 const STATUS_COLUMNS = `${PUBLIC_COLUMNS},retry_count,provider_task_id`;
 const reply = (status: number, body: Record<string, unknown>) => jsonResponse(status, body, cors);
 const dbClient = () => createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -71,7 +71,8 @@ export function retryMode(job: { status: string; retry_count?: number; error_cod
 }
 const publicClip = (job: any) => {
   const { provider_task_id: _provider, retry_count: _retries, ...clip } = job;
-  return { ...clip, can_retry: retryMode(job) !== null };
+  return { ...clip, duration_seconds: job.prompt_version >= 3 && isCompanionVideoCategory(job.category) ? companionVideoSeconds(job.category) : 3,
+    can_retry: retryMode(job) !== null };
 };
 
 export const deps = {
@@ -129,10 +130,11 @@ async function processOne(db: any, d: Dependencies) {
       // Compose before the paid-submission boundary. Missing scenery must never
       // silently fall back to generating another backgroundless video.
       const sceneImageUrl = await d.scene({ db, job, element: companion.core_element, fetchFn });
-      await save({ status: "submitting" });
+      await save({ status: "submitting", scene_image_url: sceneImageUrl });
       job.status = "submitting";
       const submitted = await d.submit({ fetchFn: guard.wrapFetch(fetchFn), apiKey, model: job.provider_model,
-        imageUrl: sceneImageUrl, prompt: job.prompt, durationSeconds: WELLBEING_VIDEO_SECONDS });
+        imageUrl: sceneImageUrl, ...(job.prompt_version >= 3 ? { endImageUrl: sceneImageUrl } : {}),
+        prompt: job.prompt, durationSeconds: job.prompt_version >= 3 && isCompanionVideoCategory(job.category) ? companionVideoSeconds(job.category) : 3 });
       // Persist the task id before any subsequent network work.
       await finish({ status: "processing", provider_task_id: submitted.requestId,
         next_poll_at: new Date(d.now() + 30_000).toISOString() });
@@ -185,7 +187,10 @@ export async function handleWellbeingVideo(req: Request, d: Dependencies = deps)
     if (await d.product(db, auth.userId) !== "cosmiq") return reply(403, { error: "This feature belongs to Cosmiq." });
     let body;
     try { body = await req.json(); } catch { return reply(400, { error: "Invalid request" }); }
-    if (!body || typeof body.companionId !== "string" || !isWellbeingCategory(body.category)) return reply(400, { error: "Choose Mind, Body, or Soul." });
+    if (!body || typeof body.companionId !== "string" || !isCompanionVideoCategory(body.category)) return reply(400, { error: "Choose a valid companion moment." });
+    // Older installed apps stop playback at 3s. Never hand them the new 5s clips.
+    const promptVersion = body.promptVersion ?? 2;
+    if (promptVersion !== 2 && promptVersion !== WELLBEING_PROMPT_VERSION) return reply(400, { code: "upgrade_required", error: "Update Cosmiq for new companion moments." });
     const { data: companion, error } = await db.from("user_companion")
       .select("id,current_stage,current_image_url,core_element,product_mode").eq("id", body.companionId).eq("user_id", auth.userId).maybeSingle();
     if (error) throw error;
@@ -199,7 +204,7 @@ export async function handleWellbeingVideo(req: Request, d: Dependencies = deps)
     if (sourceImage !== resolveWellbeingSourceImage(body.sourceImageUrl, d.env("SUPABASE_URL")!)) return reply(409, { code: "appearance_changed", error: "Your companion changed. Reopen this selection." });
     const sourceKey = await imageKey(sourceImage);
     const lookup = () => db.from(TABLE).select(STATUS_COLUMNS).eq("user_id", auth.userId).eq("companion_id", companion.id)
-      .eq("stage", stage).eq("category", body.category).eq("source_key", sourceKey).eq("prompt_version", WELLBEING_PROMPT_VERSION).maybeSingle();
+      .eq("stage", stage).eq("category", body.category).eq("source_key", sourceKey).eq("prompt_version", promptVersion).maybeSingle();
     const existing = await lookup();
     if (existing.error) throw existing.error;
     if (existing.data) {
@@ -222,18 +227,20 @@ export async function handleWellbeingVideo(req: Request, d: Dependencies = deps)
       return reply(200, { clip: publicClip(existing.data) });
     }
     if (body.action === "status") return reply(200, { clip: null, state: "not_generated" });
+    if (promptVersion !== WELLBEING_PROMPT_VERSION) return reply(426, { code: "upgrade_required", error: "Update Cosmiq to prepare new companion moments." });
     if (body.action !== "prepare") return reply(400, { error: "Invalid action" });
     if (!await d.access(db, auth.userId)) return reply(403, { code: "access_required", error: "An active trial or subscription is required to prepare animations." });
     if (!(d.env("FAL_KEY") || d.env("FAL_API_KEY"))) return reply(503, { code: "service_unavailable", error: "Animations are temporarily unavailable. Your activities still work." });
     const { count, error: countError } = await db.from(TABLE).select("id", { count: "exact", head: true }).eq("user_id", auth.userId)
       .gte("created_at", new Date(d.now() - 86400_000).toISOString());
     if (countError) throw countError;
-    if ((count ?? 0) >= 6) return reply(429, { code: "rate_limited", error: "Your next animations can be prepared tomorrow. Saved clips still play." });
+    if ((count ?? 0) >= COMPANION_VIDEO_DAILY_LIMIT) return reply(429, { code: "rate_limited", error: "Your next animations can be prepared tomorrow. Saved clips still play." });
     const { error: insertError } = await db.from(TABLE).upsert({ user_id: auth.userId, companion_id: companion.id,
       stage, category: body.category, source_image_url: sourceImage, source_key: sourceKey,
       prompt_version: WELLBEING_PROMPT_VERSION, provider_model: DEFAULT_FAL_KLING_MODEL,
       prompt: buildWellbeingVideoPrompt(stage, body.category, companion.core_element ?? ""),
     }, { onConflict: "companion_id,stage,category,source_key,prompt_version", ignoreDuplicates: true });
+    if (insertError?.message?.includes("companion_video_daily_limit")) return reply(429, { code: "rate_limited", error: "Your next animations can be prepared tomorrow. Saved clips still play." });
     if (insertError) throw insertError;
     const saved = await lookup();
     if (saved.error || !saved.data) throw new Error("Queue save failed");

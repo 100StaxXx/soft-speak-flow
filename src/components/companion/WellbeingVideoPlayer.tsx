@@ -1,47 +1,119 @@
 import { useEffect, useRef, useState } from "react";
-import type { WellbeingPlayback } from "./CompanionWellbeing";
+import { companionVideoSeconds, type CompanionVideoCategory } from "@/shared/companionWellbeing";
 
-export function WellbeingVideoPlayer({ clip, onClose }: { clip: WellbeingPlayback; onClose: () => void }) {
+export interface CompanionMomentClip {
+  url: string;
+  category: CompanionVideoCategory;
+  sourceImageUrl: string;
+  sceneImageUrl?: string;
+}
+export type PlaybackEndReason = "ended" | "failed" | "blocked" | "hidden";
+
+/** Reveal only decoded video, over the still-visible portrait/habitat. Blend the
+ * final quarter-second back to the exact scene anchor, never deform the image. */
+export function WellbeingVideoPlayer({ clip, onClose, automatic = false }: {
+  clip: CompanionMomentClip;
+  onClose: (reason?: PlaybackEndReason) => void;
+  automatic?: boolean;
+}) {
   const video = useRef<HTMLVideoElement>(null);
   const [blocked, setBlocked] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const [settling, setSettling] = useState(false);
+  const [sceneReady, setSceneReady] = useState(false);
+  const finishRef = useRef(onClose);
+  finishRef.current = onClose;
+  const finished = useRef(false);
   const watchdog = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const frameRequest = useRef<number | null>(null);
+  const attempt = useRef(0);
+  const duration = companionVideoSeconds(clip.category);
+  const playbackEnd = useRef(duration);
   const stopWatchdog = () => {
     if (watchdog.current) clearTimeout(watchdog.current);
     watchdog.current = null;
   };
+  const finish = (reason: PlaybackEndReason) => {
+    if (finished.current) return;
+    finished.current = true;
+    stopWatchdog();
+    video.current?.pause();
+    setVisible(false);
+    finishRef.current(reason);
+  };
   const watchPlayback = () => {
     stopWatchdog();
-    watchdog.current = setTimeout(() => {
-      video.current?.pause();
-      setFailed(true);
-    }, 15_000);
+    watchdog.current = setTimeout(() => finish("failed"), 15_000);
+  };
+  const play = () => {
+    const token = attempt.current;
+    watchPlayback();
+    void video.current?.play()?.catch(() => {
+      if (finished.current || token !== attempt.current) return;
+      stopWatchdog();
+      if (automatic) finish("blocked");
+      else setBlocked(true);
+    });
   };
   useEffect(() => {
-    let active = true;
-    setBlocked(false);
-    setFailed(false);
-    watchPlayback();
-    const play = video.current?.play();
-    play?.catch(() => { if (active) { stopWatchdog(); setBlocked(true); } });
-    const hide = () => { if (document.visibilityState === "hidden") { video.current?.pause(); onClose(); } };
+    attempt.current++;
+    finished.current = false;
+    setVisible(false); setSettling(false); setBlocked(false);
+    play();
+    const hide = () => { if (document.visibilityState === "hidden") finish("hidden"); };
     document.addEventListener("visibilitychange", hide);
-    return () => { active = false; stopWatchdog(); video.current?.pause(); document.removeEventListener("visibilitychange", hide); };
-  }, [onClose, clip.url]);
-  return <div className="absolute inset-0 z-30 overflow-hidden rounded-2xl bg-black" data-testid="wellbeing-video-player">
-    <video ref={video} src={clip.url} poster={clip.sourceImageUrl} muted playsInline preload="auto"
-      aria-label={`${clip.category} companion moment`} className="h-full w-full object-contain"
-      onEnded={() => { stopWatchdog(); onClose(); }} onTimeUpdate={() => {
-        if (failed) return;
-        if ((video.current?.currentTime ?? 0) >= 3) { stopWatchdog(); onClose(); }
+    const element = video.current;
+    return () => {
+      attempt.current++; finished.current = true; stopWatchdog(); element?.pause();
+      if (frameRequest.current !== null) element?.cancelVideoFrameCallback?.(frameRequest.current);
+      document.removeEventListener("visibilitychange", hide);
+    };
+    // Each URL is mounted as a separate playback; callbacks must not restart it.
+  }, [clip.url]);
+
+  const trackFrame = () => {
+    const element = video.current;
+    if (!element || finished.current) return;
+    const time = element.currentTime;
+    if (time >= playbackEnd.current - 0.25) setSettling(true);
+    if (time > duration + 0.5) { finish("ended"); return; }
+    frameRequest.current = element.requestVideoFrameCallback?.(trackFrame) ?? null;
+  };
+  return <div className={`absolute inset-0 z-30 overflow-hidden rounded-2xl ${automatic ? "pointer-events-none" : ""}`} data-testid="wellbeing-video-player">
+    {clip.sceneImageUrl && <img src={clip.sceneImageUrl} alt="" aria-hidden="true"
+      onLoad={() => setSceneReady(true)}
+      className="absolute inset-0 h-full w-full object-contain"
+      style={{ opacity: sceneReady ? 1 : 0 }} />}
+    <video ref={video} src={clip.url} muted playsInline preload="auto"
+      aria-label={`${clip.category} companion moment`}
+      className="relative h-full w-full object-contain transition-opacity duration-200"
+      style={{ opacity: visible && !settling ? 1 : 0 }}
+      onLoadedMetadata={() => {
+        const actual = video.current?.duration;
+        if (actual && Number.isFinite(actual)) {
+          if (Math.abs(actual - duration) > 0.4) finish("failed");
+          else playbackEnd.current = actual;
+        }
+      }}
+      onPlaying={() => {
+        if (finished.current) return;
+        setBlocked(false); watchPlayback();
+        const element = video.current;
+        if (element?.requestVideoFrameCallback) {
+          if (frameRequest.current !== null) element.cancelVideoFrameCallback(frameRequest.current);
+          frameRequest.current = element.requestVideoFrameCallback(() => {
+            if (!finished.current) { setVisible(true); trackFrame(); }
+          });
+        } else setVisible(true);
+      }}
+      onEnded={() => finish("ended")}
+      onTimeUpdate={() => {
+        if (finished.current) return;
+        if ((video.current?.currentTime ?? 0) >= playbackEnd.current - 0.25) setSettling(true);
+        if ((video.current?.currentTime ?? 0) > duration + 0.5) finish("ended");
         else if (!blocked) watchPlayback();
       }}
-      onError={() => { stopWatchdog(); video.current?.pause(); setFailed(true); }} />
-    {failed ? <p role="status" className="absolute inset-x-3 bottom-3 rounded bg-black/70 p-2 text-center text-xs text-white">Couldn’t play this moment. Please try again later.</p>
-      : blocked ? <button type="button" className="absolute inset-0 text-white" onClick={() => {
-        watchPlayback();
-        void video.current?.play().then(() => setBlocked(false)).catch(() => { stopWatchdog(); setFailed(true); });
-      }}>Play moment</button> : null}
-    <button type="button" className="absolute right-2 top-2 min-h-11 rounded-full bg-black/50 px-3 text-xs text-white" onClick={onClose}>Close</button>
+      onError={() => finish("failed")} />
+    {blocked && !automatic ? <button type="button" className="absolute inset-0 text-white" onClick={play}>Play moment</button> : null}
   </div>;
 }

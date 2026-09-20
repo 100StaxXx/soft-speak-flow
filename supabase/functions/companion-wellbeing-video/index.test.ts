@@ -2,7 +2,8 @@ import { assertEquals, assert } from "https://deno.land/std@0.168.0/testing/asse
 import { deps, handleWellbeingVideo, trustedSourceImage, resolveWellbeingSourceImage, hasWellbeingVideoAccess, retryMode } from "./index.ts";
 const BASE = "https://testproject.supabase.co";
 const IMAGE = `${BASE}/storage/v1/object/public/companion-images/user-1/one.png`;
-const body = { action: "prepare", companionId: "companion-1", category: "mind", stage: 5, sourceImageUrl: IMAGE };
+const body = { action: "prepare", companionId: "companion-1", category: "mind", stage: 5, sourceImageUrl: IMAGE, promptVersion: 3 };
+import { COMPANION_VIDEO_CATEGORIES, IDLE_VIDEO_CATEGORIES, WELLBEING_PROMPT_VERSION } from "../../../src/shared/companionWellbeing.ts";
 
 Deno.test("runtime smoke check is service-only and never touches jobs or paid generation", async () => {
   let verified = 0;
@@ -184,11 +185,61 @@ Deno.test("prewarming all categories and repeating it keeps exactly three durabl
   assertEquals(f.jobs.length, 3);
   assertEquals(f.calls.submit.length, 0);
 });
-Deno.test("worker submits exactly three seconds once, saves provider id, then stores and registers the video", async () => {
+Deno.test("prewarming all seven moments twice creates only seven jobs, including four 4-second idle clips", async () => {
+  const f = fixture();
+  for (let visit = 0; visit < 2; visit++) {
+    const responses = await Promise.all(COMPANION_VIDEO_CATEGORIES.map((category) => f.request({ ...body, category })));
+    for (const response of responses) assertEquals(response.status, 200);
+  }
+  assertEquals(f.jobs.length, 7);
+  assertEquals(f.calls.submit.length, 0);
+  f.calls.internal = true;
+  for (let tick = 0; tick < 6; tick++) await f.request({});
+  assertEquals(f.calls.submit.length, 7);
+  assertEquals(f.calls.submit.filter((call) => call.durationSeconds === 4).length, 4);
+  assertEquals(f.calls.submit.filter((call) => call.durationSeconds === 5).length, 3);
+  for (const call of f.calls.submit) assertEquals(call.endImageUrl, call.imageUrl);
+  f.calls.internal = false;
+  const response = await (await f.request({ ...body, category: IDLE_VIDEO_CATEGORIES[0], action: "status" })).json();
+  assertEquals(response.clip.duration_seconds, 4);
+  assertEquals(response.clip.prompt_version, WELLBEING_PROMPT_VERSION);
+  assert(response.clip.scene_image_url.includes("/wellbeing-scenes/"));
+});
+Deno.test("jobs queued by the previous release retain their original duration and submission contract", async () => {
+  const f = fixture(); await f.request(); f.jobs[0].prompt_version = 2;
+  f.calls.internal = true; await f.request({});
+  assertEquals(f.calls.submit[0].durationSeconds, 3);
+  assertEquals(f.calls.submit[0].endImageUrl, undefined);
+});
+Deno.test("old installed clients never receive the new longer clips", async () => {
+  const f = fixture(); await f.request();
+  f.jobs[0].status = "succeeded"; f.jobs[0].video_url = "new-five-second.mp4";
+  const oldRequest = { ...body, promptVersion: undefined };
+  assertEquals((await f.request(oldRequest)).status, 426);
+  f.jobs[0].prompt_version = 2; f.jobs[0].video_url = "old-three-second.mp4";
+  const old = await (await f.request(oldRequest)).json();
+  assertEquals(old.clip.video_url, "old-three-second.mp4");
+  assertEquals(old.clip.duration_seconds, 3);
+  assertEquals(f.jobs.length, 1);
+});
+Deno.test("daily cap permits two sets, but blocks a third appearance without changing saved clips", async () => {
+  const f = fixture();
+  for (const category of COMPANION_VIDEO_CATEGORIES) await f.request({ ...body, category });
+  const second = IMAGE.replace("one.png", "two.png"); f.companion.current_image_url = second;
+  for (const category of COMPANION_VIDEO_CATEGORIES) assertEquals((await f.request({ ...body, sourceImageUrl: second, category })).status, 200);
+  assertEquals(f.jobs.length, 14);
+  assertEquals((await f.request({ ...body, sourceImageUrl: second })).status, 200);
+  const third = IMAGE.replace("one.png", "three.png"); f.companion.current_image_url = third;
+  assertEquals((await f.request({ ...body, sourceImageUrl: third })).status, 429);
+  assertEquals(f.jobs.length, 14);
+});
+Deno.test("worker submits five seconds with identical scene endpoints once, then stores the video", async () => {
   const f = fixture(); await f.request(); f.calls.internal = true;
   await f.request({});
   assertEquals(f.calls.submit.length, 1);
-  assertEquals(f.calls.submit[0].durationSeconds, 3);
+  assertEquals(f.calls.submit[0].durationSeconds, 5);
+  assertEquals(f.calls.submit[0].endImageUrl, f.calls.submit[0].imageUrl);
+  assertEquals(f.jobs[0].scene_image_url, f.calls.submit[0].imageUrl);
   assert(f.calls.submit[0].imageUrl.includes("/wellbeing-scenes/"));
   assertEquals(f.calls.scenes[0].element, "storm");
   assertEquals(f.calls.scenes[0].job.source_image_url, IMAGE);
@@ -227,7 +278,7 @@ Deno.test("new scene version replaces the lookup for backgroundless clips withou
   const response = await (await f.request()).json();
   assertEquals(f.jobs.length, 2);
   assertEquals(f.jobs[0].video_url, "old-backgroundless.mp4");
-  assertEquals(f.jobs[1].prompt_version, 2);
+  assertEquals(f.jobs[1].prompt_version, 3);
   assertEquals(response.clip.status, "queued");
 });
 Deno.test("pending provider work is polled without a new generation and times out cleanly", async () => {

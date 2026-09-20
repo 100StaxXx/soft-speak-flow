@@ -21,6 +21,7 @@ import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
 import { CompanionInteractionBubble } from "@/components/companion/CompanionInteractionBubble";
 import { CompanionWellbeing, type WellbeingPlayback } from "@/components/companion/CompanionWellbeing";
 import { WellbeingVideoPlayer } from "@/components/companion/WellbeingVideoPlayer";
+import { CompanionIdleVideos } from "@/components/companion/CompanionIdleVideos";
 import { CompanionMotionSurface } from "@/components/companion/motion/CompanionMotionSurface";
 import { CompanionHabitat } from "@/components/companion/CompanionHabitat";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
@@ -202,7 +203,6 @@ export const CompanionDisplay = memo(({
   // Use care-based visual state (includes care signals to avoid duplicate hook calls)
   const { 
     cssStyles: careStyles, 
-    animationClass, 
     evolutionPath, 
   } = useCompanionVisualState();
   const expressionState = useCompanionExpressionState();
@@ -219,6 +219,7 @@ export const CompanionDisplay = memo(({
   const [companionChatOpen, setCompanionChatOpen] = useState(false);
   const [inlineEvolutionReplay, setInlineEvolutionReplay] = useState<InlineEvolutionReplayState | null>(null);
   const [wellbeingPlayback, setWellbeingPlayback] = useState<WellbeingPlayback | null>(null);
+  const [restingVideoScene, setRestingVideoScene] = useState<{ companionId: string; sourceImageUrl: string; url: string } | null>(null);
   const closeWellbeingPlayback = useCallback(() => setWellbeingPlayback(null), []);
   const [isReplayLoading, setIsReplayLoading] = useState(false);
   const replayRequestInFlight = useRef(false);
@@ -740,25 +741,6 @@ export const CompanionDisplay = memo(({
   const nextVisualStageLabel = nextVisualStageBoundaryLevel === null
     ? null
     : getVisualStageLabelForLevel(nextVisualStageBoundaryLevel);
-  const expressionAnimationClass = prefersReducedMotion
-    ? ""
-    : ({
-      excited: "animate-companion-bounce",
-      happy: "animate-companion-pulse",
-      calm: "",
-      concerned: "animate-companion-droop",
-      sleepy: "animate-companion-slow-breathe",
-    } as const)[expressionState.mood];
-  const activePortraitAnimationClass = prefersReducedMotion || !isVisible || inlineEvolutionReplay
-    ? ""
-    : expressionAnimationClass || animationClass;
-  const shouldAnimateIdleDrift = !prefersReducedMotion
-    && isVisible
-    && imageLoaded
-    && !imageError
-    && !inlineEvolutionReplay
-    && !companionInteractions.activeBehaviorId
-    && expressionState.mood === "calm";
   const customDisplayName = getStoredCompanionCustomName(displayCompanion);
   const displayedCreatureName = creatureName
     || customDisplayName
@@ -944,7 +926,7 @@ export const CompanionDisplay = memo(({
                 )}
                 style={portraitFrameStyle}
                 data-testid="companion-image-shell"
-                data-companion-idle-motion={shouldAnimateIdleDrift ? "active" : "inactive"}
+                data-companion-idle-motion="video"
                 data-companion-frame-mode={usesGeneratedSceneShell ? "generated-scene" : "square"}
                 data-companion-expression-mood={expressionState.mood}
                 data-companion-expression-variant={expressionState.variant}
@@ -1010,8 +992,6 @@ export const CompanionDisplay = memo(({
                         className={cn(
                           "h-full w-full origin-bottom",
                           portraitSceneContentClassName,
-                          !prefersReducedMotion && isVisible && !inlineEvolutionReplay && companionInteractions.activeBehaviorClassName,
-                          !companionInteractions.activeBehaviorId && (shouldAnimateIdleDrift ? "animate-companion-idle-drift" : activePortraitAnimationClass),
                         )}
                       >
                         <CompanionImage
@@ -1044,6 +1024,16 @@ export const CompanionDisplay = memo(({
                     </div>
                   </>
                 </CompanionMotionSurface>
+                {restingVideoScene?.companionId === displayCompanion.id
+                  && restingVideoScene.sourceImageUrl === displayCompanion.current_image_url && !isPendingRevealDisplay ? (
+                  <img src={restingVideoScene.url} alt="" aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 z-10 h-full w-full object-contain" />
+                ) : null}
+                {!isStageZeroEgg && !isPendingRevealDisplay && <CompanionIdleVideos
+                  companionId={displayCompanion.id} stage={displayCompanion.current_stage}
+                  sourceImageUrl={displayCompanion.current_image_url ?? ""}
+                  active={isVisible && imageLoaded && !imageError && !signals.isBackgrounded && !prefersReducedMotion
+                    && !inlineEvolutionReplay && !wellbeingPlayback} />}
                 {wellbeingPlayback && isVisible && !signals.isBackgrounded && !inlineEvolutionReplay && !isPendingRevealDisplay
                   && wellbeingPlayback.sourceImageUrl === displayCompanion.current_image_url ? (
                   <WellbeingVideoPlayer key={wellbeingPlayback.url} clip={wellbeingPlayback} onClose={closeWellbeingPlayback} />
@@ -1116,7 +1106,10 @@ export const CompanionDisplay = memo(({
                 sourceImageUrl={displayCompanion.current_image_url ?? ""}
                 isVisible={isVisible && !signals.isBackgrounded && !inlineEvolutionReplay}
                 prefersReducedMotion={prefersReducedMotion}
-                onPlay={setWellbeingPlayback}
+                onPlay={(clip) => {
+                  if (clip.sceneImageUrl) setRestingVideoScene({ companionId: displayCompanion.id, sourceImageUrl: clip.sourceImageUrl, url: clip.sceneImageUrl });
+                  setWellbeingPlayback(clip);
+                }}
               />
             ) : null}
           </div>

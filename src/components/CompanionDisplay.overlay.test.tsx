@@ -141,6 +141,10 @@ vi.mock("@/hooks/useCompanionVisualState", () => ({
   }),
 }));
 
+vi.mock("@/components/companion/CompanionIdleVideos", () => ({
+  CompanionIdleVideos: ({ active }: { active: boolean }) => <div data-testid="idle-video-controller" data-active={String(active)} />,
+}));
+
 vi.mock("@/hooks/useCompanionRegenerate", () => ({
   useCompanionRegenerate: () => ({
     regenerate: mocks.regenerate,
@@ -506,7 +510,7 @@ describe("CompanionDisplay overlay stack", () => {
     expect(await screen.findByTestId("companion-stats-analysis-surface")).toBeInTheDocument();
   });
 
-  it("starts subtle idle drift once the companion art has loaded", async () => {
+  it("enables generated idle clips after the portrait loads, without image deformation", async () => {
     mocks.isRegenerating = false;
     mocks.isDormant = false;
 
@@ -515,23 +519,23 @@ describe("CompanionDisplay overlay stack", () => {
     const shell = screen.getByTestId("companion-image-shell");
     const image = screen.getByAltText(/companion at level 8/i);
 
-    expect(shell).toHaveAttribute("data-companion-idle-motion", "inactive");
+    expect(screen.getByTestId("idle-video-controller")).toHaveAttribute("data-active", "false");
 
     fireEvent.load(image);
 
     await waitFor(() => {
-      expect(shell).toHaveAttribute("data-companion-idle-motion", "active");
+      expect(screen.getByTestId("idle-video-controller")).toHaveAttribute("data-active", "true");
     });
 
     expect(shell).not.toHaveClass("animate-companion-idle-drift");
-    expect(screen.getByTestId("companion-animal-motion")).toHaveClass("animate-companion-idle-drift");
+    expect(screen.getByTestId("companion-animal-motion")).not.toHaveClass("animate-companion-idle-drift");
     expect(screen.getByTestId("companion-habitat")).not.toHaveClass("animate-companion-idle-drift");
   });
 
   it("pauses portrait motion when the companion tab is hidden", () => {
     render(<CompanionDisplay isVisible={false} />);
     fireEvent.load(screen.getByAltText(/companion at level 8/i));
-    expect(screen.getByTestId("companion-image-shell")).toHaveAttribute("data-companion-idle-motion", "inactive");
+    expect(screen.getByTestId("idle-video-controller")).toHaveAttribute("data-active", "false");
     expect(screen.getByTestId("companion-animal-motion")).not.toHaveClass("animate-companion-idle-drift");
   });
 

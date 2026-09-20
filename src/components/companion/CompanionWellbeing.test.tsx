@@ -16,7 +16,7 @@ describe("Optional Mind Body Soul", () => {
     expect(screen.queryByLabelText("Soul ideas")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Soul" }));
     await waitFor(() => expect(props.onPlay).toHaveBeenCalledTimes(1));
-    expect(mocks.invoke).toHaveBeenCalledWith("companion-wellbeing-video", { timeout: 20000, body: { action: "prepare", companionId: "one", category: "soul", stage: 5, sourceImageUrl: props.sourceImageUrl } });
+    expect(mocks.invoke).toHaveBeenCalledWith("companion-wellbeing-video", { timeout: 20000, body: { action: "prepare", companionId: "one", category: "soul", stage: 5, sourceImageUrl: props.sourceImageUrl, promptVersion: 3 } });
     fireEvent.click(screen.getByRole("button", { name: "Soul" }));
     expect(mocks.invoke).toHaveBeenCalledTimes(1);
     expect(props.onPlay).toHaveBeenCalledTimes(2);

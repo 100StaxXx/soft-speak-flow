@@ -9,6 +9,7 @@ export interface SubmitFalKlingVideoParams {
   apiKey: string;
   model: string;
   imageUrl: string;
+  endImageUrl?: string;
   prompt: string;
   durationSeconds?: number;
 }
@@ -188,6 +189,7 @@ export const submitFalKlingVideo = async ({
   apiKey,
   model,
   imageUrl,
+  endImageUrl,
   prompt,
   durationSeconds = DEFAULT_COMPANION_ANIMATION_DURATION_SECONDS,
 }: SubmitFalKlingVideoParams): Promise<FalQueueSubmitResult> => {
@@ -199,6 +201,7 @@ export const submitFalKlingVideo = async ({
     },
     body: JSON.stringify({
       start_image_url: imageUrl,
+      ...(endImageUrl ? { end_image_url: endImageUrl } : {}),
       prompt,
       duration: String(durationSeconds),
       generate_audio: false,

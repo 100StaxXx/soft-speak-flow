@@ -9,6 +9,19 @@ import { calendarQuestSnapshot } from "@/utils/calendarSyncMerge";
 import { Button } from "@/components/ui/button";
 import { ExportQuestToTaskList } from './ExportQuestToTaskList';
 
+function taskAccessError(error: unknown, provider: string, fallback: string): string {
+  if (provider !== "apple") return error instanceof Error ? error.message : fallback;
+  const message = error instanceof Error ? error.message :
+    typeof error === "object" && error !== null && "message" in error ? String(error.message) : "";
+  if (/not implemented|unimplemented|unavailable on this platform/i.test(message)) {
+    return "Apple Reminders isn't available in this version of the app. Update Cosmiq and try again. Your reminders are unchanged.";
+  }
+  if (/wasn't granted|Approve Reminders access first|access.*denied/i.test(message)) {
+    return "Reminders access wasn't granted. You can enable it for Cosmiq in iPhone Settings.";
+  }
+  return "Couldn't connect to Apple Reminders. Try again, and check Cosmiq's Reminders access in iPhone Settings. Your reminders are unchanged.";
+}
+
 export function ConnectedTasks() {
   const { connections } = useCalendarIntegrations();
   const { links, invalidate } = useCalendarQuestImports();
@@ -36,14 +49,14 @@ export function ConnectedTasks() {
           if (!permission.granted) throw new Error("Reminders access wasn't granted. You can enable it in iOS Settings.");
           setLists((await NativeCalendar.listReminderLists()).lists);
         } else setLists(await cloud(conn, "lists"));
-      } catch (e) { setError(e instanceof Error ? e.message : "Could not load task lists."); }
+      } catch (e) { setError(taskAccessError(e, conn.provider, "Could not load task lists.")); }
       finally { setBusy(false); }
     }}>{conn.provider === "apple" ? "Apple Reminders" : conn.provider === "google" ? "Google Tasks" : "Microsoft To Do"}</Button>)}</div>
     {lists.length > 0 && <label className="block my-3">Task list<select className="ml-3 rounded border bg-background p-2" disabled={busy} value={listId} onChange={async (e) => {
       if (!connection || !e.target.value) return; setBusy(true); setError(null); setTasks([]);
       setListId(e.target.value);
       try { setTasks(connection.provider === "apple" ? (await NativeCalendar.listReminders({ listId: e.target.value })).tasks : await cloud(connection, "tasks", e.target.value)); }
-      catch (e) { setError(e instanceof Error ? e.message : "Could not load tasks."); } finally { setBusy(false); }
+      catch (e) { setError(taskAccessError(e, connection.provider, "Could not load tasks.")); } finally { setBusy(false); }
     }}><option value="" disabled>Choose a list</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.title}</option>)}</select></label>}
     {connection && listId && !lists.find((list) => list.id === listId)?.readOnly && (connection.provider === 'google' || connection.provider === 'apple') &&
       <ExportQuestToTaskList key={`${connection.id}:${listId}`} connectionId={connection.id} provider={connection.provider}

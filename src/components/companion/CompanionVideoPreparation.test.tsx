@@ -23,23 +23,23 @@ describe("Global companion video preparation", () => {
     const content = () => <QueryClientProvider client={client}><CompanionVideoPreparation /></QueryClientProvider>;
     return { ...render(content()), content };
   };
-  it("prepares all three categories for existing accounts without a selection", async () => {
+  it("prepares all seven clips for existing accounts without a selection", async () => {
     const view = setup();
-    await waitFor(() => expect(mocks.request).toHaveBeenCalledTimes(3));
-    expect(mocks.request.mock.calls.map(([request]) => request.category)).toEqual(["mind", "body", "soul"]);
+    await waitFor(() => expect(mocks.request).toHaveBeenCalledTimes(7));
+    expect(mocks.request.mock.calls.map(([request]) => request.category)).toEqual(["mind", "body", "soul", "idle_breathe", "idle_look", "idle_rest", "idle_greet"]);
     expect(mocks.request.mock.calls.every(([request]) => request.action === "prepare")).toBe(true);
     view.rerender(view.content());
-    expect(mocks.request).toHaveBeenCalledTimes(3);
+    expect(mocks.request).toHaveBeenCalledTimes(7);
   });
   it("prepares once per new visual stage, not every XP level", async () => {
     const view = setup();
-    await waitFor(() => expect(mocks.request).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(mocks.request).toHaveBeenCalledTimes(7));
     mocks.companion.current_stage = 2; view.rerender(view.content());
-    expect(mocks.request).toHaveBeenCalledTimes(3);
+    expect(mocks.request).toHaveBeenCalledTimes(7);
     mocks.companion = { ...mocks.companion, current_stage: 5, current_image_url: "portrait-5.png" };
     view.rerender(view.content());
-    await waitFor(() => expect(mocks.request).toHaveBeenCalledTimes(6));
-    expect(mocks.request.mock.calls[3][0]).toMatchObject({ stage: 5, sourceImageUrl: "portrait-5.png" });
+    await waitFor(() => expect(mocks.request).toHaveBeenCalledTimes(14));
+    expect(mocks.request.mock.calls[7][0]).toMatchObject({ stage: 5, sourceImageUrl: "portrait-5.png" });
   });
   it("does not prepare wellbeing clips for an egg or without active access", () => {
     mocks.companion.current_stage = 0;

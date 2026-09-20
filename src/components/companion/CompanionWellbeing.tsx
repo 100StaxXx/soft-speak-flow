@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { getCurrentVisualStageBoundaryLevel } from "@/config/progression";
 import { WELLBEING_CATEGORIES, WELLBEING_OPTIONS, type WellbeingCategory } from "@/shared/companionWellbeing";
 
-export interface WellbeingPlayback { url: string; category: WellbeingCategory; sourceImageUrl: string }
+export interface WellbeingPlayback { url: string; category: WellbeingCategory; sourceImageUrl: string; sceneImageUrl?: string }
 interface Props {
   companionId: string;
   currentStage: number;
@@ -52,7 +52,7 @@ function WellbeingSelection({ companionId, currentStage, sourceImageUrl, isVisib
     const cached = clips[category];
     if (cached?.status === "succeeded" && cached.video_url) {
       setLoading(false);
-      if (!prefersReducedMotion && document.visibilityState !== "hidden") onPlay({ url: cached.video_url, category, sourceImageUrl });
+      if (!prefersReducedMotion && document.visibilityState !== "hidden") onPlay({ url: cached.video_url, category, sourceImageUrl, sceneImageUrl: cached.scene_image_url ?? undefined });
       return;
     }
     setLoading(true);
@@ -60,7 +60,7 @@ function WellbeingSelection({ companionId, currentStage, sourceImageUrl, isVisib
       const clip = await load(category, retry ? "retry" : "prepare");
       if (!mounted.current || sequence !== request.current || !visible.current) return;
       if (clip) setClips((previous) => ({ ...previous, [category]: clip }));
-      if (clip?.status === "succeeded" && clip.video_url && !prefersReducedMotion && document.visibilityState !== "hidden") onPlay({ url: clip.video_url, category, sourceImageUrl });
+      if (clip?.status === "succeeded" && clip.video_url && !prefersReducedMotion && document.visibilityState !== "hidden") onPlay({ url: clip.video_url, category, sourceImageUrl, sceneImageUrl: clip.scene_image_url ?? undefined });
     } catch (cause) {
       if (mounted.current && sequence === request.current) setError((cause as Error).message);
     } finally {
@@ -130,7 +130,7 @@ function WellbeingSelection({ companionId, currentStage, sourceImageUrl, isVisib
           : null}
         {slow && pending ? <button type="button" className="min-h-11 underline" onClick={() => void select(selected)}>Check again</button> : null}
         {clip?.status === "succeeded" && clip.video_url ? <button type="button" className="min-h-11 underline underline-offset-4"
-          onClick={() => onPlay({ url: clip.video_url!, category: selected, sourceImageUrl })}>Play companion moment</button> : null}
+          onClick={() => onPlay({ url: clip.video_url!, category: selected, sourceImageUrl, sceneImageUrl: clip.scene_image_url ?? undefined })}>Play companion moment</button> : null}
       </div>
     </div> : null}
   </section>;
