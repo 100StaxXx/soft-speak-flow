@@ -38,14 +38,14 @@
 | --- | --- |
 | Frontend | 385 files, 2,918 tests passed |
 | Backend | 43 isolated groups, 833 assertions passed |
-| Static SQL migration tests | 27 passed; not a live DB regression suite |
+| Static SQL migration tests | 28 passed; not a production DB regression suite |
 | Scoped release validator | 4 passed |
 | Application and Node types | Passed |
 | Backend types | Passed |
 | Lint | Passed, zero warnings |
 | Unused code / import cycles | Passed |
 | Dependency audit | Zero reported vulnerabilities |
-| Secret scan | Passed, 2,329 files before this release note |
+| Secret scan | Passed locally and remotely; also required on each commit |
 | Product boundary / function manifest | Passed |
 | Production web build / bundle budgets / Maps asset checks | Passed |
 | Native asset synchronization / signing preflight | Passed |
@@ -77,6 +77,21 @@ Upload succeeded; Apple processed build 355 and automatically attached the exist
 
 The first remote CI run exposed an orphaned patch for the removed `@capgo/native-purchases` package. Local incremental installs had not surfaced this missing-package failure. Removed that obsolete patch; active purchases use RevenueCat and its existing native integration. This changes installation tooling only, not the uploaded app bundle. Remote CI is being rerun; local passing checks above are not a claim that remote checks have finished.
 
-Further clean-run findings: removed an orphaned `generate-daily-quotes` local configuration entry and added an entry-point existence check. Three planner fixtures incorrectly used Pacific-relative timestamps for local wall-clock expectations; all 43 planner tests now pass under both UTC and Pacific after correcting the fixtures (no planner runtime change).
+Further clean-run findings: removed an orphaned `generate-daily-quotes` local configuration entry and added an entry-point existence check. Three planner fixtures incorrectly used Pacific-relative timestamps for local wall-clock expectations; all 43 planner tests and the full 2,918-test app suite now pass under both UTC and Pacific after correcting the fixtures (no frontend runtime change).
 
-The test database also exposed missing already-applied cinema/product schema prerequisites. Recovered five migrations verbatim from production's recorded statements: `20260812090000`, `20260812100000`, `20260819090000`, `20260819101500`, and `20260819143000`. They cover the companion selection matrix, explicit product identity, cinema engine, compatible hatch RPC, and final premade product binding. These files reconstruct relevant test dependencies; they are not a claim that every historical shared-backend migration has been reconciled. No production SQL was executed. Static migration tests and secret scanning pass; a fresh isolated database rebuild remains under CI verification. The function manifest now has 100 entries, including the two existing cinema jobs recorded in the recovered history; this does not expand the four-function deployment allow-list.
+The test database also exposed missing already-applied cinema/product schema prerequisites. Recovered five migrations verbatim from production's recorded statements: `20260812090000`, `20260812100000`, `20260819090000`, `20260819101500`, and `20260819143000`. They cover the companion selection matrix, explicit product identity, cinema engine, compatible hatch RPC, and final premade product binding. These files reconstruct relevant test dependencies; they are not a claim that every historical shared-backend migration has been reconciled. No production SQL was executed. Static migration tests and secret scanning pass. The function manifest now has 100 entries, including the two existing cinema jobs recorded in the recovered history; this does not expand the four-function deployment allow-list.
+
+Recovered two additional recorded prerequisites, `20260811210000` (animation first/last endpoints) and `20260813143000` (calendar sync constraints), bringing this release's recovered migration count to seven. Corrected the already-applied calendar-link migration's fragile predicate text substitution for fresh databases: it now wraps the original check expression with the additive calendar-link exception, preserving other sources and rules. The isolated database now rebuilds successfully and the migration regression suite passes. Production was not changed or replayed.
+
+Updated the database-security evolution fixture to enforce actual visual forms rather than treating intermediate level 2 as a new form. It now separately exercises a below-threshold level-5 claim and an intermediate-level row whose XP threshold is met.
+
+Clean-run compiler differences were addressed with an explicit type for the existing web-push CommonJS wrapper and an equivalent, explicit planner slot fallback. All 117 planner backend tests pass. These backend compiler-compatibility edits were not deployed over other live functions; the only production deployment remains the wellbeing endpoint v2.
+
+## Final remote verification
+
+- [Frontend Release Gate 35498026305](https://github.com/100StaxXx/soft-speak-flow/actions/runs/35498026305) passed both jobs: the complete app/backend test and build gate, and the separate macOS iOS asset synchronization/widget-signing check. This run tested `291dd0336`.
+- [Security Regression 35498259548](https://github.com/100StaxXx/soft-speak-flow/actions/runs/35498259548) passed on `d49a71b2f`: dependency audit, fresh database reconstruction, 28 static migration tests, six live isolated migration assertions, 61 database-security assertions, and 11 edge-function security steps.
+- The only code difference between those two checkpoints is the corrected SQL test fixture; app/runtime/backend sources are identical. The redundant full frontend rerun for `d49a71b2f` was still running at this report's finalization.
+- The actual signed build-355 archive/upload and internal **Testing** status are independently confirmed above. Post-upload commits corrected installation/CI tooling, test fixtures, historical migration reconstruction, and backend compiler portability; they did not change the native app bundle or perform another production deployment.
+
+The obsolete purchase patch was removed from source control and remains recoverable in Git. The pre-existing `supabase/.temp/cli-latest` change was left outside all release commits.
