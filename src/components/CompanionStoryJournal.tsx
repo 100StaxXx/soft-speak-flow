@@ -6,6 +6,7 @@ import {
   type SyntheticEvent as ReactSyntheticEvent,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionStory } from "@/hooks/useCompanionStory";
 import { Card, outerShellCardClassName } from "./ui/card";
@@ -33,6 +34,7 @@ import {
 import {
   PROGRESSION_STORY_CHECKPOINT_LEVELS,
   getProgressionLevelDisplay,
+  getCurrentVisualStageBoundaryLevel,
 } from "@/config/progression";
 import { StoryJournalInfoTooltip } from "./StoryJournalInfoTooltip";
 import { CompanionImage } from "./CompanionImage";
@@ -76,12 +78,25 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
   );
 
   const { data: chapterImage } = useQuery<string | null>({
-    queryKey: ["companion-story-image", companion?.id, debouncedLevel],
+    queryKey: ["companion-story-image", companion?.id, debouncedLevel, companion?.current_stage, companion?.current_image_url],
     queryFn: async () => {
       if (!companion) return null;
 
       if (debouncedLevel === 0) {
-        return getUniversalEggAssetUrl(companion.core_element) || "/placeholder-egg.svg";
+        return companion.initial_image_url || getUniversalEggAssetUrl(companion.core_element) || "/placeholder-egg.svg";
+      }
+
+      const boundary = getCurrentVisualStageBoundaryLevel(debouncedLevel);
+      // The saved cinema portrait contains this companion's element habitat.
+      // Do not replace it with the generic cutout merely because a preset exists.
+      if (boundary === getCurrentVisualStageBoundaryLevel(companion.current_stage) && companion.current_image_url) {
+        return companion.current_image_url;
+      }
+      if (debouncedLevel <= companion.current_stage) {
+        const { data, error } = await supabase.from("companion_evolutions")
+          .select("image_url").eq("companion_id", companion.id).eq("stage", boundary).maybeSingle();
+        if (error) throw error;
+        if (data?.image_url) return data.image_url;
       }
 
       if (companion.preset_id) {
@@ -97,12 +112,11 @@ export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJ
         }
       }
 
-      return companion.current_image_url || "/placeholder-companion.svg";
+      return "/placeholder-companion.svg";
     },
     enabled: !!companion,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
-    placeholderData: (previousData) => previousData,
   });
   const chapterImageUsesContainedScene = shouldContainCompanionSceneImage(chapterImage);
 

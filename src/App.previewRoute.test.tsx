@@ -136,6 +136,9 @@ vi.mock("@/components/ErrorBoundary", () => ({
 vi.mock("@/components/GlobalEvolutionListener", () => ({
   GlobalEvolutionListener: () => null,
 }));
+vi.mock("@/components/companion/CompanionVideoPreparation", () => ({
+  CompanionVideoPreparation: () => null,
+}));
 
 vi.mock("@/components/RealtimeSyncProvider", () => ({
   RealtimeSyncProvider: passthroughProvider,

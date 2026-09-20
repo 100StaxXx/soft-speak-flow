@@ -843,8 +843,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
         data-tour="add-quest-sheet"
         className={cn(
           isDesktopPanel
-            ? "!top-4 !bottom-4 !left-auto !right-4 !h-[calc(100dvh-2rem)] !w-[calc(100vw-2rem)] !max-w-[640px] !rounded-[32px] flex flex-col !p-0 !gap-0 overflow-hidden sm:!w-[620px]"
-            : "h-[92vh] rounded-t-[34px] flex flex-col p-0 gap-0 overflow-hidden",
+            ? "!top-4 !bottom-4 !left-auto !right-4 !h-[calc(100dvh-2rem)] !w-[calc(100vw-2rem)] !max-w-[640px] !rounded-[24px] flex flex-col !p-0 !gap-0 overflow-hidden sm:!w-[620px]"
+            : "h-[92vh] rounded-t-[24px] flex flex-col p-0 gap-0 overflow-hidden",
           isDesktopPanel ? QUEST_FORM_STYLES.desktopPanelShell : QUEST_FORM_STYLES.sheet,
         )}
         style={resolvedCompanionFrostedThemeStyle}
@@ -896,7 +896,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                         <span className={getQuestDifficultyIconClasses(value, difficulty === value)}>
                           <Icon className="h-3.5 w-3.5" />
                         </span>
-                        <span className="font-fredoka text-[12px] leading-none">{label}</span>
+                        <span className="font-body text-[12px] leading-none">{label}</span>
                       </button>
                     ))}
                   </div>
@@ -963,7 +963,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                       <span className={getQuestDifficultyIconClasses(value, difficulty === value)}>
                         <Icon className="h-3.5 w-3.5" />
                       </span>
-                      <span className="font-fredoka text-[12px] leading-none">{label}</span>
+                      <span className="font-body text-[12px] leading-none">{label}</span>
                     </button>
                   ))}
                 </div>
@@ -997,7 +997,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               <div className={QUEST_FORM_STYLES.heroIcon}>
                 <History className="h-5 w-5" />
               </div>
-              <p className="mt-3 font-fredoka text-[1.15rem]">Quest shortcuts</p>
+              <p className="mt-3 font-body text-[1.15rem]">Quest shortcuts</p>
               <p className="mt-1 max-w-[16rem] text-sm text-muted-foreground">
                 Pick a common quest or one you already use a lot.
               </p>
@@ -1013,7 +1013,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 <div className={cn(QUEST_FORM_STYLES.sectionCard, "px-4 py-4")}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="font-fredoka text-[1.05rem] text-foreground">Your templates</p>
+                      <p className="font-body text-[1.05rem] text-foreground">Your templates</p>
                       <p className="text-xs text-muted-foreground">Saved templates and repeat quests you can reuse fast</p>
                     </div>
                     <button
@@ -1392,7 +1392,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               disabled={isAdding || !canCreateTask}
               className={cn(
                 isDesktopPanel ? "h-14" : "h-12",
-                "w-full rounded-[28px] font-fredoka text-[1.05rem] tracking-[0.01em] disabled:opacity-100",
+                "w-full rounded-xl font-body text-[1.05rem] tracking-[0.01em] disabled:opacity-100",
                 canCreateTask ? colors.primaryButton : colors.primaryButtonDisabled,
               )}
             >
@@ -1404,7 +1404,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               disabled={isAdding || !canAddToInbox}
               className={cn(
                 isDesktopPanel ? "h-12" : "h-10",
-                "w-full rounded-[26px] border font-semibold disabled:opacity-45",
+                "w-full rounded-xl border font-semibold disabled:opacity-45",
                 QUEST_FORM_STYLES.secondaryButton,
               )}
             >

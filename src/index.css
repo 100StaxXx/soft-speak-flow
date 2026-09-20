@@ -2,6 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Scoped to quest editors and their portals; the scenic calendar is unchanged. */
+.agenda-quest-theme {
+  color-scheme: dark;
+  --background: 218 22% 11%;
+  --foreground: 210 20% 96%;
+  --card: 218 20% 14%;
+  --card-foreground: 210 20% 96%;
+  --popover: 218 20% 16%;
+  --popover-foreground: 210 20% 96%;
+  --secondary: 218 16% 20%;
+  --secondary-foreground: 210 20% 96%;
+  --muted: 218 16% 20%;
+  --muted-foreground: 216 12% 72%;
+  --border: 218 12% 28%;
+  --input: 218 12% 28%;
+  --primary: 272 67% 51%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 218 16% 22%;
+  --accent-foreground: 210 20% 96%;
+  --ring: 272 67% 65%;
+  --celestial-blue: 216 12% 55%;
+  --stardust-gold: 272 55% 72%;
+  --deep-space: 210 20% 96%;
+  --shadow-glow: none;
+  --shadow-glow-lg: none;
+}
+
 .companion-frosted-theme-scope {
   --background: var(--companion-frosted-background, 202 100% 98%);
   --card: var(--companion-frosted-card, 0 0% 100%);

@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Brain, Heart, Leaf, X } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { requestWellbeingClip, WELLBEING_MESSAGES, type WellbeingClip as Clip } from "@/services/companionWellbeingVideo";
 import { useAuth } from "@/hooks/useAuth";
 import { getCurrentVisualStageBoundaryLevel } from "@/config/progression";
 import { WELLBEING_CATEGORIES, WELLBEING_OPTIONS, type WellbeingCategory } from "@/shared/companionWellbeing";
 
 export interface WellbeingPlayback { url: string; category: WellbeingCategory; sourceImageUrl: string }
-interface Clip { status: "queued" | "submitting" | "processing" | "succeeded" | "failed"; video_url: string | null; can_retry?: boolean }
 interface Props {
   companionId: string;
   currentStage: number;
@@ -43,12 +42,7 @@ function WellbeingSelection({ companionId, currentStage, sourceImageUrl, isVisib
   useEffect(() => { if (!isVisible) { request.current++; setLoading(false); } }, [isVisible]);
 
   async function load(category: WellbeingCategory, action: "prepare" | "status" | "retry") {
-    const { data, error: invokeError } = await supabase.functions.invoke("companion-wellbeing-video", {
-      body: { action, companionId, category, stage: currentStage, sourceImageUrl },
-      timeout: 20000,
-    });
-    if (invokeError || data?.error) throw new Error("Couldn't load this animation. You can still choose an activity.");
-    return (data?.clip ?? null) as Clip | null;
+    return requestWellbeingClip({ action, companionId, category, stage: currentStage, sourceImageUrl });
   }
 
   const select = async (category: WellbeingCategory, retry = false) => {
@@ -75,7 +69,7 @@ function WellbeingSelection({ companionId, currentStage, sourceImageUrl, isVisib
   };
 
   const clip = selected ? clips[selected] : null;
-  const pending = clip && ["queued", "submitting", "processing"].includes(clip.status);
+  const pending = clip && ["awaiting_portrait", "queued", "submitting", "processing"].includes(clip.status);
   useEffect(() => {
     if (!selected || !pending || !isVisible) return;
     let cancelled = false;
@@ -128,10 +122,11 @@ function WellbeingSelection({ companionId, currentStage, sourceImageUrl, isVisib
         </button>
       </li>)}</ul>
       <div className="mt-2 text-xs text-muted-foreground" aria-live="polite">
-        {loading ? <p>Loading your companion moment…</p> : error ? <p>{error} <button type="button" className="min-h-11 underline" onClick={() => void select(selected)}>Try again</button></p>
-          : clip?.status === "failed" ? <p>This animation is unavailable for now. Your activities are still here.
+        {loading ? <p>Checking your companion video…</p> : error ? <p>{error} <button type="button" className="min-h-11 underline" onClick={() => void select(selected)}>Check again</button></p>
+          : clip?.status === "failed" ? <p>{WELLBEING_MESSAGES[clip.error_code ?? ""] ?? "Video preparation didn’t finish. Your activities are still here."}
             {clip.can_retry ? <button type="button" className="ml-2 min-h-11 underline" onClick={() => void select(selected, true)}>Try animation again</button> : null}</p>
-          : pending ? <p>{slow ? "This is taking longer than expected. You can leave and check back later." : "Preparing this form’s first video. You can keep using the app."}</p>
+          : clip?.status === "not_generated" ? <p>This video hasn’t been prepared yet. <button type="button" className="min-h-11 underline" onClick={() => void select(selected)}>Prepare video</button></p>
+          : pending ? <p>{slow ? "This is taking longer than expected. You can leave and check back later." : clip?.status === "awaiting_portrait" ? "Your companion’s portrait is still preparing. Its video will follow." : "Preparing this form’s video. You can keep using the app."}</p>
           : null}
         {slow && pending ? <button type="button" className="min-h-11 underline" onClick={() => void select(selected)}>Check again</button> : null}
         {clip?.status === "succeeded" && clip.video_url ? <button type="button" className="min-h-11 underline underline-offset-4"

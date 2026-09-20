@@ -26,7 +26,7 @@
 - Secret scan passed (2,339 files).
 - Xcode archive succeeded. Previous signed archives and all source are retained; only this hotfix's temporary DerivedData cache was removed after success to free export space.
 - Final full frontend suite: 387 files / 2,931 tests passed.
-- Distribution status will be recorded after upload completes.
+- Xcode upload completed successfully at 2026-09-20 05:42 UTC ("Upload succeeded" / "EXPORT SUCCEEDED"). App Store Connect processing and physical-device recovery are not yet verified.
 
 ## Boundaries
 

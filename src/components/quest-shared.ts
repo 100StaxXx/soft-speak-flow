@@ -1,210 +1,90 @@
 import { Zap, Flame, Mountain } from "lucide-react";
-import { COMPANION_FROSTED_QUEST_LIGHT_CLASS } from "@/lib/companionFrostedTheme";
 import { cn } from "@/lib/utils";
 
-const QUEST_FROSTED_VARS = COMPANION_FROSTED_QUEST_LIGHT_CLASS;
-
-const QUEST_PRIMARY_BUTTON =
-  "border-[2px] border-[hsl(var(--celestial-blue)_/_0.62)] bg-[linear-gradient(180deg,color-mix(in_srgb,hsl(var(--celestial-blue))_18%,white)_0%,hsl(var(--celestial-blue)_/_0.52)_48%,hsl(var(--primary)_/_0.8)_100%)] text-[hsl(var(--deep-space))] shadow-[0_14px_28px_-20px_rgba(var(--primary-rgb),0.58),inset_0_1px_0_rgba(255,255,255,0.92)] hover:bg-[linear-gradient(180deg,color-mix(in_srgb,hsl(var(--celestial-blue))_10%,white)_0%,hsl(var(--celestial-blue)_/_0.62)_48%,hsl(var(--primary)_/_0.9)_100%)]";
-
-const QUEST_PRIMARY_BUTTON_DISABLED =
-  "border-[2px] border-[hsl(var(--border)_/_0.62)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.76),hsl(var(--muted)_/_0.62))] text-muted-foreground shadow-none";
-
-// --- Difficulty color helpers ---
-export const DIFFICULTY_COLORS = {
-  easy: {
-    bg: "bg-[radial-gradient(circle_at_top_left,hsl(var(--category-soul)_/_0.16),transparent_36%),linear-gradient(180deg,hsl(var(--card)_/_0.98)_0%,hsl(var(--secondary)_/_0.82)_100%)] shadow-[0_14px_30px_-24px_rgba(73,155,205,0.42),inset_0_1px_0_rgba(255,255,255,0.88)]",
-    text: "text-foreground",
-    pill: "border-[hsl(var(--category-soul)_/_0.5)] bg-[linear-gradient(180deg,hsl(var(--category-soul)_/_0.16)_0%,hsl(var(--celestial-blue)_/_0.1)_100%)] text-foreground",
-    border: "border-[hsl(var(--category-soul)_/_0.5)]",
-    difficultyActive: "border-[hsl(var(--category-soul)_/_0.62)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.98)_0%,hsl(var(--category-soul)_/_0.18)_100%)] text-foreground shadow-[0_10px_22px_-18px_rgba(73,155,205,0.45),inset_0_1px_0_rgba(255,255,255,0.92)]",
-    iconBubble: "border-[hsl(var(--category-soul)_/_0.5)] bg-[hsl(var(--category-soul)_/_0.12)] text-[hsl(var(--category-soul))]",
-    primaryButton: QUEST_PRIMARY_BUTTON,
-    primaryButtonDisabled: QUEST_PRIMARY_BUTTON_DISABLED,
-    highlightBadge: "border-[hsl(var(--category-soul)_/_0.35)] bg-[hsl(var(--category-soul)_/_0.12)]",
-  },
-  medium: {
-    bg: "bg-[radial-gradient(circle_at_top_left,hsl(var(--stardust-gold)_/_0.16),transparent_36%),linear-gradient(180deg,hsl(var(--card)_/_0.98)_0%,hsl(var(--secondary)_/_0.82)_100%)] shadow-[0_14px_30px_-24px_rgba(137,103,214,0.34),inset_0_1px_0_rgba(255,255,255,0.88)]",
-    text: "text-foreground",
-    pill: "border-[hsl(var(--stardust-gold)_/_0.45)] bg-[linear-gradient(180deg,hsl(var(--stardust-gold)_/_0.16)_0%,hsl(var(--celestial-blue)_/_0.12)_100%)] text-foreground",
-    border: "border-[hsl(var(--stardust-gold)_/_0.45)]",
-    difficultyActive: "border-[hsl(var(--stardust-gold)_/_0.62)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.98)_0%,hsl(var(--stardust-gold)_/_0.16)_50%,hsl(var(--celestial-blue)_/_0.12)_100%)] text-foreground shadow-[0_10px_22px_-18px_rgba(137,103,214,0.42),inset_0_1px_0_rgba(255,255,255,0.92)]",
-    iconBubble: "border-[hsl(var(--stardust-gold)_/_0.5)] bg-[hsl(var(--stardust-gold)_/_0.12)] text-[hsl(var(--stardust-gold))]",
-    primaryButton: QUEST_PRIMARY_BUTTON,
-    primaryButtonDisabled: QUEST_PRIMARY_BUTTON_DISABLED,
-    highlightBadge: "border-[hsl(var(--stardust-gold)_/_0.35)] bg-[hsl(var(--stardust-gold)_/_0.12)]",
-  },
-  hard: {
-    bg: "bg-[radial-gradient(circle_at_top_left,hsl(var(--category-body)_/_0.16),transparent_36%),linear-gradient(180deg,hsl(var(--card)_/_0.98)_0%,hsl(var(--secondary)_/_0.82)_100%)] shadow-[0_14px_30px_-24px_rgba(91,117,180,0.36),inset_0_1px_0_rgba(255,255,255,0.88)]",
-    text: "text-foreground",
-    pill: "border-[hsl(var(--category-body)_/_0.45)] bg-[linear-gradient(180deg,hsl(var(--category-body)_/_0.15)_0%,hsl(var(--stardust-gold)_/_0.1)_100%)] text-foreground",
-    border: "border-[hsl(var(--category-body)_/_0.45)]",
-    difficultyActive: "border-[hsl(var(--category-body)_/_0.6)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.98)_0%,hsl(var(--category-body)_/_0.15)_58%,hsl(var(--stardust-gold)_/_0.1)_100%)] text-foreground shadow-[0_10px_22px_-18px_rgba(91,117,180,0.4),inset_0_1px_0_rgba(255,255,255,0.92)]",
-    iconBubble: "border-[hsl(var(--category-body)_/_0.48)] bg-[hsl(var(--category-body)_/_0.12)] text-[hsl(var(--category-body))]",
-    primaryButton: QUEST_PRIMARY_BUTTON,
-    primaryButtonDisabled: QUEST_PRIMARY_BUTTON_DISABLED,
-    highlightBadge: "border-[hsl(var(--category-body)_/_0.35)] bg-[hsl(var(--category-body)_/_0.1)]",
-  },
-} as const;
-
+const surface = "rounded-xl border border-white/10 bg-white/5 shadow-none";
+const control = "rounded-xl border border-white/10 bg-white/5 text-foreground shadow-none transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70";
+const active = "border-primary/50 bg-primary/15 text-foreground shadow-none";
+const primary = "border border-primary/40 bg-primary text-white shadow-none hover:bg-primary/90";
+const disabled = "border border-white/10 bg-white/5 text-muted-foreground shadow-none";
+const difficulty = {
+  bg: "bg-white/5 shadow-none", text: "text-foreground", pill: active,
+  border: "border-white/15", difficultyActive: active,
+  iconBubble: "border-transparent bg-transparent text-primary",
+  primaryButton: primary, primaryButtonDisabled: disabled,
+  highlightBadge: "border-white/10 bg-white/5",
+};
+export const DIFFICULTY_COLORS = { easy: difficulty, medium: difficulty, hard: difficulty } as const;
 export type QuestFormDifficulty = keyof typeof DIFFICULTY_COLORS;
 export type QuestComposerPresentation = "mobile-sheet" | "desktop-panel";
-
-export const DifficultyIconMap = {
-  easy: Zap,
-  medium: Flame,
-  hard: Mountain,
-} as const;
+export const DifficultyIconMap = { easy: Zap, medium: Flame, hard: Mountain } as const;
 
 export const QUEST_FORM_STYLES = {
-  sheet: cn(
-    QUEST_FROSTED_VARS,
-    "border-[3px] border-[hsl(var(--celestial-blue)_/_0.62)] bg-[radial-gradient(circle_at_top,hsl(var(--stardust-gold)_/_0.18),transparent_32%),radial-gradient(circle_at_top_left,hsl(var(--celestial-blue)_/_0.24),transparent_36%),linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--card))_46%,hsl(var(--secondary))_100%)] text-foreground shadow-[0_-16px_46px_-28px_rgba(var(--primary-rgb),0.58),inset_0_1px_0_rgba(255,255,255,0.88)]",
-  ),
-  body:
-    "bg-[radial-gradient(circle_at_top_right,hsl(var(--stardust-gold)_/_0.08),transparent_34%),linear-gradient(180deg,hsl(var(--card)_/_0.98)_0%,hsl(var(--secondary)_/_0.74)_100%)] text-foreground",
-  sectionCard: cn(
-    QUEST_FROSTED_VARS,
-    "rounded-[1.6rem] border-[2px] border-[hsl(var(--celestial-blue)_/_0.52)] bg-[radial-gradient(circle_at_top_left,hsl(var(--celestial-blue)_/_0.11),transparent_34%),radial-gradient(circle_at_bottom_right,hsl(var(--stardust-gold)_/_0.08),transparent_36%),linear-gradient(180deg,hsl(var(--card)_/_0.96)_0%,hsl(var(--secondary)_/_0.72)_100%)] text-foreground shadow-[0_16px_38px_-32px_rgba(var(--primary-rgb),0.46),inset_0_1px_0_rgba(255,255,255,0.88)] backdrop-blur-xl",
-  ),
-  sectionCardSoft:
-    "rounded-[1.35rem] border-[2px] border-[hsl(var(--celestial-blue)_/_0.42)] bg-card/[0.78] text-foreground shadow-[0_12px_28px_-26px_rgba(var(--primary-rgb),0.36),inset_0_1px_0_rgba(255,255,255,0.78)]",
-  insetPanel:
-    "rounded-[1.15rem] border border-[hsl(var(--celestial-blue)_/_0.38)] bg-card/[0.7] shadow-[inset_0_1px_2px_rgba(var(--primary-rgb),0.08)]",
-  heroIcon:
-    "inline-flex h-11 w-11 items-center justify-center rounded-[14px] border border-[hsl(var(--celestial-blue)_/_0.52)] bg-[linear-gradient(180deg,hsl(var(--card))_0%,hsl(var(--celestial-blue)_/_0.18)_58%,hsl(var(--stardust-gold)_/_0.12)_100%)] text-[hsl(var(--category-soul))] shadow-[0_10px_22px_-20px_rgba(var(--primary-rgb),0.44),inset_0_1px_0_rgba(255,255,255,0.9)]",
-  heroAction:
-    "inline-flex items-center gap-1.5 rounded-[15px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.52)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.92)_0%,hsl(var(--secondary)_/_0.7)_100%)] px-3 py-1.5 text-[12px] font-semibold text-foreground shadow-[0_10px_22px_-20px_rgba(var(--primary-rgb),0.42),inset_0_1px_0_rgba(255,255,255,0.82)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-[hsl(var(--stardust-gold)_/_0.48)] hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-celestial-blue/25 focus-visible:ring-offset-0 active:translate-y-0 motion-reduce:transition-none",
-  titleFieldShell:
-    "w-full rounded-[20px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.56)] bg-card/[0.68] p-[2px] shadow-[inset_0_1px_2px_rgba(var(--primary-rgb),0.1)]",
-  titleFieldInner:
-    "rounded-[17px] border border-[hsl(var(--border)_/_0.72)] bg-card/[0.9] px-2.5 py-1",
-  titleInput:
-    "h-9 border-0 bg-transparent px-3 text-[15px] font-semibold text-foreground placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0",
-  selectorChip:
-    "rounded-[18px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.5)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.9),hsl(var(--secondary)_/_0.64))] px-4 py-3 text-foreground shadow-[0_12px_26px_-24px_rgba(var(--primary-rgb),0.44),inset_0_1px_0_rgba(255,255,255,0.82)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-[hsl(var(--stardust-gold)_/_0.5)] hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-celestial-blue/25 focus-visible:ring-offset-0 motion-reduce:transition-none",
-  selectorChipMuted:
-    "border-dashed text-muted-foreground",
-  timeWheel:
-    "relative h-[180px] overflow-y-auto rounded-[20px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.46)] bg-card/[0.74] shadow-[0_12px_28px_-24px_rgba(var(--primary-rgb),0.34),inset_0_1px_2px_rgba(var(--primary-rgb),0.08)] snap-y snap-mandatory scrollbar-none",
-  timeWheelFadeTop:
-    "sticky top-0 h-12 bg-gradient-to-b from-[hsl(var(--card)_/_0.96)] via-[hsl(var(--card)_/_0.78)] to-transparent z-10 pointer-events-none",
-  timeWheelFadeBottom:
-    "sticky bottom-0 h-12 bg-gradient-to-t from-[hsl(var(--card)_/_0.96)] via-[hsl(var(--card)_/_0.78)] to-transparent z-10 pointer-events-none",
-  optionPill:
-    "rounded-[14px] border-[2px] border-[hsl(var(--border)_/_0.72)] bg-card/[0.74] px-4 py-2 text-sm font-semibold text-foreground shadow-[0_10px_22px_-20px_rgba(var(--primary-rgb),0.32),inset_0_1px_0_rgba(255,255,255,0.78)] transition-all duration-200 ease-out hover:bg-card motion-reduce:transition-none",
-  optionPillCompact:
-    "rounded-[13px] border-[2px] border-[hsl(var(--border)_/_0.72)] bg-card/[0.74] px-3 py-2 text-sm font-semibold text-foreground shadow-[0_10px_22px_-20px_rgba(var(--primary-rgb),0.32),inset_0_1px_0_rgba(255,255,255,0.78)] transition-all duration-200 ease-out hover:bg-card motion-reduce:transition-none",
-  difficultyButton:
-    "relative flex min-w-[72px] flex-col items-center justify-center gap-0.5 rounded-[16px] border-[2px] px-2.5 py-2 text-center transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-celestial-blue/25 focus-visible:ring-offset-0 active:scale-[0.98] motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
-  difficultyButtonInactive:
-    "border-[hsl(var(--border)_/_0.72)] bg-card/[0.74] text-muted-foreground shadow-[0_10px_22px_-20px_rgba(var(--primary-rgb),0.3),inset_0_1px_0_rgba(255,255,255,0.74)] hover:bg-card hover:text-foreground",
-  difficultyIconBubble:
-    "flex h-6.5 w-6.5 items-center justify-center rounded-[999px] border border-[hsl(var(--border)_/_0.72)] bg-card/[0.72]",
-  footerReview:
-    "rounded-[18px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.42)] bg-card/[0.72] px-4 py-3 text-foreground shadow-[0_10px_22px_-20px_rgba(var(--primary-rgb),0.3),inset_0_1px_0_rgba(255,255,255,0.72)]",
-  secondaryButton:
-    "rounded-[18px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.42)] bg-card/[0.76] text-foreground shadow-[0_10px_22px_-20px_rgba(var(--primary-rgb),0.34),inset_0_1px_0_rgba(255,255,255,0.76)] transition-all duration-200 ease-out hover:border-[hsl(var(--stardust-gold)_/_0.48)] hover:bg-card hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-celestial-blue/25 focus-visible:ring-offset-0 motion-reduce:transition-none",
-  iconSecondaryButton:
-    "rounded-[18px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.42)] bg-card/[0.76] text-foreground shadow-[0_10px_22px_-20px_rgba(var(--primary-rgb),0.34),inset_0_1px_0_rgba(255,255,255,0.76)] transition-all duration-200 ease-out hover:border-[hsl(var(--stardust-gold)_/_0.48)] hover:bg-card hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-celestial-blue/25 focus-visible:ring-offset-0 motion-reduce:transition-none",
-  advancedTrigger:
-    "w-full justify-between rounded-[18px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.42)] bg-card/[0.76] px-4 py-3 text-foreground shadow-[0_10px_22px_-20px_rgba(var(--primary-rgb),0.34),inset_0_1px_0_rgba(255,255,255,0.76)] hover:border-[hsl(var(--stardust-gold)_/_0.48)] hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-celestial-blue/25 focus-visible:ring-offset-0",
-  helperText: "text-[12px] leading-5 text-muted-foreground",
-  label: "text-[13px] font-semibold tracking-[0.01em] text-foreground",
-  divider: "border-[hsl(var(--celestial-blue)_/_0.36)]",
-  subtleBadge:
-    "inline-flex items-center rounded-full border border-[hsl(var(--celestial-blue)_/_0.36)] bg-secondary/[0.52] px-2.5 py-1 text-[11px] font-medium text-muted-foreground",
-  popover: cn(
-    QUEST_FROSTED_VARS,
-    "rounded-[20px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.5)] bg-[radial-gradient(circle_at_top_left,hsl(var(--stardust-gold)_/_0.1),transparent_32%),linear-gradient(180deg,hsl(var(--card)_/_0.98)_0%,hsl(var(--secondary)_/_0.78)_100%)] p-2 text-foreground shadow-[0_18px_42px_-32px_rgba(var(--primary-rgb),0.46),inset_0_1px_0_rgba(255,255,255,0.82)]",
-  ),
-  footerLink:
-    "text-sm text-[hsl(var(--stardust-gold))] transition-colors hover:text-foreground",
-  mobileHeader:
-    "relative isolate overflow-hidden border-b-[2px] border-[hsl(var(--celestial-blue)_/_0.48)] bg-[radial-gradient(circle_at_top,hsl(var(--stardust-gold)_/_0.16),transparent_44%),radial-gradient(circle_at_top_left,hsl(var(--celestial-blue)_/_0.22),transparent_38%),linear-gradient(180deg,hsl(var(--card)_/_0.88),hsl(var(--secondary)_/_0.62))]",
-  mobileHeaderGlow:
-    "pointer-events-none absolute inset-x-0 top-0 h-16 bg-[radial-gradient(circle_at_top,hsl(var(--stardust-gold)_/_0.2),transparent_70%)]",
-  mobileHeaderUtilityButton:
-    "rounded-[14px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.5)] bg-card/[0.84] p-2 text-foreground shadow-[0_10px_22px_-20px_rgba(var(--primary-rgb),0.42),inset_0_1px_0_rgba(255,255,255,0.82)] transition-all duration-200 ease-out hover:border-[hsl(var(--stardust-gold)_/_0.52)] hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-celestial-blue/25 focus-visible:ring-offset-0 active:translate-y-0.5 motion-reduce:transition-none",
-  mobileHeaderKicker:
-    "text-[11px] font-semibold uppercase tracking-[0.22em] text-[hsl(var(--stardust-gold))]",
-  mobileHeaderSummary:
-    "mt-1 text-sm text-muted-foreground",
-  mobileHeaderToolbar:
-    "mt-2 flex items-center justify-between gap-2",
-  mobileDifficultyGroup:
-    "mt-3 inline-flex w-full items-stretch gap-1.5 rounded-[20px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.5)] bg-card/[0.58] p-1.5 shadow-[inset_0_1px_2px_rgba(var(--primary-rgb),0.08)]",
-  desktopPanelShell: cn(
-    QUEST_FROSTED_VARS,
-    "border-[3px] border-[hsl(var(--celestial-blue)_/_0.62)] bg-[radial-gradient(circle_at_top,hsl(var(--stardust-gold)_/_0.16),transparent_32%),radial-gradient(circle_at_top_left,hsl(var(--celestial-blue)_/_0.24),transparent_36%),linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--card))_46%,hsl(var(--secondary))_100%)] text-foreground shadow-[0_24px_70px_-48px_rgba(var(--primary-rgb),0.58),inset_0_1px_0_rgba(255,255,255,0.88)]",
-  ),
-  desktopPanelHeader:
-    "border-b-[2px] border-[hsl(var(--celestial-blue)_/_0.46)] bg-[radial-gradient(circle_at_top,hsl(var(--stardust-gold)_/_0.14),transparent_44%),linear-gradient(180deg,hsl(var(--card)_/_0.9),hsl(var(--secondary)_/_0.62))]",
-  desktopPanelHeaderCard:
-    "rounded-[22px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.48)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.9),hsl(var(--secondary)_/_0.58))] p-4 shadow-[0_14px_30px_-26px_rgba(var(--primary-rgb),0.42),inset_0_1px_0_rgba(255,255,255,0.84)]",
-  desktopPanelFooter:
-    "border-t-[2px] border-[hsl(var(--celestial-blue)_/_0.38)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.82),hsl(var(--secondary)_/_0.7))]",
-  desktopPanelCloseButton:
-    "rounded-[14px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.5)] bg-card/[0.84] p-2 text-foreground shadow-[0_10px_22px_-20px_rgba(var(--primary-rgb),0.42),inset_0_1px_0_rgba(255,255,255,0.82)] transition-all duration-200 ease-out hover:border-[hsl(var(--stardust-gold)_/_0.52)] hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-celestial-blue/25 focus-visible:ring-offset-0 active:translate-y-0.5 motion-reduce:transition-none",
-  desktopPanelToolbarButton:
-    "inline-flex items-center gap-2 rounded-[14px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.52)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.92),hsl(var(--secondary)_/_0.7))] px-3 py-2 text-sm font-semibold text-foreground shadow-[0_10px_22px_-20px_rgba(var(--primary-rgb),0.42),inset_0_1px_0_rgba(255,255,255,0.82)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-[hsl(var(--stardust-gold)_/_0.48)] hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-celestial-blue/25 focus-visible:ring-offset-0 motion-reduce:transition-none",
-  desktopPanelInput:
-    "h-11 rounded-[16px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.52)] bg-card/[0.88] px-4 text-[15px] font-semibold text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_2px_rgba(var(--primary-rgb),0.08)] focus-visible:border-[hsl(var(--celestial-blue)_/_0.78)] focus-visible:ring-2 focus-visible:ring-celestial-blue/25 focus-visible:ring-offset-0",
+  sheet: "agenda-quest-theme border border-white/10 bg-[#171c24]/95 text-foreground shadow-2xl backdrop-blur-2xl font-body",
+  body: "bg-transparent text-foreground",
+  sectionCard: cn("agenda-quest-theme", surface, "bg-[#202630]/95 text-foreground"),
+  sectionCardSoft: cn(surface, "text-foreground"),
+  insetPanel: "rounded-lg border border-white/10 bg-black/10",
+  heroIcon: "inline-flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 text-muted-foreground",
+  heroAction: cn(control, "inline-flex min-h-11 items-center gap-1.5 px-3 py-1.5 text-xs font-medium"),
+  titleFieldShell: "w-full border-b border-white/15 pb-1",
+  titleFieldInner: "bg-transparent",
+  titleInput: "h-11 border-0 bg-transparent px-1 text-lg font-semibold text-foreground placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0",
+  selectorChip: cn(control, "min-h-11 px-4 py-3"),
+  selectorChipMuted: "text-muted-foreground",
+  timeWheel: cn(surface, "relative h-[180px] overflow-y-auto snap-y snap-mandatory scrollbar-none"),
+  timeWheelFadeTop: "sticky top-0 h-12 bg-gradient-to-b from-card to-transparent z-10 pointer-events-none",
+  timeWheelFadeBottom: "sticky bottom-0 h-12 bg-gradient-to-t from-card to-transparent z-10 pointer-events-none",
+  optionPill: cn(control, "px-4 py-2 text-sm font-medium"),
+  optionPillCompact: cn(control, "px-3 py-2 text-sm font-medium"),
+  difficultyButton: "relative flex min-h-11 min-w-[72px] flex-row items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-center text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+  difficultyButtonInactive: "border-transparent bg-transparent text-muted-foreground hover:bg-white/5 hover:text-foreground",
+  difficultyIconBubble: "flex h-5 w-5 items-center justify-center",
+  footerReview: cn(surface, "px-4 py-3 text-foreground"),
+  secondaryButton: control,
+  iconSecondaryButton: control,
+  advancedTrigger: cn(control, "w-full justify-between px-4 py-3"),
+  helperText: "text-xs leading-5 text-muted-foreground",
+  label: "text-sm font-medium text-foreground",
+  divider: "border-white/10",
+  subtleBadge: "inline-flex items-center rounded-md bg-white/5 px-2 py-1 text-xs font-medium text-muted-foreground",
+  popover: cn("agenda-quest-theme rounded-xl border border-white/15 bg-[#202630] p-2 text-foreground shadow-xl font-body"),
+  footerLink: "min-h-11 text-sm text-muted-foreground transition-colors hover:text-foreground",
+  mobileHeader: "relative border-b border-white/10 bg-transparent",
+  mobileHeaderGlow: "hidden",
+  mobileHeaderUtilityButton: "flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-muted-foreground transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-primary",
+  mobileHeaderKicker: "text-xs font-medium text-muted-foreground",
+  mobileHeaderSummary: "mt-2 text-sm text-muted-foreground",
+  mobileHeaderToolbar: "mt-2 flex items-center justify-between gap-2",
+  mobileDifficultyGroup: "mt-3 inline-flex w-full items-stretch gap-1 rounded-xl bg-black/15 p-1",
+  desktopPanelShell: "agenda-quest-theme border border-white/10 bg-[#171c24]/95 text-foreground shadow-2xl backdrop-blur-2xl font-body",
+  desktopPanelHeader: "border-b border-white/10 bg-transparent",
+  desktopPanelHeaderCard: "space-y-3 py-3",
+  desktopPanelFooter: "border-t border-white/10 bg-[#171c24]/95",
+  desktopPanelCloseButton: cn(control, "min-h-11 min-w-11 p-2"),
+  desktopPanelToolbarButton: cn(control, "inline-flex min-h-11 items-center gap-2 px-3 py-2 text-sm font-medium"),
+  desktopPanelInput: "h-11 rounded-none border-0 border-b border-white/15 bg-transparent px-1 text-lg font-semibold text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/50",
 } as const;
-
 export const QUEST_TEMPLATE_BROWSER_STYLES = {
-  header:
-    "border-b-[2px] border-[hsl(var(--celestial-blue)_/_0.46)] bg-[radial-gradient(circle_at_top,hsl(var(--stardust-gold)_/_0.14),transparent_44%),linear-gradient(180deg,hsl(var(--card)_/_0.9),hsl(var(--secondary)_/_0.62))] shadow-[0_14px_30px_-28px_rgba(var(--primary-rgb),0.36)]",
-  tabList:
-    "grid w-full grid-cols-2 rounded-[22px] border-[2px] border-[hsl(var(--celestial-blue)_/_0.42)] bg-card/[0.7] p-1 shadow-[inset_0_1px_2px_rgba(var(--primary-rgb),0.08)]",
-  tabTrigger:
-    "rounded-[18px] text-sm font-semibold text-muted-foreground transition-all duration-200 data-[state=active]:border-[2px] data-[state=active]:border-[hsl(var(--stardust-gold)_/_0.52)] data-[state=active]:bg-[linear-gradient(180deg,hsl(var(--card)_/_0.94)_0%,hsl(var(--stardust-gold)_/_0.14)_55%,hsl(var(--celestial-blue)_/_0.12)_100%)] data-[state=active]:text-foreground data-[state=active]:shadow-[0_10px_22px_-20px_rgba(137,103,214,0.34),inset_0_1px_0_rgba(255,255,255,0.82)]",
-  searchInput: "border-[2px] border-[hsl(var(--celestial-blue)_/_0.52)] bg-card/[0.88] text-foreground placeholder:text-muted-foreground focus-visible:border-[hsl(var(--celestial-blue)_/_0.78)] focus-visible:ring-celestial-blue/25",
-  filterChip:
-    "shrink-0 rounded-full border-[2px] px-3 py-1.5 text-xs font-semibold transition-all duration-200 motion-reduce:transition-none",
-  filterChipActive: "border-[hsl(var(--stardust-gold)_/_0.52)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.94)_0%,hsl(var(--stardust-gold)_/_0.14)_55%,hsl(var(--celestial-blue)_/_0.12)_100%)] text-foreground shadow-[0_10px_22px_-20px_rgba(137,103,214,0.34),inset_0_1px_0_rgba(255,255,255,0.82)]",
-  filterChipInactive: "border-[hsl(var(--border)_/_0.72)] bg-card/[0.64] text-muted-foreground hover:bg-card hover:text-foreground",
-  row:
-    "w-full rounded-[22px] border-[2px] px-4 py-4 text-left transition-all duration-200 ease-out motion-safe:hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
-  rowHighlighted:
-    "border-[hsl(var(--stardust-gold)_/_0.42)] bg-[radial-gradient(circle_at_top_left,hsl(var(--stardust-gold)_/_0.1),transparent_34%),linear-gradient(180deg,hsl(var(--card)_/_0.96)_0%,hsl(var(--secondary)_/_0.72)_100%)] text-foreground shadow-[0_16px_38px_-32px_rgba(137,103,214,0.34),inset_0_1px_0_rgba(255,255,255,0.84)]",
-  rowDefault:
-    "border-[hsl(var(--celestial-blue)_/_0.38)] bg-card/[0.7] text-foreground shadow-[0_12px_28px_-26px_rgba(var(--primary-rgb),0.34),inset_0_1px_0_rgba(255,255,255,0.76)]",
-  emptyState:
-    "rounded-[22px] border-[2px] border-dashed border-[hsl(var(--border)_/_0.72)] bg-card/[0.48] px-5 py-10 text-center shadow-[inset_0_1px_2px_rgba(var(--primary-rgb),0.08)]",
+  header: "border-b border-white/10 bg-transparent",
+  tabList: "grid w-full grid-cols-2 rounded-xl bg-black/15 p-1",
+  tabTrigger: "rounded-lg text-sm font-medium text-muted-foreground data-[state=active]:bg-white/10 data-[state=active]:text-foreground data-[state=active]:shadow-none",
+  searchInput: cn(control, "placeholder:text-muted-foreground"),
+  filterChip: "shrink-0 rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
+  filterChipActive: active,
+  filterChipInactive: "border-white/10 bg-transparent text-muted-foreground hover:bg-white/5",
+  row: "w-full rounded-xl border px-4 py-4 text-left transition-colors",
+  rowHighlighted: "border-primary/30 bg-primary/10 text-foreground",
+  rowDefault: "border-white/10 bg-white/5 text-foreground hover:bg-white/10",
+  emptyState: "rounded-xl px-5 py-8 text-center text-muted-foreground",
 } as const;
-
-export function getQuestDifficultyOptionClasses(
-  difficulty: QuestFormDifficulty,
-  active: boolean,
-): string {
-  return cn(
-    QUEST_FORM_STYLES.difficultyButton,
-    active ? DIFFICULTY_COLORS[difficulty].difficultyActive : QUEST_FORM_STYLES.difficultyButtonInactive,
-  );
+export function getQuestDifficultyOptionClasses(difficulty: QuestFormDifficulty, selected: boolean): string {
+  return cn(QUEST_FORM_STYLES.difficultyButton, selected ? DIFFICULTY_COLORS[difficulty].difficultyActive : QUEST_FORM_STYLES.difficultyButtonInactive);
 }
-
-export function getQuestDifficultyIconClasses(
-  difficulty: QuestFormDifficulty,
-  active: boolean,
-): string {
-  return cn(
-    QUEST_FORM_STYLES.difficultyIconBubble,
-    active ? DIFFICULTY_COLORS[difficulty].iconBubble : "border-[hsl(var(--border)_/_0.72)] bg-card/[0.72] text-muted-foreground",
-  );
+export function getQuestDifficultyIconClasses(difficulty: QuestFormDifficulty, selected: boolean): string {
+  return cn(QUEST_FORM_STYLES.difficultyIconBubble, selected ? DIFFICULTY_COLORS[difficulty].iconBubble : "text-muted-foreground");
 }
-
-export function getQuestOptionPillClasses(
-  active: boolean,
-  activeTone?: string,
-  compact = false,
-): string {
-  return cn(
-    compact ? QUEST_FORM_STYLES.optionPillCompact : QUEST_FORM_STYLES.optionPill,
-    active
-      ? cn(activeTone ?? DIFFICULTY_COLORS.medium.pill, "shadow-[0_10px_22px_-18px_rgba(var(--primary-rgb),0.38),inset_0_1px_0_rgba(255,255,255,0.88)]")
-      : "",
-  );
+export function getQuestOptionPillClasses(selected: boolean, activeTone?: string, compact = false): string {
+  return cn(compact ? QUEST_FORM_STYLES.optionPillCompact : QUEST_FORM_STYLES.optionPill, selected ? activeTone ?? active : "");
 }
 
 export function formatTime12(time24: string): string {

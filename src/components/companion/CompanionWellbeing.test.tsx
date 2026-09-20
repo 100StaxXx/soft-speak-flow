@@ -69,12 +69,23 @@ describe("Optional Mind Body Soul", () => {
     mocks.invoke.mockResolvedValue({ error: new Error("offline") });
     render(<CompanionWellbeing {...props} />);
     fireEvent.click(screen.getByRole("button", { name: "Soul" }));
-    expect(await screen.findByText(/Couldn't load this animation/)).toBeInTheDocument();
+    expect(await screen.findByText(/Couldn't check video preparation/)).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /^Plan:/ })).toHaveLength(3);
   });
   it("does not request any videos before hatching", () => {
     render(<CompanionWellbeing {...props} currentStage={0} />);
     expect(screen.queryByRole("button", { name: "Mind" })).not.toBeInTheDocument();
     expect(mocks.invoke).not.toHaveBeenCalled();
+  });
+  it("shows not-generated and portrait-pending states without a playback error", async () => {
+    mocks.invoke.mockResolvedValueOnce({ data: { clip: null }, error: null })
+      .mockResolvedValueOnce({ data: { clip: { status: "awaiting_portrait", video_url: null } }, error: null });
+    render(<CompanionWellbeing {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: "Soul" }));
+    expect(await screen.findByText(/hasn’t been prepared/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Prepare video" }));
+    expect(await screen.findByText(/portrait is still preparing/)).toBeInTheDocument();
+    expect(screen.queryByText(/Couldn't load/)).not.toBeInTheDocument();
+    expect(props.onPlay).not.toHaveBeenCalled();
   });
 });

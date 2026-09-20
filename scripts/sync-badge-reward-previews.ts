@@ -12,7 +12,8 @@ import {
 } from "./badge-reward-preview-utils";
 
 const BUCKET_NAME = "badge-reward-previews";
-const BADGE_URL_MAP_FILE = path.join(process.cwd(), "src/data/badgePreviewUrls.ts");
+// Legacy upload reports must not overwrite the app's new bundled badge artwork.
+const BADGE_URL_MAP_FILE = path.join(LOG_DIR, "legacy-badge-preview-urls.ts");
 
 function listWebpFiles(dirPath: string): string[] {
   if (!fs.existsSync(dirPath)) return [];
@@ -134,6 +135,7 @@ async function main() {
     }
   }
 
+  ensureDir(LOG_DIR);
   fs.writeFileSync(BADGE_URL_MAP_FILE, buildBadgeUrlMapSource(badgeUrlMap), "utf8");
 
   ensureDir(LOG_DIR);

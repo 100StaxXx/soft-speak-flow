@@ -110,7 +110,7 @@ Deno.test("a valid 14-day app trial is honored without requiring a paid subscrip
 });
 Deno.test("status checks never enqueue, repeated prepare calls reuse one saved job", async () => {
   const f = fixture();
-  assertEquals(await (await f.request({ ...body, action: "status" })).json(), { clip: null });
+  assertEquals(await (await f.request({ ...body, action: "status" })).json(), { clip: null, state: "not_generated" });
   assertEquals(f.jobs.length, 0);
   await f.request(); await f.request();
   assertEquals(f.jobs.length, 1);
@@ -126,6 +126,23 @@ Deno.test("each category and new revealed portrait gets its own cache entry", as
   await f.request({ ...body, stage: 13, sourceImageUrl: f.companion.current_image_url });
   assertEquals(f.jobs.length, 3);
   assertEquals(new Set(f.jobs.map((job) => job.prompt)).size, 3);
+});
+
+Deno.test("missing portrait is preparation, not an animation failure or a paid job", async () => {
+  const f = fixture(); f.companion.current_image_url = null;
+  const response = await f.request({ ...body, sourceImageUrl: "" });
+  assertEquals(response.status, 200);
+  assertEquals((await response.json()).clip.status, "awaiting_portrait");
+  assertEquals(f.jobs.length, 0);
+});
+
+Deno.test("prewarming all categories and repeating it keeps exactly three durable jobs", async () => {
+  const f = fixture();
+  for (let visit = 0; visit < 2; visit++) {
+    await Promise.all(["mind", "body", "soul"].map((category) => f.request({ ...body, category })));
+  }
+  assertEquals(f.jobs.length, 3);
+  assertEquals(f.calls.submit.length, 0);
 });
 Deno.test("worker submits exactly three seconds once, saves provider id, then stores and registers the video", async () => {
   const f = fixture(); await f.request(); f.calls.internal = true;

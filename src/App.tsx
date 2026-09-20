@@ -103,6 +103,11 @@ const GlobalEvolutionListener = lazy(() =>
     default: module.GlobalEvolutionListener,
   })),
 );
+const CompanionVideoPreparation = lazy(() =>
+  import("@/components/companion/CompanionVideoPreparation").then((module) => ({
+    default: module.CompanionVideoPreparation,
+  })),
+);
 const WeeklyRecapModal = lazy(() =>
   import("@/components/WeeklyRecapModal").then((module) => ({
     default: module.WeeklyRecapModal,
@@ -221,6 +226,7 @@ const EvolutionAwareContent = memo(() => {
   return (
     <>
       <GlobalEvolutionListener />
+      <CompanionVideoPreparation />
       <WeeklyRecapModal />
     </>
   );

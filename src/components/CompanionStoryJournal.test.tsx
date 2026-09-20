@@ -114,6 +114,7 @@ describe("CompanionStoryJournal", () => {
     mocks.generateStory.mutate.mockClear();
     mocks.story = null;
     mocks.refetch.mockClear();
+    mocks.companion.preset_id = null;
   });
 
   it("contains generated landscape checkpoint art to match video framing", async () => {
@@ -164,6 +165,13 @@ describe("CompanionStoryJournal", () => {
     expect(screen.getByText("Next Chapter")).toBeInTheDocument();
     expect(screen.getAllByText(/a fourth note answered/)).toHaveLength(2);
     expect(screen.getByText("What should Nova carry forward from this chapter?")).toBeInTheDocument();
+  });
+  it("uses the saved scenic portrait even when the companion has a preset", async () => {
+    mocks.companion.preset_id = "buttercat";
+    renderWithQueryClient(<CompanionStoryJournal />);
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    const image = await screen.findByRole("img", { name: /Hatchling/ });
+    await waitFor(() => expect(image).toHaveAttribute("src", mocks.companion.current_image_url));
   });
 });
 

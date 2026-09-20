@@ -2,7 +2,6 @@
  * Badge Catalog - Defines all possible badges in the app
  * Used to show both earned and locked badges in the collection
  */
-import { BADGE_PREVIEW_URLS } from "@/data/badgePreviewUrls";
 
 export type BadgeCategory = 'streaks' | 'companion' | 'starpaths' | 'challenges' | 'firsts' | 'special' | 'astral';
 export type BadgeTier = 'bronze' | 'silver' | 'gold' | 'platinum';
@@ -911,9 +910,14 @@ const BADGE_CATALOG_BASE: Omit<BadgeDefinition, "image_url">[] = [
   },
 ];
 
+export const BADGE_CATEGORY_ARTWORK: Record<BadgeCategory, string> = {
+  streaks: "/badges-v2/streaks.webp", companion: "/badges-v2/companion.webp",
+  starpaths: "/badges-v2/starpaths.webp", challenges: "/badges-v2/challenges.webp",
+  firsts: "/badges-v2/firsts.webp", special: "/badges-v2/special.webp", astral: "/badges-v2/astral.webp",
+};
 export const BADGE_CATALOG: BadgeDefinition[] = BADGE_CATALOG_BASE.map((badge) => ({
   ...badge,
-  image_url: BADGE_PREVIEW_URLS[badge.id] ?? null,
+  image_url: badge.id === "first_epic" ? BADGE_CATEGORY_ARTWORK.starpaths : BADGE_CATEGORY_ARTWORK[badge.category],
 }));
 
 export const CATEGORY_LABELS: Record<BadgeCategory, string> = {

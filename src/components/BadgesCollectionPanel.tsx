@@ -6,7 +6,7 @@ import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Skeleton } from "./ui/skeleton";
 import { Award, Lock } from "lucide-react";
-import { BADGE_CATALOG, BadgeCategory, CATEGORY_LABELS, TIER_COLORS, BadgeDefinition } from "@/data/badgeCatalog";
+import { BADGE_CATALOG, BadgeCategory, CATEGORY_LABELS, BadgeDefinition } from "@/data/badgeCatalog";
 import {
   Dialog,
   DialogContent,
@@ -18,19 +18,6 @@ import { normalizeAchievementType } from "@/lib/achievementTypes";
 import { isSupabaseMissingRelationError } from "@/utils/supabaseSchemaErrors";
 
 type FilterCategory = 'all' | BadgeCategory;
-
-const badgePreviewModules = import.meta.glob("/src/assets/badges/*.webp", {
-  eager: true,
-  import: "default",
-}) as Record<string, string>;
-
-const badgePreviewLocalUrls = Object.fromEntries(
-  Object.entries(badgePreviewModules).map(([modulePath, moduleUrl]) => {
-    const filename = modulePath.split("/").pop() || "";
-    const badgeId = filename.replace(/\.webp$/i, "");
-    return [badgeId, moduleUrl];
-  }),
-) as Record<string, string>;
 
 interface BadgesCollectionPanelProps {
   layoutMode?: CompanionLayoutMode;
@@ -107,7 +94,7 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
   return (
     <div className={`space-y-6 ${isDesktop ? "mt-0" : "mt-6"}`}>
       {/* Header Stats */}
-      <Card className="p-6 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
+      <Card className="p-5 bg-black/20 border-white/10">
         <div className="flex items-center gap-3 mb-2">
           <Award className="h-6 w-6 text-primary" />
           <h3 className="text-lg font-semibold">Your Badges</h3>
@@ -172,7 +159,7 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
 
       {/* Badge Detail Dialog */}
       <Dialog open={!!selectedBadge} onOpenChange={() => setSelectedBadge(null)}>
-        <DialogContent className="max-w-[300px] rounded-xl">
+        <DialogContent className="max-w-[340px] rounded-2xl border-white/10 bg-[#141c22]/95 font-body backdrop-blur-xl">
           <DialogHeader>
             <DialogTitle className="text-center">
               {selectedBadge?.earned ? selectedBadge.badge.title : 'Locked Badge'}
@@ -182,7 +169,7 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
             <div className="text-center space-y-4 py-2">
               <div className={`text-6xl ${selectedBadge.earned ? '' : 'grayscale'}`}>
                 {selectedBadge.earned ? (
-                  <BadgePreview badge={selectedBadge.badge} className="h-16 w-16 rounded-xl mx-auto" />
+                  <BadgePreview badge={selectedBadge.badge} className="h-40 w-40 rounded-2xl mx-auto object-contain" />
                 ) : (
                   "🔒"
                 )}
@@ -191,7 +178,7 @@ export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectio
                 <>
                   <p className="text-muted-foreground">{selectedBadge.badge.description}</p>
                   <Badge 
-                    className={`capitalize bg-gradient-to-br ${TIER_COLORS[selectedBadge.badge.tier]} text-white border-0`}
+                    className="capitalize bg-white/5 text-muted-foreground border-white/10"
                   >
                     {selectedBadge.badge.tier}
                   </Badge>
@@ -217,23 +204,23 @@ interface BadgeCardProps {
 }
 
 const BadgeCard = ({ badge, earned, onSelect }: BadgeCardProps) => {
-  const tierGradient = TIER_COLORS[badge.tier];
-
   return (
-    <Card
+    <button
+      type="button"
+      aria-label={earned ? `${badge.title}, ${badge.tier}` : `Locked badge: ${badge.unlockHint}`}
       onClick={() => onSelect(badge)}
-      className={`relative p-3 text-center transition-all cursor-pointer active:scale-95 ${
+      className={`relative rounded-xl border p-3 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
         earned
-          ? 'bg-gradient-to-br from-primary/10 to-accent/10 border-primary/30 hover:border-primary/50'
-          : 'bg-secondary/30 border-border/50 opacity-60 hover:opacity-80'
+          ? 'bg-black/20 border-white/10 hover:bg-white/5'
+          : 'bg-black/10 border-white/5 text-muted-foreground hover:bg-white/5'
       }`}
     >
       {/* Badge Icon */}
       <div className={`text-3xl mb-2 ${earned ? '' : 'grayscale'}`}>
         {earned ? (
-          <BadgePreview badge={badge} className="h-10 w-10 rounded-lg mx-auto" />
+          <BadgePreview badge={badge} className="h-20 w-20 max-w-full rounded-xl mx-auto object-contain" />
         ) : (
-          "🔒"
+          <Lock className="h-12 w-12 mx-auto my-4 opacity-40" aria-hidden="true" />
         )}
       </div>
 
@@ -244,16 +231,17 @@ const BadgeCard = ({ badge, earned, onSelect }: BadgeCardProps) => {
 
       {/* Tier Indicator */}
       {earned && (
-        <div className={`absolute top-1 right-1 w-2 h-2 rounded-full bg-gradient-to-br ${tierGradient}`} />
+        <span className="mt-1 block text-[10px] capitalize text-muted-foreground">{badge.tier}</span>
       )}
-    </Card>
+    </button>
   );
 };
 
 const BadgePreview = ({ badge, className }: { badge: BadgeDefinition; className?: string }) => {
-  const previewUrl = badgePreviewLocalUrls[badge.id] || badge.image_url || null;
+  const [failed, setFailed] = useState(false);
+  const previewUrl = badge.image_url || null;
 
-  if (previewUrl) {
+  if (previewUrl && !failed) {
     return (
       <img
         src={previewUrl}
@@ -261,9 +249,10 @@ const BadgePreview = ({ badge, className }: { badge: BadgeDefinition; className?
         className={className}
         loading="lazy"
         decoding="async"
+        onError={() => setFailed(true)}
       />
     );
   }
 
-  return <span className={`inline-flex items-center justify-center ${className ?? ""}`}>{badge.icon}</span>;
+  return <span className={`inline-flex items-center justify-center ${className ?? ""}`}><Award aria-label={badge.title} className="h-8 w-8 text-muted-foreground" /></span>;
 };

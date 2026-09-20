@@ -227,7 +227,7 @@ describe("AddQuestSheet", () => {
     expect(screen.queryByText(/Name your quest.*Select a time/i)).not.toBeInTheDocument();
     expectElementToIncludeClasses(
       screen.getByTestId("add-quest-mobile-sheet"),
-      "border-[hsl(var(--celestial-blue)_/_0.62)] text-foreground",
+      "agenda-quest-theme",
     );
     expect(screen.getByTestId("add-quest-editor-header").firstElementChild).toContainElement(
       screen.getByPlaceholderText("Quest Title"),
@@ -250,7 +250,7 @@ describe("AddQuestSheet", () => {
     expect(screen.getByTestId("add-quest-desktop-panel")).toBeInTheDocument();
     expectElementToIncludeClasses(
       screen.getByTestId("add-quest-desktop-panel"),
-      "border-[hsl(var(--celestial-blue)_/_0.62)] text-foreground",
+      "agenda-quest-theme",
     );
     expect(screen.queryByTestId("add-quest-mobile-sheet")).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("Quest Title")).toBeInTheDocument();
@@ -899,7 +899,7 @@ describe("AddQuestSheet", () => {
     expect(await screen.findByText("Save these changes to My Templates?")).toBeInTheDocument();
     const prompt = screen.getByTestId("add-quest-template-prompt-dialog");
     const companionFrostedThemeStyle = getCompanionFrostedThemeStyle(mocks.companionFavoriteColor);
-    expect(prompt).toHaveClass("companion-frosted-quest-light");
+    expect(prompt).toHaveClass("agenda-quest-theme");
     expect(prompt.style.getPropertyValue("--companion-frosted-primary")).toBe(
       companionFrostedThemeStyle["--companion-frosted-primary"],
     );
@@ -1778,7 +1778,7 @@ describe("AddQuestSheet", () => {
     expect(await screen.findByText("Restore saved quest draft?")).toBeInTheDocument();
     const prompt = screen.getByTestId("add-quest-draft-restore-dialog");
     const companionFrostedThemeStyle = getCompanionFrostedThemeStyle(mocks.companionFavoriteColor);
-    expect(prompt).toHaveClass("companion-frosted-quest-light");
+    expect(prompt).toHaveClass("agenda-quest-theme");
     expect(prompt.style.getPropertyValue("--companion-frosted-primary")).toBe(
       companionFrostedThemeStyle["--companion-frosted-primary"],
     );

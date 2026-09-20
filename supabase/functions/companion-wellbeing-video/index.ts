@@ -180,8 +180,10 @@ export async function handleWellbeingVideo(req: Request, d: Dependencies = deps)
     if (companion.product_mode === "graceward") return reply(403, { error: "This feature belongs to Cosmiq." });
     const stage = getCurrentVisualStageBoundaryLevel(companion.current_stage);
     const sourceImage = resolveWellbeingSourceImage(companion.current_image_url, d.env("SUPABASE_URL")!);
-    if (!stage || stage !== body.stage || sourceImage !== resolveWellbeingSourceImage(body.sourceImageUrl, d.env("SUPABASE_URL")!)) return reply(409, { error: "Your companion changed. Reopen this selection." });
-    if (!sourceImage) return reply(409, { error: "Your companion portrait is not ready for video yet." });
+    if (!stage || stage !== body.stage) return reply(409, { code: "appearance_changed", error: "Your companion changed. Reopen this selection." });
+    if (!companion.current_image_url) return reply(200, { clip: { status: "awaiting_portrait", video_url: null } });
+    if (!sourceImage) return reply(409, { code: "portrait_unavailable", error: "This portrait cannot be used for video generation." });
+    if (sourceImage !== resolveWellbeingSourceImage(body.sourceImageUrl, d.env("SUPABASE_URL")!)) return reply(409, { code: "appearance_changed", error: "Your companion changed. Reopen this selection." });
     const sourceKey = await imageKey(sourceImage);
     const lookup = () => db.from(TABLE).select(STATUS_COLUMNS).eq("user_id", auth.userId).eq("companion_id", companion.id)
       .eq("stage", stage).eq("category", body.category).eq("source_key", sourceKey).eq("prompt_version", WELLBEING_PROMPT_VERSION).maybeSingle();
@@ -190,7 +192,7 @@ export async function handleWellbeingVideo(req: Request, d: Dependencies = deps)
     if (existing.data) {
       const mode = retryMode(existing.data);
       if (body.action === "retry" && mode) {
-        if (!await d.access(db, auth.userId)) return reply(403, { error: "An active trial or subscription is required to prepare animations." });
+        if (!await d.access(db, auth.userId)) return reply(403, { code: "access_required", error: "An active trial or subscription is required to prepare animations." });
         // Compare-and-swap makes concurrent retry taps a single retry. Poll timeouts
         // retain their provider id; only definitively failed/unsubmitted work can resubmit.
         const { error } = await db.from(TABLE).update({ status: mode, retry_count: 1, error_code: null,
@@ -204,14 +206,14 @@ export async function handleWellbeingVideo(req: Request, d: Dependencies = deps)
       }
       return reply(200, { clip: publicClip(existing.data) });
     }
-    if (body.action === "status") return reply(200, { clip: null });
+    if (body.action === "status") return reply(200, { clip: null, state: "not_generated" });
     if (body.action !== "prepare") return reply(400, { error: "Invalid action" });
-    if (!await d.access(db, auth.userId)) return reply(403, { error: "An active trial or subscription is required to prepare animations." });
-    if (!(d.env("FAL_KEY") || d.env("FAL_API_KEY"))) return reply(503, { error: "Animations are temporarily unavailable. Your activities still work." });
+    if (!await d.access(db, auth.userId)) return reply(403, { code: "access_required", error: "An active trial or subscription is required to prepare animations." });
+    if (!(d.env("FAL_KEY") || d.env("FAL_API_KEY"))) return reply(503, { code: "service_unavailable", error: "Animations are temporarily unavailable. Your activities still work." });
     const { count, error: countError } = await db.from(TABLE).select("id", { count: "exact", head: true }).eq("user_id", auth.userId)
       .gte("created_at", new Date(d.now() - 86400_000).toISOString());
     if (countError) throw countError;
-    if ((count ?? 0) >= 6) return reply(429, { error: "Your next animations can be prepared tomorrow. Saved clips still play." });
+    if ((count ?? 0) >= 6) return reply(429, { code: "rate_limited", error: "Your next animations can be prepared tomorrow. Saved clips still play." });
     const { error: insertError } = await db.from(TABLE).upsert({ user_id: auth.userId, companion_id: companion.id,
       stage, category: body.category, source_image_url: sourceImage, source_key: sourceKey,
       prompt_version: WELLBEING_PROMPT_VERSION, provider_model: DEFAULT_FAL_KLING_MODEL,
@@ -222,7 +224,7 @@ export async function handleWellbeingVideo(req: Request, d: Dependencies = deps)
     if (saved.error || !saved.data) throw new Error("Queue save failed");
     return reply(200, { clip: publicClip(saved.data) });
   } catch {
-    return reply(503, { error: "Animations are temporarily unavailable. Your activities still work." });
+    return reply(503, { code: "service_unavailable", error: "Animations are temporarily unavailable. Your activities still work." });
   }
 }
 
