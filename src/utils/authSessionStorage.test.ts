@@ -4,13 +4,28 @@ vi.mock("@capacitor/core", () => ({
   Capacitor: { isNativePlatform: () => mocks.native, isPluginAvailable: () => mocks.available },
   registerPlugin: () => ({ getItem: mocks.get, setItem: mocks.set, removeItem: mocks.remove }),
 }));
-import { authSessionStorage } from "./authSessionStorage";
+import { AUTH_STORAGE_READ_TIMEOUT_MS, authSessionStorage } from "./authSessionStorage";
 const key = "sb-opbfpbbqvuksuvmtmssd-auth-token";
 beforeEach(() => {
   localStorage.clear(); vi.resetAllMocks(); mocks.native = true; mocks.available = true;
   mocks.get.mockResolvedValue({ value: null }); mocks.set.mockResolvedValue(undefined); mocks.remove.mockResolvedValue(undefined);
 });
 describe("secure session persistence", () => {
+  it("bounds an unresponsive native read without falling back or erasing credentials", async () => {
+    vi.useFakeTimers();
+    try {
+      localStorage.setItem(key, "stale-web-session");
+      mocks.get.mockImplementation(() => new Promise(() => {}));
+      const rejected = expect(authSessionStorage.getItem(key)).rejects.toMatchObject({ code: "AUTH_STORAGE_READ_TIMEOUT" });
+      await vi.advanceTimersByTimeAsync(AUTH_STORAGE_READ_TIMEOUT_MS);
+      await rejected;
+      expect(mocks.remove).not.toHaveBeenCalled();
+      expect(mocks.set).not.toHaveBeenCalled();
+      expect(localStorage.getItem(key)).toBe("stale-web-session");
+      mocks.get.mockResolvedValue({ value: "current-secure-session" });
+      expect(await authSessionStorage.getItem(key)).toBe("current-secure-session");
+    } finally { vi.useRealTimers(); }
+  });
   it("migrates an existing install without requiring a fresh sign-in", async () => {
     localStorage.setItem(key, "existing-session");
     expect(await authSessionStorage.getItem(key)).toBe("existing-session");

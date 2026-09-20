@@ -120,6 +120,7 @@ describe("useAuth provider", () => {
         await vi.advanceTimersByTimeAsync(3000);
       });
       expect(result.current.status).toBe("recovering");
+      expect(result.current.recoveryIssue).toBe("secure_storage");
       expect(mocks.clearAuthScopedClientStateMock).not.toHaveBeenCalled();
     } finally { vi.useRealTimers(); }
   });

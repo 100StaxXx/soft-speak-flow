@@ -9,11 +9,30 @@ interface NativeAuthStorage {
 const secureStorage = registerPlugin<NativeAuthStorage>("AuthSessionStorage");
 const hasSecureStorage = () => Capacitor.isNativePlatform() && Capacitor.isPluginAvailable("AuthSessionStorage");
 
+export const AUTH_STORAGE_READ_TIMEOUT_MS = 5_000;
+
+const readSecureValue = async (key: string) => {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      secureStorage.getItem({ key }),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(Object.assign(
+          new Error("Secure session storage is temporarily unavailable"),
+          { code: "AUTH_STORAGE_READ_TIMEOUT" },
+        )), AUTH_STORAGE_READ_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
+};
+
 export const authSessionStorage = {
   async getItem(key: string): Promise<string | null> {
     if (!hasSecureStorage()) return safeLocalStorage.getItem(key);
     // A locked/unavailable Keychain is an error, not evidence of a signed-out user.
-    const { value } = await secureStorage.getItem({ key });
+    const { value } = await readSecureValue(key);
     if (value !== null) return value;
     const legacy = safeLocalStorage.getItem(key);
     if (legacy !== null) {

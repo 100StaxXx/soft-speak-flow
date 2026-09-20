@@ -3,6 +3,7 @@ import { createClient, processLock } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import type { Database } from './types';
 import { authSessionStorage } from '@/utils/authSessionStorage';
+import { createAuthRecoveryFetch } from '@/utils/authRecovery';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -56,6 +57,7 @@ const authLock = Capacitor.isNativePlatform() ? processLock : undefined;
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  global: { fetch: createAuthRecoveryFetch(SUPABASE_URL) },
   auth: {
     storage: authSessionStorage,
     persistSession: true,

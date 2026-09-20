@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { clearAuthScopedClientState } from "@/services/authScopedClientState";
 import { getUserTimezone } from "@/utils/timezone";
 import { isNetworkLikeError } from "@/utils/networkErrors";
+import { getAuthRecoveryIssue, type AuthRecoveryIssue } from "@/utils/authRecovery";
 
 const SESSION_RETRY_DELAYS_MS = [0, 250, 750, 1500] as const;
 const RESUME_REFRESH_COOLDOWN_MS = 4000;
@@ -28,6 +29,7 @@ interface AuthContextValue {
   session: Session | null;
   status: AuthStatus;
   loading: boolean;
+  recoveryIssue: AuthRecoveryIssue | null;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
 }
@@ -44,6 +46,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
+  const [recoveryIssue, setRecoveryIssue] = useState<AuthRecoveryIssue | null>(null);
   const sessionRef = useRef<Session | null>(null);
   const statusRef = useRef<AuthStatus>("loading");
   const refreshInFlightRef = useRef<Promise<void> | null>(null);
@@ -71,6 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSession(nextSession);
     setUser(nextSession?.user ?? null);
     setStatus(nextStatus ?? (nextSession?.user ? "authenticated" : "unauthenticated"));
+    if (nextStatus !== "recovering") setRecoveryIssue(null);
   }, []);
 
   const saveUserTimezone = useCallback(async (userId: string) => {
@@ -163,6 +167,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       console.error("Failed to refresh session:", lastError);
+      setRecoveryIssue(getAuthRecoveryIssue(lastError));
       if (currentSession?.user) {
         if (isNetworkLikeError(lastError)) {
           applySessionState(currentSession, "recovering");
@@ -345,10 +350,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       session,
       status,
       loading,
+      recoveryIssue,
       signOut,
       refreshSession,
     }),
-    [loading, refreshSession, session, signOut, status, user],
+    [loading, recoveryIssue, refreshSession, session, signOut, status, user],
   );
 
   return createElement(AuthContext.Provider, { value }, children);

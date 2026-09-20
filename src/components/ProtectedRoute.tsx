@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Paywall } from "@/components/Paywall";
 import { AccessCheckError } from "@/components/AccessCheckError";
 import { Button } from "@/components/ui/button";
+import { restartAuthRecovery } from "@/utils/authRecovery";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -13,14 +14,16 @@ interface ProtectedRouteProps {
   requireAccess?: boolean;
 }
 
-export const PROTECTED_ROUTE_AUTH_STALL_MS = 6_000;
+// The SDK may retry a 15-second request once during its 30-second renewal
+// window. A six-second gate incorrectly called that normal recovery a failure.
+export const PROTECTED_ROUTE_AUTH_STALL_MS = 35_000;
 
 export const ProtectedRoute = ({
   children,
   requireMentor: _requireMentor = true,
   requireAccess = true,
 }: ProtectedRouteProps) => {
-  const { user, loading: authLoading, status, refreshSession } = useAuth();
+  const { user, loading: authLoading, status, recoveryIssue } = useAuth();
   const { hasAccess, gateReason, loading: accessLoading, error: accessError, retry } = useAccessStatus();
   const navigate = useNavigate();
   const location = useLocation();
@@ -162,12 +165,13 @@ export const ProtectedRoute = ({
   if (isAuthPending && authGateTimedOut) {
     return <div className="min-h-screen flex items-center justify-center bg-background p-6">
       <div role="alert" className="max-w-sm space-y-4 text-center">
-        <h1 className="text-xl font-semibold">Your sign-in is taking longer than expected</h1>
-        <p className="text-muted-foreground">Check your connection and retry. Your saved session has not been cleared.</p>
-        <Button onClick={() => {
-          setAuthGateTimedOut(false);
-          void refreshSession().catch(() => setAuthGateTimedOut(true));
-        }}>Retry sign-in check</Button>
+        <h1 className="text-xl font-semibold">{recoveryIssue === "secure_storage"
+          ? "Your saved sign-in couldn’t be opened"
+          : "Your sign-in is taking longer than expected"}</h1>
+        <p className="text-muted-foreground">{recoveryIssue === "secure_storage"
+          ? "Keep your phone unlocked and retry. Your saved sign-in and account data have not been cleared."
+          : "Retry to restart the connection. This keeps your saved sign-in and account data."}</p>
+        <Button onClick={restartAuthRecovery}>Retry sign-in check</Button>
       </div>
     </div>;
   }

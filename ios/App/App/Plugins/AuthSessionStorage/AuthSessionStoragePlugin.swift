@@ -30,7 +30,7 @@ public class AuthSessionStoragePlugin: CAPPlugin, CAPBridgedPlugin {
         let status = SecItemCopyMatching(lookup as CFDictionary, &result)
         if status == errSecItemNotFound { call.resolve(["value": NSNull()]); return }
         guard status == errSecSuccess, let data = result as? Data, let value = String(data: data, encoding: .utf8) else {
-            call.reject("Secure session storage is temporarily unavailable")
+            call.reject("Secure session storage is temporarily unavailable (\(status))", "AUTH_STORAGE_READ_FAILED")
             return
         }
         call.resolve(["value": value])
@@ -49,7 +49,10 @@ public class AuthSessionStoragePlugin: CAPPlugin, CAPBridgedPlugin {
             let item = lookup.merging(attributes) { _, new in new }
             status = SecItemAdd(item as CFDictionary, nil)
         }
-        guard status == errSecSuccess else { call.reject("Could not save secure session"); return }
+        guard status == errSecSuccess else {
+            call.reject("Could not save secure session (\(status))", "AUTH_STORAGE_WRITE_FAILED")
+            return
+        }
         call.resolve()
     }
 
