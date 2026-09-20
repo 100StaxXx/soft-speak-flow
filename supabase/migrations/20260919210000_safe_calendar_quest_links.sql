@@ -3,19 +3,21 @@
 -- Extend source validation additively so imported all-day events and due-date-only
 -- tasks do not need an invented midnight appointment. Preserve all existing sources.
 DO $$ DECLARE definition text; BEGIN
-  SELECT pg_get_constraintdef(oid) INTO definition FROM pg_constraint
+  SELECT pg_get_expr(conbin, conrelid) INTO definition FROM pg_constraint
     WHERE conrelid = 'public.daily_tasks'::regclass AND conname = 'daily_tasks_source_check';
   IF definition IS NOT NULL AND position('calendar_link' IN definition) = 0 THEN
     EXECUTE 'ALTER TABLE public.daily_tasks DROP CONSTRAINT daily_tasks_source_check';
-    EXECUTE 'ALTER TABLE public.daily_tasks ADD CONSTRAINT daily_tasks_source_check ' ||
-      replace(definition, '''outlook_sync''::text', '''outlook_sync''::text, ''calendar_link''::text');
+    EXECUTE format('ALTER TABLE public.daily_tasks ADD CONSTRAINT daily_tasks_source_check CHECK ((%s) OR source = %L)',
+      definition, 'calendar_link');
   END IF;
-  SELECT pg_get_constraintdef(oid) INTO definition FROM pg_constraint
+  SELECT pg_get_expr(conbin, conrelid) INTO definition FROM pg_constraint
     WHERE conrelid = 'public.daily_tasks'::regclass AND conname = 'daily_tasks_regular_requires_time_or_inbox';
   IF definition IS NOT NULL AND position('calendar_link' IN definition) = 0 THEN
     EXECUTE 'ALTER TABLE public.daily_tasks DROP CONSTRAINT daily_tasks_regular_requires_time_or_inbox';
-    EXECUTE 'ALTER TABLE public.daily_tasks ADD CONSTRAINT daily_tasks_regular_requires_time_or_inbox ' ||
-      replace(definition, '''outlook_sync''::text', '''outlook_sync''::text, ''calendar_link''::text');
+    -- Existing installations can express this rule using OR rather than an
+    -- IN/ANY list. Wrap the whole predicate; inserting a comma corrupts OR.
+    EXECUTE format('ALTER TABLE public.daily_tasks ADD CONSTRAINT daily_tasks_regular_requires_time_or_inbox CHECK ((%s) OR source = %L)',
+      definition, 'calendar_link');
   END IF;
 END $$;
 CREATE TABLE IF NOT EXISTS public.calendar_quest_imports (
