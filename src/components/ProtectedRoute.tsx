@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { useAccessStatus, type AccessGateReason } from "@/hooks/useAccessStatus";
 import { Progress } from "@/components/ui/progress";
 import { Paywall } from "@/components/Paywall";
@@ -25,6 +26,7 @@ export const ProtectedRoute = ({
   requireAccess = true,
 }: ProtectedRouteProps) => {
   const { user, loading: authLoading, status, recoveryIssue } = useAuth();
+  const { profile, loading: profileLoading } = useProfile();
   const { hasAccess, gateReason, loading: accessLoading, error: accessError, retry } = useAccessStatus();
   const navigate = useNavigate();
   const location = useLocation();
@@ -61,6 +63,29 @@ export const ProtectedRoute = ({
     requireAccess && accessLoading && !hasResolvedAccessForCurrentRoute,
   );
   const shouldShowGateLoading = shouldShowAuthLoading || shouldShowAccessLoading;
+  // A newly-created account is allowed to resume onboarding before the
+  // entitlement check. This is intentionally narrow: only an explicit
+  // incomplete flag, or the empty profile created during Apple sign-up,
+  // qualifies. Established accounts still go through the paywall normally.
+  const canResumeOnboarding = Boolean(
+    user &&
+      !profileLoading &&
+      profile &&
+      profile.onboarding_completed !== true &&
+      (
+        profile.onboarding_completed === false ||
+        (
+          !profile.selected_mentor_id &&
+          !profile.onboarding_step &&
+          !profile.onboarding_data
+        )
+      ),
+  );
+
+  useEffect(() => {
+    if (!canResumeOnboarding || location.pathname === "/onboarding") return;
+    navigate("/onboarding", { replace: true });
+  }, [canResumeOnboarding, location.pathname, navigate]);
 
   useEffect(() => {
     setAuthGateTimedOut(false);
@@ -181,6 +206,7 @@ export const ProtectedRoute = ({
   }
 
   if (shouldShowGateLoading) {
+    if (canResumeOnboarding) return null;
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-full max-w-md px-8 space-y-4">
@@ -199,6 +225,11 @@ export const ProtectedRoute = ({
 
   // Don't render children until auth is confirmed
   if (authStatus === 'unauthenticated' || !user) return null;
+
+  // Do not let a transient subscription/backend outage strand an account that
+  // has not reached the paywall yet. The onboarding page owns its own data
+  // recovery UI and will resume at the saved step.
+  if (canResumeOnboarding) return null;
 
   if (requireAccess && accessError && !(hasResolvedAccessForCurrentRoute && resolvedAccessDecision?.hasAccess)) {
     return <AccessCheckError retry={retry} />;

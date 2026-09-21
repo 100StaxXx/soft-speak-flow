@@ -25,6 +25,20 @@ vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => authState,
 }));
 
+const profileState = vi.hoisted(() => ({
+  profile: null as {
+    onboarding_completed?: boolean | null;
+    selected_mentor_id?: string | null;
+    onboarding_step?: string | null;
+    onboarding_data?: Record<string, unknown> | null;
+  } | null,
+  loading: false,
+}));
+
+vi.mock("@/hooks/useProfile", () => ({
+  useProfile: () => profileState,
+}));
+
 vi.mock("@/hooks/useAccessStatus", () => ({
   useAccessStatus: () => accessState,
 }));
@@ -49,6 +63,7 @@ const ProtectedRouteTree = (props?: Partial<React.ComponentProps<typeof Protecte
         }
       />
       <Route path="/welcome" element={<div>Welcome Page</div>} />
+      <Route path="/onboarding" element={<div>Onboarding Page</div>} />
     </Routes>
   </MemoryRouter>
 );
@@ -68,6 +83,8 @@ describe("ProtectedRoute", () => {
     accessState.gateReason = "none";
     accessState.loading = false;
     accessState.error = false;
+    profileState.profile = null;
+    profileState.loading = false;
   });
 
   it("renders protected content while auth is recovering with a cached user", () => {
@@ -136,6 +153,27 @@ describe("ProtectedRoute", () => {
     renderProtectedRoute();
 
     expect(screen.getByText("Protected Content")).toBeInTheDocument();
+  });
+
+  it("sends a newly created incomplete account back to onboarding before access checks", async () => {
+    authState.status = "authenticated";
+    authState.loading = false;
+    authState.user = { id: "new-apple-user" };
+    profileState.profile = {
+      onboarding_completed: null,
+      selected_mentor_id: null,
+      onboarding_step: null,
+      onboarding_data: null,
+    };
+    accessState.loading = true;
+
+    renderProtectedRoute();
+
+    await waitFor(() => {
+      expect(screen.getByText("Onboarding Page")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Checking access...")).not.toBeInTheDocument();
+    expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
   });
 
   it("keeps rendered content visible while access refreshes", () => {
