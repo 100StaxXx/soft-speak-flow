@@ -11,7 +11,8 @@ type ManageAppleSubscriptionBindingDeps = {
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 const defaultDeps: Required<ManageAppleSubscriptionBindingDeps> = {
@@ -34,7 +35,10 @@ function normalizeUserId(value: unknown): string {
   return normalizeText(value).toLowerCase();
 }
 
-async function fetchAppleBinding(supabase: SupabaseClient, originalTransactionId: string) {
+async function fetchAppleBinding(
+  supabase: SupabaseClient,
+  originalTransactionId: string,
+) {
   const { data, error } = await supabase
     .from("apple_transaction_bindings")
     .select("*")
@@ -59,7 +63,10 @@ async function fetchSubscriptionForOriginalTransaction(
   return data;
 }
 
-async function fetchSubscriptionForUser(supabase: SupabaseClient, userId: string) {
+async function fetchSubscriptionForUser(
+  supabase: SupabaseClient,
+  userId: string,
+) {
   const { data, error } = await supabase
     .from("subscriptions")
     .select("*")
@@ -85,10 +92,14 @@ async function fetchUserSummary(supabase: SupabaseClient, userId: string) {
     if (error) return null;
     return data?.user
       ? {
-          id: data.user.id,
-          email: data.user.email ?? null,
-          created_at: data.user.created_at ?? null,
-        }
+        id: data.user.id,
+        email: typeof data.user.app_metadata?.account_email === "string"
+          ? data.user.app_metadata.account_email
+          : typeof data.user.user_metadata?.account_email === "string"
+          ? data.user.user_metadata.account_email
+          : data.user.email ?? null,
+        created_at: data.user.created_at ?? null,
+      }
       : null;
   }
 
@@ -103,7 +114,9 @@ async function buildLookupResponse(
   const [binding, subscription, targetUser] = await Promise.all([
     fetchAppleBinding(supabase, originalTransactionId),
     fetchSubscriptionForOriginalTransaction(supabase, originalTransactionId),
-    targetUserId ? fetchUserSummary(supabase, targetUserId) : Promise.resolve(null),
+    targetUserId
+      ? fetchUserSummary(supabase, targetUserId)
+      : Promise.resolve(null),
   ]);
 
   const currentOwner = binding?.bound_user_id
@@ -140,7 +153,11 @@ export async function handleManageAppleSubscriptionBinding(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
-    const adminRequest = await requireAdminRequestImpl(req, supabase, corsHeaders);
+    const adminRequest = await requireAdminRequestImpl(
+      req,
+      supabase,
+      corsHeaders,
+    );
     if (adminRequest instanceof Response) {
       return adminRequest;
     }
@@ -154,11 +171,14 @@ export async function handleManageAppleSubscriptionBinding(
     }
 
     if (action === "lookup") {
-      return jsonResponse(200, await buildLookupResponse(
-        supabase,
-        originalTransactionId,
-        normalizeUserId(body?.targetUserId) || undefined,
-      ));
+      return jsonResponse(
+        200,
+        await buildLookupResponse(
+          supabase,
+          originalTransactionId,
+          normalizeUserId(body?.targetUserId) || undefined,
+        ),
+      );
     }
 
     if (action !== "reassign") {
@@ -171,25 +191,41 @@ export async function handleManageAppleSubscriptionBinding(
       return jsonResponse(400, { error: "targetUserId is required" });
     }
     if (reason.length < 8) {
-      return jsonResponse(400, { error: "A support reason of at least 8 characters is required" });
+      return jsonResponse(400, {
+        error: "A support reason of at least 8 characters is required",
+      });
     }
 
-    const { data, error } = await supabase.rpc("admin_reassign_apple_subscription_binding", {
-      p_original_transaction_id: originalTransactionId,
-      p_target_user_id: targetUserId,
-      p_admin_user_id: adminRequest.isServiceRole ? null : adminRequest.userId,
-      p_reason: reason,
-    });
+    const { data, error } = await supabase.rpc(
+      "admin_reassign_apple_subscription_binding",
+      {
+        p_original_transaction_id: originalTransactionId,
+        p_target_user_id: targetUserId,
+        p_admin_user_id: adminRequest.isServiceRole
+          ? null
+          : adminRequest.userId,
+        p_reason: reason,
+      },
+    );
 
     if (error) throw error;
 
-    return jsonResponse(200, (data ?? { success: true }) as Record<string, unknown>);
+    return jsonResponse(
+      200,
+      (data ?? { success: true }) as Record<string, unknown>,
+    );
   } catch (error) {
     console.error("manage-apple-subscription-binding error:", error);
-    const message = error instanceof Error ? error.message : "Internal server error";
-    const isConflict = message.includes("Target user already has a subscription row");
+    const message = error instanceof Error
+      ? error.message
+      : "Internal server error";
+    const isConflict = message.includes(
+      "Target user already has a subscription row",
+    );
     const isNotFound = message.includes("not found");
-    return jsonResponse(isConflict ? 409 : isNotFound ? 404 : 500, { error: message });
+    return jsonResponse(isConflict ? 409 : isNotFound ? 404 : 500, {
+      error: message,
+    });
   }
 }
 

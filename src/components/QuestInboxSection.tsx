@@ -65,7 +65,7 @@ export const QuestInboxSection = memo(function QuestInboxSection({
   }, [showAllTasks, tasks]);
 
   const hiddenTaskCount = Math.max(0, tasks.length - visibleTasks.length);
-  const inboxCountLabel = `${tasks.length} quest${tasks.length === 1 ? "" : "s"}`;
+  const inboxCountLabel = `${tasks.length} action${tasks.length === 1 ? "" : "s"}`;
 
   return (
     <section
@@ -115,7 +115,7 @@ export const QuestInboxSection = memo(function QuestInboxSection({
             >
               <p className="text-sm font-medium text-foreground">Inbox is empty</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Add a quest here when you want to capture it now and schedule it later.
+                Add an action here when you want to capture it now and schedule it later.
               </p>
             </div>
           ) : (
@@ -124,7 +124,7 @@ export const QuestInboxSection = memo(function QuestInboxSection({
                 {visibleTasks.map((task) => (
                   <div
                     key={task.id}
-                    className="flex items-start gap-3 rounded-2xl border border-border/55 bg-card/82 px-3 py-3 backdrop-blur-lg shadow-[0_8px_18px_rgba(0,0,0,0.16)]"
+                    className="flex items-start gap-3 rounded-2xl border border-border/55 bg-card/[0.82] px-3 py-3 backdrop-blur-lg shadow-[0_8px_18px_rgba(0,0,0,0.16)]"
                   >
                     <button
                       type="button"
@@ -133,7 +133,7 @@ export const QuestInboxSection = memo(function QuestInboxSection({
                         onToggleQuest(task.id, !task.completed);
                       }}
                       className="mt-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border-2 border-muted-foreground/40 transition-colors hover:border-primary"
-                      aria-label={task.completed ? "Mark quest incomplete" : "Mark quest complete"}
+                      aria-label={task.completed ? "Mark action incomplete" : "Mark action complete"}
                     >
                       {task.completed ? <Check className="h-4 w-4 text-primary" /> : null}
                     </button>
@@ -169,7 +169,7 @@ export const QuestInboxSection = memo(function QuestInboxSection({
                           onEditQuest(task);
                         }}
                         className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-muted/55 hover:text-foreground"
-                        aria-label="Edit quest"
+                        aria-label="Edit action"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
@@ -179,8 +179,8 @@ export const QuestInboxSection = memo(function QuestInboxSection({
                           haptics.light();
                           void onDeleteQuest(task.id);
                         }}
-                        className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-destructive/12 hover:text-destructive"
-                        aria-label="Delete quest"
+                        className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-destructive/[0.12] hover:text-destructive"
+                        aria-label="Delete action"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -197,7 +197,7 @@ export const QuestInboxSection = memo(function QuestInboxSection({
                   className="w-full rounded-2xl text-muted-foreground"
                   onClick={() => setShowAllTasks((current) => !current)}
                 >
-                  {showAllTasks ? "Show less" : `Show ${hiddenTaskCount} more quest${hiddenTaskCount === 1 ? "" : "s"}`}
+                  {showAllTasks ? "Show less" : `Show ${hiddenTaskCount} more action${hiddenTaskCount === 1 ? "" : "s"}`}
                 </Button>
               ) : null}
             </>

@@ -11,10 +11,9 @@ import {
   Plus,
   Repeat,
   Target,
-  Trophy,
+  Leaf,
 } from "lucide-react";
 
-import { JourneysCompanionLauncher } from "@/components/journeys/JourneysCompanionLauncher";
 import { ProgressRing } from "@/features/tasks/components/ProgressRing";
 import type { DailyTask } from "@/services/dailyTasksRemote";
 import { MAIN_QUEST_XP_MULTIPLIER } from "@/config/xpRewards";
@@ -287,7 +286,7 @@ function WeekPlannerTaskCard({
       : undefined,
   });
   const isCampaignRitual = isCampaignRitualTask(task);
-  const campaignTitle = task.epic_title?.trim() || "Campaign";
+  const campaignTitle = task.epic_title?.trim() || "Commitment";
 
   return (
     <div
@@ -368,7 +367,7 @@ function WeekPlannerTaskCard({
                 </div>
                 {isCampaignRitual && !compact ? (
                   <p className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-wide text-primary/80">
-                    Campaign Ritual - {campaignTitle}
+                    Commitment rhythm · {campaignTitle}
                   </p>
                 ) : null}
               </div>
@@ -428,17 +427,17 @@ export function DesktopWeekPlanner({
   const campaignSectionLabel = onOpenCampaigns ? (
     <button
       type="button"
-      aria-label="Open campaigns page"
+      aria-label="Open commitments page"
       onClick={onOpenCampaigns}
       className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
       <Target className="h-3 w-3" />
-      Campaigns & rituals
+      Commitments & rhythms
     </button>
   ) : (
     <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
       <Target className="h-3 w-3" />
-      Campaigns & rituals
+      Commitments & rhythms
     </div>
   );
   const quickCaptureControls = (
@@ -451,7 +450,7 @@ export function DesktopWeekPlanner({
         size="icon"
         className="h-9 w-9 rounded-[18px] border-white/10 bg-white/5 hover:bg-white/10"
         onClick={onAddQuest}
-        aria-label="Add quest"
+        aria-label="Add action"
         data-tour="add-quest-fab"
       >
         <Plus className="h-4 w-4" />
@@ -626,10 +625,6 @@ export function DesktopWeekPlanner({
   const weekTotalCount = tasks.length;
   const weekScheduledCount = tasks.filter((task) => !!task.scheduled_time).length;
   const weekActiveDays = new Set(tasks.map((task) => task.task_date).filter(Boolean)).size;
-  const weekXP = tasks.reduce((sum, task) => {
-    if (!task.completed) return sum;
-    return sum + getEffectiveTaskXP(task);
-  }, 0);
   const progressPercent = weekTotalCount > 0 ? (weekCompletedCount / weekTotalCount) * 100 : 0;
 
   const epicProgress = useMemo(() => {
@@ -706,7 +701,7 @@ export function DesktopWeekPlanner({
               {format(weekStart, "MMMM d")} - {format(addDays(weekStart, 6), "MMMM d")}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Cleaner desktop week planning with click-to-inspect quests.
+              A clear week view with click-to-inspect actions.
             </p>
           </div>
 
@@ -724,8 +719,8 @@ export function DesktopWeekPlanner({
                   className={cn(
                     "h-8 rounded-[14px] px-3 text-xs",
                     plannerMode === "week"
-                      ? "bg-white/12 text-white hover:bg-white/15"
-                      : "text-muted-foreground hover:bg-white/8 hover:text-foreground",
+                      ? "bg-white/[0.12] text-white hover:bg-white/15"
+                      : "text-muted-foreground hover:bg-white/[0.08] hover:text-foreground",
                   )}
                   aria-pressed={plannerMode === "week"}
                   onClick={() => onPlannerModeChange("week")}
@@ -739,8 +734,8 @@ export function DesktopWeekPlanner({
                   className={cn(
                     "h-8 rounded-[14px] px-3 text-xs",
                     plannerMode === "day"
-                      ? "bg-white/12 text-white hover:bg-white/15"
-                      : "text-muted-foreground hover:bg-white/8 hover:text-foreground",
+                      ? "bg-white/[0.12] text-white hover:bg-white/15"
+                      : "text-muted-foreground hover:bg-white/[0.08] hover:text-foreground",
                   )}
                   aria-pressed={plannerMode === "day"}
                   onClick={() => onPlannerModeChange("day")}
@@ -788,20 +783,15 @@ export function DesktopWeekPlanner({
               </Button>
             ) : null}
             {showCompanionPlannerHeaderAction && onOpenCompanionPlanner ? (
-              <JourneysCompanionLauncher
-                variant="inline"
-                compact
-                data-tour="add-quest-launcher"
-                text={planDayLauncherLabel}
-                className="shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
-                onClick={openPlanDayThread}
-              />
+              <Button type="button" size="sm" onClick={openPlanDayThread}>
+                {planDayLauncherLabel}
+              </Button>
             ) : null}
             {quickCaptureControls}
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-[28px] border border-white/8 bg-black/10">
+        <div className="overflow-hidden rounded-[28px] border border-white/[0.08] bg-black/10">
           <div className="overflow-auto" style={{ maxHeight: "min(72vh, 820px)" }}>
             <div
               className="min-w-0"
@@ -813,7 +803,7 @@ export function DesktopWeekPlanner({
                 data-testid="desktop-week-header-grid"
                 style={{ gridTemplateColumns: WEEK_GRID_TEMPLATE_COLUMNS }}
               >
-                <div className="border-b border-r border-white/8 bg-[rgba(19,16,29,0.98)] px-3 py-4 backdrop-blur-xl">
+                <div className="border-b border-r border-white/[0.08] bg-[rgba(19,16,29,0.98)] px-3 py-4 backdrop-blur-xl">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/75">
                     Schedule
                   </p>
@@ -839,7 +829,7 @@ export function DesktopWeekPlanner({
                       }}
                       data-testid={`desktop-week-day-${dateKey}`}
                       className={cn(
-                        "min-w-0 border-b border-r border-white/8 px-3 py-3 backdrop-blur-xl",
+                        "min-w-0 border-b border-r border-white/[0.08] px-3 py-3 backdrop-blur-xl",
                         isSelected
                           ? "bg-primary/[0.12]"
                           : dayIsToday
@@ -878,7 +868,7 @@ export function DesktopWeekPlanner({
                             <span
                               className={cn(
                                 "hidden rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide 2xl:inline-flex",
-                                isSelected ? "bg-white/14 text-white" : "bg-celestial-blue/15 text-celestial-blue",
+                                isSelected ? "bg-white/[0.14] text-white" : "bg-celestial-blue/15 text-celestial-blue",
                               )}
                             >
                               Today
@@ -905,7 +895,7 @@ export function DesktopWeekPlanner({
                   className="grid"
                   style={{ gridTemplateColumns: WEEK_GRID_TEMPLATE_COLUMNS }}
                 >
-                  <div className="sticky left-0 z-20 border-b border-r border-white/8 bg-[rgba(19,16,29,0.98)] px-3 py-3 backdrop-blur-xl">
+                  <div className="sticky left-0 z-20 border-b border-r border-white/[0.08] bg-[rgba(19,16,29,0.98)] px-3 py-3 backdrop-blur-xl">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/75">
                       Anytime
                     </p>
@@ -922,7 +912,7 @@ export function DesktopWeekPlanner({
                         key={`${dateKey}-anytime`}
                         data-testid={`desktop-week-anytime-${dateKey}`}
                         className={cn(
-                          "min-h-[92px] min-w-0 border-b border-r border-white/8 p-2 align-top",
+                          "min-h-[92px] min-w-0 border-b border-r border-white/[0.08] p-2 align-top",
                           isSelected
                             ? "bg-primary/[0.05]"
                             : dayIsToday
@@ -935,8 +925,8 @@ export function DesktopWeekPlanner({
                             {buckets.anytime.map((task) => renderTaskCard(task, true))}
                           </div>
                         ) : (
-                          <div className="flex min-h-[72px] items-center justify-center rounded-[18px] border border-dashed border-white/8 bg-white/[0.02] px-3 text-center text-[11px] text-muted-foreground">
-                            No anytime quests
+                          <div className="flex min-h-[72px] items-center justify-center rounded-[18px] border border-dashed border-white/[0.08] bg-white/[0.02] px-3 text-center text-[11px] text-muted-foreground">
+                            No anytime actions
                           </div>
                         )}
                       </div>
@@ -956,7 +946,7 @@ export function DesktopWeekPlanner({
                     <div
                       key={hour}
                       data-testid={`desktop-week-hour-${hour}`}
-                      className="flex items-start justify-end border-b border-r border-white/8 px-3 py-3 text-[11px] font-semibold text-muted-foreground/75"
+                      className="flex items-start justify-end border-b border-r border-white/[0.08] px-3 py-3 text-[11px] font-semibold text-muted-foreground/75"
                       style={{ height: `${HOUR_HEIGHT_PX}px` }}
                     >
                       {formatHourLabel(hour)}
@@ -974,14 +964,14 @@ export function DesktopWeekPlanner({
                   return (
                     <div
                       key={`${dateKey}-timeline`}
-                      className="relative min-w-0 border-r border-white/8"
+                      className="relative min-w-0 border-r border-white/[0.08]"
                     >
                       {/* Hour grid lines */}
                       {timelineHours.map((hour) => (
                         <div
                           key={hour}
                           className={cn(
-                            "border-b border-white/8",
+                            "border-b border-white/[0.08]",
                             isSelected
                               ? "bg-primary/[0.04]"
                               : dayIsToday
@@ -1032,7 +1022,7 @@ export function DesktopWeekPlanner({
                 {weekCompletedCount}/{weekTotalCount || 0}
               </p>
               <p className="text-sm text-muted-foreground">
-                quests completed across {weekActiveDays || 0} active day{weekActiveDays === 1 ? "" : "s"}
+                actions completed across {weekActiveDays || 0} active day{weekActiveDays === 1 ? "" : "s"}
               </p>
             </div>
 
@@ -1041,25 +1031,25 @@ export function DesktopWeekPlanner({
                 <ProgressRing percent={progressPercent} size={40} strokeWidth={3.5} />
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
-                    XP banked
+                    Progress
                   </p>
-                  <p className="text-sm font-semibold text-stardust-gold">{weekXP}</p>
+                  <p className="text-sm font-semibold text-primary">{weekCompletedCount}/{weekTotalCount}</p>
                 </div>
               </div>
             </div>
           </div>
 
           <div className="mt-4 grid grid-cols-3 gap-3">
-            <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3">
+            <div className="rounded-[20px] border border-white/[0.08] bg-white/[0.03] p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Active</p>
               <p className="mt-2 text-xl font-semibold text-foreground">{weekActiveDays}</p>
             </div>
-            <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3">
+            <div className="rounded-[20px] border border-white/[0.08] bg-white/[0.03] p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Timed</p>
               <p className="mt-2 text-xl font-semibold text-foreground">{weekScheduledCount}</p>
             </div>
-            <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Streak</p>
+            <div className="rounded-[20px] border border-white/[0.08] bg-white/[0.03] p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Rhythm days</p>
               <p className="mt-2 flex items-center gap-1 text-xl font-semibold text-foreground">
                 <Flame className="h-4 w-4 text-stardust-gold/80" />
                 {currentStreak}
@@ -1099,14 +1089,14 @@ export function DesktopWeekPlanner({
                 >
                   <button
                     type="button"
-                    aria-label={`Open ${epic.title} campaign`}
-                    className="w-full rounded-[22px] border border-white/8 bg-white/[0.03] p-3 text-left transition-colors hover:border-primary/30 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    aria-label={`Open ${epic.title} commitment`}
+                    className="w-full rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-3 text-left transition-colors hover:border-primary/30 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-foreground">{epic.title}</p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {ritualCounts.completed}/{ritualCounts.total} rituals completed this week
+                          {ritualCounts.completed}/{ritualCounts.total} rhythms completed this week
                         </p>
                       </div>
                       <Badge variant="outline" className="h-5 border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px]">
@@ -1124,26 +1114,26 @@ export function DesktopWeekPlanner({
             </div>
           ) : isCampaignsLoading ? (
             <p className="mt-3 text-sm text-muted-foreground">
-              Loading weekly campaigns...
+              Loading weekly commitments...
             </p>
           ) : (
             <p className="mt-3 text-sm text-muted-foreground">
-              No campaigns are attached to this week yet.
+              No commitments are attached to this week yet.
             </p>
           )}
 
-          <div className="mt-4 rounded-[22px] border border-white/8 bg-white/[0.03] p-3">
+          <div className="mt-4 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-3">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
-                  Rituals this week
+                  Rhythms this week
                 </p>
                 <p className="mt-2 text-xl font-semibold text-foreground">{ritualTasks.length}</p>
               </div>
-              <Trophy className="h-5 w-5 text-stardust-gold/75" />
+              <Leaf className="h-5 w-5 text-primary/75" />
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              {standaloneRitualCount} standalone ritual{standaloneRitualCount === 1 ? "" : "s"} surfaced outside campaigns.
+              {standaloneRitualCount} standalone rhythm{standaloneRitualCount === 1 ? "" : "s"} outside commitments.
             </p>
           </div>
         </section>

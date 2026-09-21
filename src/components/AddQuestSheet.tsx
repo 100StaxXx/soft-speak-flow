@@ -13,7 +13,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { useCompanion } from "@/hooks/useCompanion";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
@@ -66,6 +65,7 @@ import {
   resolveQuestReminderOffsets,
 } from "@/utils/questReminders";
 import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
+import { PRODUCT } from "@/config/product";
 
 export interface AddQuestData {
   text: string;
@@ -179,10 +179,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   } = usePersonalQuestTemplates({ enabled: open });
   const { toast } = useToast();
   const { user } = useAuth();
-  const { companion } = useCompanion();
   const resolvedCompanionFrostedThemeStyle = useMemo(
-    () => companionFrostedThemeStyle ?? getCompanionFrostedThemeStyle(companion?.favorite_color),
-    [companionFrostedThemeStyle, companion?.favorite_color],
+    () => companionFrostedThemeStyle ?? getCompanionFrostedThemeStyle(
+      PRODUCT.mode === "cosmiq" ? "#9b6bff" : "#2f5938",
+    ),
+    [companionFrostedThemeStyle],
   );
 
   const { defaultProvider, connections } = useCalendarIntegrations();
@@ -446,7 +447,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const canAddToInbox = !!trimmedTaskText && !hasRecurrence;
   const reviewDateLabel = taskDate ? format(dateObj, "EEE, MMM d") : "Inbox";
   const reviewTimeLabel = scheduledTime ? formatTime12(scheduledTime) : "Select a time";
-  const reviewTitle = trimmedTaskText || "Name your quest";
+  const reviewTitle = trimmedTaskText || "Name your action";
   const currentTemplateDraft = useMemo(() => ({
     title: taskText,
     difficulty,
@@ -510,14 +511,14 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     if (selectedTemplate.templateOrigin === "personal_explicit") {
       return {
         title: "Update your template?",
-        description: "This quest started from one of your saved templates. Update that template with these changes too?",
+        description: "This action started from one of your saved templates. Update that template with these changes too?",
         actionLabel: "Update Template",
       };
     }
 
     return {
       title: "Save these changes to My Templates?",
-      description: "This quest started from a template. Save this customized version to My Templates so it is ready next time?",
+      description: "This action started from a template. Save this customized version to My Templates so it is ready next time?",
       actionLabel: "Save to My Templates",
     };
   }, [selectedTemplate]);
@@ -740,7 +741,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     } catch (error) {
       const message = error instanceof Error
         ? error.message
-        : "Failed to save your quest template.";
+        : "Failed to save your action template.";
       toast({
         title: "Failed to save template",
         description: message,
@@ -841,9 +842,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
         style={resolvedCompanionFrostedThemeStyle}
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <SheetTitle className="sr-only">Add Quest</SheetTitle>
+        <SheetTitle className="sr-only">Add action</SheetTitle>
         <SheetDescription className="sr-only">
-          Create a new quest with schedule, subtasks, and optional details.
+          Create a new action with a schedule, steps, and optional details.
         </SheetDescription>
         {sheetView === "editor" ? (
           isDesktopPanel ? (
@@ -851,7 +852,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[hsl(var(--stardust-gold))]">
-                    New Quest
+                    New action
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">{summaryLine}</p>
                 </div>
@@ -867,7 +868,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               <div data-testid="add-quest-editor-header" className={cn("mt-4 space-y-4", QUEST_FORM_STYLES.desktopPanelHeaderCard)}>
                 <Input
                   data-tour="add-quest-title-input"
-                  placeholder="Quest Title"
+                  placeholder="What needs doing?"
                   value={taskText}
                   onChange={(e) => handleTaskTextChange(e.target.value)}
                   onBlur={handleTaskTextBlur}
@@ -898,7 +899,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                     className={QUEST_FORM_STYLES.desktopPanelToolbarButton}
                   >
                     <Sparkles className="h-3.5 w-3.5" />
-                    Browse common quests
+                    Browse common actions
                   </button>
                 </div>
               </div>
@@ -920,7 +921,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                     <div className={QUEST_FORM_STYLES.titleFieldInner}>
                       <Input
                         data-tour="add-quest-title-input"
-                        placeholder="Quest Title"
+                        placeholder="What needs doing?"
                         value={taskText}
                         onChange={(e) => handleTaskTextChange(e.target.value)}
                         onBlur={handleTaskTextBlur}
@@ -940,7 +941,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                     className={cn(QUEST_FORM_STYLES.heroAction, "py-1")}
                   >
                     <Sparkles className="h-3.5 w-3.5" />
-                    Browse common quests
+                    Browse common actions
                   </button>
                 </div>
 
@@ -966,10 +967,10 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[hsl(var(--stardust-gold))]">
-                  Quest Shortcuts
+                  Action shortcuts
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Pick a common quest or one you already use a lot.
+                  Pick a common action or one you already use often.
                 </p>
               </div>
               <button
@@ -988,9 +989,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               <div className={QUEST_FORM_STYLES.heroIcon}>
                 <History className="h-5 w-5" />
               </div>
-              <p className="mt-3 font-fredoka text-[1.15rem]">Quest shortcuts</p>
+              <p className="mt-3 font-fredoka text-[1.15rem]">Action shortcuts</p>
               <p className="mt-1 max-w-[16rem] text-sm text-muted-foreground">
-                Pick a common quest or one you already use a lot.
+                Pick a common action or one you already use often.
               </p>
             </div>
           </div>
@@ -1005,7 +1006,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="font-fredoka text-[1.05rem] text-foreground">Your templates</p>
-                      <p className="text-xs text-muted-foreground">Saved templates and repeat quests you can reuse fast</p>
+                      <p className="text-xs text-muted-foreground">Saved templates and repeat actions you can reuse quickly</p>
                     </div>
                     <button
                       type="button"
@@ -1072,7 +1073,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   value={scheduledTime}
                   onChange={setScheduledTime}
                   placeholder="Time"
-                  ariaLabel="Custom quest time"
+                  ariaLabel="Custom action time"
                   variant="quest-soft"
                   tone={difficulty}
                   stepMinutes={30}
@@ -1387,7 +1388,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 canCreateTask ? colors.primaryButton : colors.primaryButtonDisabled,
               )}
             >
-              {isAdding ? "Adding..." : "Add Quest"}
+              {isAdding ? "Adding..." : "Add action"}
             </Button>
             <Button
               variant="outline"
@@ -1404,11 +1405,12 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             </Button>
             {isDesktopPanel && hasRecurrence && (
               <p className={cn("text-center", QUEST_FORM_STYLES.helperText)}>
-                Recurring quests must stay scheduled with a time.
+                Recurring actions must stay scheduled with a time.
               </p>
             )}
-            {isDesktopPanel && onCreateCampaign && (
+            {onCreateCampaign && (
               <button
+                type="button"
                 onClick={() => {
                   onOpenChange(false);
                   onCreateCampaign();
@@ -1416,10 +1418,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 className={cn("flex items-center justify-center gap-1.5 py-1 text-sm", QUEST_FORM_STYLES.footerLink)}
               >
                 <Map className="w-3.5 h-3.5" />
-                <span>Or create a Campaign</span>
-                <span className={QUEST_FORM_STYLES.subtleBadge}>
-                  Max 2 active
-                </span>
+                <span>Longer goal? Create a Commitment</span>
               </button>
             )}
           </div>
@@ -1438,9 +1437,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
           style={resolvedCompanionFrostedThemeStyle}
         >
           <AlertDialogHeader>
-            <AlertDialogTitle>Restore saved quest draft?</AlertDialogTitle>
+            <AlertDialogTitle>Restore saved action draft?</AlertDialogTitle>
             <AlertDialogDescription>
-              You have an unfinished quest draft saved on this device. Restore it, or discard it and start fresh.
+              You have an unfinished action draft saved on this device. Restore it, or discard it and start fresh.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1478,7 +1477,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
           <AlertDialogHeader>
             <AlertDialogTitle>{templatePromptConfig?.title ?? "Save template changes?"}</AlertDialogTitle>
             <AlertDialogDescription>
-              {templatePromptConfig?.description ?? "Save this customized version for next time, or keep it as a one-off quest."}
+              {templatePromptConfig?.description ?? "Save this customized version for next time, or keep it as a one-off action."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

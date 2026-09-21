@@ -42,6 +42,8 @@ describe("companionMotion config", () => {
   it("derives streak-style events from milestone reasons", () => {
     expect(getCompanionMotionEventTypeFromReason("7 Day Streak!")).toBe("streak");
     expect(getCompanionMotionEventTypeFromReason("Quest Complete!")).toBe("quest_complete");
+    expect(getCompanionMotionEventTypeFromReason("Faithful practice complete")).toBe("quest_complete");
+    expect(getCompanionMotionEventTypeFromReason("Faithful action complete")).toBe("quest_complete");
     expect(getCompanionMotionEventTypeFromReason("Subtask Done!")).toBe("xp_gain");
   });
 
@@ -53,6 +55,7 @@ describe("companionMotion config", () => {
 
   it("exposes stable event codes and stage power for runtime bindings", () => {
     expect(getCompanionMotionEventCode("idle")).toBe(0);
+    expect(getCompanionMotionEventCode("task_start")).toBe(7);
     expect(getCompanionMotionEventCode("evolution_reveal")).toBe(6);
     expect(getCompanionMotionStagePower(0)).toBe(0.22);
     expect(getCompanionMotionStagePower(21)).toBe(0.7);

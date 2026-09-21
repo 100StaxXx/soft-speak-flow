@@ -177,7 +177,7 @@ describe("CollectionTab mount persistence", () => {
     vi.useRealTimers();
   });
 
-  it("keeps badges/moments/postcards/loot panels mounted after first visit", async () => {
+  it("keeps badges, moments, postcards, and keepsakes mounted after first visit", async () => {
     render(<CollectionTab />);
 
     expect(mocks.badgesMountCount).toBe(1);
@@ -197,7 +197,7 @@ describe("CollectionTab mount persistence", () => {
     });
     expect(mocks.postcardsMountCount).toBe(1);
 
-    fireEvent.click(screen.getByRole("tab", { name: /loot/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /keepsakes/i }));
     await waitFor(() => {
       expect(screen.getByTestId("loot-count")).toBeInTheDocument();
     });
@@ -206,7 +206,7 @@ describe("CollectionTab mount persistence", () => {
     fireEvent.click(screen.getByRole("tab", { name: /badges/i }));
     fireEvent.click(screen.getByRole("tab", { name: /moments/i }));
     fireEvent.click(screen.getByRole("tab", { name: /postcards/i }));
-    fireEvent.click(screen.getByRole("tab", { name: /loot/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /keepsakes/i }));
 
     expect(mocks.badgesMountCount).toBe(1);
     expect(mocks.momentsMountCount).toBe(1);

@@ -1,5 +1,8 @@
 import { safeLocalStorage } from './storage';
 import { iosAudioManager, isIOS, resumeAudioContext, setupIOSAudioInteraction } from './iosAudio';
+import { productScopedStorageKey } from '@/config/productRuntime';
+
+export const GLOBAL_AUDIO_MUTED_STORAGE_KEY = productScopedStorageKey('global_audio_muted');
 
 /**
  * Global Audio Manager
@@ -37,7 +40,7 @@ class GlobalAudioManager {
 
   private loadPreferences() {
     try {
-      const savedMuted = safeLocalStorage.getItem('global_audio_muted');
+      const savedMuted = safeLocalStorage.getItem(GLOBAL_AUDIO_MUTED_STORAGE_KEY);
       if (savedMuted) {
         this.isMuted = savedMuted === 'true';
         // Sync iOS manager on load
@@ -52,7 +55,7 @@ class GlobalAudioManager {
 
   private savePreferences() {
     try {
-      safeLocalStorage.setItem('global_audio_muted', this.isMuted.toString());
+      safeLocalStorage.setItem(GLOBAL_AUDIO_MUTED_STORAGE_KEY, this.isMuted.toString());
     } catch (e) {
       console.warn('Failed to save global audio preferences:', e);
     }

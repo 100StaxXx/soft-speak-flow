@@ -6,9 +6,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { NativeCalendar } from '@/plugins/NativeCalendarPlugin';
 import { parseFunctionInvokeError, toUserFacingFunctionError } from '@/utils/supabaseFunctionErrors';
 import { toUserFacingCalendarOAuthError } from '@/utils/calendarOAuthErrors';
+import { PRODUCT_RUNTIME } from '@/config/productRuntime';
 
 export type CalendarProvider = 'google' | 'outlook' | 'apple';
-export type CalendarSyncMode = 'send_only';
+export type CalendarSyncMode = 'send_only' | 'full_sync';
 export type CalendarOAuthSource = 'web' | 'native';
 
 export interface ConnectedCalendar {
@@ -49,8 +50,6 @@ interface CalendarIntegrationsOptions {
 }
 
 const providerToFunction = (provider: CalendarProvider) => `${provider}-calendar-auth`;
-const SEND_ONLY_SYNC_MODE: CalendarSyncMode = 'send_only';
-
 const isNativeIOS = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
 const APP_UPDATE_REQUIRED_MESSAGE = 'This app build needs an update to enable Apple Calendar.';
 
@@ -115,10 +114,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      return ((data || []) as unknown as ConnectedCalendar[]).map((connection) => ({
-        ...connection,
-        sync_mode: SEND_ONLY_SYNC_MODE,
-      }));
+      return (data || []) as unknown as ConnectedCalendar[];
     },
   });
 
@@ -169,6 +165,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
     mutationFn: async ({
       provider,
       redirectUri,
+      syncMode = 'full_sync',
       source = 'web',
     }: {
       provider: Exclude<CalendarProvider, 'apple'>;
@@ -178,7 +175,13 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
     }) => {
       const fn = providerToFunction(provider);
       const { data, error } = await supabase.functions.invoke(fn, {
-        body: { action: 'getAuthUrl', redirectUri, syncMode: SEND_ONLY_SYNC_MODE, source },
+        body: {
+          action: 'getAuthUrl',
+          redirectUri,
+          syncMode,
+          source,
+          productMode: PRODUCT_RUNTIME.authProductMode,
+        },
       });
 
       if (error) {
@@ -198,6 +201,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
       provider,
       code,
       redirectUri,
+      syncMode = 'full_sync',
       state,
     }: {
       provider: Exclude<CalendarProvider, 'apple'>;
@@ -208,7 +212,14 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
     }) => {
       const fn = providerToFunction(provider);
       const { data, error } = await supabase.functions.invoke(fn, {
-        body: { action: 'exchangeCode', code, redirectUri, syncMode: SEND_ONLY_SYNC_MODE, state },
+        body: {
+          action: 'exchangeCode',
+          code,
+          redirectUri,
+          syncMode,
+          state,
+          productMode: PRODUCT_RUNTIME.authProductMode,
+        },
       });
 
       if (error) {
@@ -245,6 +256,34 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
         throw await toCalendarInvokeError({
           provider,
           action: 'disconnect your calendar',
+          error,
+        });
+      }
+    },
+    onSuccess: refreshCalendarIntegrations,
+  });
+
+  const setProviderSyncMode = useMutation({
+    mutationFn: async ({ provider, syncMode }: { provider: CalendarProvider; syncMode: CalendarSyncMode }) => {
+      if (provider === 'apple') {
+        if (!user?.id) throw new Error('User not authenticated');
+        const { error } = await supabase
+          .from('user_calendar_connections')
+          .update({ sync_mode: syncMode })
+          .eq('user_id', user.id)
+          .eq('provider', 'apple');
+        if (error) throw error;
+        return;
+      }
+
+      const fn = providerToFunction(provider);
+      const { error } = await supabase.functions.invoke(fn, {
+        body: { action: 'setSyncMode', syncMode },
+      });
+      if (error) {
+        throw await toCalendarInvokeError({
+          provider,
+          action: 'update calendar sync mode',
           error,
         });
       }
@@ -397,7 +436,8 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
   });
 
   const connectAppleNative = useMutation({
-    mutationFn: async (_variables?: { syncMode?: CalendarSyncMode }) => {
+    mutationFn: async (variables?: { syncMode?: CalendarSyncMode }) => {
+      const { syncMode = 'send_only' } = variables ?? {};
       if (!user?.id) throw new Error('User not authenticated');
       if (!isNativeIOS()) throw new Error('Apple Calendar is only available on iOS native');
       if (!canConnectAppleNative) throw new Error(appleNativeUnavailableReason ?? APP_UPDATE_REQUIRED_MESSAGE);
@@ -423,7 +463,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
             user_id: user.id,
             provider: 'apple',
             sync_enabled: true,
-            sync_mode: SEND_ONLY_SYNC_MODE,
+            sync_mode: syncMode,
             primary_calendar_id: primary.id,
             primary_calendar_name: primary.title,
             calendar_id: primary.id,
@@ -453,6 +493,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
     beginOAuthConnection,
     completeOAuthConnection,
     disconnectProvider,
+    setProviderSyncMode,
     listProviderCalendars,
     setPrimaryCalendar,
     listProviderTaskLists,

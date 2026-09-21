@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { maybeEnqueueCompanionAnimationJob } from "../_shared/companionAnimationJobs.ts";
 import { createCostGuardrailSession } from "../_shared/costGuardrails.ts";
+import { getCurrentVisualStageBoundaryLevel } from "../../../src/config/progression.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,6 +59,7 @@ const TERMINAL_CODES = new Set([
   "rate_limited",
   "evolution_quality_gate_failed",
   "evolution_continuity_unverified",
+  "premade_asset_unavailable",
 ]);
 
 const isRetryableError = (message: string) =>
@@ -329,7 +331,6 @@ const ensureEvolutionAnimationEnqueued = async ({
 }): Promise<AnimationEnqueueResult> => {
   const evolutionId = asString(evolutionPayload.evolution_id);
   const newStage = asNumber(evolutionPayload.new_stage) ?? job.requested_stage;
-  const previousStage = asNumber(evolutionPayload.previous_stage);
 
   if (!evolutionId) {
     return {
@@ -394,11 +395,14 @@ const ensureEvolutionAnimationEnqueued = async ({
 
   if (companionError) throw companionError;
 
-  const previousImageUrl = typeof previousStage === "number"
+  const previousBoundaryStage = getCurrentVisualStageBoundaryLevel(
+    newStage - 1,
+  );
+  const previousImageUrl = previousBoundaryStage > 0
     ? await fetchEvolutionImageUrlForStage(
       supabase,
       job.companion_id,
-      previousStage,
+      previousBoundaryStage,
     )
     : null;
 
@@ -914,11 +918,15 @@ export const handleProcessCompanionEvolutionJob = async (
           retryable = error.retryable;
         }
 
-        const shouldRetry = retryable && retryCount <= 2;
+        const maxRetryCount = errorCode === "cinema_event_preparing" ? 30 : 2;
+        const shouldRetry = retryable && retryCount <= maxRetryCount;
 
         if (shouldRetry) {
           const nextRetryAt = new Date(
-            now.getTime() + BASE_RETRY_DELAY_MS * 2 ** (retryCount - 1),
+            now.getTime() + Math.min(
+              2 * 60 * 1000,
+              BASE_RETRY_DELAY_MS * 2 ** (retryCount - 1),
+            ),
           ).toISOString();
           await supabase
             .from("companion_evolution_jobs")

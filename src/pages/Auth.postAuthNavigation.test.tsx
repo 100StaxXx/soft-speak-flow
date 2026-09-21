@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,7 +16,7 @@ const mocks = vi.hoisted(() => {
   const getSessionMock = vi.fn();
   const onAuthStateChangeMock = vi.fn();
   const invokeMock = vi.fn();
-  const setSessionMock = vi.fn();
+  const signInWithIdTokenMock = vi.fn();
   const appleAuthorizeMock = vi.fn();
   const maybeSingleMock = vi.fn();
   const loggerDebugMock = vi.fn();
@@ -18,6 +24,7 @@ const mocks = vi.hoisted(() => {
   const loggerWarnMock = vi.fn();
   const loggerErrorMock = vi.fn();
   const loggerLogMock = vi.fn();
+  const validateSessionProductBoundaryMock = vi.fn();
 
   const selectEqMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }));
   const selectMock = vi.fn(() => ({ eq: selectEqMock }));
@@ -31,7 +38,7 @@ const mocks = vi.hoisted(() => {
     getSessionMock,
     onAuthStateChangeMock,
     invokeMock,
-    setSessionMock,
+    signInWithIdTokenMock,
     appleAuthorizeMock,
     maybeSingleMock,
     selectEqMock,
@@ -42,6 +49,7 @@ const mocks = vi.hoisted(() => {
     loggerWarnMock,
     loggerErrorMock,
     loggerLogMock,
+    validateSessionProductBoundaryMock,
     isNativePlatform: false,
     platform: "web",
     applePluginAvailable: false,
@@ -108,13 +116,18 @@ vi.mock("@/integrations/supabase/client", () => ({
       signUp: vi.fn(),
       resetPasswordForEmail: vi.fn(),
       signInWithOAuth: vi.fn(),
-      setSession: mocks.setSessionMock,
+      signInWithIdToken: mocks.signInWithIdTokenMock,
     },
     from: mocks.fromMock,
     functions: {
       invoke: mocks.invokeMock,
     },
   },
+}));
+
+vi.mock("@/services/authProductBoundary", () => ({
+  validateSessionProductBoundary: mocks.validateSessionProductBoundaryMock,
+  announceAuthProductMismatch: vi.fn(),
 }));
 
 import Auth from "./Auth";
@@ -157,15 +170,7 @@ const primeNativeAppleFlow = () => {
       user: "apple-user-1",
     },
   });
-  mocks.invokeMock.mockResolvedValue({
-    data: {
-      access_token: "access-token",
-      refresh_token: "refresh-token",
-      user: signedInSession.user,
-    },
-    error: null,
-  });
-  mocks.setSessionMock.mockResolvedValue({
+  mocks.signInWithIdTokenMock.mockResolvedValue({
     data: {
       session: signedInSession,
     },
@@ -196,7 +201,7 @@ describe("Auth post-auth navigation", () => {
 
     mocks.getAuthRedirectPathMock.mockResolvedValue("/tasks");
     mocks.getProfileAwareAuthFallbackPathMock.mockResolvedValue("/tasks");
-    mocks.setSessionMock.mockResolvedValue({
+    mocks.signInWithIdTokenMock.mockResolvedValue({
       data: {
         session: signedInSession,
       },
@@ -216,6 +221,12 @@ describe("Auth post-auth navigation", () => {
       },
       error: null,
     });
+    mocks.validateSessionProductBoundaryMock.mockResolvedValue({
+      allowed: true,
+      expectedProductMode: "graceward",
+      actualProductMode: "graceward",
+      reason: "trusted_binding",
+    });
   });
 
   afterEach(() => {
@@ -224,7 +235,9 @@ describe("Auth post-auth navigation", () => {
 
   it("routes existing users to /tasks when core redirect hangs and timeout fallback runs", async () => {
     vi.useFakeTimers();
-    mocks.getAuthRedirectPathMock.mockImplementation(() => new Promise(() => {}));
+    mocks.getAuthRedirectPathMock.mockImplementation(
+      () => new Promise(() => {}),
+    );
     mocks.getProfileAwareAuthFallbackPathMock.mockResolvedValue("/tasks");
 
     renderAuth();
@@ -235,7 +248,10 @@ describe("Auth post-auth navigation", () => {
     });
     await flushMicrotasks();
 
-    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/tasks");
+    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(
+      expect.any(Function),
+      "/tasks",
+    );
     expect(mocks.safeNavigateMock).toHaveBeenCalledTimes(1);
     expect(mocks.toastMock).not.toHaveBeenCalled();
   });
@@ -250,8 +266,12 @@ describe("Auth post-auth navigation", () => {
     renderAuth();
     await flushMicrotasks();
 
-    expect(screen.queryByRole("button", { name: /continue as guest/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^sign in$/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /continue as guest/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^sign in$/i }),
+    ).toBeInTheDocument();
   });
 
   it("lets account creation users reveal and hide password fields", async () => {
@@ -264,30 +284,44 @@ describe("Auth post-auth navigation", () => {
     renderAuth();
     await flushMicrotasks();
 
-    expect(screen.queryByRole("button", { name: /^show confirm password$/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^show confirm password$/i }),
+    ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /need an account\? sign up/i }),
+    );
 
     const passwordInput = screen.getByLabelText(/^password$/i);
     const confirmPasswordInput = screen.getByLabelText(/^confirm password$/i);
-    const showPasswordButton = screen.getByRole("button", { name: /^show password$/i });
-    const showConfirmPasswordButton = screen.getByRole("button", { name: /^show confirm password$/i });
+    const showPasswordButton = screen.getByRole("button", {
+      name: /^show password$/i,
+    });
+    const showConfirmPasswordButton = screen.getByRole("button", {
+      name: /^show confirm password$/i,
+    });
 
     expect(passwordInput).toHaveAttribute("type", "password");
     expect(confirmPasswordInput).toHaveAttribute("type", "password");
 
     fireEvent.click(showPasswordButton);
     expect(passwordInput).toHaveAttribute("type", "text");
-    expect(screen.getByRole("button", { name: /^hide password$/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^hide password$/i }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^hide password$/i }));
     expect(passwordInput).toHaveAttribute("type", "password");
 
     fireEvent.click(showConfirmPasswordButton);
     expect(confirmPasswordInput).toHaveAttribute("type", "text");
-    expect(screen.getByRole("button", { name: /^hide confirm password$/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^hide confirm password$/i }),
+    ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /^hide confirm password$/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^hide confirm password$/i }),
+    );
     expect(confirmPasswordInput).toHaveAttribute("type", "password");
   });
 
@@ -321,7 +355,9 @@ describe("Auth post-auth navigation", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Request could not be completed.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Request could not be completed.",
+    );
   });
 
   it("shows a friendly inline error when reset password cannot reach the auth service", async () => {
@@ -385,7 +421,9 @@ describe("Auth post-auth navigation", () => {
     renderAuth();
     await flushMicrotasks();
 
-    fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /need an account\? sign up/i }),
+    );
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "new@example.com" },
     });
@@ -439,7 +477,9 @@ describe("Auth post-auth navigation", () => {
     renderAuth();
     await flushMicrotasks();
 
-    fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /need an account\? sign up/i }),
+    );
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "new@example.com" },
     });
@@ -451,7 +491,9 @@ describe("Auth post-auth navigation", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /^get started$/i }));
 
-    await screen.findByRole("button", { name: /already have an account\? sign in/i });
+    await screen.findByRole("button", {
+      name: /already have an account\? sign in/i,
+    });
 
     expect(mocks.invokeMock).toHaveBeenCalledWith("auth-gateway", {
       body: expect.objectContaining({
@@ -477,7 +519,9 @@ describe("Auth post-auth navigation", () => {
     renderAuth();
     await flushMicrotasks();
 
-    fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /need an account\? sign up/i }),
+    );
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "new@example.c" },
     });
@@ -489,7 +533,9 @@ describe("Auth post-auth navigation", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /^get started$/i }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email address");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Invalid email address",
+    );
     expect(mocks.invokeMock).not.toHaveBeenCalled();
     expect(mocks.toastMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -514,7 +560,8 @@ describe("Auth post-auth navigation", () => {
         message: "Edge Function returned a non-2xx status code",
         context: {
           json: async () => ({
-            error: "An account with this email already exists. Try signing in instead.",
+            error:
+              "An account with this email already exists. Try signing in instead.",
             code: "EMAIL_ALREADY_REGISTERED",
             requestId: "req-auth-duplicate-1",
           }),
@@ -525,7 +572,9 @@ describe("Auth post-auth navigation", () => {
     renderAuth();
     await flushMicrotasks();
 
-    fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /need an account\? sign up/i }),
+    );
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "existing@example.com" },
     });
@@ -543,7 +592,8 @@ describe("Auth post-auth navigation", () => {
     expect(mocks.toastMock).toHaveBeenCalledWith(
       expect.objectContaining({
         title: "Couldn't create account",
-        description: "An account with this email already exists. Try signing in instead.",
+        description:
+          "An account with this email already exists. Try signing in instead.",
         variant: "destructive",
       }),
     );
@@ -574,7 +624,9 @@ describe("Auth post-auth navigation", () => {
     renderAuth();
     await flushMicrotasks();
 
-    fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /need an account\? sign up/i }),
+    );
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "new@example.com" },
     });
@@ -602,25 +654,32 @@ describe("Auth post-auth navigation", () => {
   it("routes native Apple sign-in timeout fallbacks to / instead of /onboarding", async () => {
     vi.useFakeTimers();
     primeNativeAppleFlow();
-    mocks.getAuthRedirectPathMock.mockImplementation(() => new Promise(() => {}));
+    mocks.getAuthRedirectPathMock.mockImplementation(
+      () => new Promise(() => {}),
+    );
     mocks.getProfileAwareAuthFallbackPathMock.mockResolvedValue("/onboarding");
 
     renderAuth();
     await flushMicrotasks();
 
-    fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /sign in with apple/i }),
+    );
 
     await flushMicrotasks();
     await flushMicrotasks();
 
-    expect(mocks.setSessionMock).toHaveBeenCalledTimes(1);
+    expect(mocks.signInWithIdTokenMock).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);
     });
     await flushMicrotasks();
 
-    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/");
+    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(
+      expect.any(Function),
+      "/",
+    );
     expect(mocks.safeNavigateMock).toHaveBeenCalledTimes(1);
   });
 
@@ -631,10 +690,15 @@ describe("Auth post-auth navigation", () => {
     renderAuth();
     await flushMicrotasks();
 
-    fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /sign in with apple/i }),
+    );
 
     await waitFor(() => {
-      expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/");
+      expect(mocks.safeNavigateMock).toHaveBeenCalledWith(
+        expect.any(Function),
+        "/",
+      );
     });
   });
 
@@ -645,17 +709,26 @@ describe("Auth post-auth navigation", () => {
     renderAuth();
     await flushMicrotasks();
 
-    fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
-    fireEvent.click(screen.getByRole("button", { name: /sign up with apple/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /need an account\? sign up/i }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /sign up with apple/i }),
+    );
 
     await waitFor(() => {
-      expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/onboarding");
+      expect(mocks.safeNavigateMock).toHaveBeenCalledWith(
+        expect.any(Function),
+        "/onboarding",
+      );
     });
   });
 
   it("routes incomplete users to /onboarding when core redirect hangs and timeout fallback runs", async () => {
     vi.useFakeTimers();
-    mocks.getAuthRedirectPathMock.mockImplementation(() => new Promise(() => {}));
+    mocks.getAuthRedirectPathMock.mockImplementation(
+      () => new Promise(() => {}),
+    );
     mocks.getProfileAwareAuthFallbackPathMock.mockResolvedValue("/onboarding");
 
     renderAuth();
@@ -666,7 +739,10 @@ describe("Auth post-auth navigation", () => {
     });
     await flushMicrotasks();
 
-    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/onboarding");
+    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(
+      expect.any(Function),
+      "/onboarding",
+    );
     expect(mocks.safeNavigateMock).toHaveBeenCalledTimes(1);
   });
 
@@ -678,7 +754,10 @@ describe("Auth post-auth navigation", () => {
     await flushMicrotasks();
     await flushMicrotasks();
 
-    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/tasks");
+    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(
+      expect.any(Function),
+      "/tasks",
+    );
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);
@@ -691,8 +770,12 @@ describe("Auth post-auth navigation", () => {
 
   it("falls back deterministically to /onboarding when profile-aware timeout fallback throws", async () => {
     vi.useFakeTimers();
-    mocks.getAuthRedirectPathMock.mockImplementation(() => new Promise(() => {}));
-    mocks.getProfileAwareAuthFallbackPathMock.mockRejectedValue(new Error("fallback failed"));
+    mocks.getAuthRedirectPathMock.mockImplementation(
+      () => new Promise(() => {}),
+    );
+    mocks.getProfileAwareAuthFallbackPathMock.mockRejectedValue(
+      new Error("fallback failed"),
+    );
 
     renderAuth();
     await flushMicrotasks();
@@ -702,7 +785,10 @@ describe("Auth post-auth navigation", () => {
     });
     await flushMicrotasks();
 
-    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/onboarding");
+    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(
+      expect.any(Function),
+      "/onboarding",
+    );
     expect(mocks.safeNavigateMock).toHaveBeenCalledTimes(1);
   });
 
@@ -725,7 +811,10 @@ describe("Auth post-auth navigation", () => {
     });
     await flushMicrotasks();
 
-    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/tasks");
+    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(
+      expect.any(Function),
+      "/tasks",
+    );
     expect(mocks.safeNavigateMock).toHaveBeenCalledTimes(1);
 
     await act(async () => {

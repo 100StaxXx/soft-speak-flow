@@ -4,11 +4,33 @@ import {
   createCostGuardrailSession,
   detectCostAnomalies,
   getCurrentCostPeriodStart,
+  getFalVideoRatePerSecond,
   getOpenAIImageFallbackCostUsd,
   getOpenAIImageTokenRatesPerThousand,
   getOpenAITextTokenRatesPerThousand,
   normalizeThresholds,
 } from "./costGuardrails.ts";
+
+Deno.test("Fal Kling Standard and Pro native-audio estimates use current per-second rates", () => {
+  assertEquals(
+    getFalVideoRatePerSecond(
+      "fal-ai/kling-video/v3/standard/image-to-video",
+      true,
+    ),
+    0.126,
+  );
+  assertEquals(
+    getFalVideoRatePerSecond(
+      "fal-ai/kling-video/v3/standard/image-to-video",
+      false,
+    ),
+    0.084,
+  );
+  assertEquals(
+    getFalVideoRatePerSecond("fal-ai/kling-video/v3/pro/image-to-video", true),
+    0.168,
+  );
+});
 
 function createCostGuardrailSupabaseMock() {
   const inserts: Array<{ table: string; payload: Record<string, unknown> }> =
@@ -71,6 +93,21 @@ Deno.test("getCurrentCostPeriodStart uses UTC month boundaries", () => {
 
 Deno.test("getOpenAITextTokenRatesPerThousand routes GPT-5.5 to documented text rates", () => {
   assertEquals(getOpenAITextTokenRatesPerThousand("gpt-5.5"), {
+    inputRate: 0.005,
+    outputRate: 0.03,
+  });
+});
+
+Deno.test("getOpenAITextTokenRatesPerThousand routes the GPT-5.6 family to documented text rates", () => {
+  assertEquals(getOpenAITextTokenRatesPerThousand("gpt-5.6-luna"), {
+    inputRate: 0.001,
+    outputRate: 0.006,
+  });
+  assertEquals(getOpenAITextTokenRatesPerThousand("gpt-5.6-terra"), {
+    inputRate: 0.0025,
+    outputRate: 0.015,
+  });
+  assertEquals(getOpenAITextTokenRatesPerThousand("gpt-5.6-sol"), {
     inputRate: 0.005,
     outputRate: 0.03,
   });
@@ -210,6 +247,44 @@ Deno.test("cost guardrail image telemetry uses Image API size when usage tokens 
   assertEquals(costEvent?.payload.estimated_cost_usd, 0.2);
   assertEquals(costEvent?.payload.model, "gpt-image-1.5");
   assertEquals(costEvent?.payload.image_count, 1);
+});
+
+Deno.test("cost guardrail records failed multipart Image API edits", async () => {
+  const { supabase, inserts } = createCostGuardrailSupabaseMock();
+  const session = createCostGuardrailSession({
+    supabase,
+    endpointKey: "process-companion-cinema-event",
+    featureKey: "ai_companion_cinema",
+    userId: "user-1",
+    requestId: "event-1",
+  });
+  const formData = new FormData();
+  formData.set("model", "gpt-image-1-mini");
+  formData.set("prompt", "evolve this companion");
+  formData.set("size", "1536x1024");
+  formData.set("image[]", new File(["reference"], "reference.png", {
+    type: "image/png",
+  }));
+
+  const guardedFetch = session.wrapFetch(async () =>
+    new Response(JSON.stringify({ error: { type: "insufficient_quota" } }), {
+      status: 429,
+      headers: { "Content-Type": "application/json" },
+    })
+  );
+
+  await guardedFetch("https://api.openai.com/v1/images/edits", {
+    method: "POST",
+    body: formData,
+  });
+
+  const costEvent = inserts.find((row) => row.table === "cost_events");
+  assertEquals(costEvent?.payload.provider, "openai");
+  assertEquals(costEvent?.payload.capability, "image");
+  assertEquals(costEvent?.payload.model, "gpt-image-1-mini");
+  assertEquals(costEvent?.payload.status, "error");
+  assertEquals(costEvent?.payload.upstream_status, 429);
+  assertEquals(costEvent?.payload.estimated_cost_usd, 0);
 });
 
 Deno.test("detectCostAnomalies finds hourly spend spikes", () => {

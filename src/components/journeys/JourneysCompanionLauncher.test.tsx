@@ -64,6 +64,7 @@ describe("JourneysCompanionLauncher", () => {
     );
     expect(launcher.className).not.toContain("border-[#4d2811]");
     expect(launcher.querySelectorAll('[aria-hidden="true"]')).toHaveLength(0);
+    expect(launcher.querySelector('[data-testid="companion-motion-surface"]')).toBeInTheDocument();
     expect(image).toHaveAttribute("data-companion-image-fit", "portrait");
     expect(image.parentElement).toHaveClass("h-[7.75rem]", "w-[7.75rem]");
     expect(image.parentElement?.className).not.toContain("rounded");

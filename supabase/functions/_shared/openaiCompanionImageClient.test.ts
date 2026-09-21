@@ -69,6 +69,43 @@ function coerceRequestInit(
   };
 }
 
+Deno.test("editCompanionImage accepts a cinema-specific preferred model", async () => {
+  const requestedModels: string[] = [];
+  const result = await editCompanionImage({
+    guardedFetch: (async (input, init) => {
+      const url = resolveInputUrl(input);
+      if (url === "https://example.com/current.png") {
+        return createImageResponse("current-companion");
+      }
+      if (url === OPENAI_IMAGE_EDITS_URL) {
+        const formData = coerceRequestInit(init).body;
+        assert(formData instanceof FormData, "Expected multipart edit payload");
+        requestedModels.push(String(formData.get("model")));
+        return createJsonResponse({ data: [{ b64_json: "aW1hZ2U=" }] });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    }) as typeof fetch,
+    openAIApiKey: "test-key",
+    model: "gpt-image-2",
+    prompt: "evolve the same companion",
+    size: "1536x1024",
+    quality: "high",
+    background: "transparent",
+    outputFormat: "png",
+    userId: "user-1",
+    referenceImages: [{ imageUrl: "https://example.com/current.png" }],
+  });
+
+  assert(
+    requestedModels[0] === "gpt-image-2",
+    "Expected preferred cinema model first",
+  );
+  assert(
+    result.model === "gpt-image-2",
+    "Expected result metadata to preserve the model",
+  );
+});
+
 Deno.test("generateCompanionImage downloads direct image URLs with guardedFetch", async () => {
   const originalCompanionImageModel = Deno.env.get(
     "OPENAI_COMPANION_IMAGE_MODEL",
@@ -100,11 +137,15 @@ Deno.test("generateCompanionImage downloads direct image URLs with guardedFetch"
         );
         assert(
           body.background === "transparent",
-          `Expected transparent background to be forwarded, got ${String(body.background)}`,
+          `Expected transparent background to be forwarded, got ${
+            String(body.background)
+          }`,
         );
         assert(
           body.output_format === "png",
-          `Expected PNG output format to be forwarded, got ${String(body.output_format)}`,
+          `Expected PNG output format to be forwarded, got ${
+            String(body.output_format)
+          }`,
         );
         return createJsonResponse({
           data: [

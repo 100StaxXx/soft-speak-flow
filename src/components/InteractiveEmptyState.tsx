@@ -18,11 +18,11 @@ const quickPresets: QuickPreset[] = [
 ];
 
 const motivationalMessages = [
-  "Every quest begins with a single step ✨",
-  "Today's quests shape tomorrow's victories 🏆",
-  "Small wins compound into legendary achievements 🔥",
-  "Your adventure awaits, hero! ⚔️",
-  "Build habits, build greatness 💪",
+  "Faithfulness often begins with one small step.",
+  "Today’s actions help shape tomorrow.",
+  "Small, steady choices can bear lasting fruit.",
+  "You only need to take the next right step.",
+  "Practice consistency; leave room for grace.",
 ];
 
 interface InteractiveEmptyStateProps {

@@ -117,16 +117,15 @@ vi.mock("@/utils/plannerLocalStore", () => ({
 
 vi.mock("@/utils/plannerSync", () => ({
   PLANNER_SYNC_EVENT: "planner-sync-finished",
-  dispatchPlannerSyncFinished: (...args: unknown[]) =>
-    mocks.dispatchPlannerSyncFinished(...args),
+  dispatchPlannerSyncFinished: () => mocks.dispatchPlannerSyncFinished(),
   loadLocalHabitCompletions: (...args: unknown[]) =>
     mocks.loadLocalHabitCompletions(...args),
   loadLocalHabits: (...args: unknown[]) => mocks.loadLocalHabits(...args),
   loadLocalEpics: (...args: unknown[]) => mocks.loadLocalEpics(...args),
   syncLocalHabitsFromRemote: (...args: unknown[]) =>
     mocks.syncLocalHabitsFromRemote(...args),
-  withPlannerRemoteSyncLock: (...args: unknown[]) =>
-    mocks.withPlannerRemoteSyncLock(...args),
+  withPlannerRemoteSyncLock: (userId: string, operation: () => Promise<unknown>) =>
+    mocks.withPlannerRemoteSyncLock(userId, operation),
 }));
 
 import { useHabits } from "./useHabits";

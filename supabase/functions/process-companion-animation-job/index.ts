@@ -7,6 +7,7 @@ import {
 import {
   type CompanionAnimationIneligibility,
   getCompanionAnimationIneligibility,
+  isSupportedCompanionAnimationImageUrl,
 } from "../_shared/companionAnimationJobs.ts";
 import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
 import {
@@ -42,6 +43,7 @@ interface CompanionAnimationJob {
   evolution_id: string;
   stage: number;
   source_image_url: string;
+  start_image_url: string | null;
   provider: string;
   provider_model: string;
   provider_task_id: string | null;
@@ -103,6 +105,17 @@ const normalizeErrorCode = (input: string | null | undefined) => {
     .slice(0, 64) || "animation_failed";
 };
 
+const resolveProviderImageUrl = (
+  imageUrl: string,
+  env: Pick<typeof Deno.env, "get">,
+): string => {
+  if (/^https?:\/\//i.test(imageUrl)) return imageUrl;
+
+  const assetOrigin = env.get("GRACEWARD_PUBLIC_ASSET_ORIGIN")?.trim() ||
+    env.get("APP_URL")?.trim() || "https://graceward.app";
+  return new URL(imageUrl, `${assetOrigin.replace(/\/+$/, "")}/`).toString();
+};
+
 const getJobSelectColumns = () =>
   [
     "id",
@@ -111,6 +124,7 @@ const getJobSelectColumns = () =>
     "evolution_id",
     "stage",
     "source_image_url",
+    "start_image_url",
     "provider",
     "provider_model",
     "provider_task_id",
@@ -291,11 +305,14 @@ const sendEvolutionReadyPush = async ({
 
   const invoke = supabase.functions?.invoke?.bind(supabase.functions);
   if (typeof invoke !== "function") {
-    deps.warn("Skipping evolution ready push because functions.invoke is unavailable", {
-      userId: job.user_id,
-      companionId: job.companion_id,
-      evolutionId: job.evolution_id,
-    });
+    deps.warn(
+      "Skipping evolution ready push because functions.invoke is unavailable",
+      {
+        userId: job.user_id,
+        companionId: job.companion_id,
+        evolutionId: job.evolution_id,
+      },
+    );
     return;
   }
 
@@ -349,7 +366,9 @@ const sendEvolutionReadyPush = async ({
         userId: job.user_id,
         companionId: job.companion_id,
         evolutionId: job.evolution_id,
-        error: pushError instanceof Error ? pushError.message : String(pushError),
+        error: pushError instanceof Error
+          ? pushError.message
+          : String(pushError),
       });
     }
   }
@@ -487,8 +506,15 @@ const resolveJobAnimationIneligibility = async ({
   const stageIneligibility = getCompanionAnimationIneligibility({
     stage: job.stage,
     sourceImageUrl: job.source_image_url,
+    previousImageUrl: job.start_image_url,
   });
   if (stageIneligibility) return stageIneligibility;
+  if (!isSupportedCompanionAnimationImageUrl(job.source_image_url)) {
+    return {
+      code: "source_image_url_unavailable",
+      message: "Evolution animation requires an accessible ending portrait",
+    };
+  }
 
   try {
     const [evolutionResult, previousImageUrl] = await Promise.all([
@@ -509,11 +535,27 @@ const resolveJobAnimationIneligibility = async ({
     }
 
     const evolution = evolutionResult.data;
+    const resolvedStartImageUrl = isSupportedCompanionAnimationImageUrl(
+        job.start_image_url,
+      )
+      ? job.start_image_url
+      : previousImageUrl;
+    if (!isSupportedCompanionAnimationImageUrl(resolvedStartImageUrl)) {
+      return {
+        code: job.stage === 1
+          ? "hatch_start_image_url_unavailable"
+          : "evolution_start_image_url_unavailable",
+        message: job.stage === 1
+          ? "Hatch animation requires an egg starting image"
+          : "Evolution animation requires the prior approved portrait as its starting image",
+      };
+    }
+
     return getCompanionAnimationIneligibility({
       stage: job.stage,
       generationMetadata: evolution?.generation_metadata,
       sourceImageUrl: job.source_image_url,
-      previousImageUrl,
+      previousImageUrl: resolvedStartImageUrl,
     });
   } catch (error) {
     if (!(error instanceof TypeError)) {
@@ -670,11 +712,31 @@ export const processClaimedCompanionAnimationJob = async ({
     const guardedFetch = costGuardrails.wrapFetch(deps.fetchFn);
     let submitted: Awaited<ReturnType<typeof submitFalKlingVideo>>;
     try {
+      const storedStartImageUrl = isSupportedCompanionAnimationImageUrl(
+          job.start_image_url,
+        )
+        ? job.start_image_url
+        : await fetchPreviousBoundaryEvolutionImageUrl(
+          supabase,
+          job.companion_id,
+          job.stage,
+        );
+      if (!isSupportedCompanionAnimationImageUrl(storedStartImageUrl)) {
+        throw new JobProcessingError(
+          "Companion animation starting portrait is unavailable",
+          job.stage === 1
+            ? "hatch_start_image_url_unavailable"
+            : "evolution_start_image_url_unavailable",
+          false,
+        );
+      }
+
       submitted = await submitFalKlingVideo({
         fetchFn: guardedFetch,
         apiKey: falKey,
         model: providerModel,
-        imageUrl: job.source_image_url,
+        imageUrl: resolveProviderImageUrl(storedStartImageUrl, deps.env),
+        endImageUrl: resolveProviderImageUrl(job.source_image_url, deps.env),
         prompt: job.prompt,
         durationSeconds: DEFAULT_COMPANION_ANIMATION_DURATION_SECONDS,
       });

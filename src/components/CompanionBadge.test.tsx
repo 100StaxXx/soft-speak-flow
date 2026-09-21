@@ -8,13 +8,13 @@ describe("CompanionBadge", () => {
     render(<CompanionBadge element="storm" stage={4} />);
 
     expect(screen.getByText("Storm")).toBeInTheDocument();
-    expect(screen.getByText("Stage 1 • Hatchling")).toBeInTheDocument();
+    expect(screen.getByText("Stage 1 • Young")).toBeInTheDocument();
     expect(screen.queryByText("Stage 4 • Hatchling")).not.toBeInTheDocument();
   });
 
   it("caps the final form at visual stage 7", () => {
     render(<CompanionBadge element="light" stage={100} />);
 
-    expect(screen.getByText("Stage 7 • Ascended")).toBeInTheDocument();
+    expect(screen.getByText("Stage 7 • Grand")).toBeInTheDocument();
   });
 });

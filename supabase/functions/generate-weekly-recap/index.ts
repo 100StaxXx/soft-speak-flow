@@ -12,6 +12,11 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import {
+  CHRISTIAN_GUIDANCE_POLICY,
+  enforceChristianGuidanceOutput,
+} from "../_shared/christianGuidancePolicy.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 interface GenerateWeeklyRecapDeps {
   authenticate: (req: Request, corsHeaders: HeadersInit) => Promise<RequestAuth | Response>;
@@ -145,6 +150,7 @@ export async function handleGenerateWeeklyRecap(
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const productMode = await resolveUserProductMode(supabase, userId);
 
     if (typeof supabase.rpc === "function") {
       const abuseResult = await (deps.applyAbuseProtectionFn ?? applyAbuseProtection)(req, supabase, {
@@ -179,16 +185,10 @@ export async function handleGenerateWeeklyRecap(
       .from("daily_tasks")
       .select("id")
       .eq("user_id", userId)
+      .eq("source", "faithful_step")
       .eq("completed", true)
       .gte("task_date", weekStartStr)
       .lte("task_date", weekEndStr);
-
-    const { data: habits } = await supabase
-      .from("habit_completions")
-      .select("id")
-      .eq("user_id", userId)
-      .gte("date", weekStartStr)
-      .lte("date", weekEndStr);
 
     const morningMoods = (checkIns || []).map((checkIn: any) => ({
       date: checkIn.check_in_date,
@@ -248,7 +248,7 @@ export async function handleGenerateWeeklyRecap(
       checkIns: checkIns?.length || 0,
       reflections: reflections?.length || 0,
       quests: quests?.length || 0,
-      habits: habits?.length || 0,
+      habits: 0,
     };
 
     const totalActivity = stats.checkIns + stats.reflections + stats.quests + stats.habits;
@@ -274,18 +274,18 @@ export async function handleGenerateWeeklyRecap(
         .eq("id", userId)
         .single();
 
-      let mentorName = "Your Mentor";
+      let guideName = "Your Guide";
       let narrativeProfile = getMentorNarrativeProfile("sage");
 
       if (profile?.selected_mentor_id) {
         const { data: mentor } = await supabase
-          .from("mentors")
+          .from(productMode === "graceward" ? "graceward_guides" : "mentors")
           .select("name, slug, tone_description")
           .eq("id", profile.selected_mentor_id)
           .single();
 
         if (mentor) {
-          mentorName = mentor.name;
+          guideName = mentor.name;
           narrativeProfile = getMentorNarrativeProfile(mentor.slug) || narrativeProfile;
         }
       }
@@ -353,15 +353,15 @@ export async function handleGenerateWeeklyRecap(
       const missedCheckIns = Math.max(0, expectedWeeklyEntries - stats.checkIns);
       const missedReflections = Math.max(0, expectedWeeklyEntries - stats.reflections);
 
-      const storyPrompt = `You are ${mentorName}. Write a concise weekly recap that is easy to consume and grounded in behavior.
+      const storyPrompt = `Write a concise weekly review using the communication style of the fictional ${productMode === "graceward" ? "Graceward Guide" : "Cosmiq guide"} ${guideName}. Do not speak as ${guideName}, claim to be a person, or claim spiritual authority.
 
-YOUR VOICE & STYLE:
+GUIDE VOICE & STYLE:
 ${narrativeProfile?.narrativeVoice || "Warm and supportive"}
 
-YOUR SPEECH PATTERNS:
+GUIDE SPEECH PATTERNS:
 ${narrativeProfile?.speechPatterns?.map((pattern) => `- ${pattern}`).join("\n") || "- Speaks with warmth and encouragement"}
 
-YOUR WISDOM STYLE:
+GUIDE WISDOM STYLE:
 ${narrativeProfile?.wisdomStyle || "Supportive guidance"}
 
 ---
@@ -390,8 +390,7 @@ ${gratitudeTextFull || "No gratitude logged"}
 Stats:
 - Check-ins completed: ${stats.checkIns}
 - Reflections completed: ${stats.reflections}
-- Quests completed: ${stats.quests}
-- Habit completions: ${stats.habits}
+- Prepared daily practices completed: ${stats.quests}
 - Missed morning check-ins: ${missedCheckIns}
 - Missed evening reflections: ${missedReflections}
 
@@ -408,7 +407,9 @@ WRITING REQUIREMENTS:
 - Mention missed check-ins and missed reflections naturally
 - Light warmth is allowed (up to 1-2 mild encouraging lines), but avoid heavy fluff
 - Avoid poetic language, metaphors, or dramatic scene setting
-- Final sentence should give one clear focus for next week`;
+- Do not treat productivity or completion as proof of ${productMode === "graceward" ? "holiness, worth, or God's favor" : "identity or personal worth"}
+- ${productMode === "graceward" ? "Do not infer what God is doing, what God wants in this situation, or why an event happened" : "Do not introduce Scripture, prayer, theology, or Graceward's faith framing"}
+- Final sentence should offer one small, optional focus for next week`;
 
       try {
         const aiResponse = await guardedFetch("https://api.openai.com/v1/chat/completions", {
@@ -422,7 +423,9 @@ WRITING REQUIREMENTS:
             messages: [
               {
                 role: "system",
-                content: `You are ${mentorName}, a concise mentor. Address the user as "you". Write plain-text recap paragraphs that are readable, behavior-specific, and balanced between encouragement and accountability.`,
+                content: productMode === "graceward"
+                  ? `You are Graceward's AI reflection assistant. Use the communication style of the fictional Guide ${guideName} without claiming to be ${guideName}. Address the user as "you". Write plain-text review paragraphs that are readable, behavior-specific, and balanced between encouragement and accountability.\n\n${CHRISTIAN_GUIDANCE_POLICY}`
+                  : `You are Cosmiq's clearly identified AI reflection guide. Use ${guideName}'s communication style without claiming to be a person. Address the user as "you". Write practical, behavior-specific review paragraphs. Do not introduce religious framing or professional advice.`,
               },
               { role: "user", content: storyPrompt },
             ],
@@ -432,7 +435,12 @@ WRITING REQUIREMENTS:
 
         if (aiResponse.ok) {
           const aiData = await aiResponse.json();
-          const generatedRecap = aiData.choices?.[0]?.message?.content?.trim();
+          const rawGeneratedRecap = aiData.choices?.[0]?.message?.content?.trim();
+          const generatedRecap = rawGeneratedRecap
+            ? (productMode === "graceward"
+              ? enforceChristianGuidanceOutput(rawGeneratedRecap)
+              : rawGeneratedRecap)
+            : null;
           mentorStory = generatedRecap || null;
           mentorInsight = generatedRecap ? buildMentorInsightPreview(generatedRecap) : null;
         } else {

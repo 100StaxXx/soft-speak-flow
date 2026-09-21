@@ -284,10 +284,6 @@ vi.mock("@/components/Pathfinder", () => ({
   Pathfinder: () => null,
 }));
 
-vi.mock("@/components/CampaignCreatedAnimation", () => ({
-  CampaignCreatedAnimation: () => null,
-}));
-
 vi.mock("@/components/DraggableFAB", () => ({
   DraggableFAB: ({ onOpenCompanionPlanner }: { onOpenCompanionPlanner?: () => void }) => (
     <button type="button" onClick={() => onOpenCompanionPlanner?.()}>
@@ -572,13 +568,13 @@ describe("Journeys inbox integration", () => {
     });
   });
 
-  it("uses the quests cinematic wallpaper preset", () => {
+  it("uses the Graceward planner theme without a legacy cinematic layer", () => {
     renderJourneys();
 
-    expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-preset", "quests");
+    expect(screen.queryByTestId("cinematic-background")).not.toBeInTheDocument();
     expect(screen.getByTestId("journeys-theme-scope")).not.toHaveClass("companion-frosted-theme-scope");
     expect(screen.getByTestId("journeys-theme-scope").style.getPropertyValue("--companion-frosted-primary")).toBe(
-      "259 78% 70%",
+      "133 42% 52%",
     );
   });
 

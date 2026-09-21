@@ -60,7 +60,7 @@ export async function insertTomorrowDailyPepTalkAndSync({
   beforeSync,
   invokeTranscriptSync,
 }: InsertTomorrowDailyPepTalkArgs): Promise<InsertTomorrowDailyPepTalkResult> {
-  const initialInsertPayload = {
+  const initialInsertPayload: Record<string, unknown> = {
     transcript_status: TRANSCRIPT_STATUS_PENDING,
     transcript_attempt_count: 0,
     transcript_next_retry_at: new Date().toISOString(),
@@ -79,6 +79,23 @@ export async function insertTomorrowDailyPepTalkAndSync({
 
   if (beforeSync) {
     await beforeSync(dailyPepTalk.id);
+  }
+
+  const providedTranscript = Array.isArray(initialInsertPayload.transcript)
+    ? initialInsertPayload.transcript
+    : [];
+  if (providedTranscript.length > 0 && initialInsertPayload.transcript_status === "ready") {
+    return {
+      dailyPepTalkId: dailyPepTalk.id,
+      transcriptSyncAttempted: false,
+      transcriptSyncError: null,
+      transcriptSyncData: {
+        transcript: providedTranscript,
+        hasWordTimestamps: true,
+        wordCount: providedTranscript.length,
+        retryRecommended: false,
+      },
+    };
   }
 
   const currentAttemptCount = dailyPepTalk.transcript_attempt_count ?? 0;

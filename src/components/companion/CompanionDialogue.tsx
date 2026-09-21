@@ -89,11 +89,11 @@ const shimmerConfig: Record<CompanionShimmerType, ShimmerConfig> = {
 };
 
 const NEAR_EVOLUTION_LINES = [
-  "Chaos report: a new form is trying to kick the door down because apparently subtlety got murdered here.",
-  "We are one good push away from a very dramatic upgrade, assuming you stop fumbling the layup.",
-  "Something in me is winding up and it is already more organized than your whole current situation.",
-  "One more clean move and I evolve in spectacular fashion while you act like this was your idea.",
-  "My next form is pacing backstage waiting for you to quit stalling and touch the gas.",
+  "A new form is close. Your steady practice is beginning to show.",
+  "You are one faithful step away from a meaningful new stage.",
+  "Something new is taking shape through your consistency.",
+  "One more intentional step will reveal the next form.",
+  "The next stage is near. Keep the final step simple and honest.",
 ] as const;
 
 interface CompanionDialogueProps {

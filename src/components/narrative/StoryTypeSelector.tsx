@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Map, Search, Compass, Sword, Heart, Mountain, ChevronDown } from "lucide-react";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
+import { PRODUCT } from "@/config/product";
 
 interface StoryType {
   slug: StoryTypeSlug;
@@ -28,7 +29,7 @@ const storyTypes: StoryType[] = [
   },
   {
     slug: "mystery",
-    name: "Cosmiq Mystery",
+    name: `${PRODUCT.name} Mystery`,
     description: "Unravel secrets that threaten the fabric of reality",
     icon: Search,
     baseChapters: 6,

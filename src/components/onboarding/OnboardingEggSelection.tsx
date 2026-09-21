@@ -10,7 +10,10 @@ import {
   type CompanionPresetId,
   type CompanionStoryTone,
 } from "@/config/companionCatalog";
-import { isPilotCompanionElement } from "@/config/companionPilotAvailability";
+import {
+  COMPANION_FUTURE_STATE_LABEL,
+  isPilotChristianCompanionElement,
+} from "@/config/companionPilotAvailability";
 import {
   COMPANION_CUSTOM_NAME_MAX_LENGTH,
   normalizeCompanionCustomName,
@@ -218,7 +221,7 @@ export const OnboardingEggSelection = ({
             {ELEMENT_ORDER.map((elementId) => {
               const slot = CHAMBER_SLOTS[elementId];
               const element = getCompanionElement(elementId);
-              const isSupported = isPilotCompanionElement(element.id);
+              const isSupported = isPilotChristianCompanionElement(element.id);
               const isSelected = isSupported && selectedElement === element.id;
               const slotStyle: ChamberSlotStyle = {
                 "--egg-slot-x": slot.centerX,
@@ -270,6 +273,11 @@ export const OnboardingEggSelection = ({
                       loading="lazy"
                     />
                   </span>
+                  {!isSupported ? (
+                    <span className="onboarding-egg-slot__coming-soon" aria-hidden="true">
+                      {COMPANION_FUTURE_STATE_LABEL}
+                    </span>
+                  ) : null}
                 </button>
               );
             })}

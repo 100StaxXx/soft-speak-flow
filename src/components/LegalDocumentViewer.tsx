@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { NativePlacesAutocomplete } from "@/plugins/NativePlacesAutocompletePlugin";
+import { PRODUCT } from "@/config/product";
 import { FileText, X } from "lucide-react";
 
 interface LegalDocumentViewerProps {
@@ -24,7 +25,10 @@ export const LegalDocumentViewer = memo(({ open, onOpenChange, documentType }: L
         return;
       }
 
-      const filename = documentType === "terms" ? "TERMS_OF_SERVICE.md" : "PRIVACY_POLICY.md";
+      const productPrefix = PRODUCT.mode === "cosmiq" ? "COSMIQ_" : "";
+      const filename = documentType === "terms"
+        ? `${productPrefix}TERMS_OF_SERVICE.md`
+        : `${productPrefix}PRIVACY_POLICY.md`;
       const response = await fetch(`/${filename}`);
       const text = await response.text();
       setContent(text);
@@ -131,8 +135,8 @@ export const LegalDocumentViewer = memo(({ open, onOpenChange, documentType }: L
         <div className="px-6 py-4 border-t bg-muted/50">
           <p className="text-xs text-muted-foreground text-center">
             For questions or concerns, contact us at{" "}
-            <a href="mailto:admin@cosmiq.quest" className="text-primary underline">
-              admin@cosmiq.quest
+            <a href={`mailto:${PRODUCT.supportEmail}`} className="text-primary underline">
+              {PRODUCT.supportEmail}
             </a>
           </p>
         </div>

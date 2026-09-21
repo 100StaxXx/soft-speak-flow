@@ -60,6 +60,6 @@ describe("QuestDragCard draggable ownership", () => {
       "border-l-4",
       "border-l-primary",
     );
-    expect(screen.getByText("Campaign Ritual - Build Portfolio Website")).toBeInTheDocument();
+    expect(screen.getByText("Commitment rhythm — Build Portfolio Website")).toBeInTheDocument();
   });
 });

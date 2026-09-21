@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { ChevronDown, Moon, Sparkles } from "lucide-react";
+import { CheckCircle2, ChevronDown, Moon, Sparkles } from "lucide-react";
 import {
   Drawer,
   DrawerContent,
@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useEveningReflection } from "@/hooks/useEveningReflection";
 import { useToast } from "@/hooks/use-toast";
+import { useDailyGuideThread } from "@/hooks/useDailyGuideThread";
 
 const MOOD_OPTIONS = [
   { emoji: "😊", label: "Great", value: "great" },
@@ -30,6 +31,7 @@ const MAX_REFLECTION_LENGTH = 800;
 
 export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectionDrawerProps) => {
   const { submitReflection, isSubmitting } = useEveningReflection();
+  const { thread: dailyGuideThread } = useDailyGuideThread({ enabled: open });
   const { toast } = useToast();
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [mood, setMood] = useState<string>("");
@@ -70,6 +72,7 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
       });
 
       resetForm();
+      handleOpenChange(false);
     } catch (error) {
       toast({
         title: "Unable to save reflection",
@@ -137,19 +140,41 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
         >
           <DrawerHeader className="text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
-              <Moon className="h-6 w-6 text-purple-400" />
+              <Moon className="h-6 w-6 text-primary" />
               <DrawerTitle className="text-xl">Evening Reflection</DrawerTitle>
             </div>
             <DrawerDescription>
-              Take a moment to reflect on your day
+              Start with a quick check-in. Everything else is optional.
             </DrawerDescription>
           </DrawerHeader>
 
           <div className="space-y-6">
+            {dailyGuideThread?.focus_label ? (
+              <div className="rounded-2xl border border-primary/25 bg-primary/[0.07] p-4 text-left">
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 rounded-full bg-primary/15 p-2 text-primary">
+                    <Sparkles className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                      Returning to today’s thread
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-foreground/80">
+                      This morning, you chose <span className="font-semibold text-foreground">{dailyGuideThread.focus_label}</span>
+                      {dailyGuideThread.mentor_name ? ` with ${dailyGuideThread.mentor_name}` : " with your Guide"}.
+                      {dailyGuideThread.practice_completed_at
+                        ? " You also completed the connected Faithful Step."
+                        : " The focus can still matter even if the practice remained unfinished."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             {/* Mood Selection */}
             <div className="space-y-3">
               <label className="text-sm font-medium text-foreground">
-                How are you feeling tonight?
+                How are you ending the day?
               </label>
               <div className="flex justify-center gap-2">
                 {MOOD_OPTIONS.map((option) => (
@@ -172,10 +197,12 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
             {/* Wins */}
             <div className="space-y-2" data-vaul-no-drag>
               <label className="text-sm font-medium text-foreground">
-                What went well today? <span className="text-muted-foreground">(optional)</span>
+                {dailyGuideThread?.focus_label
+                  ? `Where did “${dailyGuideThread.focus_label}” show up—or where did you need more grace?`
+                  : "Where did you notice grace or goodness today?"} <span className="text-muted-foreground">(optional)</span>
               </label>
               <Textarea
-                placeholder="A small win, a moment of joy, something you appreciated about today..."
+                placeholder="A kindness, provision, moment of beauty, or small good worth receiving…"
                 value={wins}
                 maxLength={MAX_REFLECTION_LENGTH}
                 onChange={(e) => setWins(e.target.value.slice(0, MAX_REFLECTION_LENGTH))}
@@ -195,7 +222,7 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-foreground">Go a little deeper</p>
                       <p className="text-xs text-muted-foreground">
-                        Optional space for anything else on your mind tonight.
+                      Optional space for difficulty, repair, and tomorrow.
                       </p>
                     </div>
                     <ChevronDown
@@ -209,10 +236,10 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
                 <CollapsibleContent className="space-y-4 px-4 pb-4">
                   <div className="space-y-2" data-vaul-no-drag>
                     <label className="text-sm font-medium text-foreground">
-                      Anything else you'd like to reflect on from today? <span className="text-muted-foreground">(optional)</span>
+                      What was difficult, or may need confession or repair? <span className="text-muted-foreground">(optional)</span>
                     </label>
                     <Textarea
-                      placeholder="Anything else that feels worth naming tonight..."
+                      placeholder="Name what was hard without rushing past it. What might need care or repair?"
                       value={additionalReflection}
                       maxLength={MAX_REFLECTION_LENGTH}
                       onChange={(e) => setAdditionalReflection(e.target.value.slice(0, MAX_REFLECTION_LENGTH))}
@@ -226,10 +253,10 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
 
                   <div className="space-y-2" data-vaul-no-drag>
                     <label className="text-sm font-medium text-foreground">
-                      What's one small adjustment you'd like to make tomorrow? <span className="text-muted-foreground">(optional)</span>
+                      What is one small faithful step for tomorrow? <span className="text-muted-foreground">(optional)</span>
                     </label>
                     <Textarea
-                      placeholder="One small shift, boundary, or choice you'd like to try tomorrow..."
+                      placeholder="A small act of love, boundary, responsibility, rest, or return…"
                       value={tomorrowAdjustment}
                       maxLength={MAX_REFLECTION_LENGTH}
                       onChange={(e) => setTomorrowAdjustment(e.target.value.slice(0, MAX_REFLECTION_LENGTH))}
@@ -247,10 +274,10 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
             {/* Gratitude */}
             <div className="space-y-2" data-vaul-no-drag>
               <label className="text-sm font-medium text-foreground">
-                What are you grateful for? <span className="text-muted-foreground">(optional)</span>
+                What would you like to thank God for? <span className="text-muted-foreground">(optional)</span>
               </label>
               <Textarea
-                placeholder="Something or someone you appreciate today..."
+                placeholder="A person, gift, mercy, or ordinary thing you received today…"
                 value={gratitude}
                 maxLength={MAX_REFLECTION_LENGTH}
                 onChange={(e) => setGratitude(e.target.value.slice(0, MAX_REFLECTION_LENGTH))}
@@ -264,15 +291,14 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
             <Button
               onClick={handleSubmit}
               disabled={!isValid || isSubmitting}
-              className="w-full h-12 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
+              className="w-full h-12"
             >
               {isSubmitting ? (
                 "Saving..."
               ) : (
                 <span className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4" />
-                  Complete Reflection
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-white/20">+3 XP</span>
+                  <CheckCircle2 className="h-4 w-4" />
+                  Save reflection
                 </span>
               )}
             </Button>

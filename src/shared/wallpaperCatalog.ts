@@ -117,26 +117,26 @@ export interface LiveWallpaperManifestEntry {
 }
 
 const wallpaperPageLabels: Record<WallpaperPageKey, string> = {
-  guide: "Guide",
-  quests: "Quests",
-  campaigns: "Campaigns",
+  guide: "Guidance",
+  quests: "Today",
+  campaigns: "Prayer",
   companion: "Companion",
   profile: "Profile",
-  pep_talk: "Pep Talk",
+  pep_talk: "Daily Encouragement",
 };
 
 const wallpaperPageDescriptions: Record<WallpaperPageKey, string> = {
-  guide: "Calm cinematic observatory, rooftop, terrace, or reflective scenic backdrop for daily guidance and briefings.",
-  quests: "Forward-motion scenery with a clear route and a sense of possibility across natural or quiet urban environments.",
-  campaigns: "Large-scale strategic vista or monumental overlook for long-range momentum, ambition, and ritual building.",
-  companion: "Peaceful sanctuary backdrop across natural or refined built environments that leaves the companion card as the hero.",
-  profile: "Quiet premium observatory, skyline terrace, courtyard, or restrained scenic backdrop for settings and account surfaces.",
-  pep_talk: "Wide scenic landscape backdrop for the daily pep talk section, with emotional intensity around the edges and a calm readable center behind the player card.",
+  guide: "Calm, grounded sacred scenery for thoughtful Christian guidance and reflection.",
+  quests: "Hopeful morning scenery with a clear path and forward energy for today's faithful practices.",
+  campaigns: "Quiet chapels, ancient paths, open landscapes, and places of prayer that invite stillness rather than performance.",
+  companion: "A warm, living refuge that gives the companion a sense of presence, movement, safety, and wonder.",
+  profile: "Restrained courtyards, cloisters, gardens, or peaceful natural scenery for personal settings and account surfaces.",
+  pep_talk: "Awe-inspiring natural scenery for daily encouragement, with warmth around the edges and a calm readable center behind the player.",
 };
 
 const WALLPAPER_PORTRAIT_FIDELITY_CLAUSE = [
   "Portrait 9:16 mobile wallpaper composition.",
-  "Mixed cinematic realism: grounded enough to feel like a real landscape, but polished enough to feel premium and awe-inspiring.",
+  "Cinematic natural realism: grounded enough to feel like a real place, but polished enough to feel premium, sacred, and awe-inspiring.",
   "Very high detail, sharp focus, crisp terrain texture, premium wallpaper fidelity, not soft or muddy.",
 ].join(" ");
 
@@ -147,21 +147,22 @@ const WALLPAPER_LANDSCAPE_FIDELITY_CLAUSE = [
 ].join(" ");
 
 const WALLPAPER_SHARED_PALETTE_CLAUSE = [
-  "Prefer sand, rust, slate, emerald, teal, cyan, deep blue, silver, and moonlit neutrals.",
-  "Magenta or purple may appear only as a restrained accent.",
-  "Do not let purple or pink dominate the sky, fog, water, terrain, or the overall image mood.",
+  "Prefer olive, sage, cedar, moss, limestone, ivory, soft blue, sunrise gold, and warm earth neutrals.",
+  "Lavender or blush may appear only through natural flowers or a restrained sky accent.",
+  "Keep the palette organic, peaceful, luminous, and cohesive with Graceward's garden imagery.",
 ].join(" ");
 
 const WALLPAPER_SHARED_DIVERSITY_CLAUSE = [
-  "Favor broad scenic variety across forests, deserts, tundras, wetlands, grasslands, volcanic terrain, coastlines, courtyards, rooftops, observatories, and occasional elegant city-night environments.",
-  "Do not default to mountain ridges, river valleys, cliff walls, or alpine scenes unless the selected scene prompt specifically calls for them.",
-  "Urban or architectural scenery is allowed only when it remains calm, premium, spacious, and free of crowds, traffic, signage, or ad-like neon noise.",
+  "Favor broad scenic variety across gardens, olive groves, forests, deserts, wetlands, grasslands, coastlines, courtyards, cloisters, chapels, and quiet paths.",
+  "Let creation, warm natural light, cultivated spaces, and ancient materials carry the spiritual atmosphere without becoming literal or theatrical.",
+  "Architecture is allowed only when it remains calm, timeless, spacious, and free of crowds, traffic, signage, or commercial noise.",
 ].join(" ");
 
 const WALLPAPER_SHARED_NEGATIVE_CLAUSE = [
   "No text, no letters, no numbers, no logos, no readable symbols, no watermarks.",
   "No app UI, no browser chrome, no forms, no buttons, no device frames, no mockup overlays.",
-  "Avoid abstract nebula mush, soft purple haze, tunnel effects, portal gimmicks, promo-art composition, or crowded city chaos.",
+  "No planets, galaxies, zodiac imagery, fantasy portals, neon futurism, abstract nebula haze, promo-art composition, or crowded city chaos.",
+  "Avoid literal depictions of God or Jesus and avoid prominent denominational symbols; communicate faith through creation, light, shelter, paths, water, and cultivated gardens.",
 ].join(" ");
 
 const WALLPAPER_SHARED_SAFE_ZONE_CLAUSE = [
@@ -204,7 +205,7 @@ const buildWallpaperPrompt = (
     safeZoneGuidance?: string;
   },
 ) => [
-  `Create a breathtaking cinematic wallpaper for the ${wallpaperPageLabels[pageKey]} surface in the Cosmiq app.`,
+  `Create a breathtaking cinematic wallpaper for the ${wallpaperPageLabels[pageKey]} surface in the Graceward Christian formation app.`,
   `Target mood: ${wallpaperPageDescriptions[pageKey]}`,
   scenePrompt,
   emphasisPrompt,
@@ -252,7 +253,7 @@ export const wallpaperGenerationSpecs: Record<WallpaperPageKey, WallpaperGenerat
   guide: createWallpaperGenerationSpec({
     pageKey: "guide",
     scenePrompt:
-      "Show a calm observatory, moonlit terrace, rooftop study, forest lookout, coastal platform, desert telescope site, or serene city-night retreat with subtle celestial detail and elegant atmospheric depth.",
+      "Show a calm cloister garden, olive grove overlook, lamplit stone study, forest lookout, coastal path, desert prayer retreat, or quiet courtyard with elegant atmospheric depth.",
     emphasisPrompt:
       "Prioritize wisdom, steadiness, and readability for guidance cards. The image should feel premium and supportive, never loud or distracting.",
     mobileFocus: { x: 50, y: 30 },
@@ -261,7 +262,7 @@ export const wallpaperGenerationSpecs: Record<WallpaperPageKey, WallpaperGenerat
   quests: createWallpaperGenerationSpec({
     pageKey: "quests",
     scenePrompt:
-      "Show a gorgeous path, trail, boardwalk, stairway, elevated walkway, shoreline road, dune route, or other clearly readable way forward through varied scenery. The image should spark planning energy and motion.",
+      "Show a gorgeous path, garden walk, boardwalk, stairway, shoreline trail, or other clearly readable way forward through varied natural scenery. The image should support one small faithful step today.",
     emphasisPrompt:
       "Prioritize route clarity, beauty, depth, and a sense of personal momentum over spectacle or fantasy noise.",
     mobileFocus: { x: 56, y: 56 },
@@ -270,25 +271,25 @@ export const wallpaperGenerationSpecs: Record<WallpaperPageKey, WallpaperGenerat
   campaigns: createWallpaperGenerationSpec({
     pageKey: "campaigns",
     scenePrompt:
-      "Show a majestic large-scale vista such as a desert basin, tundra shelf, forest canopy overlook, delta coast, volcanic plateau, port city horizon, or monumental civic terrace built for long-range ambition and strategic planning.",
+      "Show a majestic place of prayer such as a desert basin at dawn, forest canopy overlook, quiet coast, ancient stone chapel garden, candlelit cloister, or open field beneath a luminous sky.",
     emphasisPrompt:
-      "The image should feel enormous, strategic, and high-definition, with commanding scenic depth rather than dreamy haze.",
+      "The image should feel spacious, reverent, and high-definition, with commanding scenic depth rather than dreamy haze.",
     mobileFocus: { x: 46, y: 42 },
     desktopFocus: { x: 50, y: 46 },
   }),
   companion: createWallpaperGenerationSpec({
     pageKey: "companion",
     scenePrompt:
-      "Show a serene sanctuary such as a glade, lagoon, meadow, courtyard, rooftop garden, oasis, wetland refuge, or snow field with a peaceful center, soft atmosphere, and gentle luminous beauty.",
+      "Show a breathtaking living garden sanctuary such as an olive grove, walled herb garden, wildflower meadow, courtyard fountain, oasis, wetland refuge, or woodland clearing with a peaceful center and luminous natural beauty.",
     emphasisPrompt:
-      "Keep the center especially calm and uncluttered so the companion card remains the visual hero. Avoid bright competing subjects behind the card area.",
+      "Express patient growth and cultivation. Keep the center calm and uncluttered so progress content remains readable, with no bright competing subject behind the card area.",
     mobileFocus: { x: 50, y: 26 },
     desktopFocus: { x: 50, y: 30 },
   }),
   profile: createWallpaperGenerationSpec({
     pageKey: "profile",
     scenePrompt:
-      "Show a refined coastal observatory, rooftop skyline terrace, forest retreat, elegant courtyard, snowy horizon, or restrained waterside overlook with quiet premium atmosphere.",
+      "Show a refined coastal retreat, cloister walk, forest hermitage, elegant courtyard, garden gate, or restrained waterside overlook with a quiet premium atmosphere.",
     emphasisPrompt:
       "Keep the image elegant, subtle, and uncluttered rather than dramatic or loud.",
     mobileFocus: { x: 50, y: 34 },
@@ -300,11 +301,11 @@ export const wallpaperGenerationSpecs: Record<WallpaperPageKey, WallpaperGenerat
     safeZoneGuidance:
       "Keep the middle 60 percent of the frame especially calm, darker than the outer edges, and free of bright focal subjects so the pep talk player, transcript panel, and CTA remain readable. Avoid faces, statues, suns, moons, horizons, or architectural features landing behind the central card stack.",
     scenePrompt:
-      "Show a wide premium landscape or monumental scenic environment charged with motivation, discipline, and emotional momentum without any people, text, or UI-like shapes.",
+      "Show a wide premium natural landscape, garden at dawn, quiet sea, sunlit grove, desert path, or monumental scenic environment charged with hope, courage, mercy, and steady faith without people, text, or UI-like shapes.",
     emphasisPrompt:
       "The backdrop should feel cinematic and emotionally strong around the edges, but the center must stay spacious, restrained, and highly usable behind a dark overlay card.",
     atmospherePrompt:
-      "Favor rich teal, cyan, slate, ember, silver, and deep blue neutrals with clean contrast and grounded scenic realism.",
+      "Favor rich olive, sage, limestone, sunrise gold, soft blue, warm earth, and deep green neutrals with clean contrast and grounded scenic realism.",
     mobileFocus: { x: 50, y: 48 },
     desktopFocus: { x: 50, y: 52 },
   }),

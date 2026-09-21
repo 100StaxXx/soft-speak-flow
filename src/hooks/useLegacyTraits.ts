@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from "@/components/ui/sonner";
+import { PRODUCT_RUNTIME } from '@/config/productRuntime';
 
 export interface LegacyTrait {
   trait: string;
@@ -29,6 +30,7 @@ export const useLegacyTraits = () => {
         .from('user_companion')
         .select('legacy_traits')
         .eq('user_id', user.id)
+        .eq('product_mode', PRODUCT_RUNTIME.authProductMode)
         .eq('is_alive', true)
         .maybeSingle();
 
@@ -81,6 +83,7 @@ export const useLegacyTraits = () => {
         .from('user_companion')
         .select('legacy_traits')
         .eq('id', companionId)
+        .eq('product_mode', PRODUCT_RUNTIME.authProductMode)
         .maybeSingle();
 
       const existingTraits = (existing?.legacy_traits as unknown as LegacyTrait[]) || [];
@@ -90,7 +93,8 @@ export const useLegacyTraits = () => {
       const { error } = await supabase
         .from('user_companion')
         .update({ legacy_traits: JSON.parse(JSON.stringify(combinedTraits)) })
-        .eq('id', companionId);
+        .eq('id', companionId)
+        .eq('product_mode', PRODUCT_RUNTIME.authProductMode);
 
       if (error) throw error;
 

@@ -4,13 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   mountCounts: {
     mentor: 0,
-    journeys: 0,
-    campaigns: 0,
     companion: 0,
+    guide: 0,
   },
 }));
 
-vi.mock("@/pages/Mentor", async () => {
+vi.mock("@/pages/Today", async () => {
   const React = await import("react");
   const { useMainTabVisibility } = await import("@/contexts/MainTabVisibilityContext");
   const MentorPageMock = () => {
@@ -33,36 +32,6 @@ vi.mock("@/pages/Mentor", async () => {
   return { default: MentorPageMock };
 });
 
-vi.mock("@/pages/Campaigns", async () => {
-  const React = await import("react");
-  const { useMainTabVisibility } = await import("@/contexts/MainTabVisibilityContext");
-  const CampaignsPageMock = () => {
-    const { isTabActive } = useMainTabVisibility();
-    React.useEffect(() => {
-      mocks.mountCounts.campaigns += 1;
-    }, []);
-
-    return <div data-testid="campaigns-visibility">{isTabActive ? "active" : "inactive"}</div>;
-  };
-
-  return { default: CampaignsPageMock };
-});
-
-vi.mock("@/pages/Journeys", async () => {
-  const React = await import("react");
-  const { useMainTabVisibility } = await import("@/contexts/MainTabVisibilityContext");
-  const JourneysPageMock = () => {
-    const { isTabActive } = useMainTabVisibility();
-    React.useEffect(() => {
-      mocks.mountCounts.journeys += 1;
-    }, []);
-
-    return <div data-testid="journeys-visibility">{isTabActive ? "active" : "inactive"}</div>;
-  };
-
-  return { default: JourneysPageMock };
-});
-
 vi.mock("@/pages/Companion", async () => {
   const React = await import("react");
   const { useMainTabVisibility } = await import("@/contexts/MainTabVisibilityContext");
@@ -78,6 +47,21 @@ vi.mock("@/pages/Companion", async () => {
   return { default: CompanionPageMock };
 });
 
+vi.mock("@/pages/Guide", async () => {
+  const React = await import("react");
+  const { useMainTabVisibility } = await import("@/contexts/MainTabVisibilityContext");
+  const GuidePageMock = () => {
+    const { isTabActive } = useMainTabVisibility();
+    React.useEffect(() => {
+      mocks.mountCounts.guide += 1;
+    }, []);
+
+    return <div data-testid="guide-visibility">{isTabActive ? "active" : "inactive"}</div>;
+  };
+
+  return { default: GuidePageMock };
+});
+
 import { MainTabsKeepAlive } from "@/components/MainTabsKeepAlive";
 
 const renderMainTabsKeepAlive = (activePath: Parameters<typeof MainTabsKeepAlive>[0]["activePath"]) =>
@@ -90,9 +74,8 @@ const renderMainTabsKeepAliveElement = (
 describe("MainTabsKeepAlive", () => {
   beforeEach(() => {
     mocks.mountCounts.mentor = 0;
-    mocks.mountCounts.journeys = 0;
-    mocks.mountCounts.campaigns = 0;
     mocks.mountCounts.companion = 0;
+    mocks.mountCounts.guide = 0;
 
     let rafId = 0;
     vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback: FrameRequestCallback) => {
@@ -112,19 +95,18 @@ describe("MainTabsKeepAlive", () => {
 
     expect(await screen.findByTestId("mentor-visibility")).toHaveTextContent("active");
 
-    rerender(renderMainTabsKeepAliveElement("/campaigns"));
+    rerender(renderMainTabsKeepAliveElement("/companion"));
 
     expect(screen.getByTestId("mentor-visibility")).toHaveTextContent("inactive");
-    expect(await screen.findByTestId("campaigns-visibility")).toHaveTextContent("active");
+    expect(await screen.findByTestId("companion-visibility")).toHaveTextContent("active");
   });
 
   it("mounts only the active tab on initial render", async () => {
     renderMainTabsKeepAlive("/mentor");
 
     expect(await screen.findByTestId("mentor-visibility")).toHaveTextContent("active");
-    expect(screen.queryByTestId("journeys-visibility")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("campaigns-visibility")).not.toBeInTheDocument();
     expect(screen.queryByTestId("companion-visibility")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("guide-visibility")).not.toBeInTheDocument();
   });
 
   it("preserves tab state and avoids remounting visited tabs", async () => {
@@ -134,8 +116,8 @@ describe("MainTabsKeepAlive", () => {
     expect(screen.getByTestId("mentor-counter")).toHaveTextContent("1");
     expect(mocks.mountCounts.mentor).toBe(1);
 
-    rerender(renderMainTabsKeepAliveElement("/campaigns"));
-    await screen.findByTestId("campaigns-visibility");
+    rerender(renderMainTabsKeepAliveElement("/companion"));
+    await screen.findByTestId("companion-visibility");
     rerender(renderMainTabsKeepAliveElement("/mentor"));
 
     expect(screen.getByTestId("mentor-counter")).toHaveTextContent("1");
@@ -151,8 +133,8 @@ describe("MainTabsKeepAlive", () => {
     expect(scrollToSpy).not.toHaveBeenCalled();
 
     (window as Window & { scrollY: number }).scrollY = 150;
-    rerender(renderMainTabsKeepAliveElement("/campaigns"));
-    await screen.findByTestId("campaigns-visibility");
+    rerender(renderMainTabsKeepAliveElement("/companion"));
+    await screen.findByTestId("companion-visibility");
     expect(scrollToSpy).toHaveBeenCalled();
 
     scrollToSpy.mockClear();

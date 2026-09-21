@@ -1057,7 +1057,7 @@ const CompanionTrailMarker = ({ marker }: { marker: PlacedCompanionMarker }) => 
           <motion.div
             className={cn(
               "absolute inset-0 rounded-full",
-              marker.isCurrentUser ? "bg-primary/45" : "bg-white/28",
+              marker.isCurrentUser ? "bg-primary/45" : "bg-white/[0.28]",
             )}
             style={{
               width: marker.isCurrentUser ? 42 : 36,
@@ -1312,7 +1312,7 @@ export const ConstellationTrail = memo(function ConstellationTrail({
           <div
             className={cn(
               "absolute inset-0",
-              "bg-gradient-to-t from-slate-950/58 via-slate-950/22 to-slate-950/30",
+              "bg-gradient-to-t from-slate-950/[0.58] via-slate-950/[0.22] to-slate-950/30",
             )}
             data-testid="journey-path-overlay"
             data-overlay-mode="generated"
@@ -1333,7 +1333,7 @@ export const ConstellationTrail = memo(function ConstellationTrail({
 
       {showEpicSyncPending && (
         <div
-          className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-sky-300/25 bg-slate-950/82 p-3 text-white shadow-[0_16px_40px_rgba(15,23,42,0.38)] backdrop-blur-md"
+          className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-sky-300/25 bg-slate-950/[0.82] p-3 text-white shadow-[0_16px_40px_rgba(15,23,42,0.38)] backdrop-blur-md"
           data-testid="journey-path-sync-pending"
         >
           <div className="flex items-start gap-2.5">
@@ -1342,7 +1342,7 @@ export const ConstellationTrail = memo(function ConstellationTrail({
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/85">
                 Campaign syncing
               </p>
-              <p className="mt-1 text-xs leading-5 text-white/78">
+              <p className="mt-1 text-xs leading-5 text-white/[0.78]">
                 We&apos;re still saving this campaign. Your Star Path will appear as soon as sync finishes.
               </p>
             </div>
@@ -1352,7 +1352,7 @@ export const ConstellationTrail = memo(function ConstellationTrail({
 
       {showEpicSyncError && (
         <div
-          className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-amber-300/25 bg-slate-950/82 p-3 text-white shadow-[0_16px_40px_rgba(15,23,42,0.38)] backdrop-blur-md"
+          className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-amber-300/25 bg-slate-950/[0.82] p-3 text-white shadow-[0_16px_40px_rgba(15,23,42,0.38)] backdrop-blur-md"
           data-testid="journey-path-sync-error"
         >
           <div className="flex items-start gap-2.5">
@@ -1361,7 +1361,7 @@ export const ConstellationTrail = memo(function ConstellationTrail({
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/85">
                 Campaign sync failed
               </p>
-              <p className="mt-1 text-xs leading-5 text-white/78">
+              <p className="mt-1 text-xs leading-5 text-white/[0.78]">
                 {epicSyncErrorMessage}
               </p>
               <Button
@@ -1382,7 +1382,7 @@ export const ConstellationTrail = memo(function ConstellationTrail({
 
       {showGenerationError && (
         <div
-          className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-amber-300/25 bg-slate-950/82 p-3 text-white shadow-[0_16px_40px_rgba(15,23,42,0.38)] backdrop-blur-md"
+          className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-amber-300/25 bg-slate-950/[0.82] p-3 text-white shadow-[0_16px_40px_rgba(15,23,42,0.38)] backdrop-blur-md"
           data-testid="journey-path-error"
         >
           <div className="flex items-start gap-2.5">
@@ -1391,7 +1391,7 @@ export const ConstellationTrail = memo(function ConstellationTrail({
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100/85">
                 Path image unavailable
               </p>
-              <p className="mt-1 text-xs leading-5 text-white/78">
+              <p className="mt-1 text-xs leading-5 text-white/[0.78]">
                 {generationError.message}
               </p>
               <Button

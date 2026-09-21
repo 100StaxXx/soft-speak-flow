@@ -1,4 +1,6 @@
-const PENDING_MENTOR_MOOD_KEY = "mentor-switcher-pending-mood";
+import { productScopedStorageKey } from "@/config/productRuntime";
+
+const PENDING_MENTOR_MOOD_KEY = productScopedStorageKey("mentor-switcher-pending-mood");
 const PENDING_MENTOR_MOOD_EVENT = "mentor-switcher-pending-mood-changed";
 
 type PendingMentorMoodDetail = {

@@ -42,7 +42,7 @@ describe("PremiumSuccess", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Welcome to Cosmiq!")).toBeInTheDocument();
+    expect(screen.getByText("Welcome to Graceward Plus!")).toBeInTheDocument();
     });
   });
 
@@ -57,7 +57,7 @@ describe("PremiumSuccess", () => {
     );
 
     expect(screen.getByText("Activating your subscription...")).toBeInTheDocument();
-    expect(screen.queryByText("Welcome to Cosmiq!")).not.toBeInTheDocument();
+    expect(screen.queryByText("Welcome to Graceward!")).not.toBeInTheDocument();
 
     await act(async () => {
       await Promise.resolve();
@@ -82,6 +82,6 @@ describe("PremiumSuccess", () => {
     });
 
     expect(screen.getByText("Still activating your subscription")).toBeInTheDocument();
-    expect(screen.queryByText("Welcome to Cosmiq!")).not.toBeInTheDocument();
+    expect(screen.queryByText("Welcome to Graceward!")).not.toBeInTheDocument();
   });
 });

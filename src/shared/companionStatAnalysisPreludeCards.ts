@@ -80,7 +80,10 @@ export const buildCompanionStatAnalysisPreludeCardImageUrl = (
   card: CompanionStatAnalysisPreludeCard,
   supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined,
 ) => {
-  const baseUrl = supabaseUrl?.trim() || "https://opbfpbbqvuksuvmtmssd.supabase.co";
+  const baseUrl = supabaseUrl?.trim();
+  if (!baseUrl) {
+    throw new Error("Missing VITE_SUPABASE_URL for companion card storage.");
+  }
   return `${baseUrl.replace(/\/+$/, "")}/storage/v1/object/public/${
     COMPANION_STAT_ANALYSIS_PRELUDE_CARD_BUCKET
   }/${card.imageStoragePath}`;

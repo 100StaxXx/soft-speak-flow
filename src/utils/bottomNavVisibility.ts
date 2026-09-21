@@ -4,6 +4,7 @@ const HIDDEN_EXACT_PATHS = new Set([
   "/privacy",
   "/test-scroll",
   "/test-day-planner",
+  "/mentor-selection",
 ]);
 
 const HIDDEN_PREFIX_PATHS = ["/auth", "/onboarding"];

@@ -122,6 +122,180 @@ Deno.test("auth-gateway allows normal password sign-up under limit", async () =>
   assertEquals(body.requiresEmailConfirmation, true, "Expected sign-up without a session to require email confirmation");
 });
 
+Deno.test("auth-gateway rejects a password account bound to the other product", async () => {
+  const response = await authGatewayModule.handleAuthGateway(
+    new Request("https://example.com/functions/v1/auth-gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "sign_in_password",
+        email: "cosmiq@example.com",
+        password: "supersecret123",
+        productMode: "graceward",
+      }),
+    }),
+    {
+      createAdminClient: () => ({}),
+      createAnonClient: () => ({
+        auth: {
+          signInWithPassword: async () => ({
+            data: {
+              session: {
+                access_token: "access-token",
+                refresh_token: "refresh-token",
+              },
+              user: {
+                id: "cosmiq-user",
+                app_metadata: { auth_product_mode: "cosmiq" },
+              },
+            },
+            error: null,
+          }),
+        },
+      }),
+      applyAbuseProtectionFn: async () => ({
+        requestId: "req-auth-product-mismatch",
+        ipAddress: "203.0.113.12",
+        protection: null,
+      }) as any,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 403, "Expected cross-product sign-in to be rejected");
+  assertEquals(body.code, "ACCOUNT_PRODUCT_MISMATCH", "Expected product mismatch error code");
+  assert(!body.access_token, "Expected no session token for a cross-product account");
+});
+
+Deno.test("auth-gateway ignores editable product metadata and uses server-owned records", async () => {
+  const createQuery = (data: unknown) => {
+    const query: any = {
+      select: () => query,
+      eq: () => query,
+      order: () => query,
+      limit: () => query,
+      maybeSingle: async () => ({ data, error: null }),
+    };
+    return query;
+  };
+
+  const response = await authGatewayModule.handleAuthGateway(
+    new Request("https://example.com/functions/v1/auth-gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "sign_in_password",
+        email: "legacy-cosmiq@example.com",
+        password: "supersecret123",
+        productMode: "graceward",
+      }),
+    }),
+    {
+      createAdminClient: () => ({
+        auth: {
+          admin: {
+            getUserById: async () => ({
+              data: { user: { id: "legacy-cosmiq-user", app_metadata: {} } },
+              error: null,
+            }),
+          },
+        },
+        from: (table: string) => table === "user_companion"
+          ? createQuery({ product_mode: "cosmiq", preset_id: "legacy-cosmiq-companion" })
+          : createQuery({ onboarding_data: { product_mode: "graceward" } }),
+      }),
+      createAnonClient: () => ({
+        auth: {
+          signInWithPassword: async () => ({
+            data: {
+              session: {
+                access_token: "access-token",
+                refresh_token: "refresh-token",
+              },
+              user: {
+                id: "legacy-cosmiq-user",
+                user_metadata: { auth_product_mode: "graceward" },
+              },
+            },
+            error: null,
+          }),
+        },
+      }),
+      applyAbuseProtectionFn: async () => ({
+        requestId: "req-auth-server-owned-product",
+        ipAddress: "203.0.113.14",
+        protection: null,
+      }) as any,
+    },
+  );
+
+  const body = await response.json();
+  assertEquals(response.status, 403, "Expected server-owned Cosmiq record to reject Graceward sign-in");
+  assertEquals(body.code, "ACCOUNT_PRODUCT_MISMATCH", "Expected product mismatch error code");
+  assert(!body.access_token, "Expected no session token when editable metadata conflicts with server records");
+});
+
+Deno.test("auth-gateway binds a new password account to its originating product", async () => {
+  let boundMetadata: Record<string, unknown> | null = null;
+  const response = await authGatewayModule.handleAuthGateway(
+    new Request("https://example.com/functions/v1/auth-gateway", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "sign_up_password",
+        email: "new-cosmiq@example.com",
+        password: "supersecret123",
+        productMode: "cosmiq",
+      }),
+    }),
+    {
+      createAdminClient: () => ({
+        auth: {
+          admin: {
+            updateUserById: async (_userId: string, attributes: { app_metadata?: Record<string, unknown> }) => {
+              boundMetadata = attributes.app_metadata ?? null;
+              return { data: {}, error: null };
+            },
+          },
+        },
+      }),
+      createAnonClient: () => ({
+        auth: {
+          signUp: async () => ({
+            data: {
+              session: null,
+              user: {
+                id: "new-cosmiq-user",
+                app_metadata: {},
+              },
+            },
+            error: null,
+          }),
+        },
+      }),
+      applyAbuseProtectionFn: async () => ({
+        requestId: "req-auth-product-binding",
+        ipAddress: "203.0.113.13",
+        protection: null,
+      }) as any,
+    },
+  );
+
+  assertEquals(response.status, 200, "Expected product-scoped sign-up to succeed");
+  const capturedMetadata = boundMetadata as Record<string, unknown> | null;
+  assert(Boolean(capturedMetadata), "Expected trusted app metadata to be updated");
+  assertEquals(
+    capturedMetadata?.auth_product_mode,
+    "cosmiq",
+    "Expected trusted app metadata to bind the account to Cosmiq",
+  );
+  assertEquals(
+    capturedMetadata?.account_email,
+    "new-cosmiq@example.com",
+    "Expected the real account email to remain available in trusted metadata",
+  );
+});
+
 Deno.test("auth-gateway returns a duplicate-email message for password sign-up", async () => {
   const response = await authGatewayModule.handleAuthGateway(
     new Request("https://example.com/functions/v1/auth-gateway", {

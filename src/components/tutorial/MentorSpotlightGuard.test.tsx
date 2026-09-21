@@ -189,15 +189,15 @@ describe("MentorSpotlightGuard", () => {
     const { rerender } = render(
       <MentorSpotlightGuard active targetSelector='[data-tour="square-target"]' />
     );
-    let path = screen.getByTestId("mentor-spotlight-path") as SVGPathElement;
+    let path = screen.getByTestId("mentor-spotlight-path") as unknown as SVGPathElement;
     expect(path.getAttribute("d")).toBe("M 20 20 H 100 L 100 20 V 60 L 100 60 H 20 L 20 60 V 20 L 20 20 Z");
 
     rerender(<MentorSpotlightGuard active targetSelector='[data-tour="pill-target"]' />);
-    path = screen.getByTestId("mentor-spotlight-path") as SVGPathElement;
+    path = screen.getByTestId("mentor-spotlight-path") as unknown as SVGPathElement;
     expect(path.getAttribute("d")).toContain("A 60 20");
 
     rerender(<MentorSpotlightGuard active targetSelector='[data-tour="circle-target"]' />);
-    path = screen.getByTestId("mentor-spotlight-path") as SVGPathElement;
+    path = screen.getByTestId("mentor-spotlight-path") as unknown as SVGPathElement;
     expect(path.getAttribute("d")).toContain("A 20 20");
   });
 
@@ -220,10 +220,8 @@ describe("MentorSpotlightGuard", () => {
       />
     );
 
-    const guard = screen.getByTestId("mentor-spotlight-guard");
-    expect(guard).toHaveAttribute("data-mode", "outline");
-    expect(guard.querySelector(".mentor-spotlight-mask")).toBeNull();
-    expect(guard.querySelector(".mentor-spotlight-ring--outline")).toBeInTheDocument();
+    expect(screen.queryByTestId("mentor-spotlight-guard")).not.toBeInTheDocument();
+    expect(target).toHaveClass("mentor-spotlight-target-outlined");
 
     fireEvent.click(target);
     expect(clickSpy).toHaveBeenCalledTimes(1);

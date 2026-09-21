@@ -7,6 +7,19 @@ function assert(condition: boolean, message: string): void {
 Deno.env.set("SUPABASE_FUNCTIONS_TEST", "1");
 const appleSubscriptionsModule = await import("./appleSubscriptions.ts");
 
+Deno.test("buildSubscriptionStatus preserves StoreKit introductory offers as trialing", () => {
+  const futureExpiration = new Date("2099-01-01T00:00:00.000Z");
+
+  assert(
+    appleSubscriptionsModule.buildSubscriptionStatus(futureExpiration, null, 1) === "trialing",
+    "Expected StoreKit introductory offer type 1 to remain trialing",
+  );
+  assert(
+    appleSubscriptionsModule.buildSubscriptionStatus(futureExpiration, null, null) === "active",
+    "Expected a normal paid renewal to remain active",
+  );
+});
+
 function createBindingSupabase(initialRows: Record<string, unknown>[] = []) {
   const rows = [...initialRows];
 
@@ -257,7 +270,7 @@ Deno.test("ensureAppleTransactionBinding creates the first binding when appAccou
   );
 });
 
-Deno.test("getPriceCents defaults creator yearly offer-code receipts to $69.99", () => {
+Deno.test("getPriceCents defaults eligible founding receipts to $29.99", () => {
   Deno.env.delete("APPLE_OFFER_CODE_YEARLY_PRICE_CENTS");
   Deno.env.delete("APPLE_OFFER_CODE_IDENTIFIER");
   Deno.env.delete("APPLE_GENESIS_OFFER_CODE_IDENTIFIER");
@@ -267,10 +280,10 @@ Deno.test("getPriceCents defaults creator yearly offer-code receipts to $69.99",
     offerType: null,
   });
 
-  assert(amountCents === 6999, `Expected 6999 cents, got ${amountCents}`);
+  assert(amountCents === 2999, `Expected 2999 cents, got ${amountCents}`);
 });
 
-Deno.test("getPriceCents defaults Genesis yearly offer-code receipts to $49.99", () => {
+Deno.test("getPriceCents defaults Genesis founding receipts to $29.99", () => {
   Deno.env.delete("APPLE_GENESIS_OFFER_CODE_YEARLY_PRICE_CENTS");
   Deno.env.delete("APPLE_GENESIS_OFFER_CODE_IDENTIFIER");
 
@@ -279,7 +292,7 @@ Deno.test("getPriceCents defaults Genesis yearly offer-code receipts to $49.99",
     offerType: null,
   });
 
-  assert(amountCents === 4999, `Expected 4999 cents, got ${amountCents}`);
+  assert(amountCents === 2999, `Expected 2999 cents, got ${amountCents}`);
 });
 
 Deno.test("getPriceCents does not discount mismatched yearly offer-code receipts", () => {
@@ -294,10 +307,10 @@ Deno.test("getPriceCents does not discount mismatched yearly offer-code receipts
     offerType: 3,
   });
 
-  assert(amountCents === 9999, `Expected 9999 cents, got ${amountCents}`);
+  assert(amountCents === 4999, `Expected 4999 cents, got ${amountCents}`);
 });
 
-Deno.test("getPriceCents keeps standard yearly receipts at $99.99", () => {
+Deno.test("getPriceCents keeps standard yearly receipts at $49.99", () => {
   Deno.env.delete("APPLE_YEARLY_PRICE_CENTS");
 
   const amountCents = appleSubscriptionsModule.getPriceCents("yearly", {
@@ -305,7 +318,17 @@ Deno.test("getPriceCents keeps standard yearly receipts at $99.99", () => {
     offerType: null,
   });
 
-  assert(amountCents === 9999, `Expected 9999 cents, got ${amountCents}`);
+  assert(amountCents === 4999, `Expected 4999 cents, got ${amountCents}`);
+});
+
+Deno.test("getPriceCents recognizes the dedicated $29.99 founding product", () => {
+  Deno.env.delete("APPLE_OFFER_CODE_YEARLY_PRICE_CENTS");
+
+  const amountCents = appleSubscriptionsModule.getPriceCents("yearly", {
+    productId: "graceward_plus_founder_yearly",
+  });
+
+  assert(amountCents === 2999, `Expected 2999 cents, got ${amountCents}`);
 });
 
 Deno.test("ensureAppleTransactionBinding rejects rebinding a purchase to another user", async () => {
@@ -550,4 +573,27 @@ Deno.test("resolvePlanFromProduct rejects unknown Apple product ids", () => {
         appleSubscriptionsModule.APPLE_UNSUPPORTED_PRODUCT_ERROR,
     "Expected unknown Apple products to fail closed instead of defaulting to monthly",
   );
+});
+
+Deno.test("Apple product boundary keeps Graceward and Cosmiq purchases separate", () => {
+  appleSubscriptionsModule.assertAppleProductBoundary(
+    "graceward_plus_yearly",
+    "graceward",
+  );
+  appleSubscriptionsModule.assertAppleProductBoundary(
+    "cosmiq_premium_monthly",
+    "cosmiq",
+  );
+
+  let rejected = false;
+  try {
+    appleSubscriptionsModule.assertAppleProductBoundary(
+      "cosmiq_premium_yearly",
+      "graceward",
+    );
+  } catch (error) {
+    rejected = error instanceof Error &&
+      error.message === appleSubscriptionsModule.APPLE_PRODUCT_BOUNDARY_ERROR;
+  }
+  assert(rejected, "Expected cross-product Apple purchase to be rejected");
 });

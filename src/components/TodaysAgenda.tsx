@@ -8,7 +8,6 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { toast } from "@/components/ui/sonner";
 import {
   Flame,
-  Trophy,
   Check,
   Circle,
   Clock,
@@ -35,8 +34,8 @@ import {
   MicOff,
   Plus,
   Inbox,
+  Sparkles,
 } from "lucide-react";
-import { JourneysCompanionLauncher } from "@/components/journeys/JourneysCompanionLauncher";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -99,6 +98,9 @@ import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 import { createPlanDayCompanionLaunchIntent } from "@/utils/companionPlannerLaunchContext";
 import type { Habit } from "@/features/habits/types";
 import { durationMinutesToPixels } from "@/utils/taskDurationLayout";
+import { JourneysCompanionLauncher } from "@/components/journeys/JourneysCompanionLauncher";
+import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
+import { getCompanionMotionIntensityFromXp } from "@/config/companionMotion";
 
 // Helper to calculate days remaining
 const getDaysLeft = (epic: { start_date: string; target_days: number; end_date?: string | null }) =>
@@ -312,7 +314,6 @@ const getCategoryIcon = (category: string | null | undefined) => {
   }
 };
 
-const COMBO_WINDOW_MS = 8000;
 const DESKTOP_LAYOUT_MIN_WIDTH = 1280;
 const LANE_OFFSET_STEP_PX = 10;
 const FULL_DAY_START_MINUTE = 0;
@@ -560,6 +561,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   companionFrostedThemeStyle,
 }: TodaysAgendaProps) {
   const { user } = useAuth();
+  const { triggerEvent } = useCompanionMotionSafe();
   const planDayLauncherLabel = isSameDay(selectedDate, new Date()) ? "Plan Today" : "Plan Day";
   const openPlanDayThread = useCallback(() => {
     if (!onOpenCompanionPlanner) return;
@@ -587,7 +589,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         size="icon"
         className="h-9 w-9 rounded-[18px] border-white/10 bg-white/5 hover:bg-white/10"
         onClick={onAddQuest}
-        aria-label="Add quest"
+        aria-label="Add action"
         data-tour="add-quest-fab"
       >
         <Plus className="h-4 w-4" />
@@ -729,11 +731,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const [untimedDrawerOpen, setUntimedDrawerOpen] = useState(false);
   const [justCompletedTasks, setJustCompletedTasks] = useState<Set<string>>(new Set());
   const [optimisticCompleted, setOptimisticCompleted] = useState<Set<string>>(new Set());
-  const [comboCount, setComboCount] = useState(0);
-  const [showComboFx, setShowComboFx] = useState(false);
-  const lastComboAtRef = useRef<number | null>(null);
-  const comboResetTimerRef = useRef<number | null>(null);
-  const comboFxTimerRef = useRef<number | null>(null);
   const mobileDetailTask = useMemo(
     () => mobileDetailTaskId
       ? tasks.find((task) => task.id === mobileDetailTaskId) ?? null
@@ -920,69 +917,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     };
   }, [clearTimeSlotLongPress, clearTouchCheckboxClickSuppression]);
 
-  const scheduleComboReset = useCallback(() => {
-    if (comboResetTimerRef.current !== null) {
-      window.clearTimeout(comboResetTimerRef.current);
-    }
-    comboResetTimerRef.current = window.setTimeout(() => {
-      setComboCount(0);
-      setShowComboFx(false);
-      lastComboAtRef.current = null;
-      comboResetTimerRef.current = null;
-    }, COMBO_WINDOW_MS);
-  }, []);
-
-  const registerCompletionCombo = useCallback(() => {
-    const now = Date.now();
-    const canChain = lastComboAtRef.current !== null && now - lastComboAtRef.current <= COMBO_WINDOW_MS;
-    const nextCombo = canChain ? comboCount + 1 : 1;
-
-    setComboCount(nextCombo);
-    lastComboAtRef.current = now;
-    scheduleComboReset();
-
-    if (nextCombo > 1) {
-      if (comboFxTimerRef.current !== null) {
-        window.clearTimeout(comboFxTimerRef.current);
-      }
-      setShowComboFx(true);
-      comboFxTimerRef.current = window.setTimeout(() => {
-        setShowComboFx(false);
-        comboFxTimerRef.current = null;
-      }, useLiteAnimations ? 600 : 1000);
-    }
-  }, [comboCount, scheduleComboReset, useLiteAnimations]);
-
-  const resetCombo = useCallback(() => {
-    if (comboResetTimerRef.current !== null) {
-      window.clearTimeout(comboResetTimerRef.current);
-      comboResetTimerRef.current = null;
-    }
-    if (comboFxTimerRef.current !== null) {
-      window.clearTimeout(comboFxTimerRef.current);
-      comboFxTimerRef.current = null;
-    }
-    setComboCount(0);
-    setShowComboFx(false);
-    lastComboAtRef.current = null;
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (comboResetTimerRef.current !== null) {
-        window.clearTimeout(comboResetTimerRef.current);
-      }
-      if (comboFxTimerRef.current !== null) {
-        window.clearTimeout(comboFxTimerRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    resetCombo();
-  }, [selectedDate, resetCombo]);
-
-
   // Priority weight for sorting
   const getPriorityWeight = (priority: string | null | undefined) => {
     switch (priority) {
@@ -1081,7 +1015,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       const overlapCount = getTaskConflictSetForTask(taskId, draggableTimelineItems, { [taskId]: newTime }).size;
       onUpdateScheduledTime?.(taskId, newTime);
       if (overlapCount > 0) {
-        toast(`Overlap: ${overlapCount} quest${overlapCount === 1 ? "" : "s"}`);
+        toast(`Overlap: ${overlapCount} action${overlapCount === 1 ? "" : "s"}`);
       }
     },
   });
@@ -1519,7 +1453,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         viewport.removeEventListener("scroll", updateScheduledPaneBounds);
       }
     };
-  }, [comboCount, hasRenderableNowMarker, isDesktopLayout, isTodaySelected, positionedTimelineTasks.length, tasks.length]);
+  }, [hasRenderableNowMarker, isDesktopLayout, isTodaySelected, positionedTimelineTasks.length, tasks.length]);
 
   useEffect(() => {
     const isToday = isTodaySelected;
@@ -1605,11 +1539,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       const epicId = task.epic_id;
       if (!epicId) continue;
 
-      const fallbackTitle = task.epic_title?.trim() || "Campaign";
+      const fallbackTitle = task.epic_title?.trim() || "Commitment";
       const existingGroup = ritualsByEpic.get(epicId);
       if (existingGroup) {
         existingGroup.rituals.push(task);
-        if (existingGroup.title === "Campaign" && fallbackTitle !== "Campaign") {
+        if (existingGroup.title === "Commitment" && fallbackTitle !== "Commitment") {
           existingGroup.title = fallbackTitle;
         }
         continue;
@@ -1625,7 +1559,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       const epic = activeEpicsById.get(epicId) ?? null;
       return {
         epicId,
-        title: epic?.title || group.title || "Campaign",
+        title: epic?.title || group.title || "Commitment",
         progress: epic ? Math.round(epic.progress_percentage ?? 0) : null,
         daysLeft: epic ? getDaysLeft(epic) : null,
         rituals: group.rituals,
@@ -1658,8 +1592,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     return onOpenCampaigns ? (
       <button
         type="button"
-        aria-label="Open campaigns page"
-        onClick={onOpenCampaigns}
+        aria-label="Open commitments page"
+        onClick={() => onOpenCampaigns?.()}
         className={cn(
           className,
           "transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
@@ -1675,7 +1609,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   };
 
   const renderCampaignSection = ({ inDesktopRail = false }: { inDesktopRail?: boolean } = {}) => {
-    const sectionLabel = inDesktopRail ? "Campaigns & rituals" : "Campaigns";
+    const sectionLabel = inDesktopRail ? "Commitments & rhythms" : "Commitments";
     const campaignSectionHeader = (
       <div className="flex items-center gap-2 mb-3">
         {!inDesktopRail && <div className="w-9 flex-shrink-0" />}
@@ -1708,7 +1642,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   }}>
                     <button
                       type="button"
-                      aria-label={`Open campaign ${group.title}`}
+                      aria-label={`Open commitment ${group.title}`}
                       className="flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-border/30 bg-card/30 px-3 py-2.5 text-left hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                     >
                       <span className="flex min-w-0 items-center gap-2">
@@ -1767,7 +1701,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               }}>
                 <button
                   type="button"
-                  aria-label={`Open campaign ${epic.title}`}
+                  aria-label={`Open commitment ${epic.title}`}
                   className="flex w-full items-center justify-between gap-2 rounded-xl border border-border/30 bg-card/30 px-3 py-2 text-left hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                 >
                   <span className="flex min-w-0 items-center gap-2">
@@ -1788,8 +1722,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       )}
 
       {isCampaignsLoading && campaignRitualGroups.length === 0 && (
-        <div className={cn(inDesktopRail ? "rounded-[24px] border border-white/8 bg-white/[0.03] p-4" : "mt-4 pt-3 border-t border-border/20")}>
-          <p className="text-xs text-muted-foreground">Loading campaigns...</p>
+        <div className={cn(inDesktopRail ? "rounded-[24px] border border-white/[0.08] bg-white/[0.03] p-4" : "mt-4 pt-3 border-t border-border/20")}>
+          <p className="text-xs text-muted-foreground">Loading commitments...</p>
         </div>
       )}
 
@@ -1816,7 +1750,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 }}>
                   <button
                     type="button"
-                    aria-label={`Open campaign ${epic.title}`}
+                    aria-label={`Open commitment ${epic.title}`}
                     className="w-full rounded-xl border border-border/30 bg-card/30 px-3 py-2 text-left hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -1846,26 +1780,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
 
 
-  const totalXP = tasks.reduce((sum, task) => {
-    if (!task.completed) return sum;
-    const taskXP = task.is_main_quest
-      ? Math.round(task.xp_reward * MAIN_QUEST_XP_MULTIPLIER)
-      : task.xp_reward;
-    return sum + taskXP;
-  }, 0);
   const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-  const allComplete = totalCount > 0 && completedCount === totalCount;
   const weekCompletedCount = weekTasks.filter((task) => task.completed).length;
   const weekTotalCount = weekTasks.length;
   const weekScheduledCount = weekTasks.filter((task) => !!task.scheduled_time).length;
   const weekActiveDays = new Set(weekTasks.map((task) => task.task_date)).size;
-  const weekXP = weekTasks.reduce((sum, task) => {
-    if (!task.completed) return sum;
-    const taskXP = task.is_main_quest
-      ? Math.round(task.xp_reward * MAIN_QUEST_XP_MULTIPLIER)
-      : task.xp_reward;
-    return sum + taskXP;
-  }, 0);
   const selectedScheduledCount = scheduledItems.length;
   const selectedAnytimeCount = anytimeItems.length;
   const selectedRitualCount = ritualTasks.length;
@@ -2173,7 +2092,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     const isComplete = !!task.completed || optimisticCompleted.has(task.id);
     const isRitual = !!task.habit_source_id;
     const isCampaignRitual = isCampaignRitualTask(task);
-    const campaignTitle = task.epic_title?.trim() || "Campaign";
+    const campaignTitle = task.epic_title?.trim() || "Commitment";
     const effectiveTaskXP = task.is_main_quest
       ? Math.round(task.xp_reward * MAIN_QUEST_XP_MULTIPLIER)
       : task.xp_reward;
@@ -2204,15 +2123,18 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           next.delete(task.id);
           return next;
         });
-        resetCombo();
         triggerHaptic(ImpactStyle.Light);
         onUndoToggle(task.id, effectiveTaskXP);
       } else {
         // Complete: add to optimistic set immediately for instant strikethrough
         setOptimisticCompleted(prev => new Set(prev).add(task.id));
-        registerCompletionCombo();
         triggerHaptic(ImpactStyle.Medium);
         playStrikethrough();
+        triggerEvent({
+          type: "quest_complete",
+          intensity: getCompanionMotionIntensityFromXp(effectiveTaskXP),
+          reason: "Quest complete",
+        });
         // Track for strikethrough animation
         setJustCompletedTasks(prev => new Set(prev).add(task.id));
         setTimeout(() => {
@@ -2319,7 +2241,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   </div>
                   {isCampaignRitual ? (
                     <p className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-wide text-primary/80">
-                      Campaign Ritual - {campaignTitle}
+                      Commitment rhythm · {campaignTitle}
                     </p>
                   ) : null}
                 </div>
@@ -2479,7 +2401,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 </div>
                 {isCampaignRitual && !isCompactTimelineItem && (
                   <span className="mt-1 inline-flex max-w-full items-center rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                    <span className="truncate">Campaign Ritual - {campaignTitle}</span>
+                    <span className="truncate">Commitment rhythm · {campaignTitle}</span>
                   </span>
                 )}
                 {task.scheduled_time && (
@@ -2514,7 +2436,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       <Button
                         data-interactive="true"
                         data-tap-control="true"
-                        aria-label="Quest actions"
+                        aria-label="Action menu"
                         variant="ghost"
                         size="icon"
                         className="h-9 w-9 -m-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-visible:opacity-100 transition-opacity touch-manipulation"
@@ -2538,7 +2460,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                           }}
                         >
                           <Pencil className="w-4 h-4 mr-2" />
-                          Edit quest
+                          Edit action
                         </DropdownMenuItem>
                       )}
                       {onSendToCalendar && (
@@ -2575,18 +2497,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                           }}
                         >
                           <Trash2 className="w-4 h-4 mr-2" />
-                          Delete quest
+                          Delete action
                         </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
-                {task.is_main_quest && (
-                  <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 bg-primary/10 border-primary/30">
-                    Main
-                  </Badge>
-                )}
-                <span className="text-sm font-bold text-stardust-gold/80">+{effectiveTaskXP}</span>
+                {task.is_main_quest ? (
+                  <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 bg-primary/10 border-primary/30">Focus</Badge>
+                ) : null}
 
                 {/* Chevron for expandable details - scheduled rows open a drawer to avoid changing timeline height */}
                 {canOpenQuestDetails && (
@@ -2594,10 +2513,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     data-interactive="true"
                     data-tap-control="true"
                     aria-label={isScheduledTimelineItem
-                      ? `Show quest details for ${task.task_text}`
+                      ? `Show action details for ${task.task_text}`
                       : isExpanded
-                        ? `Hide quest details for ${task.task_text}`
-                        : `Show quest details for ${task.task_text}`}
+                        ? `Hide action details for ${task.task_text}`
+                        : `Show action details for ${task.task_text}`}
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 -m-1 flex-shrink-0"
@@ -2646,10 +2565,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     toggleTaskExpanded,
     justCompletedTasks,
     optimisticCompleted,
+    triggerEvent,
     toggleSubtask,
     useLiteAnimations,
-    registerCompletionCombo,
-    resetCombo,
     armTouchCheckboxClickSuppression,
     clearTouchCheckboxClickSuppression,
     suppressNativeContextMenu,
@@ -2700,20 +2618,20 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-3">
+          <div className="rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Open</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">{selectedOpenCount}</p>
           </div>
-          <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-3">
+          <div className="rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Timed</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">{selectedScheduledCount}</p>
           </div>
-          <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-3">
+          <div className="rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Anytime</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">{selectedAnytimeCount}</p>
           </div>
-          <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Rituals</p>
+          <div className="rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Rhythms</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">{selectedRitualCount}</p>
           </div>
         </div>
@@ -2736,13 +2654,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           )}
           {!hideDesktopRailAddButton && !isDesktopLayout ? (
             <div className="mt-4">
-              <JourneysCompanionLauncher
-                variant="inline"
-                data-tour="add-quest-launcher"
-                text={planDayLauncherLabel}
-                className="w-full"
-                onClick={plannerLauncherAction}
-              />
+              <Button className="w-full" onClick={plannerLauncherAction}><Plus className="mr-2 h-4 w-4" />Add action</Button>
             </div>
           ) : null}
         </div>
@@ -2758,28 +2670,28 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               {weekCompletedCount}/{weekTotalCount || 0}
             </p>
             <p className="text-sm text-muted-foreground">
-              quests completed across {weekActiveDays || 0} active day{weekActiveDays === 1 ? "" : "s"}
+              actions completed across {weekActiveDays || 0} active day{weekActiveDays === 1 ? "" : "s"}
             </p>
           </div>
 
           <div className="rounded-[22px] border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
-              XP banked
+              Progress
             </p>
-            <p className="mt-2 text-xl font-semibold text-stardust-gold">{weekXP}</p>
+            <p className="mt-2 text-xl font-semibold text-primary">{weekCompletedCount}/{weekTotalCount}</p>
           </div>
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-3">
-          <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3">
+          <div className="rounded-[20px] border border-white/[0.08] bg-white/[0.03] p-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Active</p>
             <p className="mt-2 text-xl font-semibold text-foreground">{weekActiveDays}</p>
           </div>
-          <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3">
+          <div className="rounded-[20px] border border-white/[0.08] bg-white/[0.03] p-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Timed</p>
             <p className="mt-2 text-xl font-semibold text-foreground">{weekScheduledCount}</p>
           </div>
-          <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3">
+          <div className="rounded-[20px] border border-white/[0.08] bg-white/[0.03] p-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Streak</p>
             <p className="mt-2 text-xl font-semibold text-foreground">{currentStreak}</p>
           </div>
@@ -2794,7 +2706,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         <p className="mt-2 text-xs text-muted-foreground">
           {weekTotalCount > 0
             ? "Desktop now keeps the day plan anchored while the week stays visible above."
-            : "This week is still open. Add your first quest to start shaping it."}
+            : "This week is still open. Add your first action to start shaping it."}
         </p>
       </section>
 
@@ -2803,9 +2715,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           renderCampaignSection({ inDesktopRail: true })
         ) : (
           <>
-            {renderCampaignSectionLabel("Campaigns")}
+            {renderCampaignSectionLabel("Commitments")}
             <p className="mt-3 text-sm text-muted-foreground">
-              No campaigns or rituals are attached to this day yet.
+              No commitments or rhythms are attached to this day yet.
             </p>
           </>
         )}
@@ -2827,11 +2739,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const scheduledTimelineContentStyle: CSSProperties | undefined = isDesktopLayout
     ? undefined
     : { paddingBottom: mobileFabScrollClearance };
-  const mobileDetailTaskXP = mobileDetailTask
-    ? mobileDetailTask.is_main_quest
-      ? Math.round(mobileDetailTask.xp_reward * MAIN_QUEST_XP_MULTIPLIER)
-      : mobileDetailTask.xp_reward
-    : 0;
   const mobileDetailDurationLabel = mobileDetailTask
     ? formatDurationLabel(mobileDetailTask.estimated_duration)
     : null;
@@ -2852,7 +2759,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           isDesktopLayout && "journeys-desktop-shell flex min-h-0 flex-col rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,21,39,0.95),rgba(13,11,23,0.92))] px-5 py-5 shadow-[0_28px_54px_rgba(0,0,0,0.24)]",
         )}
       >
-        {/* Compact Header: Date + Progress Ring + XP */}
+        {/* Compact Header: date and completion progress. */}
         <div className={cn("mb-3 flex items-center justify-between gap-3", isDesktopLayout && "mb-5")}>
           <div className={cn("flex items-center gap-2", isDesktopLayout && "gap-3")}>
             <button
@@ -2884,7 +2791,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             {totalCount > 0 && (
               <div
                 className={cn(
-                  "flex items-center gap-1.5 rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1.5",
+                  "flex items-center gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5",
                   isDesktopLayout && "px-3 py-2",
                 )}
               >
@@ -2894,21 +2801,38 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 </span>
               </div>
             )}
-            <div
-              className={cn(
-                "flex items-center gap-1 rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1.5 text-sm",
-                isDesktopLayout && "px-3 py-2",
-              )}
-            >
-              <Trophy className={cn(
-                "h-4 w-4",
-                allComplete ? "text-stardust-gold" : "text-stardust-gold/70"
-              )} />
-              <span className="font-semibold text-stardust-gold">{totalXP}</span>
-            </div>
             {quickCaptureControls}
           </div>
         </div>
+
+        {!isDesktopLayout && onOpenCompanionPlanner ? (
+          <section
+            className="mb-3 flex items-center gap-3 rounded-[22px] border border-white/[0.08] bg-white/[0.035] p-2.5 pr-3"
+            aria-label="Companion focus"
+            data-testid="agenda-companion-focus"
+          >
+            <JourneysCompanionLauncher
+              variant="floating"
+              compact
+              className="h-12 w-12 shrink-0"
+              onClick={onOpenCompanionPlanner ? openPlanDayThread : undefined}
+              aria-label={onOpenCompanionPlanner ? "Plan this day with your companion" : "Your companion is present"}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-primary/80">
+                <Sparkles className="h-3 w-3" /> Next Focus
+              </p>
+              <p className="mt-1 truncate text-sm font-semibold text-foreground">
+                {nextFocusTask?.task_text ?? "Your day is clear"}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {nextFocusTask
+                  ? nextFocusTask.scheduled_time ? formatTime(nextFocusTask.scheduled_time) : "Ready when you are"
+                  : "Add one meaningful action when you’re ready."}
+              </p>
+            </div>
+          </section>
+        ) : null}
 
         {isDesktopLayout ? (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -2925,8 +2849,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   className={cn(
                     "h-8 rounded-[14px] px-3 text-xs",
                     desktopPlannerMode === "week"
-                      ? "bg-white/12 text-white hover:bg-white/15"
-                      : "text-muted-foreground hover:bg-white/8 hover:text-foreground",
+                      ? "bg-white/[0.12] text-white hover:bg-white/15"
+                      : "text-muted-foreground hover:bg-white/[0.08] hover:text-foreground",
                   )}
                   aria-pressed={desktopPlannerMode === "week"}
                   onClick={() => onDesktopPlannerModeChange("week")}
@@ -2940,8 +2864,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   className={cn(
                     "h-8 rounded-[14px] px-3 text-xs",
                     desktopPlannerMode === "day"
-                      ? "bg-white/12 text-white hover:bg-white/15"
-                      : "text-muted-foreground hover:bg-white/8 hover:text-foreground",
+                      ? "bg-white/[0.12] text-white hover:bg-white/15"
+                      : "text-muted-foreground hover:bg-white/[0.08] hover:text-foreground",
                   )}
                   aria-pressed={desktopPlannerMode === "day"}
                   onClick={() => onDesktopPlannerModeChange("day")}
@@ -2998,57 +2922,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 </Button>
               ) : null}
               {showCompanionPlannerHeaderAction && onOpenCompanionPlanner ? (
-                <JourneysCompanionLauncher
-                  variant="inline"
-                  compact
-                  data-tour="add-quest-launcher"
-                  text={planDayLauncherLabel}
-                  className="shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
-                  onClick={openPlanDayThread}
-                />
+                <Button size="sm" onClick={openPlanDayThread}>{planDayLauncherLabel}</Button>
               ) : null}
               {quickCaptureControls}
             </div>
           </div>
         ) : null}
-
-        <AnimatePresence>
-          {comboCount > 1 && (
-            <motion.div
-              key="combo-banner"
-              initial={useLiteAnimations ? { opacity: 1 } : { opacity: 0, y: 8, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={useLiteAnimations ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.98 }}
-              transition={{ duration: useLiteAnimations ? 0.1 : 0.24 }}
-              className={cn(
-                "mb-3 relative overflow-hidden rounded-xl border px-3 py-2",
-                "bg-gradient-to-r from-stardust-gold/12 via-primary/10 to-stardust-gold/12 border-stardust-gold/30",
-                showComboFx && !useLiteAnimations && "animate-combo-pop",
-              )}
-              data-testid="combo-banner"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Flame className="w-4 h-4 text-stardust-gold" />
-                  <span className="text-sm font-semibold text-stardust-gold">
-                    Combo x{comboCount}
-                  </span>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  Keep completing quests
-                </span>
-              </div>
-
-              {!useLiteAnimations && showComboFx && (
-                <div className="pointer-events-none absolute inset-0">
-                  <span className="absolute left-4 top-2 h-1.5 w-1.5 rounded-full bg-stardust-gold animate-combo-particle" />
-                  <span className="absolute left-1/2 top-1 h-1 w-1 rounded-full bg-primary animate-combo-particle [animation-delay:120ms]" />
-                  <span className="absolute right-5 bottom-2 h-1.5 w-1.5 rounded-full bg-celestial-blue animate-combo-particle [animation-delay:200ms]" />
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Timeline Content */}
         <div className={cn(isDesktopLayout && "flex min-h-0 flex-1 flex-col")}>
@@ -3058,8 +2937,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
-                      aria-label="Sort tasks"
-                      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[14px] border border-white/8 bg-white/[0.03] opacity-60 transition-opacity hover:opacity-90"
+                      aria-label="Sort actions"
+                      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.03] opacity-60 transition-opacity hover:opacity-90"
                     >
                       <ArrowUpDown className="w-3 h-3" />
                     </button>
@@ -3087,12 +2966,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       className={cn("text-xs", sortBy === 'priority' && 'bg-accent/10')}
                     >
                       Priority
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setSortBy('xp')}
-                      className={cn("text-xs", sortBy === 'xp' && 'bg-accent/10')}
-                    >
-                      XP
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -3125,9 +2998,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     style={companionFrostedThemeStyle}
                   >
                     <DrawerHeader>
-                      <DrawerTitle>Untimed quests</DrawerTitle>
+                      <DrawerTitle>Untimed actions</DrawerTitle>
                       <DrawerDescription>
-                        {anytimeItems.length} quest{anytimeItems.length === 1 ? "" : "s"} waiting for a time.
+                        {anytimeItems.length} action{anytimeItems.length === 1 ? "" : "s"} waiting for a time.
                       </DrawerDescription>
                     </DrawerHeader>
                     <div
@@ -3163,22 +3036,22 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             >
               <Circle className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
               <p className="mb-2 text-sm font-medium text-foreground">
-                No tasks for this day
+                No actions for this day
               </p>
               <p className={cn("mx-auto max-w-sm text-xs text-muted-foreground/70", isDesktopLayout && "text-sm")}>
                 {isSelectedToday
-                  ? "Your day is still open. Add a quest to give the planner some shape."
-                  : `Nothing is planned for ${selectedDateHeading} yet. Add a quest to anchor the day.`}
+                  ? "Your day is still open. Add one clear action if it would help."
+                  : `Nothing is planned for ${selectedDateHeading} yet. Add one clear action if it would help.`}
               </p>
               <div className="mt-4 flex items-center justify-center">
-                <JourneysCompanionLauncher
-                  variant="inline"
+                <Button
+                  className="w-full max-w-xs"
                   data-tour="add-quest-launcher"
-                  caption="New quest"
-                  text="Add Quest"
-                  className="w-full max-w-xs justify-center"
                   onClick={openQuestCaptureThread}
-                />
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add action
+                </Button>
               </div>
             </div>
           ) : null}
@@ -3417,7 +3290,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 {mobileDetailTask.task_text}
               </DrawerTitle>
               <DrawerDescription>
-                Quest details
+                Action details
               </DrawerDescription>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 {mobileDetailTask.scheduled_time ? (
@@ -3432,18 +3305,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     {mobileDetailDurationLabel}
                   </span>
                 ) : null}
-                <span className="rounded-full border border-stardust-gold/25 bg-stardust-gold/10 px-2 py-1 font-semibold text-stardust-gold">
-                  +{mobileDetailTaskXP} XP
-                </span>
                 {mobileDetailTask.is_main_quest ? (
                   <Badge variant="outline" className="border-primary/35 bg-primary/10 text-primary">
-                    Main quest
+                    Focus
                   </Badge>
                 ) : null}
                 {mobileDetailTask.habit_source_id ? (
                   <Badge variant="outline" className="border-accent/35 bg-accent/10 text-accent">
                     <Repeat className="mr-1 h-3 w-3" />
-                    Ritual
+                    Rhythm
                   </Badge>
                 ) : null}
               </div>

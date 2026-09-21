@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => {
     })),
   }));
   const clearAuthScopedClientStateMock = vi.fn().mockResolvedValue(undefined);
+  const validateSessionProductBoundaryMock = vi.fn();
+  const announceAuthProductMismatchMock = vi.fn();
 
   return {
     getSessionMock,
@@ -24,6 +26,8 @@ const mocks = vi.hoisted(() => {
     unsubscribeMock,
     fromMock,
     clearAuthScopedClientStateMock,
+    validateSessionProductBoundaryMock,
+    announceAuthProductMismatchMock,
   };
 });
 
@@ -58,9 +62,15 @@ vi.mock("@/services/authScopedClientState", () => ({
   clearAuthScopedClientState: mocks.clearAuthScopedClientStateMock,
 }));
 
+vi.mock("@/services/authProductBoundary", () => ({
+  validateSessionProductBoundary: mocks.validateSessionProductBoundaryMock,
+  announceAuthProductMismatch: mocks.announceAuthProductMismatchMock,
+}));
+
 import { AuthProvider, useAuth } from "./useAuth";
 
-let authStateChangeCallback: ((event: string, session: Session | null) => void) | null = null;
+let authStateChangeCallback:
+  ((event: string, session: Session | null) => void) | null = null;
 
 const createWrapper = (queryClient?: QueryClient) => {
   const client =
@@ -82,17 +92,28 @@ describe("useAuth provider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authStateChangeCallback = null;
-    mocks.onAuthStateChangeMock.mockImplementation((callback: (event: string, session: Session | null) => void) => {
-      authStateChangeCallback = callback;
-      return {
-      data: { subscription: { unsubscribe: mocks.unsubscribeMock } },
-      };
-    });
+    mocks.onAuthStateChangeMock.mockImplementation(
+      (callback: (event: string, session: Session | null) => void) => {
+        authStateChangeCallback = callback;
+        return {
+          data: { subscription: { unsubscribe: mocks.unsubscribeMock } },
+        };
+      },
+    );
     mocks.signOutMock.mockResolvedValue(undefined);
+    mocks.validateSessionProductBoundaryMock.mockResolvedValue({
+      allowed: true,
+      expectedProductMode: "graceward",
+      actualProductMode: "graceward",
+      reason: "trusted_binding",
+    });
   });
 
   it("creates one auth subscription for multiple consumers", async () => {
-    mocks.getSessionMock.mockResolvedValue({ data: { session: null }, error: null });
+    mocks.getSessionMock.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
 
     const Probe = () => {
       const { status } = useAuth();
@@ -114,8 +135,13 @@ describe("useAuth provider", () => {
   });
 
   it("keeps authenticated user in recovering state after transient refresh errors", async () => {
-    const session = { user: { id: "user-1", email: "test@example.com" } } as Session;
-    mocks.getSessionMock.mockResolvedValueOnce({ data: { session }, error: null });
+    const session = {
+      user: { id: "user-1", email: "test@example.com" },
+    } as unknown as Session;
+    mocks.getSessionMock.mockResolvedValueOnce({
+      data: { session },
+      error: null,
+    });
 
     const { result } = renderHook(() => useAuth(), {
       wrapper: createWrapper(),
@@ -139,8 +165,13 @@ describe("useAuth provider", () => {
   });
 
   it("retries immediately when connectivity returns during recovery", async () => {
-    const session = { user: { id: "user-online", email: "online@example.com" } } as Session;
-    mocks.getSessionMock.mockResolvedValueOnce({ data: { session }, error: null });
+    const session = {
+      user: { id: "user-online", email: "online@example.com" },
+    } as unknown as Session;
+    mocks.getSessionMock.mockResolvedValueOnce({
+      data: { session },
+      error: null,
+    });
     Object.defineProperty(document, "visibilityState", {
       configurable: true,
       value: "visible",
@@ -161,7 +192,9 @@ describe("useAuth provider", () => {
       document.dispatchEvent(new Event("visibilitychange"));
     });
 
-    await waitFor(() => expect(result.current.status).toBe("recovering"), { timeout: 10000 });
+    await waitFor(() => expect(result.current.status).toBe("recovering"), {
+      timeout: 10000,
+    });
 
     mocks.getSessionMock.mockResolvedValue({
       data: { session },
@@ -177,8 +210,13 @@ describe("useAuth provider", () => {
   }, 10000);
 
   it("transitions to unauthenticated when session is confirmed missing", async () => {
-    const session = { user: { id: "user-2", email: "test2@example.com" } } as Session;
-    mocks.getSessionMock.mockResolvedValueOnce({ data: { session }, error: null });
+    const session = {
+      user: { id: "user-2", email: "test2@example.com" },
+    } as Session;
+    mocks.getSessionMock.mockResolvedValueOnce({
+      data: { session },
+      error: null,
+    });
 
     const { result } = renderHook(() => useAuth(), {
       wrapper: createWrapper(),
@@ -199,9 +237,50 @@ describe("useAuth provider", () => {
     expect(result.current.user).toBeNull();
   });
 
+  it("rejects and clears a session bound to the other product", async () => {
+    const session = {
+      user: {
+        id: "cosmiq-user",
+        email: "cosmiq@example.com",
+        app_metadata: { auth_product_mode: "cosmiq" },
+      },
+    } as unknown as Session;
+    mocks.getSessionMock.mockResolvedValueOnce({
+      data: { session },
+      error: null,
+    });
+    const boundary = {
+      allowed: false,
+      expectedProductMode: "graceward",
+      actualProductMode: "cosmiq",
+      reason: "trusted_binding",
+    };
+    mocks.validateSessionProductBoundaryMock.mockResolvedValue(boundary);
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("unauthenticated"));
+    expect(result.current.user).toBeNull();
+    expect(mocks.signOutMock).toHaveBeenCalledTimes(1);
+    expect(mocks.clearAuthScopedClientStateMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ previousUserId: "cosmiq-user" }),
+    );
+    expect(mocks.announceAuthProductMismatchMock).toHaveBeenCalledWith(
+      boundary,
+    );
+  });
+
   it("exits recovering state once session absence is confirmed", async () => {
-    const session = { user: { id: "user-3", email: "test3@example.com" } } as Session;
-    mocks.getSessionMock.mockResolvedValueOnce({ data: { session }, error: null });
+    const session = {
+      user: { id: "user-3", email: "test3@example.com" },
+    } as Session;
+    mocks.getSessionMock.mockResolvedValueOnce({
+      data: { session },
+      error: null,
+    });
 
     const { result } = renderHook(() => useAuth(), {
       wrapper: createWrapper(),
@@ -235,7 +314,10 @@ describe("useAuth provider", () => {
   }, 10000);
 
   it("signOut is idempotent and performs cleanup once", async () => {
-    mocks.getSessionMock.mockResolvedValue({ data: { session: null }, error: null });
+    mocks.getSessionMock.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
 
     let resolveSignOut: (() => void) | null = null;
     mocks.signOutMock.mockImplementation(
@@ -276,10 +358,17 @@ describe("useAuth provider", () => {
   });
 
   it("clears auth-scoped state when the authenticated user switches", async () => {
-    const initialSession = { user: { id: "user-1", email: "first@example.com" } } as Session;
-    const switchedSession = { user: { id: "user-2", email: "second@example.com" } } as Session;
+    const initialSession = {
+      user: { id: "user-1", email: "first@example.com" },
+    } as Session;
+    const switchedSession = {
+      user: { id: "user-2", email: "second@example.com" },
+    } as Session;
 
-    mocks.getSessionMock.mockResolvedValueOnce({ data: { session: initialSession }, error: null });
+    mocks.getSessionMock.mockResolvedValueOnce({
+      data: { session: initialSession },
+      error: null,
+    });
 
     const { result } = renderHook(() => useAuth(), {
       wrapper: createWrapper(),
@@ -291,18 +380,23 @@ describe("useAuth provider", () => {
       authStateChangeCallback?.("SIGNED_IN", switchedSession);
     });
 
-    expect(mocks.clearAuthScopedClientStateMock).toHaveBeenCalledWith(
-      expect.any(Object),
-      expect.objectContaining({
-        previousUserId: "user-1",
-        clearLegacyLocalState: true,
-      }),
-    );
-    expect(result.current.user?.id).toBe("user-2");
+    await waitFor(() => {
+      expect(mocks.clearAuthScopedClientStateMock).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({
+          previousUserId: "user-1",
+          clearLegacyLocalState: true,
+        }),
+      );
+      expect(result.current.user?.id).toBe("user-2");
+    });
   });
 
   it("refetches profile and companion queries on sign-in events", async () => {
-    mocks.getSessionMock.mockResolvedValueOnce({ data: { session: null }, error: null });
+    mocks.getSessionMock.mockResolvedValueOnce({
+      data: { session: null },
+      error: null,
+    });
 
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -331,12 +425,20 @@ describe("useAuth provider", () => {
 
     await waitFor(() => {
       expect(refetchQueriesSpy).toHaveBeenCalledWith({ queryKey: ["profile"] });
-      expect(refetchQueriesSpy).toHaveBeenCalledWith({ queryKey: ["companion"] });
+      expect(refetchQueriesSpy).toHaveBeenCalledWith({
+        queryKey: ["companion"],
+      });
     });
 
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ["mentor-page-data"] });
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ["mentor-personality"] });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: ["mentor-page-data"],
+    });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: ["mentor-personality"],
+    });
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ["mentor"] });
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ["selected-mentor"] });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: ["selected-mentor"],
+    });
   });
 });

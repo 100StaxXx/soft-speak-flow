@@ -7,6 +7,7 @@ import { PromptBuilder } from "../_shared/promptBuilder.ts";
 import { OutputValidator } from "../_shared/outputValidator.ts";
 import { createSafeErrorResponse, requireProtectedRequest } from "../_shared/abuseProtection.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const ActivityCommentSchema = z.object({
   activityId: z.string().uuid(),
@@ -74,9 +75,11 @@ serve(async (req) => {
     if (profileError) throw profileError
     if (!profile?.selected_mentor_id) throw new Error('Profile or mentor not found')
 
-    // Get mentor personality
+    const productMode = await resolveUserProductMode(supabase, activity.user_id);
+
+    // Get product-specific mentor personality
     const { data: mentor } = await supabase
-      .from('mentors')
+      .from(productMode === "graceward" ? "graceward_guides" : "mentors")
       .select('name, tone_description')
       .eq('id', profile.selected_mentor_id)
       .maybeSingle()
@@ -100,6 +103,7 @@ serve(async (req) => {
     const { data: todaysPepTalk } = await supabase
       .from('daily_pep_talks')
       .select('title, topic_category, emotional_triggers, summary')
+      .eq('product_mode', productMode)
       .eq('for_date', today)
       .limit(1)
       .maybeSingle()

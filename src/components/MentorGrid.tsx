@@ -120,7 +120,7 @@ export const MentorGrid = ({
             className={cn(
               "absolute left-8 z-50 group cursor-pointer transition-colors",
               isOnboardingAppearance
-                ? "flex h-12 items-center gap-2 rounded-full border border-white/12 bg-black/35 px-4 text-white backdrop-blur-md hover:bg-black/50"
+                ? "flex h-12 items-center gap-2 rounded-full border border-white/[0.12] bg-black/35 px-4 text-white backdrop-blur-md hover:bg-black/50"
                 : "flex items-center justify-center w-12 h-12 text-pure-white hover:text-royal-gold",
             )}
             style={{ top: topControlOffset }}
@@ -136,7 +136,7 @@ export const MentorGrid = ({
               className={cn(
                 "absolute right-8 z-10 flex items-center gap-2 px-4 py-2 rounded-full",
                 isOnboardingAppearance
-                  ? "border border-white/12 bg-black/35 text-white backdrop-blur-md"
+                  ? "border border-white/[0.12] bg-black/35 text-white backdrop-blur-md"
                   : "bg-royal-gold/20 border border-royal-gold",
               )}
               style={{ top: topControlOffset }}
@@ -170,7 +170,7 @@ export const MentorGrid = ({
               {/* Name & Title */}
               <div className="space-y-4">
                 {isOnboardingAppearance ? (
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/25 px-4 py-2 text-[11px] uppercase tracking-[0.3em] text-white/72 backdrop-blur-md">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.12] bg-black/25 px-4 py-2 text-[11px] uppercase tracking-[0.3em] text-white/[0.72] backdrop-blur-md">
                     <span
                       className="h-2.5 w-2.5 rounded-full"
                       style={{ backgroundColor: activeMentor.primary_color }}
@@ -217,11 +217,11 @@ export const MentorGrid = ({
                 )}>
                   <h3 className={cn(
                     "text-sm font-bold uppercase tracking-wide",
-                    isOnboardingAppearance ? "text-white/62" : "text-royal-gold",
+                    isOnboardingAppearance ? "text-white/[0.62]" : "text-royal-gold",
                   )}>
                     How they guide
                   </h3>
-                  <p className={cn("leading-relaxed", isOnboardingAppearance ? "text-white/74" : "text-steel")}>
+                  <p className={cn("leading-relaxed", isOnboardingAppearance ? "text-white/[0.74]" : "text-steel")}>
                     {activeMentor.tone_description}
                   </p>
                 </div>
@@ -234,11 +234,11 @@ export const MentorGrid = ({
                 )}>
                   <h3 className={cn(
                     "text-sm font-bold uppercase tracking-wide",
-                    isOnboardingAppearance ? "text-white/62" : "text-royal-gold",
+                    isOnboardingAppearance ? "text-white/[0.62]" : "text-royal-gold",
                   )}>
                     Best for
                   </h3>
-                  <p className={cn("leading-relaxed", isOnboardingAppearance ? "text-white/74" : "text-steel")}>
+                  <p className={cn("leading-relaxed", isOnboardingAppearance ? "text-white/[0.74]" : "text-steel")}>
                     {activeMentor.target_user}
                   </p>
                 </div>
@@ -308,7 +308,7 @@ export const MentorGrid = ({
                   <div className={cn(
                     "rounded-full border shadow-lg",
                     isOnboardingAppearance
-                      ? "border-white/12 bg-white/8 px-3 py-1.5 backdrop-blur-md"
+                      ? "border-white/[0.12] bg-white/[0.08] px-3 py-1.5 backdrop-blur-md"
                       : "bg-gradient-to-r from-royal-purple to-accent-purple border-royal-purple/30 px-3 py-1",
                   )}>
                     <span className="text-xs font-black uppercase tracking-wide text-pure-white">Recommended</span>
@@ -339,17 +339,17 @@ export const MentorGrid = ({
                       <p className="text-sm uppercase tracking-[0.18em]" style={{ color: mentor.primary_color }}>
                         {mentor.short_title}
                       </p>
-                      <p className="text-sm leading-6 text-white/62">{mentor.tone_description}</p>
+                      <p className="text-sm leading-6 text-white/[0.62]">{mentor.tone_description}</p>
                     </div>
                   </div>
 
-                  <p className="text-sm leading-6 text-white/76">{mentor.signature_line}</p>
+                  <p className="text-sm leading-6 text-white/[0.76]">{mentor.signature_line}</p>
 
                   <div className="flex flex-wrap gap-2">
                     {mentor.themes.slice(0, 3).map((theme) => (
                       <span
                         key={theme}
-                        className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-white/68"
+                        className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-white/[0.68]"
                       >
                         {theme}
                       </span>

@@ -24,6 +24,7 @@ import {
   generateCompanionOpener,
   persistCompanionOpenerTurnBestEffort,
 } from "./opener.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const RequestSchema = z.object({
   companionId: z.string().uuid(),
@@ -66,6 +67,7 @@ async function loadCompanionForOpener(
   supabase: any,
   userId: string,
   companionId: string,
+  productMode: "graceward" | "cosmiq",
 ) {
   const { data, error } = await supabase
     .from("user_companion")
@@ -74,6 +76,7 @@ async function loadCompanionForOpener(
     )
     .eq("id", companionId)
     .eq("user_id", userId)
+    .eq("product_mode", productMode)
     .maybeSingle();
 
   if (error) throw error;
@@ -136,10 +139,15 @@ serve(async (req) => {
 
     const sessionId = parsed.data.sessionId ?? crypto.randomUUID();
     const createdAt = new Date().toISOString();
+    const productMode = await resolveUserProductMode(
+      protectedRequest.supabase,
+      protectedRequest.auth.userId,
+    );
     const companion = await loadCompanionForOpener(
       protectedRequest.supabase,
       protectedRequest.auth.userId,
       parsed.data.companionId,
+      productMode,
     );
     const contextRequest: CompanionAgentRequest = {
       surface: "companion",

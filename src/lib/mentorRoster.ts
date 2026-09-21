@@ -10,17 +10,39 @@ export const ACTIVE_MENTOR_SLUGS = [
 
 export type ActiveMentorSlug = (typeof ACTIVE_MENTOR_SLUGS)[number];
 
+export const MENTOR_DISPLAY_NAMES: Record<ActiveMentorSlug, string> = {
+  sage: "Micah",
+  lyra: "Clara",
+  icon: "Lydia",
+  charles: "Jude",
+  princess: "Grace",
+  operator: "Ezra",
+  rival: "Caleb",
+};
+
 export const LEGACY_ONLY_MENTOR_SLUGS = ["reign"] as const;
 export type LegacyOnlyMentorSlug = (typeof LEGACY_ONLY_MENTOR_SLUGS)[number];
 
 export const LEGACY_MENTOR_ALIASES: Record<string, ActiveMentorSlug> = {
   atlas: "sage",
+  micah: "sage",
+  "the sage": "sage",
   carmen: "icon",
+  lydia: "icon",
+  "the icon": "icon",
   solace: "charles",
   elizabeth: "charles",
+  jude: "charles",
   sienna: "princess",
+  grace: "princess",
+  "the princess": "princess",
   stryker: "operator",
+  ezra: "operator",
+  "the operator": "operator",
   eli: "rival",
+  caleb: "rival",
+  "the rival": "rival",
+  clara: "lyra",
 };
 
 export const MENTOR_DISPLAY_ORDER: readonly ActiveMentorSlug[] = [

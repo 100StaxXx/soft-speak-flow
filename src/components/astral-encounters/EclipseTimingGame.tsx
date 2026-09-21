@@ -414,7 +414,7 @@ export const EclipseTimingGame = ({
   
   const gameStartTimeRef = useRef<number>(0);
   const lastRenderTimeRef = useRef<number>(0);
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
   const notesRef = useRef<Note[]>([]);
   const gameStatsRef = useRef<GameStats>(initialGameStats);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -432,13 +432,6 @@ export const EclipseTimingGame = ({
   // Load track and initialize notes
   useEffect(() => {
     const initGame = async () => {
-      if (compact) {
-        notesRef.current = generateFallbackNotes(difficulty);
-        currentTrackRef.current = null;
-        setGameState('countdown');
-        return;
-      }
-
       loadingStartRef.current = Date.now();
       const loadedTrack = await fetchRandomTrack(difficulty);
       

@@ -183,7 +183,7 @@ export const PLANNER_INSIGHT_STATEMENTS: Record<PlannerInsightCategory, string[]
     "The schedule is doing just enough. Trust it and avoid turning a clean day into a packed one.",
     "You have structure without heaviness. Let the timed quests carry the momentum.",
     "This is a good simple plan. Work the schedule and leave the spare room unclaimed.",
-    "The calendar has a gentle route. Follow it without adding extra detours.",
+    "The calendar has a clear route. Follow it without adding extra detours.",
     "A light day can still count. Complete the scheduled pieces and keep the plan solid.",
     "The plan is balanced because it is not crowded. Keep it that way.",
     "There is enough structure here to begin, and enough space to keep the plan realistic.",
@@ -273,7 +273,7 @@ export const PLANNER_TIME_BUCKET_QUOTES: Record<PlannerQuoteTimeBucket, string[]
     "Protect energy and shrink anything too large.",
   ],
   night: [
-    "Keep tonight gentle: close one loop or schedule tomorrow.",
+    "Keep tonight focused: close one loop or schedule tomorrow.",
     "The useful move now is small, clear, and done.",
     "Let the larger work wait for a better block.",
   ],
@@ -380,7 +380,7 @@ const formatContextPhrase = (ritualCount: number, activeCampaignCount: number) =
       ? `${ritualCount} ${pluralize(ritualCount, "ritual")}`
       : null,
     activeCampaignCount > 0
-      ? `${activeCampaignCount} active ${pluralize(activeCampaignCount, "campaign")}`
+      ? `${activeCampaignCount} active ${pluralize(activeCampaignCount, "commitment")}`
       : null,
   ].filter((part): part is string => Boolean(part));
 

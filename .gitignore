@@ -11,6 +11,7 @@ node_modules
 .venv
 dist
 dist-ssr
+/build/
 *.local
 .env
 .env.*

@@ -45,7 +45,7 @@ const mocks = vi.hoisted(() => {
           if (table === "profiles") {
             return state.profileMaybeSingleResponses.shift() ?? { data: null, error: null };
           }
-          if (table === "mentors") {
+          if (table === "graceward_guides") {
             return state.mentorMaybeSingleResponses.shift() ?? { data: null, error: null };
           }
           return { data: null, error: null };

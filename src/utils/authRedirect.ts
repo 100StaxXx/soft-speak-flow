@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 import type { Database } from "@/integrations/supabase/types";
 import {
   getOnboardingMentorId,
@@ -17,7 +18,7 @@ const PROFILE_QUERY_TIMEOUT_MS = 5000;
 const RETURNING_USER_QUERY_TIMEOUT_MS = 2000;
 const HARD_FALLBACK_TIMEOUT_MS = 8000;
 const DEFAULT_AUTH_REDIRECT_PATH = "/onboarding";
-const RETURNING_USER_REDIRECT_PATH = "/tasks";
+const RETURNING_USER_REDIRECT_PATH = "/mentor";
 
 interface AuthRedirectOptions {
   email?: string | null;
@@ -50,6 +51,7 @@ const fetchAuthRedirectCompanion = (userId: string) =>
     .from("user_companion")
     .select("id, preset_id, current_stage, current_image_url, initial_image_url")
     .eq("user_id", userId)
+    .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -315,7 +317,7 @@ const resolvePathFromContext = (
       companionStage,
       hasCompanionImages,
     );
-    logger.debug("[getAuthRedirectPath] Established account, redirecting to /tasks", {
+    logger.debug("[getAuthRedirectPath] Established account, redirecting to /mentor", {
       reason: gate.reason,
     });
     return RETURNING_USER_REDIRECT_PATH;
@@ -346,7 +348,7 @@ const resolveReturningUserPath = async (userId: string, options: AuthRedirectOpt
 
 /**
  * Fast fallback path resolution for timeout/race scenarios.
- * Existing users (onboarding completed) should land on /tasks.
+ * Existing users (onboarding completed) should land on the Today screen.
  */
 export const getProfileAwareAuthFallbackPath = async (
   userId: string,

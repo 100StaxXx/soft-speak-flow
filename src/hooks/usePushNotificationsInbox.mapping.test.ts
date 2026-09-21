@@ -23,22 +23,30 @@ describe("push notification inbox mapping", () => {
     ).toEqual({
       id: "queue-1",
       type: "task_reminder",
-      sourceLabel: "Quest reminder",
+      sourceLabel: "Action reminder",
       title: "Quest soon",
       body: "Start the thing.",
       deliveredAt: "2026-05-07T12:00:00.000Z",
       readAt: null,
       openedAt: null,
-      destinationPath: "/journeys?taskId=task-1",
+      destinationPath: "/mentor",
     });
   });
 
   it("uses stable labels for known notification types", () => {
     expect(getPushNotificationSourceLabel("daily_quote")).toBe("Daily quote");
-    expect(getPushNotificationSourceLabel("task_reminder", { habit_source_id: "habit-1" })).toBe("Ritual reminder");
-    expect(getPushNotificationSourceLabel("task_start", { is_ritual: true })).toBe("Ritual start");
-    expect(getPushNotificationSourceLabel("checkin_evening_reminder")).toBe("Evening reflection");
-    expect(getPushNotificationSourceLabel("unknown")).toBe("Cosmiq");
+    expect(getPushNotificationSourceLabel("task_reminder", { habit_source_id: "habit-1" })).toBe("Rhythm reminder");
+    expect(getPushNotificationSourceLabel("task_start", { is_ritual: true })).toBe("Rhythm ready");
+    expect(getPushNotificationSourceLabel("checkin_evening_reminder")).toBe("Evening Reflection");
+    expect(getPushNotificationSourceLabel("unknown")).toBe("Graceward");
+  });
+
+  it("does not label Cosmiq encouragement as Daily Grace", () => {
+    expect(
+      getPushNotificationSourceLabel("daily_pep", undefined, {
+        productMode: "cosmiq",
+      }),
+    ).toBe("Daily encouragement");
   });
 
   it("labels legacy daily task notification rows as rituals when source context says so", () => {
@@ -60,7 +68,7 @@ describe("push notification inbox mapping", () => {
       ritualTaskIds: new Set(["task-ritual"]),
     });
 
-    expect(item.sourceLabel).toBe("Ritual reminder");
+    expect(item.sourceLabel).toBe("Rhythm reminder");
   });
 
 });

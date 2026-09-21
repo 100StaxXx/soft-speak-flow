@@ -15,13 +15,18 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { clearAuthScopedClientState } from "@/services/authScopedClientState";
+import {
+  announceAuthProductMismatch,
+  validateSessionProductBoundary,
+} from "@/services/authProductBoundary";
 import { getUserTimezone } from "@/utils/timezone";
 import { isNetworkLikeError } from "@/utils/networkErrors";
 
 const SESSION_RETRY_DELAYS_MS = [0, 250, 750, 1500] as const;
 const RESUME_REFRESH_COOLDOWN_MS = 4000;
 
-export type AuthStatus = "loading" | "authenticated" | "unauthenticated" | "recovering";
+export type AuthStatus =
+  "loading" | "authenticated" | "unauthenticated" | "recovering";
 
 interface AuthContextValue {
   user: User | null;
@@ -50,6 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOutInFlightRef = useRef<Promise<void> | null>(null);
   const lastResumeRefreshRef = useRef(0);
   const activeUserIdRef = useRef<string | null>(null);
+  const sessionValidationSequenceRef = useRef(0);
 
   useEffect(() => {
     sessionRef.current = session;
@@ -63,11 +69,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     activeUserIdRef.current = session?.user?.id ?? null;
   }, [session?.user?.id]);
 
-  const applySessionState = useCallback((nextSession: Session | null, nextStatus?: AuthStatus) => {
-    setSession(nextSession);
-    setUser(nextSession?.user ?? null);
-    setStatus(nextStatus ?? (nextSession?.user ? "authenticated" : "unauthenticated"));
-  }, []);
+  const applySessionState = useCallback(
+    (nextSession: Session | null, nextStatus?: AuthStatus) => {
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+      setStatus(
+        nextStatus ?? (nextSession?.user ? "authenticated" : "unauthenticated"),
+      );
+    },
+    [],
+  );
 
   const saveUserTimezone = useCallback(async (userId: string) => {
     try {
@@ -101,6 +112,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [queryClient],
   );
 
+  const applyValidatedSession = useCallback(
+    async (nextSession: Session): Promise<boolean> => {
+      const validationSequence = ++sessionValidationSequenceRef.current;
+      const boundary = await validateSessionProductBoundary(nextSession);
+
+      if (validationSequence !== sessionValidationSequenceRef.current) {
+        return false;
+      }
+
+      if (!boundary.allowed) {
+        const rejectedUserId = nextSession.user.id;
+        activeUserIdRef.current = null;
+        applySessionState(null, "unauthenticated");
+        announceAuthProductMismatch(boundary);
+
+        try {
+          await supabase.auth.signOut();
+        } catch (error) {
+          console.error("Failed to clear product-mismatched session:", error);
+        }
+
+        await clearAuthScopedState(rejectedUserId);
+
+        try {
+          const { unregisterNativePush } = await import(
+            "@/utils/nativePushNotifications"
+          );
+          await unregisterNativePush(rejectedUserId);
+        } catch (error) {
+          console.error("Failed to clear product-mismatched push binding:", error);
+        }
+        return false;
+      }
+
+      activeUserIdRef.current = nextSession.user.id;
+      applySessionState(nextSession, "authenticated");
+      return true;
+    },
+    [applySessionState, clearAuthScopedState],
+  );
+
   const refreshSession = useCallback(async () => {
     if (refreshInFlightRef.current) {
       return refreshInFlightRef.current;
@@ -117,7 +169,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       let resolvedSession: Session | null | undefined;
       let sawSuccessfulCheck = false;
 
-      for (let attempt = 0; attempt < SESSION_RETRY_DELAYS_MS.length; attempt += 1) {
+      for (
+        let attempt = 0;
+        attempt < SESSION_RETRY_DELAYS_MS.length;
+        attempt += 1
+      ) {
         const delay = SESSION_RETRY_DELAYS_MS[attempt];
         if (delay > 0) {
           await sleep(delay);
@@ -140,14 +196,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           break;
         }
 
-        if (!currentSession?.user || attempt >= SESSION_RETRY_DELAYS_MS.length - 1) {
+        if (
+          !currentSession?.user ||
+          attempt >= SESSION_RETRY_DELAYS_MS.length - 1
+        ) {
           break;
         }
       }
 
       if (resolvedSession?.user) {
-        applySessionState(resolvedSession, "authenticated");
-        void saveUserTimezone(resolvedSession.user.id);
+        if (await applyValidatedSession(resolvedSession)) {
+          void saveUserTimezone(resolvedSession.user.id);
+        }
         return;
       }
 
@@ -174,7 +234,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     refreshInFlightRef.current = refreshPromise;
     return refreshPromise;
-  }, [applySessionState, saveUserTimezone]);
+  }, [applySessionState, applyValidatedSession, saveUserTimezone]);
 
   const signOut = useCallback(async () => {
     if (signOutInFlightRef.current) {
@@ -213,42 +273,73 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      const previousUserId = activeUserIdRef.current;
-      const nextUserId = nextSession?.user?.id ?? null;
-      const userChanged = Boolean(previousUserId && nextUserId && previousUserId !== nextUserId);
+      if (!nextSession?.user) {
+        const previousUserId = activeUserIdRef.current;
+        sessionValidationSequenceRef.current += 1;
+        activeUserIdRef.current = null;
+        applySessionState(null, "unauthenticated");
 
-      applySessionState(nextSession, nextSession?.user ? "authenticated" : "unauthenticated");
-      activeUserIdRef.current = nextUserId;
-
-      if (
-        nextSession?.user &&
-        (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION")
-      ) {
-        void saveUserTimezone(nextSession.user.id);
+        if (event === "SIGNED_OUT") {
+          void clearAuthScopedState(previousUserId);
+        }
+        return;
       }
 
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        setTimeout(() => {
-          void syncAuthenticatedQueries().catch((error) => {
-            console.error("Auth sync refresh failed:", error);
-          });
-        }, 0);
-      }
+      // Supabase advises against awaiting other auth/data calls directly inside
+      // this callback. Validate on the next task before exposing the session.
+      setTimeout(() => {
+        void (async () => {
+          const previousUserId = activeUserIdRef.current;
+          const nextUserId = nextSession.user.id;
+          const userChanged = Boolean(
+            previousUserId && nextUserId && previousUserId !== nextUserId,
+          );
 
-      if (event === "SIGNED_OUT") {
-        void clearAuthScopedState(previousUserId);
-      } else if (userChanged) {
-        void clearAuthScopedState(previousUserId);
-      }
+          const accepted = await applyValidatedSession(nextSession);
+          if (!accepted) return;
+
+          if (
+            event === "SIGNED_IN" ||
+            event === "TOKEN_REFRESHED" ||
+            event === "INITIAL_SESSION"
+          ) {
+            void saveUserTimezone(nextSession.user.id);
+          }
+
+          if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+            setTimeout(() => {
+              void syncAuthenticatedQueries().catch((error) => {
+                console.error("Auth sync refresh failed:", error);
+              });
+            }, 0);
+          }
+
+          if (userChanged) {
+            void clearAuthScopedState(previousUserId);
+          }
+        })().catch((error) => {
+          console.error("Auth product validation failed:", error);
+        });
+      }, 0);
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [applySessionState, clearAuthScopedState, saveUserTimezone, syncAuthenticatedQueries]);
+  }, [
+    applySessionState,
+    applyValidatedSession,
+    clearAuthScopedState,
+    saveUserTimezone,
+    syncAuthenticatedQueries,
+  ]);
 
   const refreshOnResume = useCallback(() => {
-    if (statusRef.current === "loading" || statusRef.current === "unauthenticated") return;
+    if (
+      statusRef.current === "loading" ||
+      statusRef.current === "unauthenticated"
+    )
+      return;
 
     const now = Date.now();
     const elapsed = now - lastResumeRefreshRef.current;
@@ -297,7 +388,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [refreshOnResume]);
 
   useEffect(() => {

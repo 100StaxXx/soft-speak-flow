@@ -123,8 +123,8 @@ SELECT test_security.set_auth('authenticated', '10000000-0000-0000-0000-00000000
 
 SELECT is(
   public.get_highest_valid_claimed_companion_stage('22000000-0000-0000-0000-000000000001'::uuid),
-  2,
-  'highest valid claimed stage includes legitimate evolution rows at the threshold'
+  1,
+  'highest valid claimed stage ignores legitimate non-visual rows even at the threshold'
 );
 
 INSERT INTO public.companion_evolutions (
@@ -306,8 +306,8 @@ VALUES (
 
 UPDATE public.user_companion
 SET
-  preset_id = 'griffin',
-  spirit_animal = 'Griffin',
+  preset_id = 'fox',
+  spirit_animal = 'Fox',
   core_element = 'fire',
   current_stage = 0,
   current_xp = 100,

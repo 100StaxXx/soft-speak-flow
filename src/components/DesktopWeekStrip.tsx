@@ -92,8 +92,8 @@ export function DesktopWeekStrip({
                     className={cn(
                       "h-8 rounded-[14px] px-3 text-xs",
                       plannerMode === "week"
-                        ? "bg-white/12 text-white hover:bg-white/15"
-                        : "text-muted-foreground hover:bg-white/8 hover:text-foreground",
+                        ? "bg-white/[0.12] text-white hover:bg-white/15"
+                        : "text-muted-foreground hover:bg-white/[0.08] hover:text-foreground",
                     )}
                     aria-pressed={plannerMode === "week"}
                     onClick={() => onPlannerModeChange("week")}
@@ -107,8 +107,8 @@ export function DesktopWeekStrip({
                     className={cn(
                       "h-8 rounded-[14px] px-3 text-xs",
                       plannerMode === "day"
-                        ? "bg-white/12 text-white hover:bg-white/15"
-                        : "text-muted-foreground hover:bg-white/8 hover:text-foreground",
+                        ? "bg-white/[0.12] text-white hover:bg-white/15"
+                        : "text-muted-foreground hover:bg-white/[0.08] hover:text-foreground",
                     )}
                     aria-pressed={plannerMode === "day"}
                     onClick={() => onPlannerModeChange("day")}
@@ -191,8 +191,8 @@ export function DesktopWeekStrip({
                   "rounded-[20px] border px-3.5 py-3 text-left transition-all duration-200",
                   "bg-white/[0.03] hover:bg-white/[0.06]",
                   selected
-                    ? "border-primary/60 bg-primary/14 shadow-[0_18px_34px_rgba(122,61,255,0.18)]"
-                    : "border-white/8",
+                    ? "border-primary/60 bg-primary/[0.14] shadow-[0_18px_34px_rgba(122,61,255,0.18)]"
+                    : "border-white/[0.08]",
                   today && !selected && "border-celestial-blue/30 bg-celestial-blue/[0.08]",
                 )}
               >
@@ -202,7 +202,7 @@ export function DesktopWeekStrip({
                       className={cn(
                         "text-[11px] font-semibold uppercase tracking-[0.18em]",
                         selected
-                          ? "text-primary-foreground/78"
+                          ? "text-primary-foreground/[0.78]"
                           : today
                           ? "text-celestial-blue"
                           : "text-muted-foreground/80",
@@ -218,7 +218,7 @@ export function DesktopWeekStrip({
                     <span
                       className={cn(
                         "rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide",
-                        selected ? "bg-white/14 text-white" : "bg-celestial-blue/15 text-celestial-blue",
+                        selected ? "bg-white/[0.14] text-white" : "bg-celestial-blue/15 text-celestial-blue",
                       )}
                     >
                       Today

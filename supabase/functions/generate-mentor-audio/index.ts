@@ -25,6 +25,11 @@ import {
   resolveTutorialVoice,
 } from "../_shared/mentorVoiceConfig.ts";
 import { resolveSupportedMentorSlug } from "../_shared/mentorRoster.ts";
+import {
+  characterAlignmentToWords,
+  decodeBase64Audio,
+  type TimedTranscriptWord,
+} from "../_shared/elevenLabsAlignment.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,11 +42,13 @@ const RATE_LIMIT_KEY = "mentor-audio";
 const ELEVENLABS_FIRST_ATTEMPT_TIMEOUT_MS = 45000;
 const ELEVENLABS_RETRY_TIMEOUT_MS = 25000;
 const ELEVENLABS_RETRY_DELAY_MS = 1500;
+const ELEVENLABS_V3_NATURAL_STABILITY = 0.5;
 
 interface AudioGenerationResult {
   audioBytes: Uint8Array;
   provider: "elevenlabs" | "openai";
   model: string;
+  transcript: TimedTranscriptWord[];
 }
 
 interface GenerateMentorAudioDeps {
@@ -99,6 +106,25 @@ function isRetriableElevenLabsError(error: Error): boolean {
   return status === 408 || status === 429 || status >= 500;
 }
 
+export function buildElevenLabsVoiceSettings(
+  voiceConfig: MentorVoiceConfig,
+  modelId = ELEVENLABS_MENTOR_TTS_MODEL,
+): Record<string, unknown> {
+  if (modelId === "eleven_v3") {
+    return {
+      stability: ELEVENLABS_V3_NATURAL_STABILITY,
+    };
+  }
+
+  return {
+    stability: voiceConfig.stability,
+    similarity_boost: voiceConfig.similarity_boost,
+    style: voiceConfig.style_exaggeration,
+    speed: voiceConfig.speed,
+    use_speaker_boost: voiceConfig.use_speaker_boost ?? true,
+  };
+}
+
 async function fetchAudioWithTimeout({
   fetchImpl,
   url,
@@ -145,10 +171,10 @@ async function generateElevenLabsAudio({
   voiceSettings: Record<string, unknown>;
   script: string;
   timeoutMs: number;
-}): Promise<Uint8Array> {
+}): Promise<{ audioBytes: Uint8Array; transcript: TimedTranscriptWord[] }> {
   const response = await fetchAudioWithTimeout({
     fetchImpl,
-    url: `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+    url: `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`,
     init: {
       method: "POST",
       headers: {
@@ -168,10 +194,38 @@ async function generateElevenLabsAudio({
   if (!response.ok) {
     const errorText = await readErrorSnippet(response);
     console.error("ElevenLabs API error:", response.status, errorText);
-    throw new Error(`ElevenLabs API error: ${response.status}`);
+    throw new Error(
+      `ElevenLabs API error: ${response.status}${
+        errorText ? `: ${errorText}` : ""
+      }`,
+    );
   }
 
-  return new Uint8Array(await response.arrayBuffer());
+  let payload: Record<string, unknown>;
+  try {
+    payload = await response.json() as Record<string, unknown>;
+  } catch {
+    throw new Error("ElevenLabs timing response was not valid JSON");
+  }
+
+  const audioBase64 = typeof payload.audio_base64 === "string"
+    ? payload.audio_base64
+    : "";
+  const alignment = (
+    payload.normalized_alignment && typeof payload.normalized_alignment === "object"
+      ? payload.normalized_alignment
+      : payload.alignment
+  ) as Parameters<typeof characterAlignmentToWords>[0];
+  const transcript = characterAlignmentToWords(alignment);
+
+  if (transcript.length === 0) {
+    throw new Error("ElevenLabs timing response contained no word timestamps");
+  }
+
+  return {
+    audioBytes: decodeBase64Audio(audioBase64),
+    transcript,
+  };
 }
 
 async function generateOpenAiAudio({
@@ -239,15 +293,16 @@ async function generateMentorAudioBytes({
 
   if (elevenLabsApiKey) {
     try {
+      const generated = await generateElevenLabsAudio({
+        fetchImpl,
+        apiKey: elevenLabsApiKey,
+        voiceId: voiceConfig.voiceId,
+        voiceSettings,
+        script,
+        timeoutMs: ELEVENLABS_FIRST_ATTEMPT_TIMEOUT_MS,
+      });
       return {
-        audioBytes: await generateElevenLabsAudio({
-          fetchImpl,
-          apiKey: elevenLabsApiKey,
-          voiceId: voiceConfig.voiceId,
-          voiceSettings,
-          script,
-          timeoutMs: ELEVENLABS_FIRST_ATTEMPT_TIMEOUT_MS,
-        }),
+        ...generated,
         provider: "elevenlabs",
         model: ELEVENLABS_MENTOR_TTS_MODEL,
       };
@@ -265,15 +320,16 @@ async function generateMentorAudioBytes({
         await delay(getElevenLabsRetryDelayMs());
 
         try {
+          const generated = await generateElevenLabsAudio({
+            fetchImpl,
+            apiKey: elevenLabsApiKey,
+            voiceId: voiceConfig.voiceId,
+            voiceSettings,
+            script,
+            timeoutMs: ELEVENLABS_RETRY_TIMEOUT_MS,
+          });
           return {
-            audioBytes: await generateElevenLabsAudio({
-              fetchImpl,
-              apiKey: elevenLabsApiKey,
-              voiceId: voiceConfig.voiceId,
-              voiceSettings,
-              script,
-              timeoutMs: ELEVENLABS_RETRY_TIMEOUT_MS,
-            }),
+            ...generated,
             provider: "elevenlabs",
             model: ELEVENLABS_MENTOR_TTS_MODEL,
           };
@@ -324,6 +380,7 @@ async function generateMentorAudioBytes({
       }),
       provider: "openai",
       model: OPENAI_TTS_MODEL_NAME,
+      transcript: [],
     };
   } catch (fallbackError) {
     const fallbackFailure = fallbackError instanceof Error
@@ -428,13 +485,7 @@ export async function handleGenerateMentorAudio(
       );
     }
 
-    const voiceSettings = {
-      stability: voiceConfig.stability,
-      similarity_boost: voiceConfig.similarity_boost,
-      style: voiceConfig.style_exaggeration,
-      speed: voiceConfig.speed,
-      use_speaker_boost: voiceConfig.use_speaker_boost ?? true,
-    };
+    const voiceSettings = buildElevenLabsVoiceSettings(voiceConfig);
 
     console.log(
       `Generating audio for mentor ${requestedMentorSlug} (resolved=${resolvedMentorSlug}) with voice ${voiceConfig.voiceId}`,
@@ -491,6 +542,8 @@ export async function handleGenerateMentorAudio(
         audioUrl,
         provider: audioResult.provider,
         storagePath: filePath,
+        transcript: audioResult.transcript,
+        hasWordTimestamps: audioResult.transcript.length > 0,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

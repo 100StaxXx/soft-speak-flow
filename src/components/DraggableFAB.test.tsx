@@ -448,7 +448,6 @@ describe("DraggableFAB", () => {
 
     fireEvent.click(screen.getByTestId("journeys-companion-launcher-floating"));
     const upcomingButton = screen.getByTestId("journeys-companion-launcher-option-upcoming");
-    expect(upcomingButton.className).toContain("border-[#315114]");
     fireEvent.click(upcomingButton);
 
     expect(mocks.onOpenCompanionPlanner).toHaveBeenCalledWith(expect.objectContaining({

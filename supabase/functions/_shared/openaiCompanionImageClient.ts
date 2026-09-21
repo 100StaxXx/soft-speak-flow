@@ -1,6 +1,15 @@
+const readOptionalEnv = (name: string): string | undefined => {
+  try {
+    return Deno.env.get(name)?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+};
+const OPENAI_API_BASE_URL = (readOptionalEnv("OPENAI_API_BASE_URL") ||
+  "https://api.openai.com").replace(/\/+$/, "");
 const OPENAI_IMAGE_GENERATIONS_URL =
-  "https://api.openai.com/v1/images/generations";
-const OPENAI_IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits";
+  `${OPENAI_API_BASE_URL}/v1/images/generations`;
+const OPENAI_IMAGE_EDITS_URL = `${OPENAI_API_BASE_URL}/v1/images/edits`;
 const DEFAULT_COMPANION_IMAGE_MODEL = "gpt-image-1-mini";
 const DEFAULT_COMPANION_IMAGE_FALLBACK_MODELS = [
   "gpt-image-1",
@@ -36,6 +45,7 @@ export class OpenAIImageRequestError extends Error {
 interface BaseImageRequestArgs {
   guardedFetch: typeof fetch;
   openAIApiKey: string;
+  model?: string;
   prompt: string;
   size: string;
   quality?: "medium" | "high";
@@ -76,7 +86,7 @@ const parseModelList = (raw: string | undefined): string[] =>
     .map((model) => model.trim())
     .filter((model) => model.length > 0);
 
-const resolveCompanionImageModels = (): string[] => {
+const resolveCompanionImageModels = (preferredModel?: string): string[] => {
   const configuredFallbackModels = parseModelList(
     Deno.env.get("OPENAI_COMPANION_IMAGE_FALLBACK_MODELS"),
   );
@@ -84,7 +94,13 @@ const resolveCompanionImageModels = (): string[] => {
     ? configuredFallbackModels
     : [...DEFAULT_COMPANION_IMAGE_FALLBACK_MODELS];
 
-  return Array.from(new Set([resolveCompanionImageModel(), ...fallbackModels]));
+  return Array.from(
+    new Set([
+      preferredModel?.trim(),
+      resolveCompanionImageModel(),
+      ...fallbackModels,
+    ].filter((model): model is string => Boolean(model))),
+  );
 };
 
 const buildHeaders = (openAIApiKey: string) => ({
@@ -107,6 +123,7 @@ const supportsInputFidelityOverride = (model: string): boolean => {
 };
 
 const buildBaseRequestBody = ({
+  model,
   prompt,
   size,
   quality,
@@ -118,7 +135,7 @@ const buildBaseRequestBody = ({
   unknown
 > => {
   const body: Record<string, unknown> = {
-    model: resolveCompanionImageModel(),
+    model: model?.trim() || resolveCompanionImageModel(),
     prompt,
     size,
   };
@@ -463,6 +480,7 @@ const buildEditFormData = ({
 const performMultipartEditRequest = async ({
   guardedFetch,
   openAIApiKey,
+  model: preferredModel,
   prompt,
   size,
   quality,
@@ -473,6 +491,7 @@ const performMultipartEditRequest = async ({
 }: {
   guardedFetch: typeof fetch;
   openAIApiKey: string;
+  model?: string;
   prompt: string;
   size: string;
   quality?: "medium" | "high";
@@ -570,7 +589,7 @@ const performMultipartEditRequest = async ({
   };
 
   let lastError: unknown;
-  const models = resolveCompanionImageModels();
+  const models = resolveCompanionImageModels(preferredModel);
   for (const [index, model] of models.entries()) {
     try {
       return await requestWithModel(model);
@@ -590,6 +609,7 @@ const performMultipartEditRequest = async ({
 export const generateCompanionImage = async ({
   guardedFetch,
   openAIApiKey,
+  model: preferredModel,
   prompt,
   size,
   quality = "high",
@@ -599,8 +619,9 @@ export const generateCompanionImage = async ({
 }: BaseImageRequestArgs): Promise<CompanionImageGenerationResult> =>
   await (async () => {
     let lastError: unknown;
-    const models = resolveCompanionImageModels();
+    const models = resolveCompanionImageModels(preferredModel);
     const baseBody = buildBaseRequestBody({
+      model: preferredModel,
       prompt,
       size,
       quality,
@@ -636,6 +657,7 @@ export const generateCompanionImage = async ({
 export const editCompanionImage = async ({
   guardedFetch,
   openAIApiKey,
+  model,
   prompt,
   size,
   quality = "high",
@@ -653,6 +675,7 @@ export const editCompanionImage = async ({
   return await performMultipartEditRequest({
     guardedFetch,
     openAIApiKey,
+    model,
     prompt,
     size,
     quality,

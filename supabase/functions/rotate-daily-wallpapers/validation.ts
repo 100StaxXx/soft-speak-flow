@@ -22,7 +22,7 @@ const DEFAULT_VALIDATION_RESULT: WallpaperValidationResult = {
   rejectionReasons: [],
 };
 
-export const buildWallpaperValidationPrompt = (spec: WallpaperGenerationSpec) => `You are reviewing an AI-generated wallpaper for the ${spec.label} surface in the Cosmiq app.
+export const buildWallpaperValidationPrompt = (spec: WallpaperGenerationSpec) => `You are reviewing an AI-generated wallpaper for the ${spec.label} surface in the Graceward app.
 
 Goal:
 - scenic, gorgeous, awe-inspiring wallpaper first

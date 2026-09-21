@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 import {
   isAssignedCompanionName,
   normalizeCompanionName,
@@ -56,7 +57,8 @@ const cacheCompanionName = (companionId: string, name: string) => {
   void supabase
     .from("user_companion")
     .update({ cached_creature_name: name })
-    .eq("id", companionId);
+    .eq("id", companionId)
+    .eq("product_mode", PRODUCT_RUNTIME.authProductMode);
 };
 
 export const persistCompanionCustomName = async (
@@ -67,7 +69,8 @@ export const persistCompanionCustomName = async (
   const { error } = await supabase
     .from("user_companion")
     .update({ companion_name: normalizedName })
-    .eq("id", companionId);
+    .eq("id", companionId)
+    .eq("product_mode", PRODUCT_RUNTIME.authProductMode);
 
   if (error) {
     throw error;

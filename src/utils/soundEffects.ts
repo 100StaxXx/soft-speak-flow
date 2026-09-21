@@ -1,6 +1,10 @@
 import { safeLocalStorage } from './storage';
 import { globalAudio } from './globalAudio';
 import { getSharedAudioContext, resumeAudioContext } from './iosAudio';
+import { productScopedStorageKey } from '@/config/productRuntime';
+
+export const SOUND_VOLUME_STORAGE_KEY = productScopedStorageKey('sound_volume');
+export const SOUND_MUTED_STORAGE_KEY = productScopedStorageKey('sound_muted');
 
 // Sound effects management system
 class SoundManager {
@@ -53,8 +57,8 @@ class SoundManager {
   }
 
   private loadSoundPreferences() {
-    const savedVolume = safeLocalStorage.getItem('sound_volume');
-    const savedMuted = safeLocalStorage.getItem('sound_muted');
+    const savedVolume = safeLocalStorage.getItem(SOUND_VOLUME_STORAGE_KEY);
+    const savedMuted = safeLocalStorage.getItem(SOUND_MUTED_STORAGE_KEY);
     
     if (savedVolume) this.masterVolume = parseFloat(savedVolume);
     if (savedMuted) this.isMuted = savedMuted === 'true';
@@ -62,12 +66,12 @@ class SoundManager {
 
   setVolume(volume: number) {
     this.masterVolume = Math.max(0, Math.min(1, volume));
-    safeLocalStorage.setItem('sound_volume', this.masterVolume.toString());
+    safeLocalStorage.setItem(SOUND_VOLUME_STORAGE_KEY, this.masterVolume.toString());
   }
 
   toggleMute() {
     this.isMuted = !this.isMuted;
-    safeLocalStorage.setItem('sound_muted', this.isMuted.toString());
+    safeLocalStorage.setItem(SOUND_MUTED_STORAGE_KEY, this.isMuted.toString());
     if (this.isMuted) {
       this.stopAllAmbientSounds();
     }

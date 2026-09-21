@@ -1,344 +1,143 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle } from "lucide-react";
-import { toast } from "@/components/ui/sonner";
-import { StoryOnboarding } from "@/components/onboarding";
+import { useEffect, useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+
+import {
+  GracewardOnboarding,
+  type GracewardOnboardingResumeState,
+} from "@/components/onboarding/StoryOnboarding";
 import { PageLoader } from "@/components/PageLoader";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
-import { supabase } from "@/integrations/supabase/client";
-import {
-  deleteCurrentAccount,
-  getAccountDeletionErrorMetadata,
-  getAccountDeletionFailureMessage,
-  isAccountDeletionAuthError,
-} from "@/services/accountDeletion";
-import { logger } from "@/utils/logger";
-import {
-  buildEstablishedProfileSelfHealPatch,
-  getOnboardingGateState,
-} from "@/utils/profileOnboarding";
-import { getCompanionEggLabel, getCompanionPreset } from "@/config/companionCatalog";
-import { getStoredCompanionCustomName } from "@/lib/companionName";
-import { trackOnboardingTutorialEvent } from "@/utils/onboardingTutorialTelemetry";
+import { getOnboardingGateState } from "@/utils/profileOnboarding";
+import { PRODUCT } from "@/config/product";
 
-const ONBOARDING_GATE_STALL_MS = 12_000;
+const asRecord = (value: unknown): Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 
 export default function Onboarding() {
-  const { user, status, signOut } = useAuth();
-  const { profile, loading: profileLoading } = useProfile();
-  const { companion, isLoading: companionLoading } = useCompanion();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const onboardingSelfHealAttemptedRef = useRef(false);
-  const legacyAccountDeletionAttemptedRef = useRef(false);
-  const gateLoadStartedAtRef = useRef<number | null>(null);
-  const gateLoadTimeoutRef = useRef<number | null>(null);
-  const gateLoadSnapshotRef = useRef({ status, profileLoading, companionLoading });
-  const [isDeletingLegacyAccount, setIsDeletingLegacyAccount] = useState(false);
-  const [isSelfHealingProfile, setIsSelfHealingProfile] = useState(false);
-  const [isShowingJourneyCinematic, setIsShowingJourneyCinematic] = useState(false);
-  const [hasGateLoadTimedOut, setHasGateLoadTimedOut] = useState(false);
-  const [gateLoadRetryNonce, setGateLoadRetryNonce] = useState(0);
-  const onboardingData = (profile?.onboarding_data as Record<string, unknown> | null) ?? null;
-  const hasCompanion = Boolean(companion);
-  const hasPresetCompanion = Boolean(companion?.preset_id);
-  const companionStage = companion?.current_stage ?? null;
-  const hasCompanionImages = Boolean(companion?.current_image_url || companion?.initial_image_url);
-  const onboardingGate = getOnboardingGateState({
+  const { user, status } = useAuth();
+  const {
     profile,
-    hasCompanion,
-    hasPresetCompanion,
-    companionStage,
-    hasCompanionImages,
-  });
-  const onboardingGateReady =
-    status !== "loading" &&
-    status !== "recovering" &&
-    (!user || (!profileLoading && !companionLoading));
-  const journeyResumeState = useMemo(() => {
-    if (!onboardingGate.resumeStep) return null;
+    loading: profileLoading,
+    error: profileError,
+    refetch: refetchProfile,
+  } = useProfile();
+  const {
+    companion,
+    isLoading: companionLoading,
+    error: companionError,
+    refetch: refetchCompanion,
+  } = useCompanion();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const companionOnly = searchParams.get("companion") === "1";
 
-    const trimmedUserName =
-      typeof onboardingData?.userName === "string" ? onboardingData.userName.trim() : "";
-    const resumeStep =
-      trimmedUserName.length > 0 ||
-      onboardingGate.resumeStep === "prologue" ||
-      onboardingGate.resumeStep === "journey-begins"
-        ? onboardingGate.resumeStep
-        : "prologue";
-    const spiritAnimal =
-      typeof companion?.spirit_animal === "string" ? companion.spirit_animal.trim() : "";
-    const presetName = companion?.preset_id
-      ? getCompanionPreset(companion.preset_id)?.displayName ?? null
-      : null;
-    const elementalEggLabel = getCompanionEggLabel(companion?.core_element);
-    const isStageZeroEgg = companion?.current_stage === 0;
-    const companionLabel =
-      getStoredCompanionCustomName(companion)
-      || (isStageZeroEgg ? elementalEggLabel : null)
-      || presetName
-      || (spiritAnimal.length > 0 && spiritAnimal !== "Egg" ? spiritAnimal : elementalEggLabel);
+  const onboardingData = useMemo(
+    () => asRecord(profile?.onboarding_data),
+    [profile?.onboarding_data],
+  );
+
+  const onboardingGate = useMemo(() => getOnboardingGateState({
+    profile,
+    hasCompanion: Boolean(companion),
+    hasPresetCompanion: companion?.product_mode === "cosmiq" || Boolean(companion?.preset_id),
+    companionStage: companion?.current_stage ?? null,
+    hasCompanionImages: Boolean(companion?.current_image_url || companion?.initial_image_url),
+  }), [companion, profile]);
+
+  const resumeState = useMemo<GracewardOnboardingResumeState | null>(() => {
+    if (companionOnly || !onboardingGate.resumeStep) return null;
+
+    const storedName = typeof onboardingData.userName === "string" ? onboardingData.userName : "";
+    const companionLabel = companion?.companion_name
+      || companion?.cached_creature_name
+      || companion?.spirit_animal
+      || null;
 
     return {
-      stage: resumeStep,
-      userName: trimmedUserName || (resumeStep === "journey-begins" ? "You" : ""),
+      stage: onboardingGate.resumeStep,
+      userName: storedName,
       companionLabel,
       onboardingData,
-      faction: typeof profile?.faction === "string" ? profile.faction : null,
+      faction: profile?.faction ?? null,
     };
-  }, [companion, onboardingData, onboardingGate.resumeStep, profile?.faction]);
+  }, [companion, companionOnly, onboardingData, onboardingGate.resumeStep, profile?.faction]);
 
   useEffect(() => {
-    onboardingSelfHealAttemptedRef.current = false;
-    legacyAccountDeletionAttemptedRef.current = false;
-    gateLoadStartedAtRef.current = null;
-    if (gateLoadTimeoutRef.current !== null) {
-      window.clearTimeout(gateLoadTimeoutRef.current);
-      gateLoadTimeoutRef.current = null;
+    if (status === "unauthenticated" || (!user && status !== "loading" && status !== "recovering")) {
+      navigate("/welcome", { replace: true });
     }
-    setIsDeletingLegacyAccount(false);
-    setIsSelfHealingProfile(false);
-    setIsShowingJourneyCinematic(false);
-    setHasGateLoadTimedOut(false);
-  }, [user?.id]);
+  }, [navigate, status, user]);
 
   useEffect(() => {
-    gateLoadSnapshotRef.current = { status, profileLoading, companionLoading };
-  }, [companionLoading, profileLoading, status]);
+    if (profileLoading || companionLoading || !profile) return;
 
-  useEffect(() => {
-    if (gateLoadTimeoutRef.current !== null) {
-      window.clearTimeout(gateLoadTimeoutRef.current);
-      gateLoadTimeoutRef.current = null;
-    }
-
-    if (!user || onboardingGateReady) {
-      gateLoadStartedAtRef.current = null;
-      setHasGateLoadTimedOut(false);
+    if (companionOnly && companion) {
+      navigate("/companion", { replace: true });
       return;
     }
 
-    const startedAt = gateLoadStartedAtRef.current ?? Date.now();
-    gateLoadStartedAtRef.current = startedAt;
-    const remainingMs = Math.max(0, ONBOARDING_GATE_STALL_MS - (Date.now() - startedAt));
+    if (!companionOnly && onboardingGate.isEstablished) {
+      navigate(PRODUCT.mode === "cosmiq" ? "/journeys" : "/mentor", { replace: true });
+    }
+  }, [
+    companion,
+    companionLoading,
+    companionOnly,
+    navigate,
+    onboardingGate.isEstablished,
+    profile,
+    profileLoading,
+  ]);
 
-    gateLoadTimeoutRef.current = window.setTimeout(() => {
-      gateLoadTimeoutRef.current = null;
-      const snapshot = gateLoadSnapshotRef.current;
-      setHasGateLoadTimedOut(true);
-      trackOnboardingTutorialEvent("onboarding_gate_load_stalled", {
-        userId: user.id,
-        status: snapshot.status,
-        profileLoading: snapshot.profileLoading,
-        companionLoading: snapshot.companionLoading,
-      });
-    }, remainingMs);
-
-    return () => {
-      if (gateLoadTimeoutRef.current !== null) {
-        window.clearTimeout(gateLoadTimeoutRef.current);
-        gateLoadTimeoutRef.current = null;
-      }
-    };
-  }, [gateLoadRetryNonce, onboardingGateReady, user?.id]);
-
-  const handleRetryGateLoad = () => {
-    if (!user) return;
-
-    setHasGateLoadTimedOut(false);
-    gateLoadStartedAtRef.current = Date.now();
-    setGateLoadRetryNonce((nonce) => nonce + 1);
-    trackOnboardingTutorialEvent("onboarding_gate_load_retry", {
-      userId: user.id,
-      profileLoading,
-      companionLoading,
-    });
-    void queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
-    void queryClient.invalidateQueries({ queryKey: ["companion", user.id] });
-  };
-
-  useEffect(() => {
-    if (!user || !onboardingGateReady || onboardingSelfHealAttemptedRef.current) return;
-
-    const patch = buildEstablishedProfileSelfHealPatch({
-      profile,
-      hasCompanion,
-      hasPresetCompanion,
-      companionStage,
-      hasCompanionImages,
-    });
-    if (!patch) return;
-
-    onboardingSelfHealAttemptedRef.current = true;
-    setIsSelfHealingProfile(true);
-
-    void supabase
-      .from("profiles")
-      .update(patch as any)
-      .eq("id", user.id)
-      .then(({ error }) => {
-        if (error) {
-          onboardingSelfHealAttemptedRef.current = false;
-          console.warn("Failed to self-heal established profile flags:", error);
-          toast.error("We couldn't finish repairing your onboarding state. Please refresh and try again.");
-        } else {
-          void queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
-        }
-        setIsSelfHealingProfile(false);
-      });
-  }, [user, onboardingGateReady, profile, hasCompanion, hasPresetCompanion, companionStage, hasCompanionImages, queryClient]);
-
-  const handleConfirmLegacyAccountReset = () => {
-    if (!user || !onboardingGate.needsCompanionMigration) return;
-    if (legacyAccountDeletionAttemptedRef.current) return;
-
-    legacyAccountDeletionAttemptedRef.current = true;
-    setIsDeletingLegacyAccount(true);
-
-    void (async () => {
-      try {
-        await deleteCurrentAccount({
-          queryClient,
-          userId: user.id,
-          signOut,
-        });
-
-        navigate("/auth", {
-          replace: true,
-          state: {
-            message: "Your previous account was removed so you can restart onboarding with the new companion system.",
-          },
-        });
-      } catch (error) {
-        legacyAccountDeletionAttemptedRef.current = false;
-        setIsDeletingLegacyAccount(false);
-
-        if (isAccountDeletionAuthError(error)) {
-          toast.error("Your session expired. Please sign in again.");
-          try {
-            await signOut();
-          } catch (signOutError) {
-            console.warn("Sign out after legacy account deletion auth error failed:", signOutError);
-          }
-          navigate("/auth", { replace: true });
-          return;
-        }
-
-        const errorMetadata = getAccountDeletionErrorMetadata(error);
-        logger.error("[Account Deletion] Legacy onboarding reset failed", {
-          surface: "onboarding_legacy_reset",
-          userId: user.id,
-          code: errorMetadata.code,
-          status: errorMetadata.status,
-          requestId: errorMetadata.requestId,
-          stage: errorMetadata.stage,
-          message: error instanceof Error ? error.message : String(error),
-        });
-
-        toast.error(getAccountDeletionFailureMessage(error));
-      }
-    })();
-  };
-
-  useEffect(() => {
-    if (!user || !onboardingGateReady) return;
-    if (!onboardingGate.isEstablished) return;
-    if (isShowingJourneyCinematic) return;
-
-    navigate("/journeys", { replace: true });
-  }, [user, onboardingGateReady, onboardingGate.isEstablished, isShowingJourneyCinematic, navigate]);
-
-  if (status === "loading" || status === "recovering") {
-    return null;
+  if (
+    status === "loading"
+    || status === "recovering"
+    || profileLoading
+    || companionLoading
+  ) {
+    return <PageLoader message={`Preparing your ${PRODUCT.name} journey…`} />;
   }
 
-  if (isDeletingLegacyAccount) {
-    return <PageLoader message="Resetting your account so you can restart onboarding..." />;
-  }
+  if (!user) return null;
 
-  if (user && onboardingGate.needsCompanionMigration) {
+  if (profileError || companionError || !profile) {
     return (
-      <main className="min-h-screen bg-background px-4 py-safe flex items-center justify-center">
-        <section className="max-w-xl rounded-[28px] border border-destructive/25 bg-card/95 p-6 text-card-foreground shadow-2xl">
-          <div className="flex items-start gap-4">
-            <div className="rounded-full bg-destructive/10 p-3 text-destructive">
-              <AlertTriangle className="h-6 w-6" aria-hidden="true" />
-            </div>
-            <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-destructive">
-                Account Reset Required
-              </p>
-              <h1 className="text-2xl font-semibold">Your old companion setup needs a reset</h1>
-              <p className="text-sm leading-6 text-muted-foreground">
-                This account was created before the current companion system. Resetting removes the old account data so
-                you can restart onboarding cleanly with the new companion flow. We will not do this unless you confirm.
-              </p>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={handleConfirmLegacyAccountReset}
-                >
-                  Reset my account
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => signOut()}
-                >
-                  Not now
-                </Button>
-              </div>
-            </div>
-          </div>
+      <main className="flex min-h-screen items-center justify-center bg-background px-4 py-safe">
+        <section className="w-full max-w-md rounded-[28px] border border-border/70 bg-card/95 p-6 text-card-foreground shadow-2xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            Connection check
+          </p>
+          <h1 className="mt-3 text-2xl font-semibold">We couldn't load your journey</h1>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            Your progress is still safe. Retry the sync before continuing.
+          </p>
+          <Button
+            type="button"
+            className="mt-6 w-full"
+            onClick={() => {
+              void refetchProfile();
+              void refetchCompanion();
+            }}
+          >
+            Retry loading
+          </Button>
         </section>
       </main>
     );
   }
 
-  if (user && (
-    profileLoading
-    || companionLoading
-    || isSelfHealingProfile
-    || (onboardingGate.isEstablished && !isShowingJourneyCinematic)
-  )) {
-    if (hasGateLoadTimedOut && (profileLoading || companionLoading)) {
-      return (
-        <main className="min-h-screen bg-background px-4 py-safe flex items-center justify-center">
-          <section className="max-w-md rounded-[28px] border border-border/70 bg-card/95 p-6 text-card-foreground shadow-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              Connection Check
-            </p>
-            <h1 className="mt-3 text-2xl font-semibold">We are still loading your setup</h1>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Your onboarding state is taking longer than expected to load. You can retry the profile sync or sign out
-              and come back in cleanly.
-            </p>
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Button type="button" onClick={handleRetryGateLoad}>
-                Retry loading
-              </Button>
-              <Button type="button" variant="outline" onClick={() => signOut()}>
-                Sign out
-              </Button>
-            </div>
-          </section>
-        </main>
-      );
-    }
-    return null;
-  }
+  if (companionOnly && companion) return null;
+  if (!companionOnly && onboardingGate.isEstablished) return null;
 
   return (
-    <StoryOnboarding
-      mode={onboardingGate.needsProgressionReset ? "reset" : "standard"}
-      resumeState={journeyResumeState}
-      onJourneyCinematicStart={() => setIsShowingJourneyCinematic(true)}
-      onJourneyCinematicComplete={() => setIsShowingJourneyCinematic(false)}
+    <GracewardOnboarding
+      mode={companionOnly ? "creation" : "standard"}
+      resumeState={resumeState}
     />
   );
 }

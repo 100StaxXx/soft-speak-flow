@@ -6,6 +6,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { requireServiceRoleAuth } from "../_shared/auth.ts";
 import { resolveNotificationCompanionContext } from "../_shared/companionName.ts";
 import { buildProactiveNudgeCompanionIdentity } from "./companionIdentity.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -67,6 +68,10 @@ serve(async (req) => {
 
     for (const profile of profiles) {
       try {
+        if (await resolveUserProductMode(supabase, profile.id) !== "cosmiq") {
+          continue;
+        }
+
         // Get today's date
         const today = new Date().toLocaleDateString('en-CA')
         const currentHour = new Date().getHours()

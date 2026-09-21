@@ -31,7 +31,6 @@ const mocks = vi.hoisted(() => {
   let shouldQueueWrites = false;
   const warmEpicsQueryFromRemoteMock = vi.fn();
   const withPlannerRemoteSyncLockMock = vi.fn(async (_userId: string, operation: () => Promise<unknown>) => operation());
-  const awardCustomXPMock = vi.fn();
   const toastSuccessMock = vi.fn();
   const toastErrorMock = vi.fn();
   const toastMock = vi.fn();
@@ -69,7 +68,6 @@ const mocks = vi.hoisted(() => {
     },
     warmEpicsQueryFromRemoteMock,
     withPlannerRemoteSyncLockMock,
-    awardCustomXPMock,
     toastSuccessMock,
     toastErrorMock,
     toastMock,
@@ -79,12 +77,6 @@ const mocks = vi.hoisted(() => {
 vi.mock("./useAuth", () => ({
   useAuth: () => ({
     user: { id: "user-1" },
-  }),
-}));
-
-vi.mock("@/hooks/useXPRewards", () => ({
-  useXPRewards: () => ({
-    awardCustomXP: (...args: unknown[]) => mocks.awardCustomXPMock(...args),
   }),
 }));
 
@@ -235,7 +227,6 @@ describe("useEpics", () => {
     mocks.rpcMock.mockResolvedValue({ data: 0, error: null });
     mocks.warmEpicsQueryFromRemoteMock.mockResolvedValue([]);
     mocks.withPlannerRemoteSyncLockMock.mockImplementation(async (_userId: string, operation: () => Promise<unknown>) => operation());
-    mocks.awardCustomXPMock.mockResolvedValue({ xpAwarded: 10 });
     mocks.toastSuccessMock.mockReset();
     mocks.toastErrorMock.mockReset();
     mocks.toastMock.mockReset();
@@ -760,56 +751,6 @@ describe("useEpics", () => {
     });
   });
 
-  it("awards hatch-ready XP after a successful remote campaign create", async () => {
-    const tableWithInsert = () => ({
-      insert: vi.fn().mockResolvedValue({ error: null }),
-      upsert: vi.fn().mockResolvedValue({ error: null }),
-      select: mocks.selectMock,
-    });
-
-    mocks.fromMock.mockImplementation((table: string) => {
-      if (["habits", "epics", "epic_habits", "journey_phases", "epic_milestones"].includes(table)) {
-        return tableWithInsert();
-      }
-
-      return createDefaultSupabaseTableMock();
-    });
-
-    const { result } = renderHook(() => useEpics(), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
-
-    await act(async () => {
-      await result.current.createEpic({
-        title: "Hatch Launch Sequence",
-        target_days: 14,
-        habits: [
-          {
-            title: "Morning focus",
-            difficulty: "easy",
-            frequency: "daily",
-            custom_days: [1, 2, 3, 4, 5],
-          },
-        ],
-      });
-    });
-
-    expect(mocks.awardCustomXPMock).toHaveBeenCalledWith(
-      10,
-      "campaign_create",
-      "Campaign Created!",
-      expect.objectContaining({
-        campaign_title: "Hatch Launch Sequence",
-        epic_id: expect.any(String),
-      }),
-      expect.stringMatching(/^campaign_create:/),
-    );
-  });
-
   it("spawns campaign ritual tasks with time and duration during campaign creation", async () => {
     let localEpics: Array<Record<string, unknown>> = [];
     let localHabits: Array<Record<string, unknown>> = [];
@@ -961,112 +902,6 @@ describe("useEpics", () => {
           scheduled_time: "20:30",
           estimated_duration: 25,
           epic_id: expect.any(String),
-        }),
-      ]),
-      expect.objectContaining({
-        onConflict: "user_id,task_date,habit_source_id",
-      }),
-    );
-  });
-
-  it("shifts a new campaign ritual away from active campaign time conflicts", async () => {
-    mocks.loadLocalEpicsMock.mockResolvedValue([
-      {
-        ...buildActiveEpic("epic-existing"),
-        epic_habits: [
-          {
-            habit_id: "habit-existing",
-            habits: {
-              id: "habit-existing",
-              title: "Existing morning focus",
-              difficulty: "easy",
-              description: null,
-              frequency: "daily",
-              estimated_minutes: 30,
-              custom_days: null,
-              custom_month_days: null,
-              preferred_time: "08:00",
-              category: null,
-            },
-          },
-        ],
-      },
-    ]);
-
-    const habitsInsertMock = vi.fn().mockResolvedValue({ error: null });
-    const epicsInsertMock = vi.fn().mockResolvedValue({ error: null });
-    const linksInsertMock = vi.fn().mockResolvedValue({ error: null });
-    const dailyTasksUpsertMock = vi.fn().mockResolvedValue({ error: null });
-
-    mocks.fromMock.mockImplementation((table: string) => {
-      if (table === "habits") {
-        return {
-          insert: habitsInsertMock,
-          select: mocks.selectMock,
-        };
-      }
-
-      if (table === "epics") {
-        return {
-          insert: epicsInsertMock,
-          select: mocks.selectMock,
-        };
-      }
-
-      if (table === "epic_habits") {
-        return {
-          insert: linksInsertMock,
-          select: mocks.selectMock,
-        };
-      }
-
-      if (table === "daily_tasks") {
-        return {
-          upsert: dailyTasksUpsertMock,
-          select: mocks.selectMock,
-        };
-      }
-
-      return createDefaultSupabaseTableMock();
-    });
-
-    const { result } = renderHook(() => useEpics(), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
-
-    await act(async () => {
-      await result.current.createEpic({
-        title: "Second Morning Campaign",
-        target_days: 14,
-        habits: [
-          {
-            title: "New morning focus",
-            difficulty: "medium",
-            frequency: "daily",
-            custom_days: [0, 1, 2, 3, 4, 5, 6],
-            preferred_time: "08:00",
-            estimated_minutes: 30,
-          },
-        ],
-      });
-    });
-
-    expect(habitsInsertMock).toHaveBeenCalledWith(expect.arrayContaining([
-      expect.objectContaining({
-        title: "New morning focus",
-        preferred_time: "08:30",
-      }),
-    ]));
-    expect(dailyTasksUpsertMock).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({
-          task_text: "New morning focus",
-          scheduled_time: "08:30",
-          estimated_duration: 30,
         }),
       ]),
       expect.objectContaining({
@@ -1415,7 +1250,6 @@ describe("useEpics", () => {
     });
 
     expect(mocks.queueActionMock).toHaveBeenCalled();
-    expect(mocks.awardCustomXPMock).not.toHaveBeenCalled();
     expect(mocks.queueTaskActionMock).toHaveBeenCalledWith(
       "CREATE_TASK",
       expect.objectContaining({
@@ -2652,7 +2486,7 @@ describe("useEpics", () => {
     });
 
     expect(caughtError).toEqual(expect.objectContaining({
-      message: "Campaign ritual link not found",
+      message: "Commitment rhythm link not found",
     }));
     expect(localHabits).toHaveLength(1);
     expect(mocks.removePlannerRecordMock).not.toHaveBeenCalledWith(
@@ -2945,7 +2779,7 @@ describe("useEpics", () => {
     expect(linksInsertMock).toHaveBeenCalledTimes(1);
     expect(mocks.dispatchPlannerSyncFinishedMock).toHaveBeenCalledTimes(1);
     expect(mocks.toastSuccessMock).toHaveBeenCalledWith(
-      "Ritual added to campaign!",
+      "Rhythm added to commitment",
       expect.objectContaining({
         description: expect.stringContaining("Evening Walk"),
       }),
@@ -3076,7 +2910,7 @@ describe("useEpics", () => {
     expect(cachedEpics?.[0]?.epic_habits ?? []).toEqual([]);
     expect(mocks.dispatchPlannerSyncFinishedMock).toHaveBeenCalledTimes(2);
     expect(mocks.toastSuccessMock).not.toHaveBeenCalled();
-    expect(mocks.toastErrorMock).toHaveBeenCalledWith("Failed to add ritual");
+    expect(mocks.toastErrorMock).toHaveBeenCalledWith("Failed to add rhythm");
   });
 
   it("keeps a locally created campaign ritual when the remote write falls back to the offline queue", async () => {
@@ -3179,7 +3013,7 @@ describe("useEpics", () => {
     });
     expect(mocks.retryNowMock).toHaveBeenCalled();
     expect(mocks.toastSuccessMock).toHaveBeenCalledWith(
-      "Ritual saved offline",
+      "Rhythm saved offline",
       expect.objectContaining({
         description: expect.stringContaining("back online"),
       }),
@@ -3230,8 +3064,8 @@ describe("normalizeCreateCampaignError", () => {
       `User can only have ${ACTIVE_CAMPAIGN_LIMIT} active epics at a time`
     );
 
-    expect(result.title).toBe("Campaign limit reached");
-    expect(result.description).toContain(`${ACTIVE_CAMPAIGN_LIMIT} active campaigns`);
+    expect(result.title).toBe("Commitment limit reached");
+    expect(result.description).toContain("one Journey active at a time");
   });
 
   it("prioritizes legacy active habit limit errors over generic habit creation failures", () => {
@@ -3239,7 +3073,7 @@ describe("normalizeCreateCampaignError", () => {
       "Failed to create habits: Maximum active habit limit reached (limit: 2)"
     );
 
-    expect(result.title).toBe("Too many active rituals");
+    expect(result.title).toBe("Too many active rhythms");
   });
 
   it("returns a dedicated message for missing month-schedule schema fields", () => {
@@ -3247,7 +3081,7 @@ describe("normalizeCreateCampaignError", () => {
       'Failed to create habits: column "custom_month_days" of relation "habits" does not exist'
     );
 
-    expect(result.title).toBe("Campaign setup update needed");
+    expect(result.title).toBe("Commitment setup update needed");
   });
 
   it("returns a dedicated message for invalid milestone percent errors", () => {
@@ -3256,6 +3090,6 @@ describe("normalizeCreateCampaignError", () => {
       message: 'invalid input syntax for type integer: "33.33"',
     });
 
-    expect(result.title).toBe("Campaign plan needs an update");
+    expect(result.title).toBe("Commitment plan needs an update");
   });
 });

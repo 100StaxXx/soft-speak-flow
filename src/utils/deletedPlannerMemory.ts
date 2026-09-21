@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
 export type DeletedPlannerEntityType = "campaign" | "ritual" | "habit" | "task";
 
@@ -18,9 +19,11 @@ type RpcDeletedPlannerEntity = {
   metadata?: Record<string, unknown>;
 };
 
-export const DELETED_PLANNER_MEMORY_EVENT = "deleted-planner-memory-updated";
+export const DELETED_PLANNER_MEMORY_EVENT = productScopedStorageKey(
+  "deleted-planner-memory-updated",
+);
 
-const STORAGE_PREFIX = "cosmiq:deleted-planner-entities:v1:";
+const STORAGE_PREFIX = `${productScopedStorageKey("deleted-planner-entities:v1")}:`;
 const MAX_LOCAL_TOMBSTONES = 300;
 const MIN_TITLE_MATCH_LENGTH = 3;
 
@@ -65,13 +68,14 @@ const normalizeEntityType = (
 const normalizeDeletedPlannerEntity = (
   entity: DeletedPlannerEntity | Record<string, unknown>,
 ): DeletedPlannerEntity | null => {
+  const rawEntity = entity as Record<string, unknown>;
   const entityType = normalizeEntityType(
-    "entityType" in entity ? entity.entityType : entity.entity_type,
+    rawEntity.entityType ?? rawEntity.entity_type,
   );
   if (!entityType) return null;
 
   const entityId = normalizeEntityId(
-    ("entityId" in entity ? entity.entityId : entity.entity_id) as
+    (rawEntity.entityId ?? rawEntity.entity_id) as
       | string
       | null
       | undefined,
@@ -80,7 +84,7 @@ const normalizeDeletedPlannerEntity = (
   if (!entityId && !title) return null;
 
   const deletedAt = normalizeTitle(
-    ("deletedAt" in entity ? entity.deletedAt : entity.deleted_at) as
+    (rawEntity.deletedAt ?? rawEntity.deleted_at) as
       | string
       | null
       | undefined,

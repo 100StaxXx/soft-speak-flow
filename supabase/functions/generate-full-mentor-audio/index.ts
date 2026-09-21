@@ -81,8 +81,9 @@ serve(async (req) => {
   }
 
   try {
-    const { mentorSlug, topic_category, intensity, emotionalTriggers } =
+    const { mentorSlug, productMode, topic_category, intensity, emotionalTriggers } =
       await req.json();
+    const resolvedProductMode = productMode === "cosmiq" ? "cosmiq" : "graceward";
 
     if (!mentorSlug) {
       return buildErrorResponse(400, "mentorSlug is required", {
@@ -117,6 +118,7 @@ serve(async (req) => {
       "generate-mentor-script",
       {
         mentorSlug,
+        productMode: resolvedProductMode,
         topic_category,
         intensity,
         emotionalTriggers,
@@ -209,6 +211,9 @@ serve(async (req) => {
     const provider = typeof audioPayload.provider === "string"
       ? audioPayload.provider
       : null;
+    const transcript = Array.isArray(audioPayload.transcript)
+      ? audioPayload.transcript
+      : [];
     if (!audioUrl) {
       return buildErrorResponse(
         502,
@@ -226,6 +231,8 @@ serve(async (req) => {
         audioUrl,
         audioStoragePath: storagePath,
         audioProvider: provider,
+        transcript,
+        hasWordTimestamps: transcript.length > 0,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

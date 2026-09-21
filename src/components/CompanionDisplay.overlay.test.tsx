@@ -34,6 +34,15 @@ const mocks = vi.hoisted(() => ({
     element: "fire",
     stage: 8,
     reason: "Wake up",
+  } as null | {
+    id: string;
+    type: "wake";
+    intensity: "heroic";
+    durationMs: number;
+    createdAt: number;
+    element: string;
+    stage: number;
+    reason: string;
   },
   resetProgress: vi.fn(),
   regenerate: vi.fn(),
@@ -86,6 +95,22 @@ vi.mock("@/hooks/useCompanion", () => ({
     isEvolutionBusy: false,
     requiresHatchSelection: mocks.requiresHatchSelection,
     hatchCompanion: mocks.hatchCompanion,
+  }),
+}));
+
+vi.mock("@/hooks/useDailyGuideThread", () => ({
+  useDailyGuideThread: () => ({
+    thread: null,
+    previousThread: null,
+    updateThread: vi.fn().mockResolvedValue(null),
+  }),
+}));
+
+vi.mock("@/hooks/useProfile", () => ({
+  useProfile: () => ({
+    profile: {
+      companionMemoryEnabled: true,
+    },
   }),
 }));
 
@@ -314,6 +339,46 @@ vi.mock("@/components/CompanionPersonalization", () => ({
     mode === "hatch" ? <div>Hatch chooser</div> : null,
 }));
 
+vi.mock("@/components/GracewardDailyFormationBoard", () => ({
+  GracewardDailyFormationBoard: ({
+    onFormationMediaChange,
+  }: {
+    onFormationMediaChange?: (media: {
+      category: "Mind" | "Body";
+      videoUrl: string | null;
+      stillUrl: string | null;
+      playVideo: boolean;
+      phase?: "practice" | "completion";
+    }) => void;
+  }) => (
+    <div>
+      <button
+        type="button"
+        onClick={() => onFormationMediaChange?.({
+          category: "Mind",
+          videoUrl: "/graceward-motion/v1/lion/light/mind-1.mp4",
+          stillUrl: "/graceward-motion/v1/lion/light/mind-1.jpg",
+          playVideo: true,
+          phase: "practice",
+        })}
+      >
+        Start Mind formation animation
+      </button>
+      <button
+        type="button"
+        onClick={() => onFormationMediaChange?.({
+          category: "Body",
+          videoUrl: null,
+          stillUrl: null,
+          playVideo: true,
+        })}
+      >
+        Start legacy Body formation
+      </button>
+    </div>
+  ),
+}));
+
 vi.mock("@/lib/companionName", () => ({
   getStoredCompanionCustomName: vi.fn().mockReturnValue(null),
   resolveCompanionName: vi.fn().mockResolvedValue("Nova"),
@@ -350,13 +415,15 @@ import { resolveCompanionName } from "@/lib/companionName";
 describe("CompanionDisplay overlay stack", () => {
   beforeEach(() => {
     window.history.pushState({}, "", "/companion");
+    localStorage.clear();
+    sessionStorage.clear();
     mocks.resetProgress.mockClear();
     mocks.regenerate.mockClear();
     mocks.toastInfo.mockClear();
     mocks.currentEvolutionReplay = null;
     mocks.refetchCurrentEvolutionReplay.mockReset();
     mocks.refetchCurrentEvolutionReplay.mockResolvedValue({ data: null });
-    mocks.triggerManualEvolution.mockClear();
+    mocks.triggerManualEvolution.mockReset();
     mocks.hatchCompanion.mutateAsync.mockClear();
     mocks.canEvolve = false;
     mocks.requiresHatchSelection = false;
@@ -395,6 +462,16 @@ describe("CompanionDisplay overlay stack", () => {
       reason: "stable",
       isEventDriven: false,
     };
+    mocks.activeEvent = {
+      id: "wake-1",
+      type: "wake",
+      intensity: "heroic",
+      durationMs: 2200,
+      createdAt: Date.now(),
+      element: "fire",
+      stage: 8,
+      reason: "Wake up",
+    };
   });
 
   afterEach(() => {
@@ -409,7 +486,7 @@ describe("CompanionDisplay overlay stack", () => {
     const surface = screen.getByTestId("companion-motion-surface");
     const outerShell = screen.getByTestId("companion-outer-shell");
     expect(await screen.findByText("Nova")).toBeInTheDocument();
-    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 2 • Initiate");
+    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 2 • Growing");
     expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 8");
     expect(screen.getByText("Bond")).toBeInTheDocument();
     expect(screen.getByText("Dialogue Panel")).toBeInTheDocument();
@@ -477,30 +554,28 @@ describe("CompanionDisplay overlay stack", () => {
     expect(image.style.transform).toBe("");
   });
 
-  it("renders the stats analysis trigger directly below the stat grid", async () => {
+  it("keeps game-like attributes out of the Graceward companion experience", async () => {
     render(<CompanionDisplay />);
 
     await screen.findByText("Nova");
 
-    const attributes = screen.getByTestId("companion-attributes");
-    const trigger = screen.getByTestId("companion-stats-analysis-trigger");
-
-    expect(attributes.compareDocumentPosition(trigger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(trigger).toHaveTextContent("Analyze My Stats");
+    expect(screen.queryByTestId("companion-attributes")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("companion-stats-analysis-trigger")).not.toBeInTheDocument();
   });
 
-  it("opens the stats analysis surface from the companion card", async () => {
+  it("does not mount the stats analysis surface in Graceward", async () => {
     render(<CompanionDisplay />);
 
     await screen.findByText("Nova");
-    fireEvent.click(screen.getByTestId("companion-stats-analysis-trigger"));
-
-    expect(screen.getByTestId("companion-stats-analysis-surface")).toBeInTheDocument();
+    expect(screen.queryByTestId("companion-stats-analysis-surface")).not.toBeInTheDocument();
   });
 
   it("starts subtle idle drift once the companion art has loaded", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-08-11T12:00:00-07:00"));
     mocks.isRegenerating = false;
     mocks.isDormant = false;
+    mocks.activeEvent = null;
 
     render(<CompanionDisplay />);
 
@@ -518,7 +593,7 @@ describe("CompanionDisplay overlay stack", () => {
     expect(shell).toHaveClass("animate-companion-idle-drift");
   });
 
-  it("long-presses the companion image to replay the latest evolution inside the image shell", async () => {
+  it("replays the latest evolution inside the image shell from a visible control", async () => {
     mocks.isRegenerating = false;
     mocks.isDormant = false;
     mocks.currentEvolutionReplay = {
@@ -530,17 +605,9 @@ describe("CompanionDisplay overlay stack", () => {
     render(<CompanionDisplay />);
     await screen.findByText("Nova");
 
-    const trigger = screen.getByRole("button", {
-      name: /replay your companion's latest evolution/i,
-    });
     const shell = screen.getByTestId("companion-image-shell");
 
-    vi.useFakeTimers();
-    fireEvent.mouseDown(trigger);
-    act(() => {
-      vi.advanceTimersByTime(800);
-    });
-    vi.useRealTimers();
+    fireEvent.click(screen.getByRole("button", { name: /replay evolution/i }));
 
     const replay = within(shell).getByTestId("companion-inline-evolution-replay");
     const video = within(shell).getByTestId("companion-inline-evolution-video");
@@ -553,7 +620,7 @@ describe("CompanionDisplay overlay stack", () => {
     expect(screen.queryByTestId("companion-chat-modal")).not.toBeInTheDocument();
   });
 
-  it("opens companion chat after the in-frame evolution replay ends and restores the image", async () => {
+  it("restores the portrait after replay without opening a separate chat", async () => {
     mocks.isRegenerating = false;
     mocks.isDormant = false;
     mocks.currentEvolutionReplay = {
@@ -565,22 +632,20 @@ describe("CompanionDisplay overlay stack", () => {
     render(<CompanionDisplay />);
     await screen.findByText("Nova");
 
-    fireEvent.keyDown(
-      screen.getByRole("button", {
-        name: /replay your companion's latest evolution/i,
-      }),
-      { key: "Enter" },
-    );
+    fireEvent.click(screen.getByRole("button", { name: /replay evolution/i }));
 
     const video = await screen.findByTestId("companion-inline-evolution-video");
     fireEvent.ended(video);
 
-    expect(await screen.findByTestId("companion-chat-modal")).toBeInTheDocument();
-    expect(screen.queryByTestId("companion-inline-evolution-video")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByTestId("companion-inline-evolution-video")).not.toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("companion-chat-modal")).not.toBeInTheDocument();
     expect(screen.getByAltText(/companion at level 8/i)).toBeInTheDocument();
+    expect(screen.getByText("Dialogue Panel")).toBeInTheDocument();
   });
 
-  it("opens companion chat if the in-frame evolution video cannot play", async () => {
+  it("restores the portrait without opening chat if the replay cannot play", async () => {
     mocks.isRegenerating = false;
     mocks.isDormant = false;
     mocks.currentEvolutionReplay = {
@@ -592,20 +657,93 @@ describe("CompanionDisplay overlay stack", () => {
     render(<CompanionDisplay />);
     await screen.findByText("Nova");
 
-    fireEvent.keyDown(
-      screen.getByRole("button", {
-        name: /replay your companion's latest evolution/i,
-      }),
-      { key: "Enter" },
-    );
+    fireEvent.click(screen.getByRole("button", { name: /replay evolution/i }));
 
     fireEvent.error(await screen.findByTestId("companion-inline-evolution-video"));
 
-    expect(await screen.findByTestId("companion-chat-modal")).toBeInTheDocument();
-    expect(screen.queryByTestId("companion-inline-evolution-video")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByTestId("companion-inline-evolution-video")).not.toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("companion-chat-modal")).not.toBeInTheDocument();
   });
 
-  it("opens companion chat immediately when no current-stage replay exists", async () => {
+  it("plays a Graceward formation inside the portrait and settles on its finish frame", async () => {
+    mocks.isRegenerating = false;
+    mocks.isDormant = false;
+
+    render(<CompanionDisplay />);
+    await screen.findByText("Nova");
+
+    fireEvent.click(screen.getByRole("button", { name: "Start Mind formation animation" }));
+
+    const video = screen.getByLabelText("Mind companion formation animation");
+    expect(video).toHaveAttribute("src", "/graceward-motion/v1/lion/light/mind-1.mp4");
+    expect(video).toHaveAttribute("autoplay");
+    expect(video).toHaveAttribute("playsinline");
+
+    fireEvent.ended(video);
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText("Mind companion formation animation")).not.toBeInTheDocument();
+    });
+    expect(screen.getByAltText(/companion at level 8/i)).toHaveAttribute(
+      "src",
+      "/graceward-motion/v1/lion/light/mind-1.jpg",
+    );
+  });
+
+  it("restarts an unfinished Graceward formation when the user returns to the screen", async () => {
+    mocks.isRegenerating = false;
+    mocks.isDormant = false;
+
+    const { rerender } = render(<CompanionDisplay isVisible />);
+    await screen.findByText("Nova");
+    fireEvent.click(screen.getByRole("button", { name: "Start Mind formation animation" }));
+    expect(screen.getByLabelText("Mind companion formation animation")).toBeInTheDocument();
+
+    rerender(<CompanionDisplay isVisible={false} />);
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText("Mind companion formation animation")).not.toBeInTheDocument();
+    });
+    expect(screen.getByAltText(/companion at level 8/i)).toHaveAttribute(
+      "src",
+      "/graceward-motion/v1/lion/light/mind-1.jpg",
+    );
+
+    rerender(<CompanionDisplay isVisible />);
+
+    expect(await screen.findByLabelText("Mind companion formation animation")).toHaveAttribute(
+      "src",
+      "/graceward-motion/v1/lion/light/mind-1.mp4",
+    );
+  });
+
+  it("gives legacy Graceward companions an animated activity prop and leaves the finish state present", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mocks.isRegenerating = false;
+    mocks.isDormant = false;
+
+    render(<CompanionDisplay />);
+    await screen.findByText("Nova");
+    const originalPortrait = screen.getByAltText(/companion at level 8/i).getAttribute("src");
+
+    fireEvent.click(screen.getByRole("button", { name: "Start legacy Body formation" }));
+
+    const fallback = screen.getByTestId("graceward-formation-fallback");
+    expect(fallback).toHaveAccessibleName("Body companion working out with weights");
+    expect(fallback.firstElementChild).toHaveClass("animate-bounce");
+
+    act(() => vi.advanceTimersByTime(1_800));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("graceward-formation-fallback").firstElementChild).not.toHaveClass("animate-bounce");
+    });
+    expect(screen.getByAltText(/companion at level 8/i)).toHaveAttribute("src", originalPortrait);
+    expect(screen.getByTestId("graceward-formation-fallback")).toBeInTheDocument();
+  });
+
+  it("keeps chat closed and explains when no current-stage replay exists", async () => {
     mocks.isRegenerating = false;
     mocks.isDormant = false;
     mocks.currentEvolutionReplay = null;
@@ -614,19 +752,16 @@ describe("CompanionDisplay overlay stack", () => {
     render(<CompanionDisplay />);
     await screen.findByText("Nova");
 
-    fireEvent.keyDown(
-      screen.getByRole("button", {
-        name: /replay your companion's latest evolution/i,
-      }),
-      { key: " " },
-    );
+    fireEvent.click(screen.getByRole("button", { name: /replay evolution/i }));
 
-    expect(await screen.findByTestId("companion-chat-modal")).toBeInTheDocument();
-    expect(mocks.toastInfo).toHaveBeenCalledWith("No evolution replay yet.");
+    await waitFor(() => {
+      expect(mocks.toastInfo).toHaveBeenCalledWith("No evolution replay yet.");
+    });
+    expect(screen.queryByTestId("companion-chat-modal")).not.toBeInTheDocument();
     expect(screen.queryByTestId("companion-inline-evolution-video")).not.toBeInTheDocument();
   });
 
-  it("opens companion chat immediately for stage 0 eggs without rendering a replay", async () => {
+  it("lets the egg respond before hatch while keeping speech and replay controls locked", async () => {
     mocks.isRegenerating = false;
     mocks.isDormant = false;
     mocks.currentEvolutionReplay = null;
@@ -640,18 +775,52 @@ describe("CompanionDisplay overlay stack", () => {
     };
 
     render(<CompanionDisplay />);
-    await screen.findByText("Stage 0 • Egg");
+    await screen.findByText("Stage 0 • Beginning");
 
-    fireEvent.keyDown(
-      screen.getByRole("button", {
-        name: /replay your companion's latest evolution/i,
-      }),
-      { key: "Enter" },
-    );
-
-    expect(await screen.findByTestId("companion-chat-modal")).toBeInTheDocument();
-    expect(mocks.toastInfo).toHaveBeenCalledWith("No evolution replay yet.");
+    expect(screen.queryByTestId("living-companion-actions")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^talk$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /replay evolution/i })).not.toBeInTheDocument();
+    const egg = screen.getByTestId("living-companion-interaction-target");
+    expect(egg).toHaveAttribute("role", "button");
+    expect(screen.getByTestId("companion-world-pulse")).toHaveTextContent("The Quiet Spark");
+    fireEvent.click(egg);
+    expect(screen.getByTestId("living-companion-prompt")).toHaveTextContent("pulse of warmth");
+    expect(screen.queryByTestId("companion-chat-modal")).not.toBeInTheDocument();
     expect(screen.queryByTestId("companion-inline-evolution-video")).not.toBeInTheDocument();
+  });
+
+  it("responds to a portrait tap with a comment and curious body language", async () => {
+    mocks.isRegenerating = false;
+    mocks.isDormant = false;
+
+    render(<CompanionDisplay />);
+    await screen.findByText("Nova");
+
+    fireEvent.click(screen.getByRole("button", { name: /interact with nova/i }));
+
+    expect(screen.getByTestId("living-companion-prompt")).toHaveAttribute("data-prompt-kind", "comment");
+    expect(screen.getByTestId("companion-image-shell")).toHaveAttribute("data-living-body-language", "curious");
+    expect(screen.getByTestId("living-companion-interaction-aura")).toHaveAttribute("data-body-language", "curious");
+  });
+
+  it("responds to a portrait hold with a comforting moment", async () => {
+    mocks.isRegenerating = false;
+    mocks.isDormant = false;
+
+    render(<CompanionDisplay />);
+    await screen.findByText("Nova");
+
+    vi.useFakeTimers();
+    const portrait = screen.getByRole("button", { name: /interact with nova/i });
+    fireEvent.mouseDown(portrait);
+    act(() => {
+      vi.advanceTimersByTime(800);
+    });
+    fireEvent.mouseUp(portrait);
+    vi.useRealTimers();
+
+    expect(screen.getByTestId("living-companion-prompt")).toHaveTextContent("I felt that. It's good to pause together.");
+    expect(screen.getByTestId("companion-image-shell")).toHaveAttribute("data-living-body-language", "happy");
   });
 
   it("remounts the companion art when a hidden overview tab becomes visible again", async () => {
@@ -738,7 +907,9 @@ describe("CompanionDisplay overlay stack", () => {
 
     render(<CompanionDisplay />);
 
-    fireEvent.click(screen.getByRole("button", { name: "HATCH" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "HATCH" }));
+    });
 
     expect(mocks.triggerManualEvolution).toHaveBeenCalledTimes(1);
     expect(mocks.triggerManualEvolution).toHaveBeenCalledWith(
@@ -750,6 +921,38 @@ describe("CompanionDisplay overlay stack", () => {
       }),
     );
     expect(screen.queryByText("Hatch chooser")).not.toBeInTheDocument();
+  });
+
+  it("shows immediate hatch feedback while the latest companion state is syncing", async () => {
+    mocks.canEvolve = true;
+    mocks.companion = {
+      ...mocks.companion,
+      current_stage: 0,
+      current_xp: 14,
+      preset_id: "dragon",
+      spirit_animal: "Dragon",
+      cached_creature_name: null,
+    };
+
+    let finishSync: (() => void) | null = null;
+    mocks.triggerManualEvolution.mockImplementation(
+      () => new Promise<void>((resolve) => {
+        finishSync = resolve;
+      }),
+    );
+
+    render(<CompanionDisplay />);
+
+    fireEvent.click(screen.getByRole("button", { name: "HATCH" }));
+
+    const processingButton = screen.getByRole("button", { name: "HATCHING..." });
+    expect(processingButton).toBeDisabled();
+
+    await act(async () => {
+      finishSync?.();
+    });
+
+    expect(screen.getByRole("button", { name: "HATCH" })).toBeEnabled();
   });
 
   it("keeps the hatch chooser for legacy presetless eggs", async () => {
@@ -768,7 +971,9 @@ describe("CompanionDisplay overlay stack", () => {
 
     render(<CompanionDisplay />);
 
-    fireEvent.click(screen.getByRole("button", { name: "HATCH" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "HATCH" }));
+    });
 
     expect(mocks.triggerManualEvolution).not.toHaveBeenCalled();
     expect(screen.getByText("Hatch chooser")).toBeInTheDocument();
@@ -795,10 +1000,10 @@ describe("CompanionDisplay overlay stack", () => {
     expect(screen.queryByText("Nova")).not.toBeInTheDocument();
     expect(screen.getAllByText("Ready to hatch").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "HATCH" })).toBeInTheDocument();
-    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 0 • Egg");
+    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 0 • Beginning");
     expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 0");
 
-    const image = screen.getByAltText(/egg companion at level 0/i);
+    const image = screen.getByAltText(/beginning companion at level 0/i);
     expect(image).toHaveAttribute(
       "src",
       expect.stringContaining("/companion-eggs/v2/egg__t0_egg__normal__fire.webp"),
@@ -844,10 +1049,10 @@ describe("CompanionDisplay overlay stack", () => {
 
     expect(await screen.findByText("Nova")).toBeInTheDocument();
     expect(screen.queryByText("Ember Egg")).not.toBeInTheDocument();
-    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 1 • Hatchling");
+    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 1 • Young");
     expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 1");
-    expect(screen.getByText(/XP to Level 2/)).toBeInTheDocument();
-    const image = screen.getByAltText(/hatchling companion at level 1/i);
+    expect(screen.getByText(/Growth to Level 2/)).toBeInTheDocument();
+    const image = screen.getByAltText(/young companion at level 1/i);
     expect(image).toBeInTheDocument();
     expect(image).toHaveAttribute("data-companion-image-fit", "portrait");
   });
@@ -870,9 +1075,9 @@ describe("CompanionDisplay overlay stack", () => {
     render(<CompanionDisplay />);
 
     expect(await screen.findByText("Nova")).toBeInTheDocument();
-    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 1 • Hatchling");
+    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 1 • Young");
     expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 2");
-    expect(screen.getByText("Next stage at Level 5 • Initiate")).toBeInTheDocument();
+    expect(screen.getByText("Next stage at Level 5 • Growing")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "EVOLVE" })).not.toBeInTheDocument();
   });
 
@@ -960,7 +1165,7 @@ describe("CompanionDisplay overlay stack", () => {
     render(<CompanionDisplay />);
 
     expect(await screen.findByText("Nova")).toBeInTheDocument();
-    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 7 • Ascended");
+    expect(screen.getByTestId("companion-visual-stage")).toHaveTextContent("Stage 7 • Grand");
     expect(screen.getByTestId("companion-level-chip")).toHaveTextContent("Level 100");
     expect(screen.getByText("Level 100 maxed")).toBeInTheDocument();
   });

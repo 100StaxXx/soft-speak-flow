@@ -4,6 +4,7 @@ installOpenAICompatibilityShim();
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -27,6 +28,17 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     if (userError || !user) {
       throw new Error('Unauthorized');
+    }
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+    if (await resolveUserProductMode(supabaseAdmin, user.id) !== "cosmiq") {
+      return new Response(
+        JSON.stringify({ error: "Horoscopes belong to Cosmiq accounts only" }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
     // Fetch user profile with zodiac and optional birth details

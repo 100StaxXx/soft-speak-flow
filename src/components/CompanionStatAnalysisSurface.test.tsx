@@ -45,7 +45,7 @@ vi.mock("@/hooks/useCompanionStatAnalysis", () => ({
 }));
 
 vi.mock("@/utils/shareMedia", () => ({
-  DEFAULT_STATS_CARD_SHARE_TEXT: "My current Cosmiq title. #Cosmiq",
+  DEFAULT_STATS_CARD_SHARE_TEXT: "My current Graceward companion title. #Graceward",
   isShareCancelled: mocks.isShareCancelledMock,
   renderShareCardImage: mocks.renderShareCardImageMock,
   shareRenderedMedia: mocks.shareRenderedMediaMock,
@@ -305,7 +305,7 @@ describe("CompanionStatAnalysisSurface", () => {
     mocks.regenerateTitleCardMock.mockClear();
     mocks.renderShareCardImageMock.mockReset();
     mocks.renderShareCardImageMock.mockResolvedValue(
-      new File(["title-card"], "cosmiq-the-oathbound-pathfinder-stats-card.png", {
+      new File(["title-card"], "graceward-the-oathbound-pathfinder-stats-card.png", {
         type: "image/png",
       }),
     );
@@ -380,14 +380,14 @@ describe("CompanionStatAnalysisSurface", () => {
 
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "Share Cosmiq title card",
+        name: "Share Graceward companion title card",
       }),
     );
 
     await waitFor(() => {
       expect(mocks.renderShareCardImageMock).toHaveBeenCalledWith({
         element: expect.any(HTMLElement),
-        filename: "cosmiq-the-oathbound-pathfinder-stats-card.png",
+        filename: "graceward-the-oathbound-pathfinder-stats-card.png",
         format: "story",
       });
     });
@@ -398,7 +398,7 @@ describe("CompanionStatAnalysisSurface", () => {
 
     expect(capturedElement).toHaveAttribute("data-testid", "companion-cosmiq-title-share-card");
     expect(capturedElement.className).not.toContain("left-[-10000px]");
-    expect(capturedText).toContain("Cosmiq");
+    expect(capturedText).toContain("Graceward");
     expect(capturedText).toContain("The Oathbound Pathfinder");
     expect(capturedText).toContain(OATHBOUND_PATHFINDER_BIO);
     expect(capturedText).toContain("2026-04-18");
@@ -412,8 +412,8 @@ describe("CompanionStatAnalysisSurface", () => {
     expect(mocks.shareRenderedMediaMock).toHaveBeenCalledWith({
       uriOrFile: expect.any(File),
       title: "The Oathbound Pathfinder",
-      text: "My current Cosmiq title. #Cosmiq",
-      dialogTitle: "Share Cosmiq title card",
+      text: "My current Graceward companion title. #Graceward",
+      dialogTitle: "Share Graceward companion title card",
     });
   });
 

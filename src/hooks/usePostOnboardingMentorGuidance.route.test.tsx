@@ -10,7 +10,7 @@ import { CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT } from "@/utils/tutorialEvent
 
 const createFreshTutorial = () => ({
   version: 2,
-  flowVersion: 10,
+  flowVersion: 11,
   eligible: true,
   dismissed: false,
   completed: false,
@@ -30,13 +30,12 @@ const createLegacyPlanStepTutorial = () => ({
 const createCompletedTutorial = () => ({
   ...createFreshTutorial(),
   completed: true,
-  completedSteps: ["new_goal", "hatch_companion", "mentor_closeout"],
-  xpAwardedSteps: ["new_goal"],
+  completedSteps: ["morning_checkin", "hatch_companion", "mentor_closeout"],
+  xpAwardedSteps: [],
   milestonesCompleted: [
     "mentor_intro_hello",
-    "start_new_goal",
-    "complete_pathfinder_campaign",
-    "campaign_calendar_handoff",
+    "open_mentor_tab",
+    "submit_morning_checkin",
     "tap_hatch_companion",
     "complete_companion_hatch",
     "mentor_closeout_message",
@@ -179,7 +178,7 @@ describe("guided tutorial route restoration", () => {
         : createRect({ width: 0, height: 0 });
     });
     document
-      .querySelectorAll('[data-tour="campaign-builder-launcher"], [data-tour="companion-launcher-option-plan-day"], [data-tour="companion-plan-day-follow-up-option"], [data-tour="companion-plan-day-suggestion-save"], [data-tour="companion-plan-day-pending-confirm"], [data-tour="companion-plan-day-pending-confirm-all"], [data-tour="companion-launcher-option-goal"], [data-tour="pathfinder-primary-action"], [data-tour="evolve-companion-button"], [data-tour="pathfinder-campaign-builder"]')
+      .querySelectorAll('[data-tour="campaign-builder-launcher"], [data-tour="companion-launcher-option-plan-day"], [data-tour="companion-plan-day-follow-up-option"], [data-tour="companion-plan-day-suggestion-save"], [data-tour="companion-plan-day-pending-confirm"], [data-tour="companion-plan-day-pending-confirm-all"], [data-tour="companion-launcher-option-goal"], [data-tour="pathfinder-primary-action"], [data-tour="evolve-companion-button"], [data-tour="pathfinder-campaign-builder"], [data-tour="morning-prayer-open"], [data-tour="morning-prayer-complete"]')
       .forEach((element) => element.remove());
   });
 
@@ -209,12 +208,12 @@ describe("guided tutorial route restoration", () => {
     );
   };
 
-  it("restores a fresh tutorial to the campaigns route", async () => {
+  it("restores a fresh tutorial to Graceward Today", async () => {
     renderWithProviders("/companion");
 
     await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/campaigns");
-      expect(screen.getByTestId("step")).toHaveTextContent("new_goal");
+      expect(screen.getByTestId("path")).toHaveTextContent("/mentor");
+      expect(screen.getByTestId("step")).toHaveTextContent("morning_checkin");
       expect(screen.getByTestId("intro-action")).toHaveTextContent(
         "Start Tutorial",
       );
@@ -223,19 +222,19 @@ describe("guided tutorial route restoration", () => {
     fireEvent.click(screen.getByRole("button", { name: "back" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/campaigns");
+      expect(screen.getByTestId("path")).toHaveTextContent("/mentor");
     });
   });
 
-  it("steps aside in Pathfinder, waits for the animation, then routes from ritual handoff to companion hatch", async () => {
-    const campaignTarget = document.createElement("button");
-    campaignTarget.setAttribute("data-tour", "campaign-builder-launcher");
-    document.body.appendChild(campaignTarget);
+  it("routes from the first completed prayer to companion hatch", async () => {
+    const prayerTarget = document.createElement("button");
+    prayerTarget.setAttribute("data-tour", "morning-prayer-complete");
+    document.body.appendChild(prayerTarget);
     const hatchTarget = document.createElement("button");
     hatchTarget.setAttribute("data-tour", "evolve-companion-button");
     document.body.appendChild(hatchTarget);
 
-    renderWithProviders("/campaigns");
+    renderWithProviders("/mentor");
 
     await waitFor(() => {
       expect(screen.getByTestId("intro-action")).toHaveTextContent(
@@ -246,66 +245,37 @@ describe("guided tutorial route restoration", () => {
     fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("step")).toHaveTextContent("new_goal");
+      expect(screen.getByTestId("step")).toHaveTextContent("morning_checkin");
       expect(screen.getByTestId("intro-action")).toHaveTextContent("");
       expect(screen.getByTestId("target")).toHaveTextContent(
-        '[data-tour="campaign-builder-launcher"]',
+        '[data-tour="morning-prayer-complete"]',
       );
     });
 
     await act(async () => {
-      window.dispatchEvent(new CustomEvent("campaign-builder-opened"));
+      window.dispatchEvent(new CustomEvent("morning-checkin-completed"));
     });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("active")).toHaveTextContent("false");
-      expect(screen.getByTestId("step")).toHaveTextContent("");
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent("pathfinder-campaign-created"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/campaigns");
-      expect(screen.getByTestId("active")).toHaveTextContent("false");
-      expect(screen.getByTestId("step")).toHaveTextContent("");
-      expect(screen.getByTestId("dialogue")).toHaveTextContent("");
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent(CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/campaigns");
-      expect(screen.getByTestId("step")).toHaveTextContent("new_goal");
-      expect(screen.getByTestId("dialogue")).toHaveTextContent(
-        "Your rituals are on the calendar now.",
-      );
-      expect(screen.getByTestId("intro-action")).toHaveTextContent("Meet companion");
-      expect(screen.getByTestId("secondary-action")).toHaveTextContent("");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("step")).toHaveTextContent(
         "hatch_companion",
       );
       expect(screen.getByTestId("path")).toHaveTextContent("/companion");
-      expect(screen.getByTestId("target")).toHaveTextContent("");
+      expect(screen.getByTestId("target")).toHaveTextContent(
+        '[data-tour="evolve-companion-button"]',
+      );
     });
   });
 
-  it("waits on the journeys page until the campaign animation completes before restoring campaigns", async () => {
-    const campaignTarget = document.createElement("button");
-    campaignTarget.setAttribute("data-tour", "campaign-builder-launcher");
-    document.body.appendChild(campaignTarget);
+  it("restores the prayer step after navigation to a retired route", async () => {
+    const prayerTarget = document.createElement("button");
+    prayerTarget.setAttribute("data-tour", "morning-prayer-open");
+    document.body.appendChild(prayerTarget);
 
-    renderWithProviders("/campaigns");
+    renderWithProviders("/journeys");
 
     await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/mentor");
       expect(screen.getByTestId("intro-action")).toHaveTextContent(
         "Start Tutorial",
       );
@@ -313,43 +283,18 @@ describe("guided tutorial route restoration", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
 
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent("campaign-builder-opened"));
-    });
-
     await waitFor(() => {
-      expect(screen.getByTestId("active")).toHaveTextContent("false");
-      expect(screen.getByTestId("step")).toHaveTextContent("");
+      expect(screen.getByTestId("step")).toHaveTextContent("morning_checkin");
+      expect(screen.getByTestId("target")).toHaveTextContent(
+        '[data-tour="morning-prayer-open"]',
+      );
     });
 
     fireEvent.click(screen.getByRole("button", { name: "go-journeys" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent("pathfinder-campaign-created"));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
-      expect(screen.getByTestId("active")).toHaveTextContent("false");
-      expect(screen.getByTestId("step")).toHaveTextContent("");
-      expect(screen.getByTestId("dialogue")).toHaveTextContent("");
-    });
-
-    await act(async () => {
-      window.dispatchEvent(new CustomEvent(CAMPAIGN_CREATED_ANIMATION_COMPLETE_EVENT));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("path")).toHaveTextContent("/campaigns");
-      expect(screen.getByTestId("step")).toHaveTextContent("new_goal");
-      expect(screen.getByTestId("dialogue")).toHaveTextContent(
-        "Your rituals are on the calendar now.",
-      );
-      expect(screen.getByTestId("intro-action")).toHaveTextContent("Meet companion");
+      expect(screen.getByTestId("path")).toHaveTextContent("/mentor");
+      expect(screen.getByTestId("step")).toHaveTextContent("morning_checkin");
     });
   });
 
@@ -364,7 +309,9 @@ describe("guided tutorial route restoration", () => {
     await waitFor(() => {
       expect(screen.getByTestId("path")).toHaveTextContent("/companion");
       expect(screen.getByTestId("step")).toHaveTextContent("hatch_companion");
-      expect(screen.getByTestId("target")).toHaveTextContent("");
+      expect(screen.getByTestId("target")).toHaveTextContent(
+        '[data-tour="evolve-companion-button"]',
+      );
     });
   });
 

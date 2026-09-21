@@ -2,6 +2,10 @@ import React from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const TEST_USER_ID = "11111111-1111-4111-8111-111111111111";
+const LOCAL_ACCESS_KEY = `graceward:local-subscription-access:v1.${TEST_USER_ID}`;
+const REJECTED_TRANSACTIONS_KEY = `graceward:rejected-local-subscription-transactions:v1.${TEST_USER_ID}`;
+
 const mocks = vi.hoisted(() => ({
   toast: vi.fn(),
   purchase: vi.fn(),
@@ -40,8 +44,8 @@ const mocks = vi.hoisted(() => ({
   } | null,
   activePlan: null as "monthly" | "yearly" | null,
   storeKitProducts: [
-    { identifier: "cosmiq_premium_monthly", displayName: "Monthly", description: "", price: 9.99, displayPrice: "$9.99" },
-    { identifier: "cosmiq_premium_yearly", displayName: "Yearly", description: "", price: 99.99, displayPrice: "$99.99" },
+    { identifier: "graceward_plus_monthly", displayName: "Monthly", description: "", price: 9.99, displayPrice: "$9.99" },
+    { identifier: "graceward_plus_yearly", displayName: "Yearly", description: "", price: 99.99, displayPrice: "$99.99" },
   ],
   user: { id: "11111111-1111-4111-8111-111111111111" } as { id: string } | null,
   appliedReferralCodeState: {
@@ -161,10 +165,10 @@ describe("useAppleSubscription", () => {
     vi.clearAllMocks();
     localStorageState.store.clear();
     mocks.storeKitProducts = [
-      { identifier: "cosmiq_premium_monthly", displayName: "Monthly", description: "", price: 9.99, displayPrice: "$9.99" },
-      { identifier: "cosmiq_premium_yearly", displayName: "Yearly", description: "", price: 99.99, displayPrice: "$99.99" },
+      { identifier: "graceward_plus_monthly", displayName: "Monthly", description: "", price: 9.99, displayPrice: "$9.99" },
+      { identifier: "graceward_plus_yearly", displayName: "Yearly", description: "", price: 99.99, displayPrice: "$99.99" },
     ];
-    mocks.user = { id: "11111111-1111-4111-8111-111111111111" };
+    mocks.user = { id: TEST_USER_ID };
     mocks.accessState = {
       has_access: false,
       access_source: "none",
@@ -185,14 +189,14 @@ describe("useAppleSubscription", () => {
       is_apple_offer_eligible: false,
     };
     mocks.purchase.mockResolvedValue({
-      productId: "cosmiq_premium_monthly",
+      productId: "graceward_plus_monthly",
       transactionId: "tx-1",
       expirationDate: "2099-01-01T00:00:00.000Z",
       appAccountToken: "11111111-1111-4111-8111-111111111111",
     });
     mocks.redeemOfferCode.mockResolvedValue({ status: "presented", entitlement: null });
     mocks.restorePurchases.mockResolvedValue({
-      productId: "cosmiq_premium_monthly",
+      productId: "graceward_plus_monthly",
       transactionId: "tx-r",
       expirationDate: "2099-01-01T00:00:00.000Z",
       appAccountToken: "11111111-1111-4111-8111-111111111111",
@@ -208,10 +212,10 @@ describe("useAppleSubscription", () => {
     const { result } = renderHook(() => useAppleSubscription());
 
     await act(async () => {
-      await result.current.handlePurchase("cosmiq_premium_monthly");
+      await result.current.handlePurchase("graceward_plus_monthly");
     });
 
-    expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_monthly");
+    expect(mocks.purchase).toHaveBeenCalledWith("graceward_plus_monthly");
     expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
       body: { transactionId: "tx-1" },
     });
@@ -233,7 +237,7 @@ describe("useAppleSubscription", () => {
 
     let success: boolean | undefined;
     await act(async () => {
-      success = await result.current.handlePurchase("cosmiq_premium_yearly");
+      success = await result.current.handlePurchase("graceward_plus_yearly");
     });
 
     expect(success).toBe(true);
@@ -242,7 +246,7 @@ describe("useAppleSubscription", () => {
     expect(mocks.functionsInvoke).not.toHaveBeenCalled();
     expect(mocks.toast).toHaveBeenCalledWith({
       title: "Subscription already active",
-      description: "Cosmiq is already unlocked for this account.",
+      description: "Graceward is already unlocked for this account.",
     });
   });
 
@@ -260,11 +264,11 @@ describe("useAppleSubscription", () => {
 
     let success: boolean | undefined;
     await act(async () => {
-      success = await result.current.handlePurchase("cosmiq_premium_yearly");
+      success = await result.current.handlePurchase("graceward_plus_yearly");
     });
 
     expect(success).toBe(true);
-    expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_yearly");
+    expect(mocks.purchase).toHaveBeenCalledWith("graceward_plus_yearly");
     expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
       body: { transactionId: "tx-1" },
     });
@@ -272,7 +276,7 @@ describe("useAppleSubscription", () => {
 
   it("skips purchase and unlocks locally for an active TestFlight entitlement", async () => {
     mocks.currentEntitlement = {
-      productId: "cosmiq_premium_yearly",
+      productId: "graceward_plus_yearly",
       transactionId: "current-sandbox-tx",
       originalTransactionId: "current-sandbox-orig",
       expirationDate: "2099-01-01T00:00:00.000Z",
@@ -284,7 +288,7 @@ describe("useAppleSubscription", () => {
 
     let success: boolean | undefined;
     await act(async () => {
-      success = await result.current.handlePurchase("cosmiq_premium_yearly");
+      success = await result.current.handlePurchase("graceward_plus_yearly");
     });
 
     expect(success).toBe(true);
@@ -292,7 +296,7 @@ describe("useAppleSubscription", () => {
     expect(mocks.recoverPurchases).not.toHaveBeenCalled();
     expect(mocks.toast).toHaveBeenCalledWith({
       title: "Existing TestFlight subscription restored",
-      description: "Cosmiq was unlocked from an existing sandbox/App Store entitlement, so no new trial purchase was needed.",
+      description: "Graceward was unlocked from an existing sandbox/App Store entitlement, so no new trial purchase was needed.",
     });
     expect(mocks.setQueryData).toHaveBeenCalledWith(
       ["access-state", "11111111-1111-4111-8111-111111111111"],
@@ -310,7 +314,7 @@ describe("useAppleSubscription", () => {
     });
   });
 
-  it("starts offer code redemption for yearly when user has offer code", async () => {
+  it("purchases the founding yearly product directly when the account is eligible", async () => {
     mocks.appliedReferralCodeState = {
       ...mocks.appliedReferralCodeState,
       code: "OFFER123",
@@ -324,39 +328,14 @@ describe("useAppleSubscription", () => {
     const { result } = renderHook(() => useAppleSubscription());
 
     await act(async () => {
-      await result.current.handlePurchase("cosmiq_premium_yearly");
+      await result.current.handlePurchase("graceward_plus_founder_yearly");
     });
 
-    expect(mocks.redeemOfferCode).toHaveBeenCalledTimes(1);
-    expect(mocks.purchase).not.toHaveBeenCalled();
-  });
-
-  it("purchases yearly after the offer code redemption step is primed", async () => {
-    mocks.appliedReferralCodeState = {
-      ...mocks.appliedReferralCodeState,
-      code: "OFFER123",
-      owner_type: "influencer",
-      affiliate_provider: "supabase",
-      is_active: true,
-      apple_offer_code_status: "active",
-      is_apple_offer_eligible: true,
-    };
-
-    const { result } = renderHook(() => useAppleSubscription());
-
-    await act(async () => {
-      await result.current.handlePurchase("cosmiq_premium_yearly");
-    });
-
-    await act(async () => {
-      await result.current.handlePurchase("cosmiq_premium_yearly");
-    });
-
-    expect(mocks.redeemOfferCode).toHaveBeenCalledTimes(1);
-    expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_yearly");
+    expect(mocks.purchase).toHaveBeenCalledWith("graceward_plus_founder_yearly");
     expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
       body: { transactionId: "tx-1" },
     });
+    expect(mocks.redeemOfferCode).not.toHaveBeenCalled();
   });
 
   it("calls regular purchase for yearly when no offer code", async () => {
@@ -369,10 +348,10 @@ describe("useAppleSubscription", () => {
     const { result } = renderHook(() => useAppleSubscription());
 
     await act(async () => {
-      await result.current.handlePurchase("cosmiq_premium_yearly");
+      await result.current.handlePurchase("graceward_plus_yearly");
     });
 
-    expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_yearly");
+    expect(mocks.purchase).toHaveBeenCalledWith("graceward_plus_yearly");
     expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
       body: { transactionId: "tx-1" },
     });
@@ -385,10 +364,10 @@ describe("useAppleSubscription", () => {
     const { result } = renderHook(() => useAppleSubscription());
 
     await act(async () => {
-      await result.current.handlePurchase("cosmiq_premium_yearly");
+      await result.current.handlePurchase("graceward_plus_yearly");
     });
 
-    expect(mocks.purchase).toHaveBeenCalledWith("cosmiq_premium_yearly");
+    expect(mocks.purchase).toHaveBeenCalledWith("graceward_plus_yearly");
     expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
       body: { transactionId: "tx-1" },
     });
@@ -404,7 +383,7 @@ describe("useAppleSubscription", () => {
 
     let success: boolean | undefined;
     await act(async () => {
-      success = await result.current.handlePurchase("cosmiq_premium_monthly");
+      success = await result.current.handlePurchase("graceward_plus_monthly");
     });
 
     expect(success).toBe(false);
@@ -421,7 +400,7 @@ describe("useAppleSubscription", () => {
 
     let success: boolean | undefined;
     await act(async () => {
-      success = await result.current.handlePurchase("cosmiq_premium_monthly");
+      success = await result.current.handlePurchase("graceward_plus_monthly");
     });
 
     expect(success).toBe(false);
@@ -432,7 +411,7 @@ describe("useAppleSubscription", () => {
   it("recovers an existing App Store subscription when purchase returns null", async () => {
     mocks.purchase.mockResolvedValue(null);
     mocks.recoverPurchases.mockResolvedValueOnce({
-      productId: "cosmiq_premium_yearly",
+      productId: "graceward_plus_yearly",
       transactionId: "recovered-null-purchase-tx",
       expirationDate: "2099-01-01T00:00:00.000Z",
       appAccountToken: "11111111-1111-4111-8111-111111111111",
@@ -442,7 +421,7 @@ describe("useAppleSubscription", () => {
 
     let success: boolean | undefined;
     await act(async () => {
-      success = await result.current.handlePurchase("cosmiq_premium_yearly");
+      success = await result.current.handlePurchase("graceward_plus_yearly");
     });
 
     expect(success).toBe(true);
@@ -464,7 +443,7 @@ describe("useAppleSubscription", () => {
   it("recovers an existing App Store subscription when Apple says already subscribed", async () => {
     mocks.purchase.mockRejectedValueOnce(new Error("You're already subscribed to this subscription."));
     mocks.recoverPurchases.mockResolvedValueOnce({
-      productId: "cosmiq_premium_monthly",
+      productId: "graceward_plus_monthly",
       transactionId: "already-subscribed-recovery-tx",
       expirationDate: "2099-01-01T00:00:00.000Z",
       appAccountToken: "11111111-1111-4111-8111-111111111111",
@@ -474,7 +453,7 @@ describe("useAppleSubscription", () => {
 
     let success: boolean | undefined;
     await act(async () => {
-      success = await result.current.handlePurchase("cosmiq_premium_monthly");
+      success = await result.current.handlePurchase("graceward_plus_monthly");
     });
 
     expect(success).toBe(true);
@@ -493,7 +472,7 @@ describe("useAppleSubscription", () => {
   it("recovers TestFlight access when Apple says already subscribed", async () => {
     mocks.purchase.mockRejectedValueOnce(new Error("You're currently subscribed to this."));
     mocks.recoverPurchases.mockResolvedValueOnce({
-      productId: "cosmiq_premium_yearly",
+      productId: "graceward_plus_yearly",
       transactionId: "already-subscribed-sandbox-tx",
       originalTransactionId: "already-subscribed-sandbox-orig",
       expirationDate: "2099-01-01T00:00:00.000Z",
@@ -504,7 +483,7 @@ describe("useAppleSubscription", () => {
 
     let success: boolean | undefined;
     await act(async () => {
-      success = await result.current.handlePurchase("cosmiq_premium_yearly");
+      success = await result.current.handlePurchase("graceward_plus_yearly");
     });
 
     expect(success).toBe(true);
@@ -538,66 +517,6 @@ describe("useAppleSubscription", () => {
     });
   });
 
-  it("syncs a hosted RevenueCat paywall success through Apple receipt verification", async () => {
-    mocks.presentPaywallIfNeeded.mockResolvedValueOnce(true);
-    mocks.recoverPurchases.mockResolvedValueOnce({
-      productId: "cosmiq_premium_yearly",
-      transactionId: "hosted-paywall-recovered-tx",
-      expirationDate: "2099-01-01T00:00:00.000Z",
-      appAccountToken: "11111111-1111-4111-8111-111111111111",
-    });
-
-    const { result } = renderHook(() => useAppleSubscription());
-
-    let success: boolean | undefined;
-    await act(async () => {
-      success = await result.current.handlePresentRevenueCatPaywall("hosted_paywall");
-    });
-
-    expect(success).toBe(true);
-    expect(mocks.presentPaywallIfNeeded).toHaveBeenCalledTimes(1);
-    expect(mocks.recoverPurchases).toHaveBeenCalledTimes(1);
-    expect(mocks.functionsInvoke).toHaveBeenCalledWith("verify-apple-receipt", {
-      body: { transactionId: "hosted-paywall-recovered-tx" },
-    });
-    expect(mocks.setQueryData).toHaveBeenCalledWith(
-      ["access-state", "11111111-1111-4111-8111-111111111111"],
-      expect.objectContaining({
-        has_access: true,
-        access_source: "subscription",
-        subscribed: true,
-        plan: "yearly",
-      }),
-    );
-  });
-
-  it("does not turn hosted RevenueCat paywall success into a paywall error when immediate sync fails", async () => {
-    mocks.presentPaywallIfNeeded.mockResolvedValueOnce(true);
-    mocks.recoverPurchases.mockRejectedValueOnce(new Error("RevenueCat recovery timed out"));
-
-    const { result } = renderHook(() => useAppleSubscription());
-
-    let success: boolean | undefined;
-    await act(async () => {
-      success = await result.current.handlePresentRevenueCatPaywall("hosted_paywall");
-    });
-
-    expect(success).toBe(true);
-    expect(mocks.recoverPurchases).toHaveBeenCalledTimes(1);
-    expect(mocks.functionsInvoke).not.toHaveBeenCalled();
-    expect(mocks.toast).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "Unable to show paywall",
-        variant: "destructive",
-      }),
-    );
-    expect(mocks.toast).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "Cosmiq unlocked",
-      }),
-    );
-  });
-
   it("shows an activation error when Apple succeeds but server verification fails", async () => {
     mocks.functionsInvoke.mockResolvedValueOnce({
       data: null,
@@ -608,7 +527,7 @@ describe("useAppleSubscription", () => {
 
     let success: boolean | undefined;
     await act(async () => {
-      success = await result.current.handlePurchase("cosmiq_premium_monthly");
+      success = await result.current.handlePurchase("graceward_plus_monthly");
     });
 
     expect(success).toBe(false);
@@ -622,7 +541,7 @@ describe("useAppleSubscription", () => {
 
   it("shows account-linked recovery copy when Apple purchase belongs to another account", async () => {
     globalThis.localStorage.setItem(
-      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      LOCAL_ACCESS_KEY,
       JSON.stringify({
         has_access: true,
         access_source: "subscription",
@@ -649,25 +568,25 @@ describe("useAppleSubscription", () => {
 
     let success: boolean | undefined;
     await act(async () => {
-      success = await result.current.handlePurchase("cosmiq_premium_monthly");
+      success = await result.current.handlePurchase("graceward_plus_monthly");
     });
 
     expect(success).toBe(false);
     expect(result.current.productError).toBe(
-      "This App Store subscription is already linked to another Cosmiq account. Sign in to that account, or contact support if this is your purchase.",
+      "This App Store subscription is already linked to another Graceward account. Sign in to that account, or contact support if this is your purchase.",
     );
     expect(mocks.toast).toHaveBeenCalledWith(
       expect.objectContaining({
         title: "Subscription already linked",
-        description: "This App Store subscription is already linked to another Cosmiq account. Sign in to that account, or contact support if this is your purchase.",
+        description: "This App Store subscription is already linked to another Graceward account. Sign in to that account, or contact support if this is your purchase.",
         variant: "destructive",
       }),
     );
     expect(globalThis.localStorage.getItem(
-      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      LOCAL_ACCESS_KEY,
     )).toBeNull();
     expect(globalThis.localStorage.getItem(
-      "cosmiq.rejectedLocalSubscriptionTransactions.v1.11111111-1111-4111-8111-111111111111",
+      REJECTED_TRANSACTIONS_KEY,
     )).toContain("tx-1");
     expect(mocks.setQueryData).toHaveBeenCalledWith(
       ["access-state", "11111111-1111-4111-8111-111111111111"],
@@ -684,7 +603,7 @@ describe("useAppleSubscription", () => {
 
   it("keeps TestFlight sandbox subscriptions unlocked when backend binding points at an old account", async () => {
     mocks.purchase.mockResolvedValueOnce({
-      productId: "cosmiq_premium_yearly",
+      productId: "graceward_plus_yearly",
       transactionId: "sandbox-conflict-tx",
       originalTransactionId: "sandbox-conflict-orig",
       expirationDate: "2099-01-01T00:00:00.000Z",
@@ -706,7 +625,7 @@ describe("useAppleSubscription", () => {
 
     let success: boolean | undefined;
     await act(async () => {
-      success = await result.current.handlePurchase("cosmiq_premium_yearly");
+      success = await result.current.handlePurchase("graceward_plus_yearly");
     });
 
     expect(success).toBe(true);
@@ -720,7 +639,7 @@ describe("useAppleSubscription", () => {
       }),
     );
     expect(globalThis.localStorage.getItem(
-      "cosmiq.rejectedLocalSubscriptionTransactions.v1.11111111-1111-4111-8111-111111111111",
+      REJECTED_TRANSACTIONS_KEY,
     )).toBeNull();
     expect(mocks.toast).not.toHaveBeenCalledWith(
       expect.objectContaining({
@@ -740,7 +659,7 @@ describe("useAppleSubscription", () => {
 
     let success: boolean | undefined;
     await act(async () => {
-      success = await result.current.handlePurchase("cosmiq_premium_monthly");
+      success = await result.current.handlePurchase("graceward_plus_monthly");
     });
 
     expect(success).toBe(true);
@@ -761,7 +680,7 @@ describe("useAppleSubscription", () => {
       }),
     );
     expect(globalThis.localStorage.getItem(
-      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      LOCAL_ACCESS_KEY,
     )).toContain("2099-01-01T00:00:00.000Z");
   });
 
@@ -770,7 +689,7 @@ describe("useAppleSubscription", () => {
     vi.setSystemTime(new Date("2026-05-18T00:23:39.000Z"));
     try {
       mocks.purchase.mockResolvedValueOnce({
-        productId: "cosmiq_premium_yearly",
+        productId: "graceward_plus_yearly",
         transactionId: "2000001171944416",
         purchaseDate: "2026-05-18T00:23:39Z",
       });
@@ -779,7 +698,7 @@ describe("useAppleSubscription", () => {
 
       let success: boolean | undefined;
       await act(async () => {
-        success = await result.current.handlePurchase("cosmiq_premium_yearly");
+        success = await result.current.handlePurchase("graceward_plus_yearly");
       });
 
       expect(success).toBe(true);
@@ -814,7 +733,7 @@ describe("useAppleSubscription", () => {
       const { result } = renderHook(() => useAppleSubscription());
 
       await act(async () => {
-        await result.current.handlePurchase("cosmiq_premium_monthly");
+        await result.current.handlePurchase("graceward_plus_monthly");
       });
 
       expect(mocks.functionsInvoke).toHaveBeenCalledTimes(1);
@@ -842,7 +761,7 @@ describe("useAppleSubscription", () => {
     vi.useFakeTimers();
     try {
       mocks.purchase.mockResolvedValueOnce({
-        productId: "cosmiq_premium_yearly",
+        productId: "graceward_plus_yearly",
         transactionId: "sandbox-deferred-conflict-tx",
         originalTransactionId: "sandbox-deferred-conflict-orig",
         expirationDate: "2099-01-01T00:00:00.000Z",
@@ -868,7 +787,7 @@ describe("useAppleSubscription", () => {
       const { result } = renderHook(() => useAppleSubscription());
 
       await act(async () => {
-        await result.current.handlePurchase("cosmiq_premium_yearly");
+        await result.current.handlePurchase("graceward_plus_yearly");
       });
 
       await act(async () => {
@@ -876,10 +795,10 @@ describe("useAppleSubscription", () => {
       });
 
       expect(globalThis.localStorage.getItem(
-        "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+        LOCAL_ACCESS_KEY,
       )).toContain("sandbox-deferred-conflict-tx");
       expect(globalThis.localStorage.getItem(
-        "cosmiq.rejectedLocalSubscriptionTransactions.v1.11111111-1111-4111-8111-111111111111",
+        REJECTED_TRANSACTIONS_KEY,
       )).toBeNull();
       expect(mocks.setQueryData).not.toHaveBeenCalledWith(
         ["access-state", "11111111-1111-4111-8111-111111111111"],
@@ -909,13 +828,13 @@ describe("useAppleSubscription", () => {
 
     let success: boolean | undefined;
     await act(async () => {
-      success = await result.current.handlePurchase("cosmiq_premium_monthly");
+      success = await result.current.handlePurchase("graceward_plus_monthly");
     });
 
     expect(success).toBe(false);
     expect(mocks.setQueryData).not.toHaveBeenCalled();
     expect(globalThis.localStorage.getItem(
-      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      LOCAL_ACCESS_KEY,
     )).toBeNull();
     expect(mocks.toast).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -927,7 +846,7 @@ describe("useAppleSubscription", () => {
 
   it("unlocks locally for active sandbox purchases missing Apple's app-account binding", async () => {
     mocks.purchase.mockResolvedValueOnce({
-      productId: "cosmiq_premium_yearly",
+      productId: "graceward_plus_yearly",
       transactionId: "tokenless-sandbox-tx",
       expirationDate: "2099-01-01T00:00:00.000Z",
     });
@@ -947,7 +866,7 @@ describe("useAppleSubscription", () => {
 
     let success: boolean | undefined;
     await act(async () => {
-      success = await result.current.handlePurchase("cosmiq_premium_yearly");
+      success = await result.current.handlePurchase("graceward_plus_yearly");
     });
 
     expect(success).toBe(true);
@@ -970,7 +889,7 @@ describe("useAppleSubscription", () => {
 
   it("defers local activation when binding-missing is returned as a successful payload", async () => {
     mocks.purchase.mockResolvedValueOnce({
-      productId: "cosmiq_premium_yearly",
+      productId: "graceward_plus_yearly",
       transactionId: "tokenless-payload-tx",
       expirationDate: "2099-01-01T00:00:00.000Z",
     });
@@ -986,7 +905,7 @@ describe("useAppleSubscription", () => {
 
     let success: boolean | undefined;
     await act(async () => {
-      success = await result.current.handlePurchase("cosmiq_premium_yearly");
+      success = await result.current.handlePurchase("graceward_plus_yearly");
     });
 
     expect(success).toBe(true);
@@ -1012,7 +931,7 @@ describe("useAppleSubscription", () => {
     vi.setSystemTime(new Date("2026-05-18T00:23:39.000Z"));
     try {
       mocks.purchase.mockResolvedValueOnce({
-        productId: "cosmiq_premium_yearly",
+        productId: "graceward_plus_yearly",
         transactionId: "missing-expiration-tx",
         purchaseDate: "2026-05-18T00:23:39Z",
       });
@@ -1027,7 +946,7 @@ describe("useAppleSubscription", () => {
 
       let success: boolean | undefined;
       await act(async () => {
-        success = await result.current.handlePurchase("cosmiq_premium_yearly");
+        success = await result.current.handlePurchase("graceward_plus_yearly");
       });
 
       expect(success).toBe(true);
@@ -1052,7 +971,7 @@ describe("useAppleSubscription", () => {
     const { result } = renderHook(() => useAppleSubscription());
 
     await act(async () => {
-      await result.current.handlePurchase("cosmiq_premium_monthly");
+      await result.current.handlePurchase("graceward_plus_monthly");
     });
 
     expect(mocks.toast).toHaveBeenCalledWith(
@@ -1081,7 +1000,7 @@ describe("useAppleSubscription", () => {
 
   it("does not cache local access when restore finds a purchase linked to another account", async () => {
     globalThis.localStorage.setItem(
-      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      LOCAL_ACCESS_KEY,
       JSON.stringify({
         has_access: true,
         access_source: "subscription",
@@ -1114,10 +1033,10 @@ describe("useAppleSubscription", () => {
     expect(success).toBe(false);
     expect(mocks.restorePurchases).toHaveBeenCalled();
     expect(globalThis.localStorage.getItem(
-      "cosmiq.localSubscriptionAccess.v1.11111111-1111-4111-8111-111111111111",
+      LOCAL_ACCESS_KEY,
     )).toBeNull();
     expect(globalThis.localStorage.getItem(
-      "cosmiq.rejectedLocalSubscriptionTransactions.v1.11111111-1111-4111-8111-111111111111",
+      REJECTED_TRANSACTIONS_KEY,
     )).toContain("tx-r");
     expect(mocks.setQueryData).toHaveBeenCalledWith(
       ["access-state", "11111111-1111-4111-8111-111111111111"],
@@ -1165,7 +1084,7 @@ describe("useAppleSubscription", () => {
     expect(result.current.productError).toBe("No products are available. Please try again later.");
 
     mocks.refreshProducts.mockResolvedValueOnce([
-      { identifier: "cosmiq_premium_yearly", displayName: "Yearly", description: "", price: 99.99, displayPrice: "$99.99" },
+      { identifier: "graceward_plus_yearly", displayName: "Yearly", description: "", price: 99.99, displayPrice: "$99.99" },
     ]);
 
     await act(async () => {
@@ -1188,7 +1107,7 @@ describe("useAppleSubscription", () => {
     };
     const { result } = renderHook(() => useAppleSubscription());
     expect(result.current.hasOfferCode).toBe(true);
-    expect(result.current.activeYearlyOffer?.price).toBe("$69.99");
+    expect(result.current.activeYearlyOffer?.price).toBe("$29.99");
   });
 
   it("exposes Genesis pricing from the applied code campaign identifier", () => {
@@ -1206,9 +1125,9 @@ describe("useAppleSubscription", () => {
     expect(result.current.hasOfferCode).toBe(true);
     expect(result.current.activeYearlyOffer).toMatchObject({
       tier: "genesis",
-      price: "$49.99",
-      priceCents: 4999,
-      unitPrice: "$4.17/month for the first year",
+      price: "$29.99",
+      priceCents: 2999,
+      unitPrice: "$2.50/month, locked while active",
     });
   });
 

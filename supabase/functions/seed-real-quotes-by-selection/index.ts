@@ -131,6 +131,7 @@ Deno.serve(async (req) => {
     if (type === 'category') {
       const quotes = realQuotesByCategory[value.toLowerCase()] || [];
       quotesToInsert = quotes.map(q => ({
+        product_mode: 'cosmiq',
         text: q.text,
         author: q.author,
         category: value.toLowerCase(),
@@ -141,6 +142,7 @@ Deno.serve(async (req) => {
     } else {
       const quotes = realQuotesByTrigger[value.toLowerCase()] || [];
       quotesToInsert = quotes.map(q => ({
+        product_mode: 'cosmiq',
         text: q.text,
         author: q.author,
         category: null,

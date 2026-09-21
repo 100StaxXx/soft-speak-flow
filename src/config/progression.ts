@@ -30,14 +30,14 @@ export const PROGRESSION_ACHIEVEMENT_LEVELS = [5, 21, 56, 100] as const;
 export const PROGRESSION_STORY_CHECKPOINT_LEVELS = [0, 1, 5, 13, 21, 36, 56, 81] as const;
 
 export const PROGRESSION_TIER_LABELS: Record<ProgressionTier, string> = {
-  egg: "Egg",
-  hatchling: "Hatchling",
-  initiate: "Initiate",
-  awakened: "Awakened",
-  guardian: "Guardian",
-  champion: "Champion",
-  mythic: "Mythic",
-  ascended: "Ascended",
+  egg: "Beginning",
+  hatchling: "Young",
+  initiate: "Growing",
+  awakened: "Rooted",
+  guardian: "Steady",
+  champion: "Flourishing",
+  mythic: "Majestic",
+  ascended: "Grand",
 };
 
 export const PROGRESSION_TIER_BANDS = [

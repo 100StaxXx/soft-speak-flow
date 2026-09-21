@@ -187,7 +187,7 @@ export function TimelineView({
                 <div className="w-10 h-10 rounded-full bg-coral-500/20 flex items-center justify-center group-hover:bg-coral-500/30 transition-colors">
                   <Plus className="h-5 w-5 text-coral-500" />
                 </div>
-                <span className="font-medium text-coral-500">Add Quest</span>
+                <span className="font-medium text-coral-500">Add Action</span>
               </button>
             </div>
           )}
@@ -237,7 +237,7 @@ export function TimelineView({
                   className="bg-coral-500 hover:bg-coral-600 text-white rounded-full px-6"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Quest
+                  Add Action
                 </Button>
               )}
             </div>

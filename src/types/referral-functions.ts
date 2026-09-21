@@ -64,6 +64,7 @@ export interface CreateCompanionIfNotExistsResult {
   id: string;
   user_id: string;
   preset_id: string | null;
+  product_mode?: "graceward" | "cosmiq" | null;
   favorite_color: string;
   spirit_animal: string;
   core_element: string;

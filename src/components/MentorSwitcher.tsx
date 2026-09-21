@@ -19,6 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchActiveProductMentors } from "@/services/productMentorCatalog";
 import {
   getMentorDisplaySortIndex,
   normalizeMentorSlug,
@@ -245,16 +246,7 @@ export const MentorSwitcher = ({
     queryKey: ["mentors", "active"],
     staleTime: 10 * 60 * 1000,
     queryFn: async (): Promise<ActiveMentorRecord[]> => {
-      const { data, error } = await supabase
-        .from("mentors")
-        .select(
-          "id, name, slug, avatar_url, primary_color, short_title, tone_description, tags, themes, style_description, target_user, intensity_level",
-        )
-        .eq("is_active", true)
-        .order("name");
-
-      if (error) throw error;
-      return data || [];
+      return fetchActiveProductMentors();
     },
   });
 
@@ -483,7 +475,7 @@ export const MentorSwitcher = ({
           <div className="space-y-5">
             <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
               <div className="flex items-start gap-3">
-                <div className="rounded-full bg-primary/12 p-2 text-primary">
+                <div className="rounded-full bg-primary/[0.12] p-2 text-primary">
                   <Sparkles className="h-4 w-4" />
                 </div>
                 <div className="space-y-1">

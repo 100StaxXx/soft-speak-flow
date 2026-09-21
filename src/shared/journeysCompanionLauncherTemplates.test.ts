@@ -6,7 +6,7 @@ import {
 } from "@/shared/journeysCompanionLauncherTemplates";
 
 describe("journeys companion launcher greetings", () => {
-  it("keeps the free-talk greeting pool mostly English with only a little multilingual flavor", () => {
+  it("keeps the free-talk greeting pool warm, clear, and free of forced slang", () => {
     const greetings = new Set<string>();
 
     for (let index = 0; index < 256; index += 1) {
@@ -23,28 +23,14 @@ describe("journeys companion launcher greetings", () => {
     const greetingList = Array.from(greetings);
 
     expect(greetingList).toEqual(expect.arrayContaining([
-      "What's good, friend?",
-      "What's good, buddy?",
-      "What's good, guy?",
-      "What's good, dude?",
-      "What's good, fam?",
-      "What's good, pal?",
+      "How are you doing today?",
+      "What's on your heart today?",
+      "Would you like to reflect or make a plan?",
+      "Where do you need encouragement today?",
     ]));
-
-    const multilingualGreetings = greetingList.filter((greeting) =>
-      /\b(amigo|mon ami)\b/i.test(greeting),
+    expect(greetingList.join(" ")).not.toMatch(
+      /\b(?:fam|boss|homie|champ|dude|vibe)\b/i,
     );
-    const disallowedGreetings = greetingList.filter((greeting) =>
-      /\b(compa|hermano)\b/i.test(greeting),
-    );
-
-    expect(multilingualGreetings).toEqual(expect.arrayContaining([
-      "What's good, amigo?",
-      "What's good, mon ami?",
-    ]));
-    expect(multilingualGreetings).toHaveLength(2);
-    expect(greetingList.length - multilingualGreetings.length).toBeGreaterThan(multilingualGreetings.length);
-    expect(disallowedGreetings).toHaveLength(0);
   });
 
   it("uses the selected greeting as the free-talk launcher label and message", () => {
@@ -78,8 +64,8 @@ describe("journeys companion launcher greetings", () => {
 
     expect(templates.find((template) => template.id === "quest")).toMatchObject({
       id: "quest",
-      label: "Quest?",
-      message: "New Quest",
+      label: "Action?",
+      message: "New action",
       target: "auto",
       starterIntent: "general",
     });

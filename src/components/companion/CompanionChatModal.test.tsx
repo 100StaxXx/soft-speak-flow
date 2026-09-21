@@ -58,7 +58,7 @@ vi.mock("@/hooks/useCompanionAssistant", () => ({
     canArchiveThread: true,
     draftInput: "",
     interimText: "",
-    placeholder: "Message Nova",
+    placeholder: "Share what's on your heart...",
     permissionStatus: "granted",
     showPermissionDialog: false,
     isRequestingPermission: false,
@@ -246,7 +246,7 @@ describe("CompanionChatModal", () => {
     const modal = screen.getByTestId("companion-chat-modal");
 
     expect(modal.className).toContain("[--background:202_100%_98%]");
-    expect(modal.className).toContain("border-[hsl(var(--celestial-blue)_/_0.58)]");
+    expect(modal.className).toContain("border-input");
   });
 
   it("disables Vaul input repositioning for the mobile drawer", () => {

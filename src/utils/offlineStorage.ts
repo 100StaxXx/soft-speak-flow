@@ -4,12 +4,13 @@
  */
 
 import { normalizeUuidFields, normalizeUuidLikeId } from "@/utils/offlineId";
+import { getProductIndexedDbName } from "@/config/productRuntime";
 import {
   bindIndexedDbLifecycle,
   withReopenedIndexedDb,
 } from "@/utils/indexedDbReconnect";
 
-const DB_NAME = "cosmiq-offline-db";
+const DB_NAME = getProductIndexedDbName("offline-db");
 const DB_VERSION = 3;
 
 export type QueueActionKind =

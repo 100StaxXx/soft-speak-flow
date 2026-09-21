@@ -3,11 +3,11 @@ import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 
 const LOADING_MESSAGES = [
-  "Reading the stars...",
-  "Aligning your cosmic path...",
-  "Finding your perfect guide...",
-  "The universe is revealing your guide...",
-  "Calculating your destiny...",
+  "Listening to what you need...",
+  "Considering your preferred guidance style...",
+  "Finding a Guide who fits your season...",
+  "Preparing your recommendation...",
+  "Almost ready...",
 ];
 
 export const MentorCalculating = () => {

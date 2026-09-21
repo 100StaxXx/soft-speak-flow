@@ -3,6 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireRequestAuth } from "../_shared/auth.ts";
 import { sendToMultipleSubscriptions, PushSubscription, PushNotificationPayload } from "../_shared/webPush.ts";
+import { MENTOR_DISPLAY_NAMES, resolveActiveMentorSlug } from "../_shared/mentorRoster.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -33,7 +35,7 @@ serve(async (req) => {
     // Load VAPID keys for Web Push (optional, only for web browsers)
     const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
     const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
-    const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:admin@cosmiq.quest';
+    const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:hello@graceward.app';
 
     console.log('Note: This function is for web push only. Native iOS uses dispatch-daily-pushes-native.');
 
@@ -51,7 +53,8 @@ serve(async (req) => {
           title,
           summary,
           audio_url,
-          mentor_slug
+          mentor_slug,
+          product_mode
         )
       `)
       .is('delivered_at', null)
@@ -79,6 +82,16 @@ serve(async (req) => {
     for (const push of pendingPushes) {
       try {
         const pepTalk = Array.isArray(push.daily_pep_talks) ? push.daily_pep_talks[0] : push.daily_pep_talks;
+
+        const userProductMode = await resolveUserProductMode(supabase, push.user_id);
+        if (userProductMode !== "graceward" || pepTalk?.product_mode !== "graceward") {
+          console.warn(`Skipping product-mismatched daily push ${push.id}`);
+          await supabase
+            .from('user_daily_pushes')
+            .update({ delivered_at: new Date().toISOString() })
+            .eq('id', push.id);
+          continue;
+        }
         
         console.log(`Dispatching push ${push.id} to user ${push.user_id}`);
         console.log(`Pep talk: ${pepTalk?.title}`);
@@ -113,9 +126,11 @@ serve(async (req) => {
         }
 
         // Prepare notification payload
+        const mentorSlug = resolveActiveMentorSlug(pepTalk?.mentor_slug);
+        const mentorName = mentorSlug ? MENTOR_DISPLAY_NAMES[mentorSlug] : 'Your Guide';
         const payload: PushNotificationPayload = {
-          title: pepTalk?.title || 'Your Daily Pep Talk',
-          body: pepTalk?.summary || 'A new message from your mentor',
+          title: `A word from ${mentorName}`,
+          body: pepTalk?.summary || 'A new reflection from your Guide is ready.',
           icon: '/icon-192.png',
           badge: '/icon-192.png',
           tag: `pep-talk-${push.daily_pep_talk_id}`,
@@ -123,7 +138,8 @@ serve(async (req) => {
             type: 'daily_pep_talk',
             pep_talk_id: push.daily_pep_talk_id,
             audio_url: pepTalk?.audio_url,
-            url: '/pep-talks'
+            mentor_slug: mentorSlug,
+            url: `/pep-talk/${push.daily_pep_talk_id}`
           }
         };
 

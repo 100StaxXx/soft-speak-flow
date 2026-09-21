@@ -85,7 +85,7 @@ async function claimGenesisSpecialCode(
 
   return {
     success: true,
-    message: "Genesis code applied! Your yearly plan is now eligible for the $49.99 Apple offer.",
+    message: "Founding rate unlocked! Your yearly plan is $29.99 while your subscription remains active.",
     user: {
       app_user_id: userId,
       referral_code: profile.referral_code ?? null,
@@ -97,7 +97,7 @@ async function claimGenesisSpecialCode(
     code_type: "special",
     offer: {
       identifier: genesisOfferIdentifier,
-      yearly_price_cents: 4999,
+      yearly_price_cents: 2999,
     },
   };
 }
@@ -249,7 +249,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       message: codeType === "affiliate"
-        ? "Creator code applied! Your yearly plan is now eligible for the Apple discount flow."
+        ? "Creator code applied! Your account can now purchase the $29.99 founding yearly plan through Apple."
         : "Referral code applied! Your friend will earn rewards when you reach Stage 5 • Initiate.",
       user: {
         app_user_id: userAuth.userId,

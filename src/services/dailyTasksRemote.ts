@@ -49,6 +49,7 @@ export interface DailyTask {
   habit_source_id: string | null;
   epic_id: string | null;
   epic_title?: string | null;
+  excluded_from_planner_at?: string | null;
   sort_order?: number | null;
   contact_id: string | null;
   auto_log_interaction: boolean | null;

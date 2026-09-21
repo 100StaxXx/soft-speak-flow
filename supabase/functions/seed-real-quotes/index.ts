@@ -94,6 +94,7 @@ serve(async (req) => {
         : null;
 
       return {
+        product_mode: "cosmiq",
         text: quote.text,
         author: quote.author,
         category: quote.category,

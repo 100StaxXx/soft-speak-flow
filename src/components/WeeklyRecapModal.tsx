@@ -1,48 +1,43 @@
 import { useRef } from "react";
-import { X, Share2, Calendar, Sparkles, TrendingUp, TrendingDown, Minus, BookOpen } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { BookHeart, Calendar, Minus, Share2, Sparkles, TrendingDown, TrendingUp, X } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { format, parseISO } from "date-fns";
-import { Button } from "@/components/ui/button";
-import { useWeeklyRecap } from "@/hooks/useWeeklyRecap";
-import { useMentorPersonality } from "@/hooks/useMentorPersonality";
-import { downloadImage } from "@/utils/imageDownload";
 import { toPng } from "html-to-image";
 
-const TrendBadge = ({ trend }: { trend: string }) => {
-  const config = {
-    improving: { icon: TrendingUp, label: "Rising Week", className: "text-emerald-300 bg-emerald-500/20 border-emerald-400/30" },
-    declining: { icon: TrendingDown, label: "Reflective Week", className: "text-amber-300 bg-amber-500/20 border-amber-400/30" },
-    stable: { icon: Minus, label: "Steady Week", className: "text-sky-300 bg-sky-500/20 border-sky-400/30" },
+import { Button } from "@/components/ui/button";
+import { PRODUCT } from "@/config/product";
+import { useWeeklyRecap } from "@/hooks/useWeeklyRecap";
+import { downloadImage } from "@/utils/imageDownload";
+
+const TrendBadge = ({ trend, isCosmiq }: { trend: string; isCosmiq: boolean }) => {
+  const config = isCosmiq ? {
+    improving: { icon: TrendingUp, label: "Rising week" },
+    declining: { icon: TrendingDown, label: "Reflective week" },
+    stable: { icon: Minus, label: "Steady week" },
+  } : {
+    improving: { icon: TrendingUp, label: "A strengthening week" },
+    declining: { icon: TrendingDown, label: "A tender week" },
+    stable: { icon: Minus, label: "A steady week" },
   };
-  const { icon: Icon, label, className } = config[trend as keyof typeof config] || config.stable;
-  
+  const { icon: Icon, label } = config[trend as keyof typeof config] ?? config.stable;
+
   return (
-    <motion.span 
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay: 0.3 }}
-      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border backdrop-blur-sm ${className}`}
-    >
-      <Icon className="h-3 w-3" />
+    <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.07] px-3 py-1 text-xs font-medium text-primary">
+      <Icon className="h-3.5 w-3.5" />
       {label}
-    </motion.span>
+    </span>
   );
 };
 
-const StatPill = ({ value, label, color }: { value: number; label: string; color: string }) => (
-  <motion.div 
-    initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: 1, y: 0 }}
-    className="flex flex-col items-center gap-0.5"
-  >
-    <span className={`text-lg font-bold ${color}`}>{value}</span>
-    <span className="text-[10px] text-muted-foreground/70 uppercase tracking-wider">{label}</span>
-  </motion.div>
+const Stat = ({ value, label }: { value: number; label: string }) => (
+  <div className="text-center">
+    <p className="text-xl font-semibold text-foreground">{value}</p>
+    <p className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+  </div>
 );
 
 export const WeeklyRecapModal = () => {
   const { isModalOpen, selectedRecap, closeRecap } = useWeeklyRecap();
-  const mentor = useMentorPersonality();
   const cardRef = useRef<HTMLDivElement>(null);
 
   if (!selectedRecap) return null;
@@ -50,225 +45,129 @@ export const WeeklyRecapModal = () => {
   const startDate = parseISO(selectedRecap.week_start_date);
   const endDate = parseISO(selectedRecap.week_end_date);
   const dateRange = `${format(startDate, "MMMM d")} – ${format(endDate, "d, yyyy")}`;
-
-  const storyContent = selectedRecap.mentor_story?.trim() || selectedRecap.mentor_insight?.trim();
-  const paragraphs = storyContent?.split(/\n{2,}/).filter(p => p.trim()) || [];
+  const reviewText = selectedRecap.mentor_story?.trim() || selectedRecap.mentor_insight?.trim();
+  const paragraphs = reviewText?.split(/\n{2,}/).filter((paragraph) => paragraph.trim()) ?? [];
+  const practices = selectedRecap.stats.quests + selectedRecap.stats.habits;
+  const isCosmiq = PRODUCT.mode === "cosmiq";
 
   const handleShare = async () => {
     if (!cardRef.current) return;
     try {
       const dataUrl = await toPng(cardRef.current, {
         quality: 0.95,
-        backgroundColor: "#0a0a0f",
+        backgroundColor: isCosmiq ? "#0a0a0f" : "#f1f0e7",
       });
-      await downloadImage(dataUrl, `cosmiq-recap-${selectedRecap.week_start_date}.png`);
+      await downloadImage(
+        dataUrl,
+        `${isCosmiq ? "cosmiq-recap" : "graceward-review"}-${selectedRecap.week_start_date}.png`,
+      );
     } catch (error) {
-      console.error("Failed to share recap:", error);
+      console.error("Failed to share weekly review:", error);
     }
-  };
-
-  const handleClose = () => {
-    closeRecap();
   };
 
   return (
     <AnimatePresence>
-      {isModalOpen && (
+      {isModalOpen ? (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-20"
-          onClick={handleClose}
+          className={isCosmiq
+            ? "fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 pb-20 backdrop-blur-md"
+            : "fixed inset-0 z-50 flex items-center justify-center bg-[#17271b]/70 p-4 pb-20 backdrop-blur-md"}
+          onClick={closeRecap}
         >
-          {/* Backdrop with animated gradient */}
-          <motion.div 
-            className="absolute inset-0 bg-black/90 backdrop-blur-md"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          />
-          
-          {/* Ambient glow effects */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <motion.div 
-              className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl"
-              animate={{ 
-                scale: [1, 1.2, 1],
-                opacity: [0.3, 0.5, 0.3],
-              }}
-              transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-            />
-            <motion.div 
-              className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"
-              animate={{ 
-                scale: [1.2, 1, 1.2],
-                opacity: [0.3, 0.5, 0.3],
-              }}
-              transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 4 }}
-            />
-          </div>
-
           <motion.div
-            initial={{ scale: 0.9, opacity: 0, y: 40 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.9, opacity: 0, y: 40 }}
-            transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-lg max-h-[75dvh] flex flex-col rounded-3xl overflow-hidden"
+            initial={{ opacity: 0, y: 24, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.97 }}
+            onClick={(event) => event.stopPropagation()}
+            className={isCosmiq
+              ? "relative flex max-h-[78dvh] w-full max-w-lg flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[#0a0a0f] text-white shadow-[0_24px_100px_rgba(139,92,246,0.22)]"
+              : "relative flex max-h-[78dvh] w-full max-w-lg flex-col overflow-hidden rounded-[28px] border border-white/70 bg-[#f1f0e7] text-[#203124] shadow-2xl"}
           >
-            {/* Glass card background */}
-            <div className="absolute inset-0 bg-gradient-to-b from-background/95 via-background/90 to-background/95 backdrop-blur-xl border border-white/10 rounded-3xl" />
-            
-            {/* Decorative top accent */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-amber-400/50 to-transparent" />
-
-            {/* Header */}
-            <div className="relative flex items-center justify-between px-6 py-5">
-              <motion.div 
-                className="flex items-center gap-4"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1 }}
-              >
-                <div className="relative">
-                  <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
-                    <BookOpen className="h-6 w-6 text-white" />
-                  </div>
-                  <motion.div 
-                    className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 flex items-center justify-center"
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  >
-                    <Sparkles className="h-2.5 w-2.5 text-white" />
-                  </motion.div>
-                </div>
+            {isCosmiq ? (
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(245,158,11,0.12),transparent_32%),radial-gradient(circle_at_88%_28%,rgba(139,92,246,0.18),transparent_38%)]" />
+            ) : null}
+            <div className={isCosmiq
+              ? "relative flex items-center justify-between border-b border-white/10 px-5 py-4 sm:px-6"
+              : "flex items-center justify-between border-b border-[#203124]/10 px-5 py-4 sm:px-6"}>
+              <div className="flex items-center gap-3">
+                <span className={isCosmiq
+                  ? "relative rounded-2xl bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 p-3 text-white shadow-lg shadow-orange-500/20"
+                  : "rounded-2xl bg-[#496f4c]/10 p-3 text-[#496f4c]"}>
+                  <BookHeart className="h-5 w-5" />
+                  {isCosmiq ? <Sparkles className="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full bg-violet-500 p-0.5 text-white" /> : null}
+                </span>
                 <div>
-                  <h2 className="font-semibold text-lg text-foreground">
-                    {mentor?.name || "Your Guide"} Reflects
+                  <h2 className={isCosmiq ? "text-xl font-semibold" : "font-serif text-xl font-semibold"}>
+                    {isCosmiq ? "Weekly journal" : "Weekly review"}
                   </h2>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="h-3.5 w-3.5" />
-                    <span>{dateRange}</span>
-                  </div>
-                </div>
-              </motion.div>
-              
-              <motion.div 
-                className="flex items-center gap-1"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                <Button variant="ghost" size="icon" onClick={handleShare} className="rounded-xl hover:bg-white/5">
-                  <Share2 className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={handleClose} className="rounded-xl hover:bg-white/5">
-                  <X className="h-4 w-4" />
-                </Button>
-              </motion.div>
-            </div>
-
-            {/* Story Content */}
-            <div
-              className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain"
-              style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
-            >
-              <div ref={cardRef} className="px-4 pb-6 space-y-6">
-                {/* Trend Badge */}
-                <div className="flex items-center justify-center pt-2">
-                  <TrendBadge trend={selectedRecap.mood_data.trend} />
-                </div>
-
-                {/* The Story */}
-                {paragraphs.length > 0 ? (
-                  <div className="space-y-5">
-                    {paragraphs.map((paragraph, i) => (
-                      <motion.p 
-                        key={i}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.4 + (i * 0.1), duration: 0.5 }}
-                        className="text-[15px] leading-[1.65] text-foreground/90"
-                      >
-                        {paragraph}
-                      </motion.p>
-                    ))}
-                  </div>
-                ) : (
-                  <motion.div 
-                    className="text-center py-12"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                  >
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-muted/30 mb-4">
-                      <BookOpen className="h-8 w-8 text-muted-foreground/50" />
-                    </div>
-                    <p className="text-muted-foreground">
-                      No story available for this week yet.
-                    </p>
-                  </motion.div>
-                )}
-
-                {/* Decorative divider */}
-                <motion.div 
-                  className="flex items-center justify-center gap-3 py-4"
-                  initial={{ opacity: 0, scaleX: 0 }}
-                  animate={{ opacity: 1, scaleX: 1 }}
-                  transition={{ delay: 0.8 }}
-                >
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
-                  <Sparkles className="h-3 w-3 text-amber-400/50" />
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
-                </motion.div>
-
-                {/* Stats Row */}
-                <motion.div 
-                  className="flex items-center justify-around py-4 px-2 rounded-2xl bg-white/[0.02] border border-white/5"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.9 }}
-                >
-                  <StatPill value={selectedRecap.stats.checkIns} label="Check-ins" color="text-sky-400" />
-                  <div className="w-px h-8 bg-border/30" />
-                  <StatPill value={selectedRecap.stats.reflections} label="Reflections" color="text-violet-400" />
-                  <div className="w-px h-8 bg-border/30" />
-                  <StatPill value={selectedRecap.stats.quests} label="Quests" color="text-emerald-400" />
-                  <div className="w-px h-8 bg-border/30" />
-                  <StatPill value={selectedRecap.stats.habits} label="Habits" color="text-amber-400" />
-                </motion.div>
-
-                {/* Branding */}
-                <motion.div 
-                  className="text-center pt-2 pb-4"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 1 }}
-                >
-                  <p className="text-[10px] text-muted-foreground/40 tracking-widest uppercase">
-                    Cosmiq Weekly Journal
+                  <p className={isCosmiq
+                    ? "mt-1 flex items-center gap-1.5 text-xs text-white/55"
+                    : "mt-1 flex items-center gap-1.5 text-xs text-[#657067]"}>
+                    <Calendar className="h-3.5 w-3.5" />{dateRange}
                   </p>
-                </motion.div>
+                </div>
+              </div>
+              <div className="flex gap-1">
+                <Button variant="ghost" size="icon" onClick={() => void handleShare()} aria-label="Share weekly review"><Share2 className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={closeRecap} aria-label="Close weekly review"><X className="h-4 w-4" /></Button>
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="relative px-6 py-5 pb-6 border-t border-white/5">
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
+            <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <div ref={cardRef} className={isCosmiq
+                ? "space-y-6 bg-[#0a0a0f] px-5 py-6 text-white sm:px-7"
+                : "space-y-6 bg-[#f1f0e7] px-5 py-6 sm:px-7"}>
+                <div className="flex justify-center"><TrendBadge trend={selectedRecap.mood_data.trend} isCosmiq={isCosmiq} /></div>
+
+                {paragraphs.length > 0 ? (
+                  <div className="space-y-4">
+                    {paragraphs.map((paragraph, index) => (
+                      <p key={`${index}-${paragraph.slice(0, 20)}`} className={isCosmiq ? "leading-7 text-white/85" : "leading-7 text-[#38463b]"}>{paragraph}</p>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={isCosmiq
+                    ? "rounded-2xl border border-dashed border-white/15 p-6 text-center text-sm leading-6 text-white/55"
+                    : "rounded-2xl border border-dashed border-[#203124]/15 p-6 text-center text-sm leading-6 text-[#657067]"}>
+                    {isCosmiq
+                      ? "Your weekly story is still taking shape. Keep showing up."
+                      : "Your review does not have a written reflection yet. The record of showing up still matters."}
+                  </div>
+                )}
+
+                <div className={isCosmiq
+                  ? "grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-white/[0.035] p-4"
+                  : "grid grid-cols-3 gap-2 rounded-2xl border border-[#203124]/10 bg-white/45 p-4"}>
+                  <Stat value={selectedRecap.stats.checkIns} label="Check-ins" />
+                  <Stat value={selectedRecap.stats.reflections} label="Reflections" />
+                  <Stat value={practices} label={isCosmiq ? "Quests + habits" : "Practices"} />
+                </div>
+
+                <p className={isCosmiq
+                  ? "text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-white/35"
+                  : "text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[#657067]"}>
+                  {PRODUCT.name} · {isCosmiq ? "weekly journal" : "weekly review"}
+                </p>
+              </div>
+            </div>
+
+            <div className={isCosmiq ? "relative border-t border-white/10 p-5" : "border-t border-[#203124]/10 p-5"}>
+              <Button
+                onClick={closeRecap}
+                className={isCosmiq
+                  ? "h-12 w-full rounded-xl bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/20 hover:from-violet-500 hover:via-purple-500 hover:to-fuchsia-500"
+                  : "h-12 w-full rounded-xl bg-[#2f5938] text-white hover:bg-[#24482d]"}
               >
-                <Button 
-                  onClick={handleClose} 
-                  className="w-full h-12 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-400 hover:via-orange-400 hover:to-rose-400 text-white font-medium shadow-lg shadow-orange-500/20 transition-all duration-300 hover:shadow-orange-500/30 hover:scale-[1.02]"
-                >
-                  Continue Your Journey
-                </Button>
-              </motion.div>
+                {isCosmiq ? "Continue your journey" : "Return to the day"}
+              </Button>
             </div>
           </motion.div>
         </motion.div>
-      )}
+      ) : null}
     </AnimatePresence>
   );
 };

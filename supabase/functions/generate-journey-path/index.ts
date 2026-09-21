@@ -15,6 +15,7 @@ import {
   JOURNEY_PATH_RENDER_VERSION,
   needsJourneyPathLandscapeRefresh,
 } from "../../../src/shared/journeyPathConfig.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 interface JourneyPathRequestBody {
   epicId: string | null;
@@ -186,6 +187,7 @@ export async function handleGenerateJourneyPath(
     }
 
     const userId = auth.userId;
+    const productMode = await resolveUserProductMode(supabase, userId);
     const costGuardrails = createCostGuardrailSession({
       supabase,
       endpointKey: "generate-journey-path",
@@ -293,6 +295,7 @@ export async function handleGenerateJourneyPath(
       .from("user_companion")
       .select("spirit_animal, core_element, favorite_color")
       .eq("user_id", userId)
+      .eq("product_mode", productMode)
       .single();
 
     const worldContext = {

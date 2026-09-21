@@ -260,17 +260,18 @@ vi.mock("@/integrations/supabase/client", () => ({
       }
 
       if (table === "user_companion") {
+        const chain = {
+          eq: vi.fn(),
+          maybeSingle: vi.fn().mockResolvedValue({
+            data: mocks.state.userCompanionLookup ?? {
+              core_element: "fire",
+            },
+            error: mocks.state.userCompanionError,
+          }),
+        };
+        chain.eq.mockReturnValue(chain);
         return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              maybeSingle: vi.fn().mockResolvedValue({
-                data: mocks.state.userCompanionLookup ?? {
-                  core_element: "fire",
-                },
-                error: mocks.state.userCompanionError,
-              }),
-            })),
-          })),
+          select: vi.fn(() => chain),
         };
       }
 

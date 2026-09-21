@@ -138,7 +138,7 @@ const InboxPage = memo(function InboxPage() {
       const destinations = results
         .map((result) => `${result.providerLabel} ${result.destinationKind === "todo" ? "To Do" : "Calendar"} -> ${result.destinationName}`)
         .join("; ");
-      toast.success(`Quest sent to ${results.length} destinations`, {
+      toast.success(`Action sent to ${results.length} destinations`, {
         description: `Destinations: ${destinations}.`,
       });
     };
@@ -344,7 +344,7 @@ const InboxPage = memo(function InboxPage() {
               {inboxTasks.map((task) => (
                 <div
                   key={task.id}
-                  className="flex items-center gap-3 py-3 px-3 rounded-2xl bg-card/82 backdrop-blur-lg border border-border/55 shadow-[0_8px_18px_rgba(0,0,0,0.16)]"
+                  className="flex items-center gap-3 py-3 px-3 rounded-2xl bg-card/[0.82] backdrop-blur-lg border border-border/55 shadow-[0_8px_18px_rgba(0,0,0,0.16)]"
                 >
                   {/* Checkbox */}
                   <button
@@ -383,7 +383,7 @@ const InboxPage = memo(function InboxPage() {
                         void handleDeleteQuest(task.id);
                         haptics.light();
                       }}
-                      className="p-2 rounded-xl hover:bg-destructive/12 text-muted-foreground hover:text-destructive transition-colors touch-manipulation"
+                      className="p-2 rounded-xl hover:bg-destructive/[0.12] text-muted-foreground hover:text-destructive transition-colors touch-manipulation"
                       aria-label="Delete quest"
                     >
                       <Trash2 className="w-4 h-4" />

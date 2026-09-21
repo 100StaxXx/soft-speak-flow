@@ -2611,7 +2611,7 @@ describe("useCompanionPlanner", () => {
       },
     });
     expect(mocks.toastMessage).toHaveBeenCalledWith(
-      "Quest updated, but I couldn't finish the step breakdown yet.",
+      "Action updated, but I couldn't finish the step breakdown yet.",
     );
     expect(result.current.messages.at(-1)?.content).toBe(
       "Saved: Update Workout. I couldn't finish the step breakdown yet.",

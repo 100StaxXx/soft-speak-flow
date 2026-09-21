@@ -247,7 +247,7 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
                   {/* Then show tasks */}
                   {dayTasks.slice(0, Math.max(0, maxVisibleItems - dayMilestones.length)).map(task => {
                     const isCampaignRitual = isCampaignRitualTask(task);
-                    const campaignTitle = task.epic_title?.trim() || "Campaign";
+                    const campaignTitle = task.epic_title?.trim() || "Commitment";
 
                     return (
                       <div

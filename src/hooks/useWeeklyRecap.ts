@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useXPRewards } from "@/hooks/useXPRewards";
 import { useWeeklyRecapContext } from "@/contexts/WeeklyRecapContext";
 import { format } from "date-fns";
 import { safeLocalStorage } from "@/utils/storage";
@@ -38,7 +37,6 @@ export interface WeeklyRecap {
 export const useWeeklyRecap = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { awardCustomXP } = useXPRewards();
   const { isModalOpen, selectedRecap, openRecap: contextOpenRecap, closeRecap: contextCloseRecap } = useWeeklyRecapContext();
 
   // Get previous week boundaries (Mon-Sun), recalculates for accuracy
@@ -182,9 +180,7 @@ export const useWeeklyRecap = () => {
   const openRecap = (recap: WeeklyRecap) => {
     contextOpenRecap(recap);
     
-    // Award XP if not viewed before
     if (!recap.viewed_at) {
-      awardCustomXP(5, "weekly_recap_viewed", "Weekly Recap");
       markViewedMutation.mutate(recap.id);
     }
   };

@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { Skeleton } from "./ui/skeleton";
 import { formatDisplayLabel } from "@/lib/utils";
 import { buildPostgrestIlikeOr } from "@/utils/postgrestSearchFilters";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 
 interface GlobalSearchProps {
   initialQuery?: string;
@@ -65,12 +66,13 @@ export const GlobalSearch = ({
   };
 
   const { data: quotes, isLoading: quotesLoading } = useQuery({
-    queryKey: ["search-quotes", currentQuery],
+    queryKey: ["search-quotes", PRODUCT_RUNTIME.authProductMode, currentQuery],
     enabled: currentQuery.length >= 2,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("quotes")
         .select("*")
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
         .or(quoteSearchFilter)
         .limit(10);
 
@@ -80,12 +82,13 @@ export const GlobalSearch = ({
   });
 
   const { data: pepTalks, isLoading: pepTalksLoading } = useQuery({
-    queryKey: ["search-pep-talks", currentQuery],
+    queryKey: ["search-pep-talks", PRODUCT_RUNTIME.authProductMode, currentQuery],
     enabled: currentQuery.length >= 2,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("pep_talks")
         .select("*")
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
         .or(pepTalkSearchFilter)
         .limit(10);
 
@@ -176,7 +179,7 @@ export const GlobalSearch = ({
             <TabsTrigger value="quotes">Quotes</TabsTrigger>
             <TabsTrigger value="pep-talks">Pep Talks</TabsTrigger>
             <TabsTrigger value="challenges">Challenges</TabsTrigger>
-            <TabsTrigger value="quests">Quests</TabsTrigger>
+            <TabsTrigger value="quests">Actions</TabsTrigger>
             <TabsTrigger value="epics">Epics</TabsTrigger>
           </TabsList>
 
@@ -294,7 +297,7 @@ export const GlobalSearch = ({
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <Trophy className="h-4 w-4 text-primary" />
-                      <h3 className="font-semibold">Quests</h3>
+                      <h3 className="font-semibold">Actions</h3>
                       <Badge variant="secondary">{tasks.length}</Badge>
                     </div>
                     <div className="space-y-3">
@@ -341,7 +344,7 @@ export const GlobalSearch = ({
                             </div>
                             <div className="flex flex-col items-end gap-1">
                               {task.is_main_quest && (
-                                <Badge variant="secondary" className="text-xs">Main Quest</Badge>
+                                <Badge variant="secondary" className="text-xs">Main Action</Badge>
                               )}
                               {task.completed && (
                                 <Badge className="text-xs bg-success/10 text-success">Completed</Badge>
@@ -498,7 +501,7 @@ export const GlobalSearch = ({
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       {task.is_main_quest && (
-                        <Badge variant="secondary" className="text-xs">Main Quest</Badge>
+                        <Badge variant="secondary" className="text-xs">Main Action</Badge>
                       )}
                       {task.completed && (
                         <Badge className="text-xs bg-success/10 text-success">Completed</Badge>

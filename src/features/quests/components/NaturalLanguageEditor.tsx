@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Sparkles, Mic, MicOff, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useNaturalLanguageParser, ParsedTask } from "@/features/tasks/hooks";
+import { useNaturalLanguageParser } from "@/features/tasks/hooks/useNaturalLanguageParser";
+import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { cn } from "@/lib/utils";
 import { DIFFICULTY_COLORS, QUEST_FORM_STYLES } from "@/components/quest-shared";
@@ -37,7 +38,6 @@ export function NaturalLanguageEditor({ onApply, visualStyle = "default" }: Natu
     parsed.category || parsed.frequency || parsed.customDays ||
     parsed.paused !== null || parsed.archived !== null ||
     parsed.isBonus !== null || parsed.isMilestone !== null ||
-    parsed.xpReward || parsed.xpMultiplier ||
     parsed.newTitle || parsed.triggerDecomposition ||
     // Clear values
     parsed.clearTime || parsed.clearDate || parsed.clearDuration || parsed.clearRecurrence ||
@@ -161,12 +161,6 @@ export function NaturalLanguageEditor({ onApply, visualStyle = "default" }: Natu
           )}
           {parsed.isMilestone && (
             <Badge color="gold">🏆 Milestone</Badge>
-          )}
-          {parsed.xpReward && (
-            <Badge color="yellow">✨ {parsed.xpReward} XP</Badge>
-          )}
-          {parsed.xpMultiplier && (
-            <Badge color="yellow">✨ {parsed.xpMultiplier}x XP</Badge>
           )}
           {parsed.paused === true && (
             <Badge color="orange">⏸️ Pause</Badge>

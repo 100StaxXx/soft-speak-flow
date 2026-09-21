@@ -21,6 +21,7 @@ const createJob = (overrides: Record<string, unknown> = {}) => ({
   evolution_id: "evo-1",
   stage: 5,
   source_image_url: "https://example.com/stage-5.png",
+  start_image_url: "https://example.com/stage-1.png",
   provider: "fal",
   provider_model: "fal-ai/kling-video/v3/standard/image-to-video",
   provider_task_id: null,
@@ -226,7 +227,7 @@ const createDeps = ({
   return { deps, ledgerCalls, costGuardrailCalls };
 };
 
-Deno.test("processClaimedCompanionAnimationJob submits a new fal queue request", async () => {
+Deno.test("processClaimedCompanionAnimationJob submits egg and infant hatch endpoints", async () => {
   const { supabase, updates, functionInvocations } = createSupabaseHarness({
     deviceTokens: [{ device_token: "device-token-1" }],
   });
@@ -242,7 +243,12 @@ Deno.test("processClaimedCompanionAnimationJob submits a new fal queue request",
 
   const result = await module.processClaimedCompanionAnimationJob({
     supabase: supabase as never,
-    job: createJob() as never,
+    job: createJob({
+      stage: 1,
+      start_image_url: "/companion-eggs/v2/egg__t0_egg__normal__light.webp",
+      source_image_url: "https://example.com/infant.png",
+      prompt: "Hatch from the egg into the supplied infant",
+    }) as never,
     deps,
   });
 
@@ -257,6 +263,16 @@ Deno.test("processClaimedCompanionAnimationJob submits a new fal queue request",
     fetchCalls[0]?.url,
     "https://queue.fal.run/fal-ai/kling-video/v3/standard/image-to-video",
   );
+  assertEquals(JSON.parse(String(fetchCalls[0]?.init?.body)), {
+    start_image_url:
+      "https://graceward.app/companion-eggs/v2/egg__t0_egg__normal__light.webp",
+    end_image_url: "https://example.com/infant.png",
+    prompt: "Hatch from the egg into the supplied infant",
+    duration: "5",
+    generate_audio: false,
+    negative_prompt:
+      "photorealism, live action, realistic fur, realistic feathers, natural-history footage, CGI, 3D render, painterly realism, style drift, identity drift, distorted anatomy, extra limbs, extra heads, text, captions, logos, franchise resemblance, cuts, scene changes, jitter, blur, low quality",
+  });
   assertEquals(
     updates.find((update) => update.table === "companion_animation_jobs")
       ?.payload.provider_task_id,
@@ -410,6 +426,16 @@ Deno.test("handleProcessCompanionAnimationJob submits explicit queued jobs witho
 
       if (table === "companion_evolutions") {
         return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({
+                data: {
+                  generation_metadata: { sourceType: "canonical_preset" },
+                },
+                error: null,
+              }),
+            }),
+          }),
           update: (payload: Record<string, unknown>) => ({
             eq: async () => {
               updates.push({ table, payload });
@@ -461,6 +487,15 @@ Deno.test("handleProcessCompanionAnimationJob submits explicit queued jobs witho
   assertEquals(body.status, "processing");
   assertEquals(body.providerTaskId, "fal-request-1");
   assertEquals(fetchCalls[0]?.url.includes("queue.fal.run"), true);
+  assertEquals(JSON.parse(String(fetchCalls[0]?.init?.body)), {
+    start_image_url: "https://example.com/stage-1.png",
+    end_image_url: "https://example.com/stage-5.png",
+    prompt: "Animate the companion",
+    duration: "5",
+    generate_audio: false,
+    negative_prompt:
+      "photorealism, live action, realistic fur, realistic feathers, natural-history footage, CGI, 3D render, painterly realism, style drift, identity drift, distorted anatomy, extra limbs, extra heads, text, captions, logos, franchise resemblance, cuts, scene changes, jitter, blur, low quality",
+  });
   assertEquals(
     updates.find((update) =>
       update.table === "companion_animation_jobs" &&

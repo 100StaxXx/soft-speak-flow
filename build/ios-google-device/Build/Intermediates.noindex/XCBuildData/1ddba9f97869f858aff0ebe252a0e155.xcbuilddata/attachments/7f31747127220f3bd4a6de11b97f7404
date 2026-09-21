@@ -1,5 +1,0 @@
-
-module CapawesomeCapacitorFilePicker.Swift {
-  header "CapawesomeCapacitorFilePicker-Swift.h"
-  requires objc
-}

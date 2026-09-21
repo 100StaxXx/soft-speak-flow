@@ -2,14 +2,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useCompanion } from "@/hooks/useCompanion";
-import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useXPToast } from "@/contexts/XPContext";
+import { PRODUCT_COPY } from "@/config/product";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useSchedulingLearner } from "@/hooks/useSchedulingLearner";
 import { useRef } from "react";
 import { getEffectiveQuestXP, MAIN_QUEST_XP_MULTIPLIER } from "@/config/xpRewards";
-import { calculateGuildBonus } from "@/utils/guildBonus";
 import { format } from "date-fns";
 import { TimeoutError, pollWithDeadline, withTimeout } from "@/utils/asyncTimeout";
 import {
@@ -42,14 +40,13 @@ import {
   upsertPlannerRecord,
   upsertPlannerRecords,
 } from "@/utils/plannerLocalStore";
-import { getDailyTasksQueryKey, withPlannerRemoteSyncLock } from "@/utils/plannerSync";
+import { withPlannerRemoteSyncLock } from "@/utils/plannerSync";
 import {
   getTaskCompletionDisciplineAward,
   isTaskCompletionOnTime,
   type TaskCompletionDisciplineAward,
   type TaskCompletionDisciplineAwardInput,
 } from "@/shared/taskCompletionTiming";
-import { useCompletionFeedback } from "@/hooks/useCompletionFeedback";
 import type { CompletionFeedbackSource } from "@/types/completionFeedback";
 import {
   getPrimaryQuestReminderOffset,
@@ -60,15 +57,17 @@ import {
   type DeletedPlannerEntity,
 } from "@/utils/deletedPlannerMemory";
 import {
-  buildCompletionFeedbackDaySignals,
   getCompletionFeedbackDaySignalTasksQueryKey,
-  getCompletionFeedbackInboxTasksQueryKey,
   getCompletionFeedbackLocalCompletionsQueryKey,
   getCompletionFeedbackTaskDate,
   mergeCompletionFeedbackDaySignalTasks,
   type CompletionFeedbackDaySignalTask,
-  type CompletionFeedbackDaySignals,
 } from "@/utils/completionFeedbackDaySignals";
+import {
+  dispatchCalendarTaskUpdated,
+  requestCalendarTaskDeleteSync,
+} from "@/utils/calendarSyncEvents";
+import { dispatchCompanionAgendaEvent } from "@/lib/companionAgendaEvents";
 
 export {
   getTaskCompletionDisciplineAward,
@@ -263,7 +262,7 @@ const resolveQuestSource = (
 
 const MONTHLY_RECURRENCE_SCHEMA_MESSAGE = "Monthly recurrence is temporarily unavailable until backend update completes.";
 const REGULAR_QUEST_REQUIRES_TIME_OR_INBOX_ERROR = "REGULAR_QUEST_REQUIRES_TIME_OR_INBOX";
-const REGULAR_QUEST_REQUIRES_TIME_OR_INBOX_MESSAGE = "Scheduled quests need a time. Pick a time or send it to Inbox instead.";
+const REGULAR_QUEST_REQUIRES_TIME_OR_INBOX_MESSAGE = "Scheduled actions need a time. Pick a time or send the action to Inbox instead.";
 const CREATE_TASK_REMOTE_TIMEOUT_MS = 3_000;
 const CREATE_TASK_EXISTENCE_CHECK_MS = 1_500;
 const CREATE_TASK_EXISTENCE_CHECK_INTERVAL_MS = 150;
@@ -367,13 +366,13 @@ function getQueuedTaskCreateToastMessage(queueReason?: TaskCreateQueueReason): {
 } {
   if (queueReason === "offline") {
     return {
-      title: "Quest saved offline",
+      title: "Action saved offline",
       description: "We'll sync it when you're back online.",
     };
   }
 
   return {
-    title: "Quest saved locally. Server sync will retry automatically.",
+    title: "Action saved locally. Server sync will retry automatically.",
   };
 }
 
@@ -402,29 +401,29 @@ function getTaskCreateWarningToast(warnings: TaskCreateWarning[]): {
 
   if (hasAttachmentFailure && hasSubtaskFailure) {
     return {
-      title: "Quest added with warnings",
-      description: "Attachments and subtasks could not be saved. Reopen the quest to try again.",
+      title: "Action added with warnings",
+      description: "Attachments and subtasks could not be saved. Reopen the action to try again.",
     };
   }
 
   if (hasAttachmentFailure) {
     return {
-      title: "Quest added with warnings",
-      description: "Attachments could not be saved. Reopen the quest to try again.",
+      title: "Action added with warnings",
+      description: "Attachments could not be saved. Reopen the action to try again.",
     };
   }
 
   if (hasAttachmentSchemaWarning) {
     return {
-      title: "Quest added with warnings",
+      title: "Action added with warnings",
       description: "Attachments could not be stored right now. Please try again after the backend update finishes.",
     };
   }
 
   if (hasSubtaskFailure) {
     return {
-      title: "Quest added with warnings",
-      description: "Subtasks could not be saved. Reopen the quest to try again.",
+      title: "Action added with warnings",
+      description: "Subtasks could not be saved. Reopen the action to try again.",
     };
   }
 
@@ -509,17 +508,10 @@ const emptyAttachmentPersistResult = (): TaskAttachmentPersistResult => ({
 export const useTaskMutations = (taskDate: string) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const { companion } = useCompanion();
-  const {
-    awardBehaviorStat,
-    awardDisciplineForHabitCompletion,
-    awardDisciplineForPlannedTaskOnTime,
-  } = useCompanionAttributes();
   const { showXPToast } = useXPToast();
   const { awardCustomXP } = useXPRewards();
+  const queryClient = useQueryClient();
   const { trackTaskCompletion, trackTaskCreation } = useSchedulingLearner();
-  const { triggerCompletionFeedback } = useCompletionFeedback();
   const {
     state: resilienceState,
     shouldQueueWrites,
@@ -529,7 +521,6 @@ export const useTaskMutations = (taskDate: string) => {
   } = useResilience();
 
   const addInProgress = useRef(false);
-  const tasksAwaitingRedoFeedbackSuppression = useRef<Set<string>>(new Set());
   const getRequiredUserId = () => {
     if (!user?.id) throw new Error("User not authenticated");
     return user.id;
@@ -564,66 +555,6 @@ export const useTaskMutations = (taskDate: string) => {
       seenIds.add(subtask.id);
       return true;
     });
-  };
-
-  const getCompletionFeedbackDaySignals = (
-    completedTaskId: string | null | undefined,
-    completedTaskDate: string | null | undefined,
-    completedAt: string | null | undefined,
-  ): CompletionFeedbackDaySignals => {
-    if (!completedTaskId || !user?.id) return {};
-
-    const resolvedTaskDate = getCompletionFeedbackTaskDate(
-      completedTaskDate || taskDate,
-      completedAt,
-    );
-    const cachedDaySignalTasks = queryClient.getQueryData<CompletionFeedbackDaySignalTask[]>(
-      getCompletionFeedbackDaySignalTasksQueryKey(user.id, resolvedTaskDate),
-    );
-    const cachedInboxCompletions = queryClient.getQueryData<CompletionFeedbackDaySignalTask[]>(
-      getCompletionFeedbackInboxTasksQueryKey(user.id, resolvedTaskDate),
-    );
-    const cachedLocalCompletions = queryClient.getQueryData<CompletionFeedbackDaySignalTask[]>(
-      getCompletionFeedbackLocalCompletionsQueryKey(user.id, resolvedTaskDate),
-    );
-    const cachedInboxTasks = Array.isArray(cachedInboxCompletions) ? cachedInboxCompletions : [];
-    const cachedLocalTasks = mergeCompletionFeedbackDaySignalTasks(
-      [
-        ...cachedInboxTasks,
-        ...(Array.isArray(cachedLocalCompletions) ? cachedLocalCompletions : []),
-      ],
-      getRemoteTaskId,
-    );
-
-    if (Array.isArray(cachedDaySignalTasks)) {
-      return buildCompletionFeedbackDaySignals({
-        completedTaskId,
-        tasks: mergeCompletionFeedbackDaySignalTasks(
-          [...cachedDaySignalTasks, ...cachedLocalTasks],
-          getRemoteTaskId,
-        ),
-        normalizeTaskId: getRemoteTaskId,
-      });
-    }
-
-    const cachedTasks = queryClient.getQueryData<DailyTask[]>(
-      getDailyTasksQueryKey(user.id, resolvedTaskDate),
-    );
-    if (!Array.isArray(cachedTasks)) return {};
-
-    const cachedSignals = buildCompletionFeedbackDaySignals({
-      completedTaskId,
-      tasks: mergeCompletionFeedbackDaySignalTasks(
-        [...cachedTasks, ...cachedLocalTasks],
-        getRemoteTaskId,
-      ),
-      normalizeTaskId: getRemoteTaskId,
-    });
-
-    return {
-      ...(cachedSignals.isBuildingMomentum === true ? { isBuildingMomentum: true } : {}),
-      ...(cachedSignals.isOverloaded === true ? { isOverloaded: true } : {}),
-    };
   };
 
   const rememberCompletionFeedbackLocalDayCompletion = (
@@ -1497,7 +1428,7 @@ export const useTaskMutations = (taskDate: string) => {
       }
       reportApiFailure(error, { source: "task_add_onError" });
       toast({
-        title: "Failed to add quest",
+        title: "Failed to add action",
         description: getTaskMutationErrorMessage(error),
         variant: "destructive",
       });
@@ -1520,7 +1451,8 @@ export const useTaskMutations = (taskDate: string) => {
         toast(queuedToast);
         return;
       }
-      toast({ title: "Quest added!" });
+      dispatchCalendarTaskUpdated(createdTask?.id);
+      toast({ title: "Action added" });
       const warningToast = getTaskCreateWarningToast(createdTask?.postCreateWarnings ?? []);
       if (warningToast) {
         toast(warningToast);
@@ -1588,7 +1520,7 @@ export const useTaskMutations = (taskDate: string) => {
           toastReason: null,
           wasAlreadyCompleted: false,
           isUndo: false,
-          taskText: localTask?.task_text ?? "Quest",
+          taskText: localTask?.task_text ?? "Action",
           habitSourceId: localHabitSourceId,
           taskDifficulty: localTask?.difficulty ?? null,
           taskScheduledTime: localTask?.scheduled_time ?? null,
@@ -1606,12 +1538,17 @@ export const useTaskMutations = (taskDate: string) => {
       const taskText = existingTask?.task_text || localTask?.task_text || 'Task';
       const habitSourceId = existingTask?.habit_source_id ?? localTask?.habit_source_id ?? null;
       const taskDateValue = existingTask?.task_date || localTask?.task_date || format(new Date(), 'yyyy-MM-dd');
-      const isMainQuest = existingTask?.is_main_quest === true || localTask?.is_main_quest === true;
+      const isPriorityAction = existingTask?.is_main_quest === true || localTask?.is_main_quest === true;
       const storedTaskXP = Number(existingTask?.xp_reward ?? localTask?.xp_reward ?? xpReward);
-      const mainQuestXP = Math.round(storedTaskXP * MAIN_QUEST_XP_MULTIPLIER);
-      const normalizedTaskXP = isMainQuest && xpReward <= storedTaskXP
-        ? mainQuestXP
-        : xpReward;
+      const requestedTaskXP = Number.isFinite(Number(xpReward)) ? Number(xpReward) : storedTaskXP;
+      const normalizedTaskXP = Math.max(0, Math.min(
+        50,
+        Math.round(
+          isPriorityAction && requestedTaskXP <= storedTaskXP
+            ? storedTaskXP * MAIN_QUEST_XP_MULTIPLIER
+            : requestedTaskXP,
+        ),
+      ));
       const taskDifficulty = existingTask?.difficulty || localTask?.difficulty || 'medium';
       const taskScheduledTime = existingTask?.scheduled_time || localTask?.scheduled_time || null;
       const taskCategory = existingTask?.category || localTask?.category || null;
@@ -1622,6 +1559,23 @@ export const useTaskMutations = (taskDate: string) => {
         ?? null;
       const epicId = existingTask?.epic_id ?? localTask?.epic_id ?? null;
       const epicTitle = existingTask?.epics?.title ?? localTask?.epic_title ?? null;
+      const awardTaskCompletionXP = async (completionTimestamp: string) => {
+        if (normalizedTaskXP <= 0) return 0;
+
+        try {
+          const awardResult = await awardCustomXP(
+            normalizedTaskXP,
+            'task_complete',
+            undefined,
+            { task_id: remoteTaskId, task_date: taskDateValue },
+            `task-complete:${remoteTaskId}:${completionTimestamp}`,
+          );
+          return awardResult?.xpAwarded ?? 0;
+        } catch (xpError) {
+          console.warn('[TaskMutations] Companion XP will retry when the action is reconciled:', xpError);
+          return 0;
+        }
+      };
       const reconcileCompletedTask = async (taskState: ToggleTaskRemoteState | null, completedAt?: string | null) => {
         const resolvedTaskText = taskState?.task_text || existingTask?.task_text || localTask?.task_text || 'Task';
         const resolvedHabitSourceId = taskState?.habit_source_id ?? existingTask?.habit_source_id ?? localTask?.habit_source_id ?? null;
@@ -1652,10 +1606,12 @@ export const useTaskMutations = (taskDate: string) => {
 
         await syncHabitCompletionState(resolvedHabitSourceId, resolvedTaskDate, true);
 
+        const awardedXP = await awardTaskCompletionXP(resolvedCompletedAt);
+
         return {
           taskId,
           completed: true,
-          xpAwarded: 0,
+          xpAwarded: awardedXP,
           bonusXP: 0,
           toastReason: null,
           wasAlreadyCompleted: true,
@@ -1681,6 +1637,7 @@ export const useTaskMutations = (taskDate: string) => {
 
       // Handle undo case - revert task and deduct XP
       if (!completed && forceUndo) {
+        const completionTimestamp = existingTask?.completed_at ?? localTask?.completed_at ?? 'unknown';
         const { error } = await supabase
           .from('daily_tasks')
           .update({ completed: false, completed_at: null })
@@ -1696,9 +1653,18 @@ export const useTaskMutations = (taskDate: string) => {
           });
         }
 
-        // Deduct the XP that was awarded
         if (normalizedTaskXP > 0) {
-          await awardCustomXP(-normalizedTaskXP, 'task_undo', 'Quest undone', { task_id: taskId });
+          try {
+            await awardCustomXP(
+              -normalizedTaskXP,
+              'task_undo',
+              undefined,
+              { task_id: remoteTaskId, task_date: taskDateValue },
+              `task-undo:${remoteTaskId}:${completionTimestamp}`,
+            );
+          } catch (xpError) {
+            console.warn('[TaskMutations] Companion XP undo could not be recorded:', xpError);
+          }
         }
 
         // If this was a habit-sourced task, remove the habit completion
@@ -1733,8 +1699,6 @@ export const useTaskMutations = (taskDate: string) => {
         return reconcileCompletedTask(existingTask, existingTask?.completed_at ?? localTask?.completed_at ?? null);
       }
 
-      const { bonusXP, toastReason } = await calculateGuildBonus(user.id, normalizedTaskXP);
-      const totalXP = normalizedTaskXP + bonusXP;
       const completedAt = new Date().toISOString();
 
       const { data: updateResult, error: updateError } = await supabase
@@ -1763,8 +1727,7 @@ export const useTaskMutations = (taskDate: string) => {
         });
       }
 
-      const awardResult = await awardCustomXP(totalXP, 'task_complete', toastReason, { task_id: taskId });
-      const awardedXP = awardResult?.xpAwarded ?? 0;
+      const awardedXP = await awardTaskCompletionXP(completedAt);
 
       // If this is a habit-sourced task, sync with habit_completions
       await syncHabitCompletionState(habitSourceId, taskDateValue, true);
@@ -1772,9 +1735,9 @@ export const useTaskMutations = (taskDate: string) => {
       return { 
         taskId, 
         completed: true, 
-        xpAwarded: awardedXP, 
-        bonusXP, 
-        toastReason, 
+        xpAwarded: awardedXP,
+        bonusXP: 0,
+        toastReason: null,
         wasAlreadyCompleted, 
         isUndo: false, 
         taskText, 
@@ -1796,7 +1759,6 @@ export const useTaskMutations = (taskDate: string) => {
       const {
         completed,
         xpAwarded,
-        toastReason,
         wasAlreadyCompleted,
         isUndo,
         taskId,
@@ -1806,11 +1768,7 @@ export const useTaskMutations = (taskDate: string) => {
         taskDifficulty,
         taskScheduledTime,
         taskCategory,
-        epicId,
-        epicTitle,
-        completionFeedback,
         completedAt,
-        contactId,
       } = result ?? {};
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
@@ -1829,125 +1787,46 @@ export const useTaskMutations = (taskDate: string) => {
       if (result?.queued) {
         if (completed === true && !wasAlreadyCompleted) {
           syncCompletionFeedbackQueuedDayCompletion(taskId, true, taskDate, completedAt);
+          dispatchCompanionAgendaEvent({
+            eventType: "task-complete",
+            category: taskCategory,
+            taskId,
+            taskTitle: taskText,
+          });
         }
         toast({
-          title: "Quest update queued",
+          title: "Action update queued",
           description: "We'll sync this change when connection is restored.",
         });
         return;
       }
 
+      dispatchCalendarTaskUpdated(taskId);
+
       // Handle undo success
       if (isUndo) {
-        if (typeof taskId === "string") {
-          tasksAwaitingRedoFeedbackSuppression.current.add(taskId);
-        }
         toast({ 
-          title: "Quest undone", 
-          description: "XP has been adjusted",
+          title: "Action restored",
+          description: "The action is open again.",
         });
         return;
       }
 
       if (completed && !wasAlreadyCompleted) {
         if (xpAwarded > 0) {
-          showXPToast(xpAwarded, toastReason || 'Quest Complete!');
+          showXPToast(xpAwarded, PRODUCT_COPY.actionComplete);
         }
         const now = new Date();
         const wasOnTime = isTaskCompletionOnTime(taskScheduledTime, now);
-        const disciplineAward = getTaskCompletionDisciplineAward({
-          taskId,
-          taskDate: taskDate || format(now, "yyyy-MM-dd"),
-          habitSourceId: habitSourceId ?? null,
-          scheduledTime: taskScheduledTime ?? null,
-          completedAt: now,
-        });
-
-        if (companion?.id && disciplineAward) {
-          if (disciplineAward.kind === "habit_complete") {
-            awardDisciplineForHabitCompletion({
-              companionId: companion.id,
-              habitId: disciplineAward.habitId,
-              date: disciplineAward.date,
-            }).catch(console.error);
-          } else {
-            awardDisciplineForPlannedTaskOnTime({
-              companionId: companion.id,
-              taskId: disciplineAward.taskId,
-            }).catch(console.error);
-          }
-        }
-
-        if (companion?.id) {
-          awardBehaviorStat({
-            companionId: companion.id,
-            source: "task",
-            sourceId: taskId,
-            title: taskText,
-            date: taskDate ?? null,
-            category: taskCategory ?? null,
-            difficulty: taskDifficulty ?? null,
-            contactId: contactId ?? null,
-          }).catch(console.error);
-        }
-
+        window.dispatchEvent(new CustomEvent('action-completed'));
         window.dispatchEvent(new CustomEvent('mission-completed'));
         window.dispatchEvent(new CustomEvent('quest-completed'));
-
-        const shouldSuppressRedoFeedback = typeof taskId === "string"
-          && tasksAwaitingRedoFeedbackSuppression.current.delete(taskId);
-        const feedbackCompletedAt = typeof completedAt === "string"
-          ? completedAt
-          : now.toISOString();
-
-        const completionFeedbackDaySignals = shouldSuppressRedoFeedback
-          ? {}
-          : getCompletionFeedbackDaySignals(
-            taskId,
-            taskDate,
-            feedbackCompletedAt,
-          );
-        rememberCompletionFeedbackLocalDayCompletion(
+        dispatchCompanionAgendaEvent({
+          eventType: "task-complete",
+          category: taskCategory,
           taskId,
-          taskDate,
-          feedbackCompletedAt,
-        );
-        if (!shouldSuppressRedoFeedback) {
-          void triggerCompletionFeedback(
-            {
-              taskId,
-              taskTitle: taskText,
-              completionSource: completionFeedback?.completionSource ?? (habitSourceId ? "ritual" : "quest"),
-              completedAt: feedbackCompletedAt,
-              taskDate: taskDate ?? null,
-              scheduledTime: taskScheduledTime ?? null,
-              difficulty: taskDifficulty ?? null,
-              category: taskCategory ?? null,
-              habitSourceId: habitSourceId ?? null,
-              epicId: epicId ?? null,
-              epicTitle: epicTitle ?? null,
-              completedAllRituals: completionFeedback?.completedAllRituals === true,
-              firstRitualToday: completionFeedback?.firstRitualToday === true,
-              ...completionFeedbackDaySignals,
-            },
-            {
-              action: {
-                label: "Undo",
-                ariaLabel: `Undo completion for ${taskText}`,
-                onSelect: () => {
-                  toggleTask.mutate({
-                    taskId,
-                    completed: false,
-                    xpReward: xpAwarded,
-                    forceUndo: true,
-                  });
-                },
-              },
-            },
-          ).catch((feedbackError) => {
-            console.warn("[TaskMutations] Completion feedback failed:", feedbackError);
-          });
-        }
+          taskTitle: taskText,
+        });
 
         console.log('[TaskMutations] About to track completion:', {
           taskId,
@@ -2042,7 +1921,7 @@ export const useTaskMutations = (taskDate: string) => {
         void queueTaskAction("COMPLETE_TASK", queuedPayload);
 
         toast({
-          title: "Quest update queued",
+          title: "Action update queued",
           description: "We'll sync this change when connection is restored.",
         });
         return;
@@ -2055,7 +1934,7 @@ export const useTaskMutations = (taskDate: string) => {
         ? 'Network error. Please check your connection and try again.'
         : error.message;
       
-      toast({ title: "Failed to toggle quest", description: errorMessage, variant: "destructive" });
+      toast({ title: "Failed to update action", description: errorMessage, variant: "destructive" });
     },
     retry: 2,
     retryDelay: 1000,
@@ -2125,6 +2004,8 @@ export const useTaskMutations = (taskDate: string) => {
         return { queued: true };
       }
 
+      await requestCalendarTaskDeleteSync(remoteTaskId);
+
       const { error } = await supabase
         .from('daily_tasks')
         .delete()
@@ -2139,7 +2020,7 @@ export const useTaskMutations = (taskDate: string) => {
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
       if ((result as { queued?: boolean } | undefined)?.queued) {
         toast({
-          title: "Quest deletion queued",
+          title: "Action deletion queued",
           description: "We'll sync this deletion when connection is restored.",
         });
       }
@@ -2152,13 +2033,13 @@ export const useTaskMutations = (taskDate: string) => {
           remoteTaskId: getRemoteTaskId(taskId),
         });
         toast({
-          title: "Quest deletion queued",
+          title: "Action deletion queued",
           description: "We'll sync this deletion when connection is restored.",
         });
         return;
       }
       reportApiFailure(error, { source: "task_delete_onError_nonqueueable" });
-      toast({ title: "Failed to delete quest", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to delete action", description: error.message, variant: "destructive" });
     },
   });
 
@@ -2298,7 +2179,7 @@ export const useTaskMutations = (taskDate: string) => {
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to restore quest", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to restore action", description: error.message, variant: "destructive" });
     },
   });
 
@@ -2364,12 +2245,12 @@ export const useTaskMutations = (taskDate: string) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
       toast({
-        title: result?.queued ? "Main quest saved offline" : "Main quest updated!",
+        title: result?.queued ? "Priority action saved offline" : "Priority action updated",
         description: result?.queued ? "We'll sync this change when connection is restored." : undefined,
       });
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to update main quest", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to update priority action", description: error.message, variant: "destructive" });
     },
   });
 
@@ -2629,16 +2510,18 @@ export const useTaskMutations = (taskDate: string) => {
 
       if (data?.queued) {
         toast({
-          title: "Quest update queued",
+          title: "Action update queued",
           description: "We'll sync this change when connection is restored.",
         });
         return;
       }
 
+      dispatchCalendarTaskUpdated(variables.taskId);
+
       if (data?.attachmentsSkippedDueToSchema) {
         toast({
           title: "Attachments unavailable",
-          description: "Quest saved, but attachments could not be stored. Please try again after the backend migration finishes.",
+          description: "Action saved, but attachments could not be stored. Please try again after the backend migration finishes.",
         });
       }
 
@@ -2650,21 +2533,21 @@ export const useTaskMutations = (taskDate: string) => {
       if (data?.normalizedToInbox) {
         toast({
           title: "Moved to Inbox",
-          description: "Regular quests without a time are kept in Inbox.",
+          description: "Actions without a time are kept in Inbox.",
         });
         return;
       }
 
       if (data?.movedFromInboxToScheduled) {
         toast({
-          title: "Moved to Quests",
-          description: "Added a time, so this quest is now scheduled in Quests.",
+          title: "Moved to plan",
+          description: "Added a time, so this action is now scheduled in your plan.",
         });
         return;
       }
 
       if (!isScheduledTimeOnlyUpdate) {
-        toast({ title: "Quest updated!" });
+        toast({ title: "Action updated" });
       }
     },
     onError: (error: Error, variables: TaskUpdateVariables) => {
@@ -2673,7 +2556,7 @@ export const useTaskMutations = (taskDate: string) => {
         void queueTaskAction("UPDATE_TASK", buildQueuedTaskUpdatePayload(variables.taskId, variables.updates));
 
         toast({
-          title: "Quest update queued",
+          title: "Action update queued",
           description: "We'll sync this change when connection is restored.",
         });
         return;
@@ -2681,7 +2564,7 @@ export const useTaskMutations = (taskDate: string) => {
 
       reportApiFailure(error, { source: "task_update_onError_nonqueueable" });
       toast({
-        title: "Failed to update quest",
+        title: "Failed to update action",
         description: getTaskMutationErrorMessage(error),
         variant: "destructive",
       });
@@ -2784,7 +2667,7 @@ export const useTaskMutations = (taskDate: string) => {
           queryClient.setQueryData(queryKey, data);
         });
       }
-      toast({ title: "Failed to reorder quests", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to reorder actions", description: error.message, variant: "destructive" });
     },
     onSettled: () => {
       // Sync with server after mutation settles
@@ -2857,24 +2740,25 @@ export const useTaskMutations = (taskDate: string) => {
       }
       return { ...normalizedScheduling, queued: false };
     }),
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
       if (data?.queued) {
         toast({
-          title: "Quest move queued",
+          title: "Action move queued",
           description: "We'll sync this move when connection is restored.",
         });
       }
+      if (!data?.queued) dispatchCalendarTaskUpdated(variables.taskId);
       if (data?.normalizedToInbox) {
         toast({
           title: "Moved to Inbox",
-          description: "Regular quests without a time are kept in Inbox.",
+          description: "Actions without a time are kept in Inbox.",
         });
       }
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to move quest", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to move action", description: error.message, variant: "destructive" });
     },
   });
 
@@ -2966,19 +2850,20 @@ export const useTaskMutations = (taskDate: string) => {
       if (context?.previousCalendar) {
         context.previousCalendar.forEach(([key, data]) => queryClient.setQueryData(key, data));
       }
-      toast({ title: "Failed to move quest", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to move action", description: error.message, variant: "destructive" });
     },
     onSuccess: (data) => {
       if (data?.queued) {
         toast({
-          title: "Quest move queued",
+          title: "Action move queued",
           description: "We'll sync this move when connection is restored.",
         });
       }
+      if (!data?.queued) dispatchCalendarTaskUpdated(data?.taskId);
       if (data?.normalizedToInbox) {
         toast({
           title: "Moved to Inbox",
-          description: "Regular quests without a time are kept in Inbox.",
+          description: "Actions without a time are kept in Inbox.",
         });
       }
     },

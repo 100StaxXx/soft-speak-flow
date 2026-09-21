@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PRODUCT } from "@/config/product";
 
 interface DestinyRevealProps {
   userName: string;
@@ -9,10 +10,10 @@ interface DestinyRevealProps {
 }
 
 const narrativeLines = [
-  "The stars have watched countless souls wander through the cosmos...",
-  "But few possess the spark to shape their own destiny.",
-  "You are different.",
-  "The universe has been waiting for you.",
+  "Growth rarely arrives all at once.",
+  "It is formed through prayer, attention, and small faithful choices.",
+  "Your days already contain places where grace can take root.",
+  `${PRODUCT.name} will help you notice them and take the next step.`,
 ];
 
 export const DestinyReveal = ({ userName, onComplete }: DestinyRevealProps) => {
@@ -115,9 +116,9 @@ export const DestinyReveal = ({ userName, onComplete }: DestinyRevealProps) => {
                   transition={{ delay: 0.9 }}
                   className="text-muted-foreground text-lg"
                 >
-                  Every legend begins with a choice.
+                  Every daily path begins with a choice.
                   <br />
-                  <span className="text-foreground/80">Choose your allegiance.</span>
+                  <span className="text-foreground/80">Choose how you most naturally grow.</span>
                 </motion.p>
               </motion.div>
             )}
@@ -137,7 +138,7 @@ export const DestinyReveal = ({ userName, onComplete }: DestinyRevealProps) => {
                 size="lg"
                 className="px-8 py-6 text-lg bg-primary hover:bg-primary/90"
               >
-                Choose My Faction
+                Choose My Path
               </Button>
             </motion.div>
           )}

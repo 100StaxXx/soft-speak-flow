@@ -6,9 +6,9 @@ const LINE_DISPLAY_MS = 3000;
 const NARRATIVE_LINE_COUNT = 5;
 const FINAL_LINE_HOLD_MS = 3200;
 const FINAL_BUTTON_DELAY_MS = 900;
-const FIRST_LINE_TEXT = "A bond has been forged across the cosmos...";
-const SECOND_LINE_TEXT = "Within the shell, your companion stirs and answers your presence.";
-const FINAL_LINE_TEXT = "...will shape both your destinies.";
+const FIRST_LINE_TEXT = "Your daily path is ready...";
+const SECOND_LINE_TEXT = "Your Guide helps you listen and choose a direction.";
+const FINAL_LINE_TEXT = "In the evening, your Guide helps you return to the same day with grace.";
 
 vi.mock("framer-motion", async () => {
   const React = await import("react");
@@ -72,31 +72,31 @@ describe("JourneyBegins", () => {
       }
 
       expect(screen.getByText(FINAL_LINE_TEXT)).toBeInTheDocument();
-      expect(screen.queryByText("Your Journey Awaits")).not.toBeInTheDocument();
+      expect(screen.queryByText("Your Daily Path Is Ready")).not.toBeInTheDocument();
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(FINAL_LINE_HOLD_MS - 1);
       });
 
-      expect(screen.queryByText("Your Journey Awaits")).not.toBeInTheDocument();
+      expect(screen.queryByText("Your Daily Path Is Ready")).not.toBeInTheDocument();
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1);
       });
 
-      expect(screen.getByText("Your Journey Awaits")).toBeInTheDocument();
+      expect(screen.getByText("Your Daily Path Is Ready")).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: "Nova" })).toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: "Nova & Kitsune" })).not.toBeInTheDocument();
       expect(
-        screen.getByText(/Kitsune is already part of your story now\. For a little while longer, they rest inside the shell and wait for the bond that will awaken their form\./i),
+        screen.getByText(/visual companion for the practices you complete/i),
       ).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /Begin My Journey/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /See Today/i })).not.toBeInTheDocument();
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(FINAL_BUTTON_DELAY_MS);
       });
 
-      expect(screen.getByRole("button", { name: /Begin My Journey/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /See Today/i })).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

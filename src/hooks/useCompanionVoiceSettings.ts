@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { safeLocalStorage } from "@/utils/storage";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
-export const COMPANION_VOICE_SETTINGS_STORAGE_KEY = "companion-chat-voice-settings-v2";
+export const COMPANION_VOICE_SETTINGS_STORAGE_KEY = productScopedStorageKey("companion-chat-voice-settings-v2");
 const SETTINGS_CHANGE_EVENT = "companion-chat-voice-settings-change";
 const DEFAULT_AUTOPLAY_VOICE = false;
 const DEFAULT_MUTE_SPOKEN_REPLIES = false;

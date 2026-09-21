@@ -28,8 +28,8 @@ serve(async (req) => {
 
     // Parse request body
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
-    const productId = typeof body.product_id === "string" ? body.product_id : "cosmiq_premium_yearly";
-    const offerId = typeof body.offer_id === "string" ? body.offer_id : "Cosmiq_PromoOffer_yearly";
+    const productId = typeof body.product_id === "string" ? body.product_id : "graceward_plus_yearly";
+    const offerId = typeof body.offer_id === "string" ? body.offer_id : "Graceward_PromoOffer_yearly";
 
     // Verify user has a valid offer code applied (via referred_by_code on profile)
     const { data: profile, error: profileError } = await supabase

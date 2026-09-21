@@ -8,6 +8,11 @@ import {
   isCostGuardrailBlockedError,
 } from "./costGuardrails.ts";
 import { isTierBoundaryLevel } from "../../../src/config/progression.ts";
+import {
+  coerceCompanionPresetId,
+  hasBundledYouthCompanionPresetAssets,
+} from "../../../src/config/companionCatalog.ts";
+import { isBundledCosmiqCanonicalCompanionAssetUrl } from "../../../src/config/cosmiqCanonicalCompanionAssets.ts";
 
 export interface CompanionAnimationEligibilityParams {
   stage: number;
@@ -27,7 +32,7 @@ const truthyEnvValue = (value: string | null | undefined): boolean => {
     normalized === "on";
 };
 
-const hasPublicHttpUrl = (
+export const hasPublicHttpUrl = (
   value: string | null | undefined,
 ): value is string => {
   if (!value) return false;
@@ -38,6 +43,35 @@ const hasPublicHttpUrl = (
     return false;
   }
 };
+
+const isBundledGracewardEggUrl = (
+  value: string | null | undefined,
+): value is string =>
+  typeof value === "string" &&
+  /^\/companion-eggs\/(?:v2\/)?egg__t0_egg__normal__[a-z0-9_-]+\.(?:png|webp)$/i
+    .test(value.trim());
+
+const isBundledCompanionYouthUrl = (
+  value: string | null | undefined,
+): value is string => {
+  if (typeof value !== "string") return false;
+
+  const match = value.trim().match(
+    /^\/companion-presets\/([a-z0-9_-]+)\/t1_youth\/normal\/([a-z0-9_-]+)__t1_youth__normal__[a-z0-9_-]+\.png$/i,
+  );
+  if (!match || match[1] !== match[2]) return false;
+
+  const presetId = coerceCompanionPresetId(match[1]);
+  return Boolean(presetId && hasBundledYouthCompanionPresetAssets(presetId));
+};
+
+export const isSupportedCompanionAnimationImageUrl = (
+  value: string | null | undefined,
+): value is string =>
+  hasPublicHttpUrl(value) ||
+  isBundledGracewardEggUrl(value) ||
+  isBundledCompanionYouthUrl(value) ||
+  isBundledCosmiqCanonicalCompanionAssetUrl(value);
 
 const normalizeComparableImageUrl = (
   value: string | null | undefined,
@@ -63,7 +97,9 @@ export const getCompanionAnimationIneligibility = ({
   generationMetadata,
   sourceImageUrl,
   previousImageUrl,
-}: CompanionAnimationEligibilityParams): CompanionAnimationIneligibility | null => {
+}: CompanionAnimationEligibilityParams):
+  | CompanionAnimationIneligibility
+  | null => {
   if (!isTierBoundaryLevel(stage)) {
     return {
       code: "stage_not_animatable",
@@ -81,7 +117,9 @@ export const getCompanionAnimationIneligibility = ({
   }
 
   const normalizedSourceImageUrl = normalizeComparableImageUrl(sourceImageUrl);
-  const normalizedPreviousImageUrl = normalizeComparableImageUrl(previousImageUrl);
+  const normalizedPreviousImageUrl = normalizeComparableImageUrl(
+    previousImageUrl,
+  );
   if (
     normalizedSourceImageUrl &&
     normalizedPreviousImageUrl &&
@@ -212,10 +250,22 @@ export const maybeEnqueueCompanionAnimationJob = async ({
     return await markSkipped("fal_key_missing", "FAL_KEY is not configured");
   }
 
-  if (!hasPublicHttpUrl(imageUrl)) {
+  if (!isSupportedCompanionAnimationImageUrl(imageUrl)) {
     return await markSkipped(
       "source_image_url_unavailable",
-      "Evolution image URL is not publicly accessible",
+      "Evolution ending image is not publicly accessible",
+    );
+  }
+
+  const animationStartImageUrl = previousImageUrl?.trim() || null;
+  if (!isSupportedCompanionAnimationImageUrl(animationStartImageUrl)) {
+    return await markSkipped(
+      stage === 1
+        ? "hatch_start_image_url_unavailable"
+        : "evolution_start_image_url_unavailable",
+      stage === 1
+        ? "Hatch animation requires an accessible egg starting image"
+        : "Evolution animation requires the prior approved portrait as its starting image",
     );
   }
 
@@ -281,14 +331,22 @@ export const maybeEnqueueCompanionAnimationJob = async ({
           evolution_id: evolutionId,
           stage,
           source_image_url: imageUrl,
+          start_image_url: animationStartImageUrl,
           provider: COMPANION_ANIMATION_PROVIDER,
           provider_model: providerModel,
+          provider_task_id: null,
+          provider_status: null,
           status: "queued",
           prompt,
+          video_url: null,
+          storage_path: null,
           error_code: null,
           error_message: null,
+          retry_count: 0,
           next_retry_at: nowIso,
           requested_at: nowIso,
+          started_at: null,
+          completed_at: null,
           updated_at: nowIso,
         },
         { onConflict: "evolution_id" },

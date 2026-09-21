@@ -6,21 +6,26 @@ import { Label } from "@/components/ui/label";
 import { CompanionImage } from "@/components/CompanionImage";
 import {
   COMPANION_ELEMENTS,
-  COMPANION_ONBOARDING_SILHOUETTE_SOURCES,
-  COMPANION_PRESETS,
   COMPANION_STORY_TONES,
   FAVORITE_COLORS,
   getCompanionEggLabel,
   type CompanionElementId,
   type CompanionStoryTone,
 } from "@/config/companionCatalog";
-import { isPilotCompanionElement } from "@/config/companionPilotAvailability";
+import { CHRISTIAN_COMPANION_FORMS } from "@/config/christianCompanionForms";
+import {
+  COMPANION_FUTURE_STATE_LABEL,
+  getDefaultGracewardCompanionElementId,
+  isPilotChristianCompanionForm,
+  isPilotChristianCompanionElement,
+} from "@/config/companionPilotAvailability";
 import { getUniversalEggAssetUrl } from "@/lib/companionAssetResolver";
 import {
   COMPANION_CUSTOM_NAME_MAX_LENGTH,
   normalizeCompanionCustomName,
 } from "@/lib/companionName";
 import { cn } from "@/lib/utils";
+import { PRODUCT } from "@/config/product";
 
 export interface AICompanionCreationData {
   favoriteColor: string;
@@ -53,9 +58,9 @@ const getKnownSpiritAnimalDisplayName = (value: string | null | undefined): stri
   const normalizedValue = value?.trim().toLowerCase();
   if (!normalizedValue) return null;
 
-  return COMPANION_PRESETS.find((preset) =>
-    preset.displayName.toLowerCase() === normalizedValue
-    || preset.id.toLowerCase() === normalizedValue
+  return CHRISTIAN_COMPANION_FORMS.find((form) =>
+    form.displayName.toLowerCase() === normalizedValue
+    || form.id.toLowerCase() === normalizedValue
   )?.displayName ?? null;
 };
 
@@ -67,25 +72,28 @@ export const AICompanionCreator = ({
   allowToneSelection = false,
   initialFavoriteColor = null,
   initialSpiritAnimal = null,
-  initialElement = "fire",
+  initialElement = "light",
   initialCompanionName = null,
   onBack,
-  title = "Shape Your Companion Lineage",
-  description = "Choose the color, element, and species that will define your egg's hidden destiny.",
-  submitLabel = "Create AI Egg",
+  title = "Shape Your Companion",
+  description = "Choose the creature, colors, and character that will grow alongside your daily formation.",
+  submitLabel = "Create My Companion",
 }: AICompanionCreatorProps) => {
   const isCompact = layout === "compact";
+  const initialSpiritAnimalDisplayName = getKnownSpiritAnimalDisplayName(initialSpiritAnimal);
   const [favoriteColor, setFavoriteColor] = useState<string>(
     isKnownFavoriteColor(initialFavoriteColor) ? initialFavoriteColor : FAVORITE_COLORS[0].value,
   );
   const [spiritAnimal, setSpiritAnimal] = useState<string>(
-    getKnownSpiritAnimalDisplayName(initialSpiritAnimal) ?? COMPANION_PRESETS[0].displayName,
+    initialSpiritAnimalDisplayName
+      ?? CHRISTIAN_COMPANION_FORMS.find((form) => isPilotChristianCompanionForm(form.id))?.displayName
+      ?? "Lion",
   );
   const [selectedStoryTone, setSelectedStoryTone] = useState<CompanionStoryTone>(storyTone);
   const [customCompanionName, setCustomCompanionName] = useState(initialCompanionName ?? "");
   const [coreElement, setCoreElement] = useState<CompanionElementId>(() => {
-    const candidate = initialElement ?? "fire";
-    return isPilotCompanionElement(candidate) ? candidate : "fire";
+    const candidate = initialElement ?? getDefaultGracewardCompanionElementId();
+    return candidate;
   });
 
   const normalizedCustomName = normalizeCompanionCustomName(customCompanionName);
@@ -99,7 +107,11 @@ export const AICompanionCreator = ({
   );
 
   return (
-    <div className={cn("relative z-10", isCompact ? "w-full" : "min-h-screen px-4 pt-safe-top pb-safe-bottom")}>
+    <div className={cn(
+      "relative z-10",
+      PRODUCT.mode === "christian" && "graceward-companion-creator",
+      isCompact ? "w-full" : "min-h-screen px-4 pt-safe-top pb-safe-bottom",
+    )}>
       <div
         className={cn(
           "mx-auto w-full rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,16,28,0.95),rgba(11,10,20,0.96))] shadow-[0_24px_60px_rgba(0,0,0,0.34)] backdrop-blur-xl",
@@ -109,12 +121,12 @@ export const AICompanionCreator = ({
         <div className="space-y-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-3">
-              <span className="inline-flex rounded-full border border-white/12 bg-white/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
-                AI Companion
+              <span className="inline-flex rounded-full border border-white/[0.12] bg-white/[0.08] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
+                {PRODUCT.mode === "christian" ? "Living Companion" : "AI Companion"}
               </span>
               <div className="space-y-2">
                 <h1 className="text-3xl font-semibold text-white sm:text-4xl">{title}</h1>
-                <p className="max-w-3xl text-sm leading-6 text-white/72 sm:text-base">{description}</p>
+                <p className="max-w-3xl text-sm leading-6 text-white/[0.72] sm:text-base">{description}</p>
               </div>
             </div>
 
@@ -124,7 +136,7 @@ export const AICompanionCreator = ({
                 variant="ghost"
                 onClick={onBack}
                 disabled={isLoading}
-                className="self-start rounded-full border border-white/12 bg-white/6 px-5 text-white/86 hover:bg-white/10"
+                className="self-start rounded-full border border-white/[0.12] bg-white/6 px-5 text-white/[0.86] hover:bg-white/10"
               >
                 Back
               </Button>
@@ -170,10 +182,10 @@ export const AICompanionCreator = ({
               <section className="space-y-3">
                 <div className="space-y-1">
                   <Label id="egg-element-picker-label" className="text-lg font-semibold text-white">
-                    Egg Element
+                    Visual Nature
                   </Label>
                   <p className="text-sm text-white/60">
-                    Pick the egg whose elemental energy your companion will hatch with.
+                    Choose a symbolic atmosphere. Your companion still grows naturally; light and nature appear around meaningful moments.
                   </p>
                 </div>
                 <div
@@ -183,7 +195,8 @@ export const AICompanionCreator = ({
                 >
                   <div className="grid grid-cols-2 gap-3">
                     {COMPANION_ELEMENTS.map((element) => {
-                      const isSupported = isPilotCompanionElement(element.id);
+                      const isSupported = isPilotChristianCompanionElement(element.id)
+                        || element.id === initialElement;
                       const isSelected = isSupported && element.id === coreElement;
                       const eggLabel = getCompanionEggLabel(element.id);
 
@@ -203,10 +216,10 @@ export const AICompanionCreator = ({
                           className={cn(
                             "group flex flex-col overflow-hidden rounded-2xl border text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed",
                             isSelected
-                              ? "border-primary/60 bg-primary/12 shadow-[0_18px_36px_rgba(168,85,247,0.18)]"
+                              ? "border-primary/60 bg-primary/[0.12] shadow-[0_18px_36px_rgba(168,85,247,0.18)]"
                               : isSupported
                                 ? "border-white/10 bg-black/25 hover:border-white/25 hover:bg-black/35"
-                                : "border-white/8 bg-black/20 opacity-65 saturate-50",
+                                : "border-white/[0.08] bg-black/20 opacity-65 saturate-50",
                           )}
                         >
                           <div className="relative flex h-28 w-full items-center justify-center bg-gradient-to-br from-slate-950/70 via-slate-900/60 to-slate-950/85">
@@ -219,7 +232,14 @@ export const AICompanionCreator = ({
                             />
                           </div>
                           <div className="px-3 py-2">
-                            <span className="text-sm font-semibold text-white">{eggLabel}</span>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-semibold text-white">{eggLabel}</span>
+                              {!isSupported ? (
+                                <span className="rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/55">
+                                  {COMPANION_FUTURE_STATE_LABEL}
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
                         </button>
                       );
@@ -234,7 +254,7 @@ export const AICompanionCreator = ({
                     Species
                   </Label>
                   <p className="text-sm text-white/60">
-                    Choose the creature family your egg will grow toward.
+                    Choose the symbolic creature that will grow with your daily practice.
                   </p>
                 </div>
                 <div
@@ -242,56 +262,61 @@ export const AICompanionCreator = ({
                   aria-labelledby="species-picker-label"
                   className="space-y-3"
                 >
-                  {COMPANION_PRESETS.map((preset) => {
-                    const isSelected = preset.displayName === spiritAnimal;
-                    const silhouetteSrc = COMPANION_ONBOARDING_SILHOUETTE_SOURCES[preset.id];
+                  {CHRISTIAN_COMPANION_FORMS.map((form) => {
+                    const isSupported = isPilotChristianCompanionForm(form.id)
+                      || form.displayName === initialSpiritAnimalDisplayName;
+                    const isSelected = isSupported && form.displayName === spiritAnimal;
 
                     return (
                       <button
-                        key={preset.id}
+                        key={form.id}
                         type="button"
-                        onClick={() => setSpiritAnimal(preset.displayName)}
-                        aria-label={`Select ${preset.displayName} species`}
+                        onClick={() => {
+                          if (!isSupported) return;
+                          setSpiritAnimal(form.displayName);
+                        }}
+                        disabled={!isSupported}
+                        aria-label={`Select ${form.displayName} companion`}
                         aria-pressed={isSelected}
+                        aria-disabled={!isSupported}
                         className={cn(
                           "w-full overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
                           isSelected
-                            ? "border-emerald-300/55 bg-[#20313a]/88 text-white shadow-[0_20px_44px_rgba(52,211,153,0.14)]"
-                            : "border-white/10 bg-[#171421]/82 text-white/86 hover:border-white/20 hover:bg-[#1d1929]/88",
+                            ? "border-emerald-300/55 bg-[#20313a]/[0.88] text-white shadow-[0_20px_44px_rgba(52,211,153,0.14)]"
+                            : isSupported
+                              ? "border-white/10 bg-[#171421]/[0.82] text-white/[0.86] hover:border-white/20 hover:bg-[#1d1929]/[0.88]"
+                              : "cursor-not-allowed border-white/[0.07] bg-[#171421]/[0.58] text-white/55 opacity-60 saturate-50",
                         )}
                         data-selected={isSelected ? "true" : "false"}
                       >
-                        <div className="grid grid-cols-[minmax(0,1fr)_48px] items-center gap-x-3 gap-y-1.5 sm:grid-cols-[minmax(0,1fr)_56px]">
+                        <div className="grid grid-cols-[minmax(0,1fr)_64px] items-center gap-x-3 gap-y-1.5 sm:grid-cols-[minmax(0,1fr)_72px]">
                           <div className="min-w-0 self-start">
-                            <div className="text-base font-semibold leading-tight text-white">
-                              {preset.displayName}
+                            <div className="flex flex-wrap items-center gap-2 text-base font-semibold leading-tight text-white">
+                              <span>{form.displayName}</span>
+                              {!isSupported ? (
+                                <span className="rounded-full border border-white/10 bg-black/25 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/55">
+                                  {COMPANION_FUTURE_STATE_LABEL}
+                                </span>
+                              ) : null}
                             </div>
-                            <p className="mt-1 break-words text-[10px] uppercase leading-4 tracking-[0.18em] text-white/48">
-                              {preset.role}
+                            <p className="mt-1 break-words text-[10px] uppercase leading-4 tracking-[0.18em] text-white/[0.48]">
+                              {form.role}
                             </p>
                           </div>
 
-                          <div className="row-span-2 flex h-12 w-12 items-center justify-center justify-self-end self-center sm:h-14 sm:w-14">
-                            {silhouetteSrc ? (
-                              <img
-                                src={silhouetteSrc}
-                                alt=""
-                                aria-hidden="true"
-                                data-testid={`species-silhouette-${preset.id}`}
-                                data-silhouette-variant="compact-black"
-                                className="h-full w-full object-contain opacity-95"
-                                loading="lazy"
-                                style={{ filter: "brightness(0) drop-shadow(0 0 10px rgba(132, 99, 255, 0.34))" }}
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center text-2xl font-semibold text-black/80">
-                                {preset.displayName.slice(0, 2)}
-                              </div>
-                            )}
+                          <div className="row-span-2 h-16 w-16 overflow-hidden rounded-2xl border border-white/15 justify-self-end self-center sm:h-[72px] sm:w-[72px]">
+                            <img
+                              src={form.image}
+                              alt=""
+                              aria-hidden="true"
+                              data-testid={`companion-form-${form.id}`}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
                           </div>
 
-                          <p className="line-clamp-2 text-xs leading-[18px] text-white/72">
-                            {preset.revealCopy}
+                          <p className="line-clamp-2 text-xs leading-[18px] text-white/[0.72]">
+                            {form.meaning}
                           </p>
                         </div>
                       </button>
@@ -304,11 +329,11 @@ export const AICompanionCreator = ({
             <div className="space-y-5">
               <div className="rounded-[28px] border border-white/10 bg-black/20 p-5">
                 <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-[0.22em] text-white/48">
-                    {allowToneSelection ? "Story Tone" : "Locked Story Tone"}
+                  <p className="text-xs uppercase tracking-[0.22em] text-white/[0.48]">
+                    {allowToneSelection ? "Personality" : "Chosen Personality"}
                   </p>
                   <h2 className="text-2xl font-semibold text-white">{selectedTone.label}</h2>
-                  <p className="text-sm leading-6 text-white/72">{selectedTone.summary}</p>
+                  <p className="text-sm leading-6 text-white/[0.72]">{selectedTone.summary}</p>
                 </div>
                 {allowToneSelection ? (
                   <div className="mt-4 grid gap-3">
@@ -323,11 +348,11 @@ export const AICompanionCreator = ({
                             "rounded-2xl border px-4 py-3 text-left transition-all duration-200",
                             isSelected
                               ? "border-primary/60 bg-primary/15 text-white"
-                              : "border-white/10 bg-white/5 text-white/82 hover:border-white/20 hover:bg-white/8",
+                              : "border-white/10 bg-white/5 text-white/[0.82] hover:border-white/20 hover:bg-white/[0.08]",
                           )}
                         >
                           <div className="text-sm font-semibold">{tone.label}</div>
-                          <p className="mt-1 text-xs leading-5 text-white/58">{tone.summary}</p>
+                          <p className="mt-1 text-xs leading-5 text-white/[0.58]">{tone.summary}</p>
                         </button>
                       );
                     })}
@@ -342,7 +367,7 @@ export const AICompanionCreator = ({
                       Companion Name
                     </Label>
                     <p className="text-sm text-white/60">
-                      Optional. If you do not choose a companion name, one will be granted to your companion.
+                      Optional. If you leave this blank, {PRODUCT.name} will suggest a name.
                     </p>
                   </div>
                   <Input
@@ -357,7 +382,7 @@ export const AICompanionCreator = ({
                     <span>
                       {normalizedCustomName
                         ? `${normalizedCustomName} will be shown from the beginning.`
-                        : "Leave blank for a granted companion name."}
+                        : "Leave blank for a suggested companion name."}
                     </span>
                     <span>{customCompanionName.length}/{COMPANION_CUSTOM_NAME_MAX_LENGTH}</span>
                   </div>
@@ -379,7 +404,7 @@ export const AICompanionCreator = ({
                   })}
                 >
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {isLoading ? "Forging Egg..." : submitLabel}
+                  {isLoading ? "Preparing Companion..." : submitLabel}
                 </Button>
               </div>
             </div>

@@ -169,7 +169,7 @@ vi.mock("@/utils/validateCompanionImage", () => ({
   generateWithValidation: mocks.generateWithValidationMock,
 }));
 
-import { useCompanion } from "./useCompanion";
+import { kickQueuedEvolutionJob, useCompanion } from "./useCompanion";
 
 const createRelayInvokeError = () => ({
   name: "FunctionsRelayError",
@@ -395,9 +395,61 @@ describe("useCompanion evolveCompanion", () => {
 
     expect(mocks.loggerWarnMock).toHaveBeenCalledWith(
       "Queued companion evolution processor kick failed",
-      expect.objectContaining({ jobId: "evolution-job-1" }),
+      expect.objectContaining({
+        jobId: "evolution-job-1",
+        attempt: 1,
+        willRetry: true,
+      }),
     );
+    await waitFor(() => {
+      expect(mocks.invokeMock).toHaveBeenCalledTimes(2);
+    });
     expect(mocks.toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("bounds processor retries and reports when none can start the queued hatch", async () => {
+    mocks.invokeMock.mockResolvedValue({
+      data: null,
+      error: createRelayInvokeError(),
+    });
+
+    await expect(kickQueuedEvolutionJob("evolution-job-1", [0, 0, 0])).resolves.toBe(false);
+
+    expect(mocks.invokeMock).toHaveBeenCalledTimes(3);
+    expect(mocks.loggerWarnMock).toHaveBeenLastCalledWith(
+      "Queued companion evolution processor kick failed",
+      expect.objectContaining({
+        jobId: "evolution-job-1",
+        attempt: 3,
+        willRetry: false,
+      }),
+    );
+  });
+
+  it("restores the Hatch action when every processor start attempt fails", async () => {
+    mocks.invokeMock.mockResolvedValue({
+      data: null,
+      error: createRelayInvokeError(),
+    });
+
+    const { result } = await renderUseCompanion();
+
+    await act(async () => {
+      await result.current.evolveCompanion.mutateAsync({
+        newStage: 1,
+        currentXP: 14,
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.toastErrorMock).toHaveBeenCalledWith(
+        "Your hatch is queued but couldn't start. Tap Hatch to try again.",
+        expect.objectContaining({ duration: MAX_TOAST_DURATION_MS }),
+      );
+    }, { timeout: 2_500 });
+
+    expect(mocks.invokeMock).toHaveBeenCalledTimes(3);
+    expect(mocks.setIsEvolvingLoadingMock).toHaveBeenLastCalledWith(false);
   });
 
   it("surfaces a clean error when queueing is unavailable", async () => {
@@ -1294,11 +1346,8 @@ describe("useCompanion evolveCompanion", () => {
     });
   });
 
-  it("creates an AI-generated egg companion without a preset", async () => {
-    mocks.invokeMock.mockResolvedValueOnce({
-      data: aiEggGenerationFixture,
-      error: null,
-    });
+  it("creates a Graceward egg from the bundled premade asset without runtime image generation", async () => {
+    const bundledIceEggUrl = "/companion-eggs/v2/egg__t0_egg__normal__ice.webp";
     mocks.rpcMock.mockResolvedValueOnce({
       data: [
         {
@@ -1306,8 +1355,8 @@ describe("useCompanion evolveCompanion", () => {
           preset_id: null,
           spirit_animal: "Wolf",
           core_element: "ice",
-          current_image_url: aiEggGenerationFixture.imageUrl,
-          initial_image_url: aiEggGenerationFixture.imageUrl,
+          current_image_url: bundledIceEggUrl,
+          initial_image_url: bundledIceEggUrl,
           is_new: false,
         },
       ],
@@ -1326,49 +1375,30 @@ describe("useCompanion evolveCompanion", () => {
       });
     });
 
-    expect(mocks.invokeMock).toHaveBeenCalledWith("generate-companion-image", {
-      body: expect.objectContaining({
-        spiritAnimal: "Wolf",
-        element: "ice",
-        stage: 0,
-        favoriteColor: "#000000",
-        storyTone: "epic_adventure",
-        flowType: "ai_onboarding_egg",
-        idempotencyKey: expect.any(String),
-      }),
-    });
+    expect(mocks.invokeMock).not.toHaveBeenCalledWith(
+      "generate-companion-image",
+      expect.anything(),
+    );
     expect(mocks.rpcMock).toHaveBeenCalledWith(
       "create_companion_if_not_exists",
       expect.objectContaining({
         p_preset_id: null,
         p_spirit_animal: "Wolf",
         p_core_element: "ice",
-        p_current_image_url: aiEggGenerationFixture.imageUrl,
-        p_current_image_focal_x: aiEggGenerationFixture.imageFocalX,
-        p_current_image_focal_y: aiEggGenerationFixture.imageFocalY,
-        p_initial_image_url: aiEggGenerationFixture.imageUrl,
-        p_initial_image_focal_x: aiEggGenerationFixture.imageFocalX,
-        p_initial_image_focal_y: aiEggGenerationFixture.imageFocalY,
-        p_visual_identity_profile: aiEggGenerationFixture.visualIdentityProfile,
-        p_image_lineage_metadata: aiEggGenerationFixture.imageLineageMetadata,
+        p_current_image_url: bundledIceEggUrl,
+        p_current_image_focal_x: 0.5,
+        p_current_image_focal_y: 0.5,
+        p_initial_image_url: bundledIceEggUrl,
+        p_initial_image_focal_x: 0.5,
+        p_initial_image_focal_y: 0.5,
+        p_visual_identity_profile: null,
+        p_image_lineage_metadata: null,
       }),
     );
   });
 
-  it("can defer AI egg image generation so onboarding creates the companion immediately", async () => {
+  it("ignores the legacy deferred-generation flag because Graceward eggs are premade", async () => {
     const bundledIceEggUrl = "/companion-eggs/v2/egg__t0_egg__normal__ice.webp";
-    let resolveGeneratedImage: ((value: { data: unknown; error: unknown }) => void) | null = null;
-    const generatedImagePromise = new Promise<{ data: unknown; error: unknown }>((resolve) => {
-      resolveGeneratedImage = resolve;
-    });
-
-    mocks.invokeMock.mockImplementation((functionName: string) => {
-      if (functionName === "generate-companion-image") {
-        return generatedImagePromise;
-      }
-
-      return Promise.resolve({ data: null, error: null });
-    });
     mocks.rpcMock.mockImplementation((functionName: string) => {
       if (functionName === "create_companion_if_not_exists") {
         return Promise.resolve({
@@ -1387,10 +1417,6 @@ describe("useCompanion evolveCompanion", () => {
           ],
           error: null,
         });
-      }
-
-      if (functionName === "apply_deferred_companion_onboarding_image") {
-        return Promise.resolve({ data: null, error: null });
       }
 
       return Promise.resolve({ data: null, error: null });
@@ -1424,38 +1450,20 @@ describe("useCompanion evolveCompanion", () => {
         p_image_lineage_metadata: null,
       }),
     );
-    expect(mocks.invokeMock).toHaveBeenCalledWith("generate-companion-image", {
-      body: expect.objectContaining({
-        spiritAnimal: "Wolf",
-        element: "ice",
-        flowType: "ai_onboarding_egg",
-        idempotencyKey: expect.any(String),
-      }),
-    });
+    expect(mocks.invokeMock).not.toHaveBeenCalledWith(
+      "generate-companion-image",
+      expect.anything(),
+    );
     expect(
       mocks.rpcMock.mock.calls.some(([functionName]) =>
         functionName === "apply_deferred_companion_onboarding_image"
       ),
     ).toBe(false);
 
-    await act(async () => {
-      resolveGeneratedImage?.({ data: aiEggGenerationFixture, error: null });
-      await generatedImagePromise;
-    });
-
-    await waitFor(() => {
-      expect(mocks.rpcMock).toHaveBeenCalledWith(
-        "apply_deferred_companion_onboarding_image",
-        expect.objectContaining({
-          p_companion_id: "companion-1",
-          p_image_url: aiEggGenerationFixture.imageUrl,
-          p_image_focal_x: aiEggGenerationFixture.imageFocalX,
-          p_image_focal_y: aiEggGenerationFixture.imageFocalY,
-          p_visual_identity_profile: aiEggGenerationFixture.visualIdentityProfile,
-          p_image_lineage_metadata: aiEggGenerationFixture.imageLineageMetadata,
-        }),
-      );
-    });
+    expect(mocks.rpcMock).not.toHaveBeenCalledWith(
+      "apply_deferred_companion_onboarding_image",
+      expect.anything(),
+    );
   });
 
   it("retries egg-first creation against the preset-aware legacy RPC signature when focal args are unavailable", async () => {
@@ -1512,8 +1520,8 @@ describe("useCompanion evolveCompanion", () => {
       expect.objectContaining({
         p_preset_id: null,
         p_spirit_animal: "Wolf",
-        p_visual_identity_profile: aiEggGenerationFixture.visualIdentityProfile,
-        p_image_lineage_metadata: aiEggGenerationFixture.imageLineageMetadata,
+        p_visual_identity_profile: null,
+        p_image_lineage_metadata: null,
       }),
     );
     expect(mocks.rpcMock).toHaveBeenNthCalledWith(

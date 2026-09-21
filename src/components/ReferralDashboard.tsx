@@ -7,6 +7,7 @@ import { toast } from "@/components/ui/sonner";
 import { Share as CapacitorShare } from "@capacitor/share";
 import { Capacitor } from "@capacitor/core";
 import { safeClipboardWrite } from "@/utils/clipboard";
+import { PRODUCT } from "@/config/product";
 
 export const ReferralDashboard = memo(() => {
   const { referralStats, availableSkins } = useReferrals();
@@ -16,14 +17,14 @@ export const ReferralDashboard = memo(() => {
     if (!referralStats?.referral_code) return;
     setIsSharing(true);
 
-    const shareText = `Join me on Cosmiq and use my code: ${referralStats.referral_code}`;
+    const shareText = `Join me on ${PRODUCT.name} and use my code: ${referralStats.referral_code}`;
 
     try {
       // Use native share on mobile
       if (Capacitor.isNativePlatform()) {
         try {
           await CapacitorShare.share({
-            title: "Join Cosmiq",
+            title: `Join ${PRODUCT.name}`,
             text: shareText,
             dialogTitle: "Share your referral code",
           });
@@ -46,7 +47,7 @@ export const ReferralDashboard = memo(() => {
         if (navigator.share) {
           try {
             await navigator.share({
-              title: "Join Cosmiq",
+              title: `Join ${PRODUCT.name}`,
               text: shareText,
             });
           } catch (error) {

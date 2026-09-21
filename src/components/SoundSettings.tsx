@@ -5,7 +5,11 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Volume2, VolumeX, Sparkles } from "lucide-react";
-import { soundManager } from "@/utils/soundEffects";
+import {
+  SOUND_MUTED_STORAGE_KEY,
+  SOUND_VOLUME_STORAGE_KEY,
+  soundManager,
+} from "@/utils/soundEffects";
 import { globalAudio } from "@/utils/globalAudio";
 
 export const SoundSettings = memo(() => {
@@ -14,8 +18,8 @@ export const SoundSettings = memo(() => {
   const [isGloballyMuted, setIsGloballyMuted] = useState(globalAudio.getMuted());
 
   useEffect(() => {
-    const savedVolume = safeLocalStorage.getItem('sound_volume');
-    const savedMuted = safeLocalStorage.getItem('sound_muted');
+    const savedVolume = safeLocalStorage.getItem(SOUND_VOLUME_STORAGE_KEY);
+    const savedMuted = safeLocalStorage.getItem(SOUND_MUTED_STORAGE_KEY);
     
     if (savedVolume) {
       const parsed = parseFloat(savedVolume);

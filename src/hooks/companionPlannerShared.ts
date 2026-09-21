@@ -19,6 +19,7 @@ import { formatCurrentDateTimeWithOffset } from "@/utils/currentDateTime";
 import { getOnboardingScheduleArchetypeProfile } from "@/shared/onboardingScheduleArchetype";
 import type { Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
+import { productScopedStorageKey } from "@/config/productRuntime";
 import type { EpicRecord } from "@/hooks/epicsQuery";
 import type {
   CompanionPlannerProposal,
@@ -36,7 +37,7 @@ import type {
   PlannerTonePack,
 } from "@/types/companionPlanner";
 
-export const COMPANION_PLANNER_STORAGE_KEY = "companion-planner-preferences-v1";
+export const COMPANION_PLANNER_STORAGE_KEY = productScopedStorageKey("companion-planner-preferences-v1");
 const MAX_CONTEXT_TASKS = 18;
 const EMPTY_CALENDAR_EVENTS: PlannerContextCalendarEvent[] = [];
 

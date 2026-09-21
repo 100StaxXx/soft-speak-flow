@@ -222,5 +222,6 @@ class AppBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(NativePlacesAutocompletePlugin())
         bridge?.registerPluginInstance(EvolutionShareVideoPlugin())
         bridge?.registerPluginInstance(AppleOfferCodeRedemptionPlugin())
+        bridge?.registerPluginInstance(AppleStoreKitPlugin())
     }
 }

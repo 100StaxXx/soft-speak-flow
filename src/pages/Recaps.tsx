@@ -1,11 +1,11 @@
-import { Calendar, ChevronLeft, Sparkles, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { BookHeart, Calendar, ChevronLeft, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageTransition } from "@/components/PageTransition";
-import { useWeeklyRecap, WeeklyRecap } from "@/hooks/useWeeklyRecap";
+import { useWeeklyRecap } from "@/hooks/useWeeklyRecap";
+import type { WeeklyRecap } from "@/hooks/useWeeklyRecap";
 import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
 import { formatDisplayLabel } from "@/lib/utils";
 
@@ -24,6 +24,7 @@ const RecapCard = ({ recap, onClick }: { recap: WeeklyRecap; onClick: () => void
   const startDate = parseISO(recap.week_start_date);
   const endDate = parseISO(recap.week_end_date);
   const dateRange = `${format(startDate, "MMM d")} - ${format(endDate, "MMM d, yyyy")}`;
+  const practices = recap.stats.quests + recap.stats.habits;
 
   return (
     <motion.button
@@ -45,7 +46,7 @@ const RecapCard = ({ recap, onClick }: { recap: WeeklyRecap; onClick: () => void
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-2 text-center">
+      <div className="grid grid-cols-3 gap-2 text-center">
         <div>
           <p className="text-lg font-bold text-blue-400">{recap.stats.checkIns}</p>
           <p className="text-[10px] text-muted-foreground">Check-ins</p>
@@ -55,12 +56,8 @@ const RecapCard = ({ recap, onClick }: { recap: WeeklyRecap; onClick: () => void
           <p className="text-[10px] text-muted-foreground">Reflections</p>
         </div>
         <div>
-          <p className="text-lg font-bold text-green-400">{recap.stats.quests}</p>
-          <p className="text-[10px] text-muted-foreground">Quests</p>
-        </div>
-        <div>
-          <p className="text-lg font-bold text-amber-400">{recap.stats.habits}</p>
-          <p className="text-[10px] text-muted-foreground">Habits</p>
+          <p className="text-lg font-bold text-green-400">{practices}</p>
+          <p className="text-[10px] text-muted-foreground">Practices</p>
         </div>
       </div>
 
@@ -81,9 +78,7 @@ const Recaps = () => {
 
   return (
     <PageTransition>
-      <StarfieldBackground />
-      
-      <div className="min-h-screen pb-nav-safe pt-safe relative z-10">
+      <div className="daily-way-page min-h-screen pb-nav-safe pt-safe relative z-10">
         {/* Header */}
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 safe-area-top">
           <div className="max-w-4xl mx-auto px-4 py-4">
@@ -93,8 +88,8 @@ const Recaps = () => {
               </Button>
               <div>
                 <h1 className="text-xl font-bold flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-amber-400" />
-                  Weekly Recaps
+                  <BookHeart className="h-5 w-5 text-primary" />
+                  Weekly reviews
                 </h1>
                 <p className="text-sm text-muted-foreground">Your reflection history</p>
               </div>
@@ -116,9 +111,9 @@ const Recaps = () => {
               <div>
                 <h3 className="font-semibold text-foreground">No recaps yet</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Complete check-ins and reflections to build your recap history.
+                  Complete check-ins and reflections to build your review history.
                   <br />
-                  Your first recap will appear next Sunday!
+                  Your first review will appear next Sunday.
                 </p>
               </div>
             </div>

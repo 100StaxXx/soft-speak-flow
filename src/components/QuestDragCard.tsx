@@ -127,7 +127,7 @@ export const QuestDragCard = React.memo(({
   const category = isValidCategory(task.category) ? task.category : undefined;
   const categoryInfo = category ? categoryConfig[category] : null;
   const isCampaignRitual = isCampaignRitualTask(task);
-  const campaignTitle = task.epic_title?.trim() || "Campaign";
+  const campaignTitle = task.epic_title?.trim() || "Commitment";
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
@@ -214,7 +214,7 @@ export const QuestDragCard = React.memo(({
             {isCampaignRitual && !compact && (
               <div className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                 <Repeat className="h-3 w-3 flex-shrink-0" />
-                <span className="truncate">Campaign Ritual - {campaignTitle}</span>
+                <span className="truncate">Commitment rhythm — {campaignTitle}</span>
               </div>
             )}
 

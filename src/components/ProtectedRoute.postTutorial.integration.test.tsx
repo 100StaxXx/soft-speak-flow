@@ -31,6 +31,10 @@ const accessState = vi.hoisted(() => ({
   isLoading: false,
 }));
 
+const productState = vi.hoisted(() => ({
+  requiresSubscription: true,
+}));
+
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => authState,
 }));
@@ -47,6 +51,10 @@ vi.mock("@/components/Paywall", () => ({
   Paywall: ({ variant }: { variant?: "pre_trial_signup" | "trial_expired" }) => (
     <div>{`Paywall:${variant ?? "pre_trial_signup"}`}</div>
   ),
+}));
+
+vi.mock("@/config/product", () => ({
+  PRODUCT: productState,
 }));
 
 import { ProtectedRoute } from "./ProtectedRoute";
@@ -80,6 +88,7 @@ describe("ProtectedRoute post-tutorial gating", () => {
       subscribed: false,
     };
     accessState.isLoading = false;
+    productState.requiresSubscription = true;
 
     profileState.loading = false;
     profileState.profile = {
@@ -141,6 +150,20 @@ describe("ProtectedRoute post-tutorial gating", () => {
     expect(screen.queryByText("Paywall:pre_trial_signup")).not.toBeInTheDocument();
   });
 
+  it("does not let tutorial dismissal bypass the trial choice", () => {
+    profileState.profile = {
+      ...profileState.profile,
+      onboarding_data: {
+        guided_tutorial: { completed: false, dismissed: true },
+      },
+    };
+
+    renderRoute();
+
+    expect(screen.getByText("Paywall:pre_trial_signup")).toBeInTheDocument();
+    expect(screen.queryByText("Tutorial Complete Screen")).not.toBeInTheDocument();
+  });
+
   it("still renders trial-expired gate when tutorial is not complete and trial is expired", () => {
     profileState.profile = {
       ...profileState.profile,
@@ -200,6 +223,24 @@ describe("ProtectedRoute post-tutorial gating", () => {
     await waitFor(() => {
       expect(screen.getByText("Tutorial Complete Screen")).toBeInTheDocument();
     });
+    expect(screen.queryByText("Paywall:pre_trial_signup")).not.toBeInTheDocument();
+  });
+
+  it("does not show the post-tutorial paywall while Graceward is free", () => {
+    productState.requiresSubscription = false;
+    profileState.profile = {
+      ...profileState.profile,
+      onboarding_data: {
+        guided_tutorial: {
+          completed: true,
+          milestonesCompleted: ["mentor_closeout_message"],
+        },
+      },
+    };
+
+    renderRoute();
+
+    expect(screen.getByText("Tutorial Complete Screen")).toBeInTheDocument();
     expect(screen.queryByText("Paywall:pre_trial_signup")).not.toBeInTheDocument();
   });
 });

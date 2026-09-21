@@ -134,7 +134,7 @@ export const CompanionPostcards = ({ layoutMode = "mobile" }: CompanionPostcards
       <div className={cn("flex items-center justify-between gap-3", isDesktop && "flex-wrap")}>
         <div className="flex items-center gap-2">
           <MapPin className="w-5 h-5 text-primary" />
-          <h3 className="font-semibold text-foreground">Cosmic Postcards</h3>
+          <h3 className="font-semibold text-foreground">Growth Chapters</h3>
           <button
             onClick={openTutorial}
             className="p-1 rounded-full hover:bg-muted/50 transition-colors"
@@ -186,7 +186,7 @@ export const CompanionPostcards = ({ layoutMode = "mobile" }: CompanionPostcards
             Your Story Awaits
           </h4>
           <p className="text-muted-foreground text-sm max-w-xs mx-auto mb-6">
-            As you complete Quests and progress through Campaigns, your companion's journey unfolds through cosmic postcards, each one a chapter in your adventure.
+            As you complete daily actions and move through longer journeys, your companion’s story unfolds one chapter at a time.
           </p>
 
           <div className="bg-card/50 rounded-xl p-4 border border-border/50 text-left max-w-xs mx-auto">
@@ -197,15 +197,15 @@ export const CompanionPostcards = ({ layoutMode = "mobile" }: CompanionPostcards
             <ul className="text-xs text-muted-foreground space-y-1.5">
               <li className="flex items-start gap-2">
                 <ChevronRight className="w-3 h-3 mt-0.5 text-primary" />
-                <span>Open Quests and start a Campaign (or choose a Star Path).</span>
+                <span>Follow Today’s prepared practice or begin a longer journey.</span>
               </li>
               <li className="flex items-start gap-2">
                 <ChevronRight className="w-3 h-3 mt-0.5 text-primary" />
-                <span>Complete quests and rituals to progress your campaign.</span>
+                <span>Complete faithful actions and scheduled plans.</span>
               </li>
               <li className="flex items-start gap-2">
                 <ChevronRight className="w-3 h-3 mt-0.5 text-primary" />
-                <span>Reach campaign milestones to unlock story chapters.</span>
+                <span>Reach journey milestones to unlock new chapters.</span>
               </li>
             </ul>
           </div>

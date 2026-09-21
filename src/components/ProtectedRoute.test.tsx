@@ -14,6 +14,10 @@ const accessState = vi.hoisted(() => ({
   loading: false,
 }));
 
+const productState = vi.hoisted(() => ({
+  requiresSubscription: true,
+}));
+
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => authState,
 }));
@@ -26,6 +30,10 @@ vi.mock("@/components/Paywall", () => ({
   Paywall: ({ variant }: { variant?: "pre_trial_signup" | "trial_expired" }) => (
     <div>{`Paywall:${variant ?? "pre_trial_signup"}`}</div>
   ),
+}));
+
+vi.mock("@/config/product", () => ({
+  PRODUCT: productState,
 }));
 
 import { ProtectedRoute, PROTECTED_ROUTE_AUTH_STALL_MS } from "./ProtectedRoute";
@@ -57,6 +65,7 @@ describe("ProtectedRoute", () => {
     accessState.hasAccess = true;
     accessState.gateReason = "none";
     accessState.loading = false;
+    productState.requiresSubscription = true;
   });
 
   it("renders protected content while auth is recovering with a cached user", () => {
@@ -238,6 +247,20 @@ describe("ProtectedRoute", () => {
     renderProtectedRoute();
 
     expect(screen.getByText("Paywall:trial_expired")).toBeInTheDocument();
+  });
+
+  it("keeps Graceward open when subscriptions are temporarily disabled", () => {
+    authState.status = "authenticated";
+    authState.loading = false;
+    authState.user = { id: "user-free" };
+    accessState.hasAccess = false;
+    accessState.gateReason = "pre_trial_signup";
+    productState.requiresSubscription = false;
+
+    renderProtectedRoute();
+
+    expect(screen.getByText("Protected Content")).toBeInTheDocument();
+    expect(screen.queryByText("Paywall:pre_trial_signup")).not.toBeInTheDocument();
   });
 
   it("renders protected content without waiting on subscription checks when access is not required", () => {

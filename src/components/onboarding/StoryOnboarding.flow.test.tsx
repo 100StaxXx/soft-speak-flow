@@ -150,6 +150,14 @@ vi.mock("@/hooks/useCompanion", () => ({
   }),
 }));
 
+vi.mock("@/services/productMentorCatalog", () => ({
+  fetchActiveProductMentors: async () => {
+    const result = await mocks.mentorsEq();
+    if (result?.error) throw result.error;
+    return result?.data ?? [];
+  },
+}));
+
 vi.mock("@/utils/mentorExplanation", () => ({
   generateMentorExplanation: () => ({
     title: "Your Guide is: The Sage",
@@ -184,7 +192,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     rpc: mocks.prepareCompanionOnboardingJourney,
     from: (table: string) => {
-      if (table === "mentors") {
+      if (table === "mentors" || table === "graceward_guides") {
         return {
           select: () => ({
             eq: mocks.mentorsEq,
@@ -478,8 +486,6 @@ const renderOnboarding = (
 
 const advanceToQuestionnaire = async () => {
   fireEvent.click(screen.getByRole("button", { name: "prologue-next" }));
-  fireEvent.click(await screen.findByRole("button", { name: "destiny-next" }));
-  fireEvent.click(await screen.findByRole("button", { name: "faction-next" }));
   await screen.findByRole("button", { name: "questionnaire-submit" });
 };
 
@@ -778,7 +784,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
 
       await screen.findByTestId("journey-begins-stage");
 
-      expect(screen.getByTestId("journey-begins-summary")).toHaveTextContent("Nova:Ice Egg");
+      expect(screen.getByTestId("journey-begins-summary")).toHaveTextContent("Nova:Clear Water Egg");
       expect(screen.getByTestId("journey-begins-summary")).not.toHaveTextContent("Ignisyl");
       expect(
         mocks.userCompanionUpdate.mock.calls.every(([payload]) => !("cached_creature_name" in (payload as Record<string, unknown>))),
@@ -1024,7 +1030,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
       });
       await waitFor(() => {
         expect(mocks.toastSuccess).toHaveBeenCalledWith(
-          "Welcome to Cosmiq! Your journey begins.",
+          "Welcome to Graceward. Your daily path is ready.",
           expect.objectContaining({ duration: expect.any(Number) }),
         );
       });
@@ -1116,7 +1122,7 @@ describe("StoryOnboarding questionnaire submission flow", () => {
     expect(rawProgress).toBeTruthy();
     expect(mocks.profilesUpdateEq).toHaveBeenCalled();
     expect(mocks.toastSuccess).toHaveBeenCalledWith(
-      "Welcome to Cosmiq! Your journey begins.",
+      "Welcome to Graceward. Your daily path is ready.",
       expect.objectContaining({ duration: expect.any(Number) }),
     );
   });

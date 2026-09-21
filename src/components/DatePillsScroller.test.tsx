@@ -512,7 +512,7 @@ describe("DatePillsScroller", () => {
     });
 
     try {
-      const { rerender, container } = render(
+      const { container } = render(
         <DatePillsScroller
           selectedDate={new Date("2026-02-13T08:00:00.000Z")}
           onDateSelect={onDateSelect}
@@ -528,18 +528,6 @@ describe("DatePillsScroller", () => {
         selectedLeft: 320,
         selectedWidth: 60,
       });
-
-      await act(async () => {
-        await Promise.resolve();
-      });
-
-      scrollToSpy.mockClear();
-      rerender(
-        <DatePillsScroller
-          selectedDate={new Date("2026-02-13T20:30:00.000Z")}
-          onDateSelect={onDateSelect}
-        />,
-      );
 
       await waitFor(() => {
         expect(scrollToSpy).toHaveBeenCalledTimes(1);

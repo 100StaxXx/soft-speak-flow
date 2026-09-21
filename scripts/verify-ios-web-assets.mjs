@@ -11,7 +11,10 @@ const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 
 const distAssetsDir = path.join(projectRoot, "dist", "assets");
+const distRoot = path.join(projectRoot, "dist");
+const iosPublicRoot = path.join(projectRoot, "ios", "App", "App", "public");
 const iosAssetsDir = path.join(projectRoot, "ios", "App", "App", "public", "assets");
+const iosCapacitorConfigPath = path.join(projectRoot, "ios", "App", "App", "capacitor.config.json");
 const generatedBuildRoots = [
   path.join(projectRoot, "ios", "App", "build-cli"),
   path.join(projectRoot, "ios", "App", "build-cli-device-smoke"),
@@ -23,6 +26,25 @@ const LEGACY_JOURNEY_PATH_CONTRACT_PATTERN =
   /generate-journey-path["']?\s*,\s*\{[\s\S]{0,250}?body:\{[\s\S]{0,250}?userId:/;
 const LEGACY_JOURNEY_PATH_ERROR =
   "Missing required parameters: epicId, milestoneIndex, userId";
+const PRODUCTS = {
+  graceward: {
+    name: "Graceward",
+    bundleId: "com.darrylgraham.graceward",
+    forbiddenPatterns: [/Cosmiq/i, /cosmiq:\/\//i, /com\.darrylgraham\.revolution/i],
+  },
+  cosmiq: {
+    name: "Cosmiq",
+    bundleId: "com.darrylgraham.revolution",
+    forbiddenPatterns: [/Graceward/i, /graceward:\/\//i, /com\.darrylgraham\.graceward/i],
+  },
+};
+const PRODUCT_IDENTITY_FILES = [
+  "index.html",
+  "manifest.webmanifest",
+  "calendar/oauth/callback.html",
+  "apple-app-site-association",
+  ".well-known/apple-app-site-association",
+];
 
 const prefix = "[ios:verify-assets]";
 
@@ -32,7 +54,7 @@ const info = (message) => {
 
 const fail = (message) => {
   console.error(`${prefix} ${message}`);
-  console.error(`${prefix} Run \`npm run build && npm run ios:sync\` and retry.`);
+  console.error(`${prefix} Run \`npm run ios:sync:cosmiq\` or \`npm run ios:sync:graceward\` and retry.`);
   process.exit(1);
 };
 
@@ -40,6 +62,7 @@ const parseArgs = (argv) => {
   let targetBuiltAssetsDir = null;
   let skipGeneratedBuildScan = false;
   let scanGeneratedBuilds = false;
+  let productName = process.env.IOS_PRODUCT?.trim().toLowerCase() || null;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -51,6 +74,25 @@ const parseArgs = (argv) => {
 
     if (arg === "--skip-generated-build-scan") {
       skipGeneratedBuildScan = true;
+      continue;
+    }
+
+    if (arg === "--product") {
+      const nextArg = argv[index + 1];
+      if (!nextArg || !(nextArg.toLowerCase() in PRODUCTS)) {
+        fail(`Expected --product graceward or --product cosmiq; got ${String(nextArg)}.`);
+      }
+      productName = nextArg.toLowerCase();
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--product=")) {
+      const value = arg.slice("--product=".length).toLowerCase();
+      if (!(value in PRODUCTS)) {
+        fail(`Expected --product graceward or --product cosmiq; got ${value}.`);
+      }
+      productName = value;
       continue;
     }
 
@@ -72,7 +114,7 @@ const parseArgs = (argv) => {
     fail(`Unsupported argument: ${arg}`);
   }
 
-  return { targetBuiltAssetsDir, skipGeneratedBuildScan, scanGeneratedBuilds };
+  return { targetBuiltAssetsDir, skipGeneratedBuildScan, scanGeneratedBuilds, productName };
 };
 
 const directoryExists = async (directory) => {
@@ -156,6 +198,87 @@ const hashFile = async (filePath) => {
   return createHash("sha256").update(fileBuffer).digest("hex");
 };
 
+const resolveProduct = async (requestedProductName, compareDist) => {
+  if (requestedProductName) return PRODUCTS[requestedProductName];
+
+  const identityRoot = compareDist ? distRoot : iosPublicRoot;
+  const manifest = JSON.parse(
+    await fs.readFile(path.join(identityRoot, "manifest.webmanifest"), "utf8"),
+  );
+  const match = Object.values(PRODUCTS).find((product) => product.name === manifest.short_name);
+  if (!match) {
+    fail(`Could not infer iOS product from manifest short_name ${String(manifest.short_name)}.`);
+  }
+  return match;
+};
+
+const verifyNativeProductIdentity = async (product, compareDist = true) => {
+  for (const relativePath of PRODUCT_IDENTITY_FILES) {
+    const distPath = path.join(distRoot, relativePath);
+    const iosPath = path.join(iosPublicRoot, relativePath);
+
+    let distContents;
+    let iosContents;
+    try {
+      iosContents = await fs.readFile(iosPath, "utf8");
+      distContents = compareDist
+        ? await fs.readFile(distPath, "utf8")
+        : iosContents;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      fail(`Missing required ${product.name} identity artifact ${relativePath}: ${message}`);
+    }
+
+    if (distContents !== iosContents) {
+      fail(`Capacitor iOS identity artifact is stale: ${relativePath}`);
+    }
+
+    const forbiddenPattern = product.forbiddenPatterns.find((pattern) =>
+      pattern.test(distContents)
+    );
+    if (forbiddenPattern) {
+      fail(
+        `${relativePath} contains an opposite-product identifier and cannot be packaged in the ${product.name} iOS target.`,
+      );
+    }
+  }
+
+  const identityRoot = compareDist ? distRoot : iosPublicRoot;
+  const manifest = JSON.parse(
+    await fs.readFile(path.join(identityRoot, "manifest.webmanifest"), "utf8"),
+  );
+  if (manifest.short_name !== product.name) {
+    fail(
+      `Expected ${product.name} manifest, got ${String(manifest.short_name ?? "missing short_name")}.`,
+    );
+  }
+
+  const association = JSON.parse(
+    await fs.readFile(path.join(identityRoot, "apple-app-site-association"), "utf8"),
+  );
+  const associatedAppIds = association?.applinks?.details?.map((detail) => detail.appID) ?? [];
+  const expectedAssociatedAppId = `B6VW78ABTR.${product.bundleId}`;
+  if (
+    associatedAppIds.length !== 1
+    || associatedAppIds[0] !== expectedAssociatedAppId
+  ) {
+    fail(
+      `Expected only ${expectedAssociatedAppId} in the native association artifact; got ${associatedAppIds.join(", ") || "none"}.`,
+    );
+  }
+
+  const capacitorConfig = JSON.parse(await fs.readFile(iosCapacitorConfigPath, "utf8"));
+  if (
+    capacitorConfig.appId !== product.bundleId
+    || capacitorConfig.appName !== product.name
+  ) {
+    fail(
+      `Capacitor native identity mismatch: expected ${product.name} (${product.bundleId}), `
+      + `got ${String(capacitorConfig.appName)} (${String(capacitorConfig.appId)}).`,
+    );
+  }
+};
+
 const verifyNoLegacyJourneyPathContract = async (directory, bundles) => {
   const offenders = [];
 
@@ -177,7 +300,13 @@ const verifyNoLegacyJourneyPathContract = async (directory, bundles) => {
   }
 };
 
-const verifyDirectoryMatchesDist = async (directory, distBundles, distJavaScriptBundles, label) => {
+const verifyDirectoryMatchesDist = async (
+  directory,
+  distBundles,
+  distJavaScriptBundles,
+  label,
+  referenceAssetsDir = distAssetsDir,
+) => {
   const directoryBundles = await listIndexBundles(directory);
   const directoryJavaScriptBundles = await listJavaScriptBundles(directory);
 
@@ -195,7 +324,7 @@ const verifyDirectoryMatchesDist = async (directory, distBundles, distJavaScript
 
   const hashMismatches = [];
   for (const bundle of distBundles) {
-    const distHash = await hashFile(path.join(distAssetsDir, bundle));
+    const distHash = await hashFile(path.join(referenceAssetsDir, bundle));
     const directoryHash = await hashFile(path.join(directory, bundle));
     if (distHash !== directoryHash) {
       hashMismatches.push(bundle);
@@ -206,7 +335,7 @@ const verifyDirectoryMatchesDist = async (directory, distBundles, distJavaScript
     fail(`${label} at ${directory} has bundle content mismatch for: ${hashMismatches.join(", ")}`);
   }
 
-  await verifyNoLegacyJourneyPathContract(distAssetsDir, distJavaScriptBundles);
+  await verifyNoLegacyJourneyPathContract(referenceAssetsDir, distJavaScriptBundles);
   await verifyNoLegacyJourneyPathContract(directory, directoryJavaScriptBundles);
 };
 
@@ -215,7 +344,29 @@ const verifyAssets = async () => {
     targetBuiltAssetsDir,
     skipGeneratedBuildScan,
     scanGeneratedBuilds,
+    productName,
   } = parseArgs(process.argv.slice(2));
+
+  // During an Xcode build the copied Capacitor bundle is the immutable source
+  // of truth. The root dist directory may legitimately be replaced by a
+  // separate Cosmiq web build while the archive is compiling.
+  if (targetBuiltAssetsDir) {
+    const product = await resolveProduct(productName, false);
+    const iosBundles = await listIndexBundles(iosAssetsDir);
+    const iosJavaScriptBundles = await listJavaScriptBundles(iosAssetsDir);
+    await verifyNoLegacyJourneyPathContract(iosAssetsDir, iosJavaScriptBundles);
+    await verifyNativeProductIdentity(product, false);
+    await verifyDirectoryMatchesDist(
+      targetBuiltAssetsDir,
+      iosBundles,
+      iosJavaScriptBundles,
+      "Xcode target bundled assets",
+      iosAssetsDir,
+    );
+    info(`Verified ${iosBundles.length} staged ${product.name} index bundle(s) in the Xcode target.`);
+    return;
+  }
+
   const distBundles = await listIndexBundles(distAssetsDir);
   const distJavaScriptBundles = await listJavaScriptBundles(distAssetsDir);
 
@@ -225,6 +376,8 @@ const verifyAssets = async () => {
 
   await verifyNoLegacyJourneyPathContract(distAssetsDir, distJavaScriptBundles);
   await verifyDirectoryMatchesDist(iosAssetsDir, distBundles, distJavaScriptBundles, "Capacitor iOS public assets");
+  const product = await resolveProduct(productName, true);
+  await verifyNativeProductIdentity(product);
 
   const buildAssetDirs = new Set();
   if (scanGeneratedBuilds && !skipGeneratedBuildScan) {
@@ -246,7 +399,7 @@ const verifyAssets = async () => {
     );
   }
 
-  info(`Verified ${distBundles.length} index bundle(s) are synced between dist and iOS public assets.`);
+  info(`Verified ${distBundles.length} ${product.name} index bundle(s) are synced between dist and iOS public assets.`);
 };
 
 verifyAssets().catch((error) => {

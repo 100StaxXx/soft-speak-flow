@@ -188,6 +188,7 @@ function isPlaceholderValue(value) {
   const normalized = value.trim().toLowerCase();
   if (normalized.length === 0) return true;
   if (normalized === "null" || normalized === "undefined") return true;
+  if (normalized === "..." || normalized.startsWith("... ")) return true;
 
   return placeholderSnippets.some((snippet) => normalized.includes(snippet));
 }

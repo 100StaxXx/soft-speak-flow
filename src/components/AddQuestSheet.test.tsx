@@ -202,23 +202,23 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    expect(screen.getByPlaceholderText("Quest Title")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Browse common quests" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("What needs doing?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Browse common actions" })).toBeInTheDocument();
     expect(screen.queryByText("New Quest")).not.toBeInTheDocument();
-    expect(screen.queryByText("Step 1 · Name your quest")).not.toBeInTheDocument();
+    expect(screen.queryByText("Step 1 · Name your action")).not.toBeInTheDocument();
     expect(screen.queryByText("Step 2 · Pick a time")).not.toBeInTheDocument();
-    expect(screen.queryByText("Step 3 · Add quest")).not.toBeInTheDocument();
+    expect(screen.queryByText("Step 3 · Add action")).not.toBeInTheDocument();
     expect(screen.getByText("30 min")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Time" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add Quest" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add action" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add to Inbox instead" })).toBeInTheDocument();
-    expect(screen.queryByText(/Name your quest.*Select a time/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Name your action.*Select a time/i)).not.toBeInTheDocument();
     expectElementToIncludeClasses(
       screen.getByTestId("add-quest-mobile-sheet"),
       "border-[hsl(var(--celestial-blue)_/_0.62)] text-foreground",
     );
     expect(screen.getByTestId("add-quest-editor-header").firstElementChild).toContainElement(
-      screen.getByPlaceholderText("Quest Title"),
+      screen.getByPlaceholderText("What needs doing?"),
     );
     expect(screen.queryByText("Link to Contact")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /next/i })).not.toBeInTheDocument();
@@ -241,8 +241,8 @@ describe("AddQuestSheet", () => {
       "border-[hsl(var(--celestial-blue)_/_0.62)] text-foreground",
     );
     expect(screen.queryByTestId("add-quest-mobile-sheet")).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Quest Title")).toBeInTheDocument();
-    expect(screen.getByText(/Name your quest.*Select a time.*Thu, Jan 15/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("What needs doing?")).toBeInTheDocument();
+    expect(screen.getByText(/Name your action.*Select a time.*Thu, Jan 15/i)).toBeInTheDocument();
   });
 
   it("applies supplied companion frosted variables to the sheet portal", () => {
@@ -263,9 +263,9 @@ describe("AddQuestSheet", () => {
     );
   });
 
-  it("falls back to the stored companion color when no theme style is supplied", () => {
+  it("falls back to the Graceward theme when no theme style is supplied", () => {
     mocks.companionFavoriteColor = "#58d68d";
-    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle(mocks.companionFavoriteColor);
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle("#2f5938");
 
     render(
       <AddQuestSheet
@@ -376,7 +376,7 @@ describe("AddQuestSheet", () => {
         />
       );
 
-      const titleInput = screen.getByPlaceholderText("Quest Title");
+      const titleInput = screen.getByPlaceholderText("What needs doing?");
       expect(titleInput).not.toHaveFocus();
 
       act(() => {
@@ -392,7 +392,7 @@ describe("AddQuestSheet", () => {
     }
   });
 
-  it("keeps desktop-only footer extras out of the default mobile sheet", () => {
+  it("keeps desktop-only review details out of mobile while preserving Commitment creation", () => {
     mocks.integrationVisible = true;
     mocks.defaultProvider = "google";
     mocks.connections = [{ provider: "google" }];
@@ -407,9 +407,8 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    expect(screen.queryByText(/Name your quest.*Select a time/i)).not.toBeInTheDocument();
-    expect(screen.queryByText("Or create a Campaign")).not.toBeInTheDocument();
-    expect(screen.queryByText("Max 2 active")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Name your action.*Select a time/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Longer goal? Create a Commitment")).toBeInTheDocument();
     expect(screen.queryByTestId("add-quest-calendar-section")).not.toBeInTheDocument();
     expect(screen.queryByText("Send to Google Calendar after create.")).not.toBeInTheDocument();
   });
@@ -446,7 +445,7 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Calendar-ready quest" },
     });
     expect(screen.queryByText("Send to Google Calendar after create.")).not.toBeInTheDocument();
@@ -457,7 +456,7 @@ describe("AddQuestSheet", () => {
     expect(screen.getByText("Send to Google Calendar after create.")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("switch", { name: "Send to external calendar after create" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add action" }));
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);
@@ -471,7 +470,7 @@ describe("AddQuestSheet", () => {
     }));
   });
 
-  it("shows campaign creation CTA with inline max cap hint in the desktop footer", () => {
+  it("shows Commitment creation in the desktop footer", () => {
     render(
       <AddQuestSheet
         open
@@ -483,11 +482,10 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    expect(screen.getByText("Or create a Campaign")).toBeInTheDocument();
-    expect(screen.getByText("Max 2 active")).toBeInTheDocument();
+    expect(screen.getByText("Longer goal? Create a Commitment")).toBeInTheDocument();
   });
 
-  it("keeps Add Quest disabled until title and time are both set", () => {
+  it("keeps Add action disabled until title and time are both set", () => {
     render(
       <AddQuestSheet
         open
@@ -497,10 +495,10 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    const createButton = screen.getByRole("button", { name: "Add Quest" });
+    const createButton = screen.getByRole("button", { name: "Add action" });
     expect(createButton).toBeDisabled();
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Plan sprint tasks" },
     });
     expect(createButton).toBeDisabled();
@@ -519,13 +517,13 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Take a quick walk" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Time" }));
     fireEvent.click(screen.getByRole("button", { name: "Easy" }));
 
-    const createButton = screen.getByRole("button", { name: "Add Quest" });
+    const createButton = screen.getByRole("button", { name: "Add action" });
     expect(createButton).toBeEnabled();
     expectElementToIncludeClasses(createButton, DIFFICULTY_COLORS.easy.primaryButton);
   });
@@ -540,13 +538,13 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Plan the weekly sprint" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Time" }));
     fireEvent.click(screen.getByRole("button", { name: "Medium" }));
 
-    const createButton = screen.getByRole("button", { name: "Add Quest" });
+    const createButton = screen.getByRole("button", { name: "Add action" });
     expect(createButton).toBeEnabled();
     expectElementToIncludeClasses(createButton, DIFFICULTY_COLORS.medium.primaryButton);
   });
@@ -563,11 +561,11 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Tutorial quest" },
     });
 
-    const createButton = screen.getByRole("button", { name: "Add Quest" });
+    const createButton = screen.getByRole("button", { name: "Add action" });
     expect(createButton).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Time" }));
@@ -589,7 +587,7 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    const titleInput = screen.getByPlaceholderText("Quest Title");
+    const titleInput = screen.getByPlaceholderText("What needs doing?");
     fireEvent.change(titleInput, {
       target: { value: "Committed quest" },
     });
@@ -602,7 +600,7 @@ describe("AddQuestSheet", () => {
     fireEvent.click(screen.getByRole("button", { name: "Time" }));
     expect(dispatchSpy).not.toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-time-selected" }));
 
-    fireEvent.blur(screen.getByLabelText("Custom quest time"));
+    fireEvent.blur(screen.getByLabelText("Custom action time"));
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-time-selected" }));
 
     dispatchSpy.mockRestore();
@@ -619,10 +617,10 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    const createButton = screen.getByRole("button", { name: "Add Quest" });
+    const createButton = screen.getByRole("button", { name: "Add action" });
     expect(createButton).toBeDisabled();
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Morning planning" },
     });
 
@@ -691,7 +689,7 @@ describe("AddQuestSheet", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Deep work block/i }));
 
-    expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Deep work block");
+    expect(screen.getByPlaceholderText("What needs doing?")).toHaveValue("Deep work block");
     expect(screen.getByDisplayValue("Protect focus and silence notifications.")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Choose one priority")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Silence notifications")).toBeInTheDocument();
@@ -717,7 +715,7 @@ describe("AddQuestSheet", () => {
     expect(screen.getByRole("button", { name: /Deep work block/i })).toBeInTheDocument();
   });
 
-  it("opens the template browser on the Common tab from Browse common quests", () => {
+  it("opens the template browser on the Common tab from Browse common actions", () => {
     render(
       <AddQuestSheet
         open
@@ -727,9 +725,9 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
+    fireEvent.click(screen.getByRole("button", { name: "Browse common actions" }));
 
-    expect(screen.getByPlaceholderText("Search common quests")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Search common actions")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Respond to emails/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Work" })).toBeInTheDocument();
   });
@@ -746,7 +744,7 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
+    fireEvent.click(screen.getByRole("button", { name: "Browse common actions" }));
     expect(screen.getByRole("button", { name: /Respond to emails/i })).toBeInTheDocument();
 
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Yours" }));
@@ -759,7 +757,7 @@ describe("AddQuestSheet", () => {
     expect(screen.queryByRole("button", { name: /Respond to emails/i })).not.toBeInTheDocument();
   });
 
-  it("filters common quests by category", () => {
+  it("filters common actions by category", () => {
     render(
       <AddQuestSheet
         open
@@ -769,7 +767,7 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
+    fireEvent.click(screen.getByRole("button", { name: "Browse common actions" }));
     fireEvent.click(screen.getByRole("button", { name: "Health" }));
 
     expect(screen.getByRole("button", { name: /Go to the gym/i })).toBeInTheDocument();
@@ -800,7 +798,7 @@ describe("AddQuestSheet", () => {
     expect(screen.queryByRole("button", { name: /Deep work block/i })).not.toBeInTheDocument();
   });
 
-  it("returns to the editor and does not auto-submit after selecting a common quest", async () => {
+  it("returns to the editor and does not auto-submit after selecting a common action", async () => {
     const onAdd = vi.fn().mockResolvedValue(undefined);
 
     render(
@@ -812,11 +810,11 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
+    fireEvent.click(screen.getByRole("button", { name: "Browse common actions" }));
     fireEvent.click(screen.getByRole("button", { name: /Respond to emails/i }));
 
-    expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Respond to emails");
-    expect(screen.getByRole("button", { name: "Browse common quests" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("What needs doing?")).toHaveValue("Respond to emails");
+    expect(screen.getByRole("button", { name: "Browse common actions" })).toBeInTheDocument();
 
     await waitFor(() => {
       expect(onAdd).not.toHaveBeenCalled();
@@ -834,7 +832,7 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
+    fireEvent.click(screen.getByRole("button", { name: "Browse common actions" }));
     fireEvent.click(screen.getByRole("button", { name: /Go to the gym/i }));
 
     expect(screen.getByRole("button", { name: "Jan 15" })).toBeInTheDocument();
@@ -854,9 +852,9 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
+    fireEvent.click(screen.getByRole("button", { name: "Browse common actions" }));
     fireEvent.click(screen.getByRole("button", { name: /Respond to emails/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add action" }));
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);
@@ -877,16 +875,16 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
+    fireEvent.click(screen.getByRole("button", { name: "Browse common actions" }));
     fireEvent.click(screen.getByRole("button", { name: /Respond to emails/i }));
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Respond to priority emails" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add action" }));
 
     expect(await screen.findByText("Save these changes to My Templates?")).toBeInTheDocument();
     const prompt = screen.getByTestId("add-quest-template-prompt-dialog");
-    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle(mocks.companionFavoriteColor);
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle("#2f5938");
     expect(prompt).toHaveClass("companion-frosted-quest-light");
     expect(prompt.style.getPropertyValue("--companion-frosted-primary")).toBe(
       companionFrostedThemeStyle["--companion-frosted-primary"],
@@ -913,10 +911,10 @@ describe("AddQuestSheet", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /Deep work block/i }));
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Deep work sprint" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add action" }));
 
     expect(await screen.findByText("Update your template?")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Update Template" })).toBeInTheDocument();
@@ -935,12 +933,12 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
+    fireEvent.click(screen.getByRole("button", { name: "Browse common actions" }));
     fireEvent.click(screen.getByRole("button", { name: /Respond to emails/i }));
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Respond to priority emails" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add action" }));
     fireEvent.click(await screen.findByRole("button", { name: "Just this time" }));
 
     await waitFor(() => {
@@ -969,12 +967,12 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
+    fireEvent.click(screen.getByRole("button", { name: "Browse common actions" }));
     fireEvent.click(screen.getByRole("button", { name: /Respond to emails/i }));
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Respond to priority emails" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add action" }));
     fireEvent.click(await screen.findByRole("button", { name: "Save to My Templates" }));
 
     await waitFor(() => {
@@ -1006,11 +1004,11 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
+    fireEvent.click(screen.getByRole("button", { name: "Browse common actions" }));
     clickButtonForText("Respond to emails");
     clickButtonForText("9:00 AM");
     clickTimeSlot("09:30");
-    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add action" }));
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);
@@ -1031,9 +1029,9 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
+    fireEvent.click(screen.getByRole("button", { name: "Browse common actions" }));
     clickButtonForText("Respond to emails");
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Respond to priority emails" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add to Inbox instead" }));
@@ -1092,7 +1090,7 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    expect(screen.getByPlaceholderText("Quest Title")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("What needs doing?")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "See all" }));
     expect(screen.getByPlaceholderText("Search your templates")).toHaveValue("");
     expect(screen.getByRole("button", { name: /Deep work block/i })).toBeInTheDocument();
@@ -1242,7 +1240,7 @@ describe("AddQuestSheet", () => {
       );
 
       fireEvent.click(screen.getByRole("button", { name: "Time" }));
-      fireEvent.change(screen.getByLabelText("Custom quest time"), {
+      fireEvent.change(screen.getByLabelText("Custom action time"), {
         target: { value: "11:17" },
       });
 
@@ -1278,16 +1276,16 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Custom time quest" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Time" }));
-    const customTimeInput = screen.getByLabelText("Custom quest time");
+    const customTimeInput = screen.getByLabelText("Custom action time");
     expect(customTimeInput).toHaveClass("text-base");
     fireEvent.change(customTimeInput, {
       target: { value: "11:17" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add action" }));
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);
@@ -1312,7 +1310,7 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Triage inbox" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add to Inbox instead" }));
@@ -1360,7 +1358,7 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Recurring inbox attempt" },
     });
     fireEvent.click(within(getRecurrenceSection()).getByRole("button", { name: "None" }));
@@ -1377,7 +1375,7 @@ describe("AddQuestSheet", () => {
     });
   });
 
-  it("submits scheduled quest payload when Add Quest is tapped", async () => {
+  it("submits scheduled quest payload when Add action is tapped", async () => {
     const onAdd = vi.fn<(data: AddQuestData) => Promise<void>>()
       .mockResolvedValue(undefined);
     const onOpenChange = vi.fn();
@@ -1392,10 +1390,10 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Review roadmap" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add action" }));
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);
@@ -1431,7 +1429,7 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    const titleInput = screen.getByPlaceholderText("Quest Title");
+    const titleInput = screen.getByPlaceholderText("What needs doing?");
     expect(titleInput).toHaveValue("Voice planned quest");
     expect(screen.getByRole("button", { name: "Jan 16" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "3:00 PM" })).toBeInTheDocument();
@@ -1456,7 +1454,7 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Edited voice quest");
+    expect(screen.getByPlaceholderText("What needs doing?")).toHaveValue("Edited voice quest");
     expect(screen.getByRole("button", { name: "3:00 PM" })).toBeInTheDocument();
 
     rerender(
@@ -1481,7 +1479,7 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Reopened voice quest");
+    expect(screen.getByPlaceholderText("What needs doing?")).toHaveValue("Reopened voice quest");
 
     rerender(
       <AddQuestSheet
@@ -1494,7 +1492,7 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Fresh voice quest");
+    expect(screen.getByPlaceholderText("What needs doing?")).toHaveValue("Fresh voice quest");
     expect(screen.getByRole("button", { name: "4:30 PM" })).toBeInTheDocument();
   });
 
@@ -1513,7 +1511,7 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add action" }));
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);
@@ -1609,7 +1607,7 @@ describe("AddQuestSheet", () => {
 
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-sheet-opened" }));
 
-    const titleInput = screen.getByPlaceholderText("Quest Title");
+    const titleInput = screen.getByPlaceholderText("What needs doing?");
     fireEvent.change(titleInput, {
       target: { value: "Evented quest" },
     });
@@ -1627,7 +1625,7 @@ describe("AddQuestSheet", () => {
     fireEvent.click(explicitTimeButton as Element);
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-time-selected" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add action" }));
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);
@@ -1650,11 +1648,11 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Quest with files" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Attach 10" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add action" }));
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);
@@ -1678,12 +1676,12 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Weekday quest" },
     });
     fireEvent.click(within(getRecurrenceSection()).getByRole("button", { name: "None" }));
     fireEvent.click(screen.getByRole("button", { name: "Weekdays" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add action" }));
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);
@@ -1710,12 +1708,12 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Biweekly quest" },
     });
     fireEvent.click(within(getRecurrenceSection()).getByRole("button", { name: "None" }));
     fireEvent.click(screen.getByRole("button", { name: "Every 2 Weeks" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add action" }));
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);
@@ -1740,7 +1738,7 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Persistent quest" },
     });
 
@@ -1763,16 +1761,16 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    expect(await screen.findByText("Restore saved quest draft?")).toBeInTheDocument();
+    expect(await screen.findByText("Restore saved action draft?")).toBeInTheDocument();
     const prompt = screen.getByTestId("add-quest-draft-restore-dialog");
-    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle(mocks.companionFavoriteColor);
+    const companionFrostedThemeStyle = getCompanionFrostedThemeStyle("#2f5938");
     expect(prompt).toHaveClass("companion-frosted-quest-light");
     expect(prompt.style.getPropertyValue("--companion-frosted-primary")).toBe(
       companionFrostedThemeStyle["--companion-frosted-primary"],
     );
     fireEvent.click(screen.getByRole("button", { name: "Restore draft" }));
 
-    expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Persistent quest");
+    expect(screen.getByPlaceholderText("What needs doing?")).toHaveValue("Persistent quest");
   });
 
   it("auto-restores a saved quest draft when opened from creation popup recovery", async () => {
@@ -1812,9 +1810,9 @@ describe("AddQuestSheet", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Recovered quest");
+      expect(screen.getByPlaceholderText("What needs doing?")).toHaveValue("Recovered quest");
     });
-    expect(screen.queryByText("Restore saved quest draft?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Restore saved action draft?")).not.toBeInTheDocument();
   });
 
   it("discards a saved quest draft when requested", async () => {
@@ -1852,13 +1850,13 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    expect(await screen.findByText("Restore saved quest draft?")).toBeInTheDocument();
+    expect(await screen.findByText("Restore saved action draft?")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Discard draft" }));
 
     await waitFor(() => {
       expect(mocks.safeLocalStorage.getItem(getQuestDraftStorageKey("user-1"))).toBeNull();
     });
-    expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("");
+    expect(screen.getByPlaceholderText("What needs doing?")).toHaveValue("");
   });
 
   it("clears the saved quest draft after a successful submission", async () => {
@@ -1874,7 +1872,7 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("What needs doing?"), {
       target: { value: "Submit clears draft" },
     });
 
@@ -1882,7 +1880,7 @@ describe("AddQuestSheet", () => {
       expect(mocks.safeLocalStorage.getItem(getQuestDraftStorageKey("user-1"))).toContain("Submit clears draft");
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add action" }));
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);
@@ -1928,7 +1926,7 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    expect(screen.queryByText("Restore saved quest draft?")).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Voice wins");
+    expect(screen.queryByText("Restore saved action draft?")).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("What needs doing?")).toHaveValue("Voice wins");
   });
 });

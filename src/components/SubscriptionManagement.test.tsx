@@ -18,7 +18,6 @@ const appleSubscriptionMocks = vi.hoisted(() => ({
   handlePurchase: vi.fn(),
   handleRestore: vi.fn(),
   handleManageSubscriptions: vi.fn(),
-  handlePresentRevenueCatPaywall: vi.fn(),
   reloadProducts: vi.fn(),
   hasOfferCode: false,
   activeYearlyOffer: null as null | { tier: string; price: string; priceCents: number; unitPrice: string },
@@ -38,7 +37,6 @@ vi.mock("@/hooks/useAppleSubscription", () => ({
     reloadProducts: appleSubscriptionMocks.reloadProducts,
     hasOfferCode: appleSubscriptionMocks.hasOfferCode,
     activeYearlyOffer: appleSubscriptionMocks.activeYearlyOffer,
-    handlePresentRevenueCatPaywall: appleSubscriptionMocks.handlePresentRevenueCatPaywall,
   }),
 }));
 
@@ -52,18 +50,18 @@ describe("SubscriptionManagement", () => {
   it("shows concrete subscription benefits while keeping the unlock CTA enabled on native iOS", () => {
     render(<SubscriptionManagement />);
 
-    expect(screen.getByText("Unlock unlimited companion chat, quests, and offline access")).toBeInTheDocument();
-    expect(screen.getByText("Unlimited companion chat")).toBeInTheDocument();
-    expect(screen.getByText("100+ levels and 12+ evolutions")).toBeInTheDocument();
-    expect(screen.getByText("Unlimited Quests & Epics")).toBeInTheDocument();
+    expect(screen.getByText("Unlock daily practices, Guide reflections, and offline access")).toBeInTheDocument();
+    expect(screen.getByText("Reviewed daily Scripture and prayer")).toBeInTheDocument();
+    expect(screen.getByText("One ready-made self-improvement practice each day")).toBeInTheDocument();
+    expect(screen.getByText("Guide encouragement and guided reflections")).toBeInTheDocument();
     expect(screen.getByText("Offline access to downloaded content")).toBeInTheDocument();
     expect(
-      screen.getByText("Both monthly and yearly plans include the same Cosmiq features and renew automatically until canceled."),
+      screen.getByText("Both monthly and yearly plans include the same Graceward Plus features and renew automatically until canceled."),
     ).toBeInTheDocument();
-    expect(screen.getByText("Cosmiq Pro Monthly")).toBeInTheDocument();
-    expect(screen.getAllByText("Cosmiq Pro Yearly").length).toBeGreaterThan(0);
+    expect(screen.getByText("Graceward Plus Monthly")).toBeInTheDocument();
+    expect(screen.getAllByText("Graceward Plus Yearly").length).toBeGreaterThan(0);
     expect(screen.getByText("Length: 1 year")).toBeInTheDocument();
-    expect(screen.getByText("$8.33/month when billed yearly")).toBeInTheDocument();
+    expect(screen.getByText("$4.17/month when billed yearly")).toBeInTheDocument();
     expect(
       screen.getByText(/Subscriptions renew automatically unless canceled at least 24 hours before the end/i),
     ).toBeInTheDocument();
@@ -77,12 +75,12 @@ describe("SubscriptionManagement", () => {
     expect(screen.queryByRole("button", { name: "View All Plans" })).not.toBeInTheDocument();
   });
 
-  it("hides the RevenueCat paywall bypass when a creator Apple offer code is active", () => {
+  it("shows the Apple founding rate when an eligible creator code is active", () => {
     appleSubscriptionMocks.hasOfferCode = true;
 
     render(<SubscriptionManagement />);
 
-    expect(screen.getByText("$69.99")).toBeInTheDocument();
+    expect(screen.getByText("$29.99")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /unlock with yearly/i })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "View All Plans" })).not.toBeInTheDocument();
   });
@@ -91,15 +89,15 @@ describe("SubscriptionManagement", () => {
     appleSubscriptionMocks.hasOfferCode = true;
     appleSubscriptionMocks.activeYearlyOffer = {
       tier: "genesis",
-      price: "$49.99",
-      priceCents: 4999,
-      unitPrice: "$4.17/month for the first year",
+      price: "$29.99",
+      priceCents: 2999,
+      unitPrice: "$2.50/month, locked while active",
     };
 
     render(<SubscriptionManagement />);
 
-    expect(screen.getByText("$49.99")).toBeInTheDocument();
-    expect(screen.getByText("$4.17/month for the first year")).toBeInTheDocument();
+    expect(screen.getByText("$29.99")).toBeInTheDocument();
+    expect(screen.getByText("$2.50/month, locked while active")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "View All Plans" })).not.toBeInTheDocument();
   });
 });

@@ -5,6 +5,7 @@ import { useCompanion } from "./useCompanion";
 import { useCompanionCareSignals } from "./useCompanionCareSignals";
 import { safeSessionStorage } from "@/utils/storage";
 import { resolveCompanionName } from "@/lib/companionName";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
 export type WhisperTrigger = 
   | 'navigation'      // User navigated to a new page
@@ -41,23 +42,23 @@ const WHISPER_TEMPLATES: Record<WhisperContext, Record<CompanionMood, string[]>>
     joyful: ["Let's conquer today together!", "I believe in every step you take.", "Your determination inspires me!"],
     content: ["Ready when you are.", "We make a good team.", "One step at a time."],
     neutral: ["I'm here if you need me.", "Take your time.", "No rush."],
-    reserved: ["...I'm still here.", "Don't forget about me.", "I miss our adventures."],
-    quiet: ["...", "Please come back...", "I'm fading..."],
+    reserved: ["We can start smaller today.", "I'm here when you're ready.", "A quiet return still counts."],
+    quiet: ["No pressure.", "We can begin here.", "One small step is enough."],
     dormant: [],
   },
   companion: {
     joyful: ["So happy you came to visit!", "I've been waiting for you!", "Let's spend time together!"],
     content: ["It's good to see you.", "Thanks for checking in.", "I appreciate you."],
     neutral: ["Hello again.", "You're here.", "Nice to see you."],
-    reserved: ["You came back...", "I was worried.", "Don't leave again."],
-    quiet: ["...you're here...", "...finally...", "...don't go..."],
+    reserved: ["It's good to see you again.", "Nothing to make up for.", "We can find our rhythm again."],
+    quiet: ["Welcome back.", "We can take this slowly.", "I'm here with you."],
     dormant: [],
   },
   mentor: {
     joyful: ["Learning makes us both stronger!", "Wisdom flows through connection.", "I love when you seek guidance!"],
     content: ["Mentorship is a beautiful path.", "Growth looks good on you.", "Listen well, friend."],
     neutral: ["Seeking wisdom, I see.", "Learn well.", "Good choice."],
-    reserved: ["At least you're learning...", "Knowledge without presence...", "Don't forget me."],
+    reserved: ["Take what helps and leave the rest.", "A little clarity can change the next step.", "Learning can take time too."],
     quiet: ["...grow strong...", "...for both of us...", "..."],
     dormant: [],
   },
@@ -65,8 +66,8 @@ const WHISPER_TEMPLATES: Record<WhisperContext, Record<CompanionMood, string[]>>
     joyful: ["The grand adventures await us!", "Together we can achieve anything!", "Let's write our story!"],
     content: ["Big goals need steady hearts.", "One campaign at a time.", "We'll get there."],
     neutral: ["Ambitious plans.", "Keep focused.", "Stay the course."],
-    reserved: ["So many plans... so little time together.", "Don't lose yourself.", "Remember me."],
-    quiet: ["...dreams...", "...fading...", "..."],
+    reserved: ["Big plans still need breathing room.", "Keep the next step human-sized.", "You can adjust the plan without failing it."],
+    quiet: ["One piece at a time.", "The plan can wait while you breathe.", "Start where you are."],
     dormant: [],
   },
   profile: {
@@ -74,7 +75,7 @@ const WHISPER_TEMPLATES: Record<WhisperContext, Record<CompanionMood, string[]>>
     content: ["Reflection is valuable.", "You've grown so much.", "Keep being you."],
     neutral: ["Taking stock.", "Self-reflection.", "Good to pause."],
     reserved: ["Do you remember our early days?", "So much has changed.", "..."],
-    quiet: ["...memories...", "...fading...", "..."],
+    quiet: ["Your progress is still yours.", "A quiet season still holds growth.", "You can begin from here."],
     dormant: [],
   },
   morning: {
@@ -112,9 +113,9 @@ const WHISPER_TEMPLATES: Record<WhisperContext, Record<CompanionMood, string[]>>
   low_care: {
     joyful: [], // Won't trigger when joyful
     content: [],
-    neutral: ["I could use a little more attention...", "Been a while since we connected.", "Miss you."],
-    reserved: ["Please don't forget about me.", "I'm starting to worry.", "Are we okay?"],
-    quiet: ["I need you...", "Please come back...", "Don't let me fade..."],
+    neutral: ["We can reconnect with one small step.", "It's been a while. No judgment.", "Start wherever you are."],
+    reserved: ["Nothing is ruined.", "A gentle return is still a return.", "We can make today smaller."],
+    quiet: ["No pressure.", "Rest if you need it.", "We'll begin when you're ready."],
     dormant: [],
   },
   high_care: {
@@ -128,9 +129,9 @@ const WHISPER_TEMPLATES: Record<WhisperContext, Record<CompanionMood, string[]>>
   dormancy_warning: {
     joyful: [],
     content: [],
-    neutral: ["I'm getting tired... please don't forget me.", "Feeling sleepy...", "Stay with me?"],
-    reserved: ["I might fall asleep soon...", "Don't let me slip away.", "Please... I'm fading."],
-    quiet: ["...so... tired...", "...don't... leave...", "...help..."],
+    neutral: ["Our rhythm is getting quiet.", "A small check-in can restore the thread.", "Rest may be asking for attention."],
+    reserved: ["We can slow down without disappearing.", "Nothing is lost. We can begin again.", "Choose one kind step if you have it."],
+    quiet: ["Rest is allowed.", "No pressure to perform.", "Tomorrow can hold the next step."],
     dormant: [],
   },
   general: {
@@ -164,8 +165,8 @@ const getTimeContext = (): WhisperContext => {
 
 // Storage keys
 const STORAGE_KEYS = {
-  lastWhisperTime: 'companion_last_whisper_time',
-  sessionWhisperCount: 'companion_session_whisper_count',
+  lastWhisperTime: productScopedStorageKey('companion_last_whisper_time'),
+  sessionWhisperCount: productScopedStorageKey('companion_session_whisper_count'),
 };
 
 export function useCompanionWhispers() {

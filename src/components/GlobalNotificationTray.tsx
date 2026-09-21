@@ -21,6 +21,7 @@ import {
 import { useRemainingTodayBadgeCount } from "@/hooks/useDailyTaskBadgeSync";
 import { cn } from "@/lib/utils";
 import { logger } from "@/utils/logger";
+import { PRODUCT } from "@/config/product";
 
 const formatDeliveredAt = (value: string): string => {
   const date = new Date(value);
@@ -60,7 +61,7 @@ export const GlobalNotificationTray = memo(({ enabled = true }: { enabled?: bool
 
   const handleOpenRemainingToday = useCallback(() => {
     setOpen(false);
-    navigate("/journeys");
+    navigate("/mentor");
   }, [navigate]);
 
   const handleMarkAllRead = useCallback(async () => {
@@ -82,7 +83,7 @@ export const GlobalNotificationTray = memo(({ enabled = true }: { enabled?: bool
           type="button"
           variant="outline"
           size="icon"
-          className="fixed right-4 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-40 h-10 w-10 rounded-full border-border/70 bg-card/82 shadow-[0_12px_28px_rgba(0,0,0,0.22)] backdrop-blur-xl"
+          className="fixed right-4 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-40 h-10 w-10 rounded-full border-border/70 bg-card/[0.82] shadow-[0_12px_28px_rgba(0,0,0,0.22)] backdrop-blur-xl"
           aria-label={remainingTodayCount > 0 ? `Open notifications, ${remainingTodayCount} remaining today` : "Open notifications"}
         >
           <Bell className="h-4 w-4" />
@@ -129,7 +130,7 @@ export const GlobalNotificationTray = memo(({ enabled = true }: { enabled?: bool
               </div>
             </div>
             <SheetDescription className="sr-only">
-              Recent Cosmiq notifications
+              Recent {PRODUCT.name} notifications
             </SheetDescription>
           </SheetHeader>
         </div>

@@ -10,10 +10,14 @@ import type {
   UpdateChannel,
   UseUpdateAvailabilityResult,
 } from "@/types/updateAvailability";
+import {
+  PRODUCT_RUNTIME,
+  productScopedStorageKey,
+} from "@/config/productRuntime";
 
-const IOS_BUNDLE_ID = "com.darrylgraham.revolution";
+const IOS_BUNDLE_ID = PRODUCT_RUNTIME.iosBundleId;
 const IOS_LOOKUP_URL = `https://itunes.apple.com/lookup?bundleId=${IOS_BUNDLE_ID}`;
-const UPDATE_DISMISS_PREFIX = "update-dismissed";
+const UPDATE_DISMISS_PREFIX = productScopedStorageKey("update-dismissed");
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const RESUME_COOLDOWN_MS = 10_000; // 10 seconds
 
@@ -110,6 +114,13 @@ export const useUpdateAvailability = (): UseUpdateAvailabilityResult => {
 
     try {
       const appInfo = await CapacitorApp.getInfo();
+      if (appInfo.id !== IOS_BUNDLE_ID) {
+        logger.warn("Skipping App Store update check for mismatched product bundle", {
+          expectedBundleId: IOS_BUNDLE_ID,
+          actualBundleId: appInfo.id,
+        });
+        return null;
+      }
       const currentVersion = appInfo.version ?? null;
       if (!currentVersion) return null;
 

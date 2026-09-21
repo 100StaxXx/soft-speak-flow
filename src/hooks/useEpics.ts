@@ -3,10 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
-import { useXPRewards } from "@/hooks/useXPRewards";
-import { CAMPAIGN_XP_REWARDS } from "@/config/xpRewards";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
-import { useAchievements } from "@/hooks/useAchievements";
 import { addDays, format, getDay } from "date-fns";
 import type { DailyTask } from "@/services/dailyTasksRemote";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
@@ -64,6 +61,7 @@ import {
   type NormalizedRitualSchedule,
 } from "@/hooks/habitTaskReconciliation";
 import { isHabitScheduledForDate } from "@/utils/habitSchedule";
+import { productScopedStorageKey } from "@/config/productRuntime";
 
 const normalizeDifficulty = (value: string): "easy" | "medium" | "hard" => {
   const lower = value?.toLowerCase()?.trim() || "medium";
@@ -149,7 +147,7 @@ export const normalizeCreateCampaignError = (error: unknown): { title: string; d
 
   if (isActiveCampaignLimitHaystack(haystack)) {
     return {
-      title: "Campaign limit reached",
+      title: "Commitment limit reached",
       description: ACTIVE_CAMPAIGN_LIMIT_MESSAGE,
     };
   }
@@ -157,21 +155,21 @@ export const normalizeCreateCampaignError = (error: unknown): { title: string; d
   if (haystack.includes("not authenticated") || haystack.includes("jwt") || haystack.includes("auth")) {
     return {
       title: "Sign in required",
-      description: "Please refresh and sign in again before creating a campaign.",
+      description: "Please refresh and sign in again before creating a commitment.",
     };
   }
 
   if (haystack.includes("maximum active habit limit reached")) {
     return {
-      title: "Too many active rituals",
-      description: "Your account hit a legacy ritual limit. Update your app data and try creating this campaign again.",
+      title: "Too many active rhythms",
+      description: "Your account hit a legacy rhythm limit. Update your app data and try creating this commitment again.",
     };
   }
 
   if (isLegacyMonthSchemaError(error)) {
     return {
-      title: "Campaign setup update needed",
-      description: "Your planner data is missing a recent ritual scheduling update. Please try again shortly.",
+      title: "Commitment setup update needed",
+      description: "Your planner data is missing a recent rhythm scheduling update. Please try again shortly.",
     };
   }
 
@@ -181,28 +179,28 @@ export const normalizeCreateCampaignError = (error: unknown): { title: string; d
     || haystack.includes("milestone_percent")
   ) {
     return {
-      title: "Campaign plan needs an update",
+      title: "Commitment plan needs an update",
       description: "One of the generated milestones had an invalid percentage. Rebuild the plan and try again.",
     };
   }
 
   if (haystack.includes("daily_tasks_regular_requires_time_or_inbox")) {
     return {
-      title: "Campaign cleanup needs attention",
-      description: "We couldn't finish cleaning up a failed campaign save. Refresh your planner and try again.",
+      title: "Commitment cleanup needs attention",
+      description: "We couldn't finish cleaning up a failed commitment save. Refresh your planner and try again.",
     };
   }
 
   if (haystack.includes("failed to create habits") || haystack.includes("no habits were created")) {
     return {
-      title: "Campaign needs attention",
-      description: "We couldn't finish saving every part of this campaign. Please review it and try again.",
+      title: "Commitment needs attention",
+      description: "We couldn't finish saving every part of this commitment. Please review it and try again.",
     };
   }
 
   return {
-    title: "Campaign couldn't be saved",
-    description: "We couldn't finish saving every part of this campaign. Please review it and try again.",
+    title: "Commitment couldn't be saved",
+    description: "We couldn't finish saving every part of this commitment. Please review it and try again.",
   };
 };
 
@@ -339,7 +337,9 @@ type FingerprintPhase = {
 
 const RECENT_EPIC_CREATE_WINDOW_MS = 5 * 60 * 1000;
 const RECENT_EPIC_CREATE_ATTEMPT_WINDOW_MS = 24 * 60 * 60 * 1000;
-const EPIC_CREATE_ATTEMPT_STORAGE_KEY = "cosmiq:recent-epic-create-attempts:v1";
+const EPIC_CREATE_ATTEMPT_STORAGE_KEY = productScopedStorageKey(
+  "recent-epic-create-attempts:v1",
+);
 const inFlightEpicCreateRequests = new Map<string, Promise<CreateEpicMutationResult>>();
 const recentEpicCreateAttempts = new Map<string, { createdAt: number; payload: LocalEpicPayload }>();
 
@@ -1295,7 +1295,7 @@ async function applyLocalCampaignRitualDelete(
     .filter((link) => link.habit_id === habitId)
     .map((link) => link.id);
   if (linkIdsToDelete.length === 0) {
-    throw new Error("Campaign ritual link not found");
+    throw new Error("Commitment rhythm link not found");
   }
 
   const linkedTasks = localTasks.filter((task) => task.habit_source_id === habitId);
@@ -1379,7 +1379,7 @@ async function applyRemoteCampaignRitualDelete(
     if (habitLookupError) throw habitLookupError;
     if (!matchingHabits || matchingHabits.length === 0) return;
 
-    throw new Error("Campaign ritual link not found");
+    throw new Error("Commitment rhythm link not found");
   }
 
   await runDailyTaskCleanupUpdate({
@@ -1709,7 +1709,7 @@ async function applyLocalEpicStatusChange(userId: string, epicId: string, status
   const localEpics = await loadLocalEpics(userId);
   const epic = localEpics.find((candidate) => candidate.id === epicId);
   if (!epic) {
-    throw new Error("Epic not found");
+    throw new Error("Commitment not found");
   }
 
   await upsertPlannerRecord("epics", {
@@ -1792,7 +1792,7 @@ async function applyLocalEpicUpdate(
   const localEpics = await loadLocalEpics(userId);
   const epic = localEpics.find((candidate) => candidate.id === epicId);
   if (!epic) {
-    throw new Error("Epic not found");
+    throw new Error("Commitment not found");
   }
 
   const nextEpic: LocalEpicRow = {
@@ -1834,7 +1834,7 @@ async function applyLocalEpicDelete(userId: string, epicId: string) {
 
   const epic = localEpics.find((candidate) => candidate.id === epicId);
   if (!epic) {
-    throw new Error("Epic not found");
+    throw new Error("Commitment not found");
   }
 
   const habitIds = epicHabits.map((link) => link.habit_id);
@@ -2107,8 +2107,6 @@ async function applyRemoteEpicDelete(userId: string, epicId: string) {
 export const useEpics = (options: EpicsOptions = {}) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { awardCustomXP } = useXPRewards();
-  const { checkFirstTimeAchievements, checkStoryCompletionAchievement } = useAchievements();
   const { trackEpicOutcome } = useAIInteractionTracker();
   const { queueAction, queueTaskAction, shouldQueueWrites, retryNow, reportApiFailure } = useResilience();
   const { enabled = true } = options;
@@ -2175,21 +2173,21 @@ export const useEpics = (options: EpicsOptions = {}) => {
         let remotePersistMs: number | null = null;
 
         if (!epicData.habits || epicData.habits.length === 0) {
-          throw new Error("Campaign must have at least one ritual");
+          throw new Error("A commitment must have at least one rhythm");
         }
 
         const invalidPhase = (epicData.phases ?? []).find(
           (phase) => !phase.start_date || !phase.end_date || !Number.isFinite(Number(phase.phase_order)),
         );
         if (invalidPhase) {
-          throw new Error("Campaign phase dates are missing. Please rebuild the plan and try again.");
+          throw new Error("Commitment phase dates are missing. Please rebuild the plan and try again.");
         }
 
         const normalizedInputMilestonePercents = normalizeCampaignMilestonePercentArray(
           (epicData.milestones ?? []).map((milestone) => milestone.milestone_percent),
         );
         if (normalizedInputMilestonePercents.some((percent) => !isValidCampaignMilestonePercent(percent))) {
-          throw new Error("Campaign milestone percentages must be whole numbers from 1 to 100.");
+          throw new Error("Commitment milestone percentages must be whole numbers from 1 to 100.");
         }
 
         const fingerprint = buildCampaignCreateFingerprint(user.id, epicData);
@@ -2534,34 +2532,6 @@ export const useEpics = (options: EpicsOptions = {}) => {
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
       queryClient.invalidateQueries({ queryKey: DAILY_PLAN_OPTIMIZATION_QUERY_KEY });
 
-      if (!queued && isNewCreate) {
-        try {
-          await awardCustomXP(
-            CAMPAIGN_XP_REWARDS.CREATE,
-            "campaign_create",
-            "Campaign Created!",
-            {
-              epic_id: epic.id,
-              campaign_title: epic.title,
-            },
-            `campaign_create:${epic.id}`,
-          );
-        } catch (error) {
-          console.error("Failed to award campaign creation XP:", error);
-        }
-      }
-
-      if (!queued && isNewCreate && user?.id) {
-        const { count } = await supabase
-          .from("epics")
-          .select("*", { count: "exact", head: true })
-          .eq("user_id", user.id);
-
-        if ((count ?? 0) === 1) {
-          await checkFirstTimeAchievements("epic");
-        }
-      }
-
       if (!queued && isNewCreate && user?.id) {
         void requestJourneyPathGeneration({
           epicId: epic.id,
@@ -2574,10 +2544,10 @@ export const useEpics = (options: EpicsOptions = {}) => {
       }
 
       window.dispatchEvent(new CustomEvent("campaign-created"));
-      toast.success(queued ? "Campaign saved offline" : "Campaign created! 🎯", {
+      toast.success(queued ? "Commitment saved offline" : "Commitment created", {
         description: queued
-          ? "Your campaign will sync when you're back online."
-          : "Your companion is excited for this new journey!",
+          ? "Your commitment will sync when you're back online."
+          : "Your new commitment is ready to tend one step at a time.",
       });
     },
     onError: (error) => {
@@ -2632,11 +2602,11 @@ export const useEpics = (options: EpicsOptions = {}) => {
       return withPlannerRemoteSyncLock(user.id, async () => {
         const epic = epics.find((candidate) => candidate.id === epicId);
         if (!epic) {
-          throw new Error("Epic not found or you don't have permission");
+          throw new Error("Commitment not found or you don't have permission");
         }
 
         if (epic.status === "completed" && status === "completed") {
-          throw new Error("Epic is already completed");
+          throw new Error("Commitment is already completed");
         }
 
         await applyLocalEpicStatusChange(user.id, epicId, status);
@@ -2685,36 +2655,25 @@ export const useEpics = (options: EpicsOptions = {}) => {
       }
 
       if (queued) {
-        toast(status === "abandoned" ? "Campaign abandoned offline" : "Campaign completed offline", {
-          description: "We'll sync this campaign change when you're back online.",
+        toast(status === "abandoned" ? "Commitment set aside offline" : "Commitment completed offline", {
+          description: "We'll sync this commitment change when you're back online.",
         });
         return;
       }
 
       if (status === "completed" && !wasAlreadyCompleted) {
-        try {
-          await awardCustomXP(
-            epic.xp_reward ?? 0,
-            "epic_complete",
-            `Epic "${epic.title}" Completed!`,
-            { epic_id: variables?.epicId },
-          );
-        } catch (error) {
-          console.error("Failed to award epic completion XP:", error);
-        }
-        await checkStoryCompletionAchievement(epic.story_type_slug);
-        toast.success("Epic Completed! 🏆", {
-          description: `You've conquered the ${epic.title} epic! Your companion grows stronger!`,
+        toast.success("Commitment completed", {
+          description: `Take a moment to give thanks for the work you finished in ${epic.title}.`,
         });
       } else if (status === "abandoned") {
-        toast("Epic abandoned", {
-          description: "You can always start a new epic when ready.",
+        toast("Commitment set aside", {
+          description: "You can begin another commitment when the time is right.",
         });
       }
     },
     onError: (error) => {
-      console.error("Failed to update epic:", error);
-      toast.error("Failed to update epic status");
+      console.error("Failed to update commitment:", error);
+      toast.error("Failed to update commitment status");
     },
   });
 
@@ -2738,7 +2697,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
         if (updates.title !== undefined) {
           const trimmedTitle = updates.title.trim();
           if (!trimmedTitle) {
-            throw new Error("Campaign title cannot be empty");
+            throw new Error("Commitment title cannot be empty");
           }
           normalizedUpdates.title = trimmedTitle;
         }
@@ -2749,20 +2708,20 @@ export const useEpics = (options: EpicsOptions = {}) => {
         }
 
         if (Object.keys(normalizedUpdates).length === 0) {
-          throw new Error("No campaign changes were provided");
+          throw new Error("No commitment changes were provided");
         }
 
         if (normalizedUpdates.title !== undefined && normalizedUpdates.title.length === 0) {
-          throw new Error("Campaign title cannot be empty");
+          throw new Error("Commitment title cannot be empty");
         }
 
         const epic = epics.find((candidate) => candidate.id === epicId);
         if (!epic) {
-          throw new Error("Epic not found or you don't have permission");
+          throw new Error("Commitment not found or you don't have permission");
         }
 
         if (epic.status !== "active") {
-          throw new Error("Only active campaigns can be edited");
+          throw new Error("Only active commitments can be edited");
         }
 
         const hasTitleChange = normalizedUpdates.title !== undefined && epic.title !== normalizedUpdates.title;
@@ -2833,20 +2792,20 @@ export const useEpics = (options: EpicsOptions = {}) => {
 
       toast.success(
         queued
-          ? (titleOnly ? "Campaign rename saved offline" : "Campaign update saved offline")
-          : (titleOnly ? "Campaign renamed" : "Campaign updated"),
+          ? (titleOnly ? "Commitment rename saved offline" : "Commitment update saved offline")
+          : (titleOnly ? "Commitment renamed" : "Commitment updated"),
         {
           description: queued
-            ? "Your campaign changes will sync when you're back online."
+            ? "Your commitment changes will sync when you're back online."
             : titleOnly && title
               ? `Now titled "${title}".`
-              : "Your campaign details are up to date.",
+              : "Your commitment details are up to date.",
         },
       );
     },
     onError: (error) => {
       console.error("Failed to update epic:", error);
-      toast.error("Failed to update campaign");
+      toast.error("Failed to update commitment");
     },
   });
 
@@ -2863,11 +2822,11 @@ export const useEpics = (options: EpicsOptions = {}) => {
       return withPlannerRemoteSyncLock(user.id, async () => {
         const epic = epics.find((candidate) => candidate.id === epicId);
         if (!epic) {
-          throw new Error("Epic not found or you don't have permission");
+          throw new Error("Commitment not found or you don't have permission");
         }
 
         if (epic.status !== "active") {
-          throw new Error("Only active campaigns can be deleted");
+          throw new Error("Only active commitments can be deleted");
         }
 
         const localDelete = await applyLocalEpicDelete(user.id, epicId);
@@ -2929,15 +2888,15 @@ export const useEpics = (options: EpicsOptions = {}) => {
       queryClient.resetQueries({ queryKey: DAILY_PLAN_OPTIMIZATION_QUERY_KEY });
       dispatchPlannerSyncFinished();
 
-      toast.success(queued ? "Campaign deletion saved offline" : "Campaign deleted", {
+      toast.success(queued ? "Commitment deletion saved offline" : "Commitment deleted", {
         description: queued
           ? `We'll remove "${epic.title}" from the cloud when you're back online.`
-          : `"${epic.title}" and its linked rituals were removed.`,
+          : `"${epic.title}" and its linked rhythms were removed.`,
       });
     },
     onError: (error) => {
       console.error("Failed to delete epic:", error);
-      toast.error("Failed to delete campaign");
+      toast.error("Failed to delete commitment");
     },
   });
 
@@ -2951,11 +2910,11 @@ export const useEpics = (options: EpicsOptions = {}) => {
         const localEpics = await loadLocalEpics(user.id);
         const epic = localEpics.find((candidate) => candidate.id === input.epicId);
         if (!epic) {
-          throw new Error("Campaign not found");
+          throw new Error("Commitment not found");
         }
 
         if (epic.status !== "active") {
-          throw new Error("Only active campaign rituals can be deleted");
+          throw new Error("Only active commitment rhythms can be deleted");
         }
 
         const localDelete = await applyLocalCampaignRitualDelete(
@@ -3015,7 +2974,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
     },
     onError: (error) => {
       console.error("Failed to delete campaign ritual:", error);
-      toast.error("Failed to delete ritual");
+      toast.error("Failed to delete rhythm");
     },
   });
 
@@ -3028,17 +2987,17 @@ export const useEpics = (options: EpicsOptions = {}) => {
       return withPlannerRemoteSyncLock(user.id, async () => {
         const trimmedTitle = input.title.trim();
         if (!trimmedTitle) {
-          throw new Error("Ritual title cannot be empty");
+          throw new Error("Rhythm title cannot be empty");
         }
 
         const localEpics = await loadLocalEpics(user.id);
         const epic = localEpics.find((candidate) => candidate.id === input.epicId);
         if (!epic) {
-          throw new Error("Campaign not found");
+          throw new Error("Commitment not found");
         }
 
         if (epic.status !== "active") {
-          throw new Error("Only active campaigns can receive new rituals");
+          throw new Error("Only active commitments can receive new rhythms");
         }
 
         const frequency = normalizeFrequency(input.frequency);
@@ -3177,15 +3136,15 @@ export const useEpics = (options: EpicsOptions = {}) => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
 
-      toast.success(queued ? "Ritual saved offline" : "Ritual added to campaign!", {
+      toast.success(queued ? "Rhythm saved offline" : "Rhythm added to commitment", {
         description: queued
-          ? "Your new ritual will sync when you're back online."
-          : `"${habit.title}" is now part of this campaign.`,
+          ? "Your new rhythm will sync when you're back online."
+          : `"${habit.title}" is now part of this commitment.`,
       });
     },
     onError: (error) => {
       console.error("Failed to create campaign ritual:", error);
-      toast.error("Failed to add ritual");
+      toast.error("Failed to add rhythm");
     },
   });
 
@@ -3198,12 +3157,12 @@ export const useEpics = (options: EpicsOptions = {}) => {
       habitId: string;
     }) => {
       if (!epicId || !habitId) {
-        throw new Error("Invalid epic or habit ID");
+        throw new Error("Invalid commitment or rhythm ID");
       }
 
       const existing = await getLocalEpicHabits<Array<{ id: string; epic_id: string; habit_id: string }>[number]>([epicId]);
       if (existing.some((row) => row.habit_id === habitId)) {
-        throw new Error("Habit is already linked to this epic");
+        throw new Error("Rhythm is already linked to this commitment");
       }
 
       const row = {
@@ -3224,11 +3183,11 @@ export const useEpics = (options: EpicsOptions = {}) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
-      toast.success("Habit linked to epic! ⚔️");
+      toast.success("Rhythm linked to commitment");
     },
     onError: (error) => {
       console.error("Failed to link habit:", error);
-      toast.error("Failed to link habit to epic");
+      toast.error("Failed to link rhythm to commitment");
     },
   });
 
@@ -3241,7 +3200,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
       habitId: string;
     }) => {
       if (!epicId || !habitId) {
-        throw new Error("Invalid epic or habit ID");
+        throw new Error("Invalid commitment or rhythm ID");
       }
 
       if (!user?.id) {
@@ -3288,11 +3247,11 @@ export const useEpics = (options: EpicsOptions = {}) => {
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
       queryClient.resetQueries({ queryKey: DAILY_PLAN_OPTIMIZATION_QUERY_KEY });
       dispatchPlannerSyncFinished();
-      toast(queued ? "Habit unlink saved offline" : "Habit removed from epic");
+      toast(queued ? "Rhythm removal saved offline" : "Rhythm removed from commitment");
     },
     onError: (error) => {
       console.error("Failed to remove habit:", error);
-      toast.error("Failed to remove habit from epic");
+      toast.error("Failed to remove rhythm from commitment");
     },
   });
 

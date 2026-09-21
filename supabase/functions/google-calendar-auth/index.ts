@@ -1,12 +1,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { createSignedOAuthState, verifySignedOAuthState } from "../_shared/oauthState.ts";
+import type { OAuthProductMode } from "../_shared/oauthState.ts";
+import {
+  assertRedirectProductBoundary,
+  assertUserProductBoundary,
+} from "../_shared/productBoundary.ts";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_CALENDAR_LIST_URL = "https://www.googleapis.com/calendar/v3/users/me/calendarList";
 const GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
-const NATIVE_CALLBACK_SCHEME_URL = "cosmiq://calendar/oauth/callback";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
@@ -14,7 +18,7 @@ const SCOPES = [
   "https://www.googleapis.com/auth/userinfo.email",
 ].join(" ");
 
-type SyncMode = "send_only";
+type SyncMode = "send_only" | "full_sync";
 type OAuthSource = "web" | "native";
 
 type Action =
@@ -23,6 +27,7 @@ type Action =
   | "status"
   | "listCalendars"
   | "setPrimaryCalendar"
+  | "setSyncMode"
   | "disconnect"
   | "refreshToken";
 
@@ -78,6 +83,7 @@ function toNativeCallbackErrorMessage(error: unknown): string {
 function buildNativeCallbackRedirect(args: {
   status: "success" | "error";
   message?: string;
+  productMode: OAuthProductMode;
 }): string {
   const params = new URLSearchParams({
     provider: "google",
@@ -88,7 +94,12 @@ function buildNativeCallbackRedirect(args: {
     params.set("message", args.message);
   }
 
-  return `${NATIVE_CALLBACK_SCHEME_URL}?${params.toString()}`;
+  const scheme = args.productMode === "cosmiq" ? "cosmiq" : "graceward";
+  return `${scheme}://calendar/oauth/callback?${params.toString()}`;
+}
+
+function normalizeProductMode(value: unknown): OAuthProductMode {
+  return value === "cosmiq" ? "cosmiq" : "graceward";
 }
 
 function buildFunctionCallbackUrl(req: Request): string {
@@ -117,6 +128,8 @@ function normalizeAction(raw: string | undefined): Action | null {
     list_calendars: "listCalendars",
     setPrimaryCalendar: "setPrimaryCalendar",
     set_primary_calendar: "setPrimaryCalendar",
+    setSyncMode: "setSyncMode",
+    set_sync_mode: "setSyncMode",
     disconnect: "disconnect",
     refreshToken: "refreshToken",
     refresh_token: "refreshToken",
@@ -125,11 +138,11 @@ function normalizeAction(raw: string | undefined): Action | null {
 }
 
 function normalizeSyncMode(mode: unknown): SyncMode {
-  return "send_only";
+  return mode === "full_sync" ? "full_sync" : "send_only";
 }
 
 function isSyncMode(mode: unknown): mode is SyncMode {
-  return mode === "send_only";
+  return mode === "send_only" || mode === "full_sync";
 }
 
 function normalizeOAuthSource(source: unknown): OAuthSource {
@@ -142,7 +155,7 @@ function getBearerToken(req: Request): string | null {
   return authHeader.replace("Bearer ", "").trim() || null;
 }
 
-async function getAuthedUserId(supabaseAdmin: any, req: Request): Promise<string> {
+async function getAuthedUser(supabaseAdmin: any, req: Request): Promise<any> {
   const token = getBearerToken(req);
   if (!token) {
     throw new Error("Missing Authorization bearer token");
@@ -157,6 +170,11 @@ async function getAuthedUserId(supabaseAdmin: any, req: Request): Promise<string
     throw new Error("Unauthorized");
   }
 
+  return user;
+}
+
+async function getAuthedUserId(supabaseAdmin: any, req: Request): Promise<string> {
+  const user = await getAuthedUser(supabaseAdmin, req);
   return user.id;
 }
 
@@ -396,6 +414,25 @@ async function exchangeGoogleConnection(args: {
     throw new OAuthHttpError("Failed to store calendar connection", 500, upsertError.message);
   }
 
+  const { data: calendarSettings } = await supabase
+    .from("calendar_user_settings")
+    .select("default_provider")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const { error: settingsError } = await supabase
+    .from("calendar_user_settings")
+    .upsert(
+      {
+        user_id: userId,
+        integration_visible: true,
+        default_provider: calendarSettings?.default_provider ?? "google",
+      },
+      { onConflict: "user_id" },
+    );
+  if (settingsError) {
+    console.warn("Failed to initialize Google calendar settings", settingsError.message);
+  }
+
   return {
     success: true,
     connection,
@@ -441,11 +478,25 @@ Deno.serve(async (req) => {
       const providerError = requestUrl.searchParams.get("error");
       const providerErrorDescription = requestUrl.searchParams.get("error_description");
       const redirectUri = buildFunctionCallbackUrl(req);
+      let callbackProductMode: OAuthProductMode = "graceward";
+
+      if (state && internalFunctionSecret) {
+        try {
+          callbackProductMode = (await verifySignedOAuthState({
+            state,
+            provider: "google",
+            secret: internalFunctionSecret,
+          })).productMode;
+        } catch {
+          // Invalid state is handled below; retain the legacy Graceward target.
+        }
+      }
 
       if (providerError) {
         return redirectResponse(buildNativeCallbackRedirect({
           status: "error",
           message: providerErrorDescription || providerError,
+          productMode: callbackProductMode,
         }));
       }
 
@@ -465,11 +516,13 @@ Deno.serve(async (req) => {
         return redirectResponse(buildNativeCallbackRedirect({
           status: "success",
           message: "Google Calendar connected successfully.",
+          productMode: callbackProductMode,
         }));
       } catch (error) {
         return redirectResponse(buildNativeCallbackRedirect({
           status: "error",
           message: toNativeCallbackErrorMessage(error),
+          productMode: callbackProductMode,
         }));
       }
     }
@@ -482,13 +535,25 @@ Deno.serve(async (req) => {
     }
 
     if (action === "getAuthUrl") {
-      const userId = await getAuthedUserId(supabase, req);
+      const authedUser = await getAuthedUser(supabase, req);
+      const userId = authedUser.id;
       const rawRedirectUri = (body?.redirectUri || body?.redirect_uri) as string | undefined;
       const redirectUri = rawRedirectUri?.trim();
       const requestedSyncMode = normalizeSyncMode(body?.syncMode ?? body?.sync_mode);
       const requestedSource = normalizeOAuthSource(body?.source ?? body?.calendar_source);
+      const requestedProductMode = normalizeProductMode(
+        body?.productMode ?? body?.product_mode,
+      );
       if (!redirectUri) {
         return jsonResponse({ error: "redirectUri is required" }, 400);
+      }
+      try {
+        assertUserProductBoundary(authedUser, requestedProductMode);
+        assertRedirectProductBoundary(redirectUri, requestedProductMode);
+      } catch (error) {
+        return jsonResponse({
+          error: error instanceof Error ? error.message : "Product boundary mismatch",
+        }, 403);
       }
 
       if (!internalFunctionSecret) {
@@ -500,6 +565,7 @@ Deno.serve(async (req) => {
         userId,
         syncMode: requestedSyncMode,
         source: requestedSource,
+        productMode: requestedProductMode,
         redirectUri,
         secret: internalFunctionSecret,
       });
@@ -524,6 +590,22 @@ Deno.serve(async (req) => {
       const requestedSyncModeFromBody = isSyncMode(body?.syncMode ?? body?.sync_mode)
         ? (body?.syncMode ?? body?.sync_mode)
         : null;
+      const requestedProductMode = normalizeProductMode(
+        body?.productMode ?? body?.product_mode,
+      );
+      const authedUser = await getAuthedUser(supabase, req).catch(() => null);
+      try {
+        if (authedUser) {
+          assertUserProductBoundary(authedUser, requestedProductMode);
+        }
+        if (redirectUri) {
+          assertRedirectProductBoundary(redirectUri, requestedProductMode);
+        }
+      } catch (error) {
+        return jsonResponse({
+          error: error instanceof Error ? error.message : "Product boundary mismatch",
+        }, 403);
+      }
 
       try {
         const result = await exchangeGoogleConnection({
@@ -578,7 +660,7 @@ Deno.serve(async (req) => {
         primaryCalendarId: connection?.primary_calendar_id ?? null,
         primaryCalendarName: connection?.primary_calendar_name ?? null,
         syncEnabled: connection?.sync_enabled ?? false,
-        syncMode: "send_only",
+        syncMode: connection?.sync_mode ?? "send_only",
         lastSyncedAt: connection?.last_synced_at ?? null,
         connectedAt: connection?.created_at ?? null,
       });
@@ -600,6 +682,30 @@ Deno.serve(async (req) => {
 
     if (!connection || connectionError) {
       return jsonResponse({ error: "No Google Calendar connection found" }, 404);
+    }
+
+    if (action === "setSyncMode") {
+      const syncMode = normalizeSyncMode(body?.syncMode ?? body?.sync_mode);
+      const { error: connectionUpdateError } = await supabase
+        .from("user_calendar_connections")
+        .update({ sync_mode: syncMode, updated_at: new Date().toISOString() })
+        .eq("id", connection.id);
+
+      if (connectionUpdateError) {
+        return jsonResponse({ error: "Failed to update sync mode", details: connectionUpdateError.message }, 500);
+      }
+
+      const { error: linksUpdateError } = await supabase
+        .from("quest_calendar_links")
+        .update({ sync_mode: syncMode, updated_at: new Date().toISOString() })
+        .eq("connection_id", connection.id)
+        .eq("user_id", userId)
+        .eq("provider", "google");
+      if (linksUpdateError) {
+        return jsonResponse({ error: "Failed to update linked event sync mode", details: linksUpdateError.message }, 500);
+      }
+
+      return jsonResponse({ success: true, syncMode });
     }
 
     if (action === "refreshToken") {

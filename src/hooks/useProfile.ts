@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { getAuthUserAccountEmail } from "@/utils/authUser";
 
 import { ProfilePreferences } from "@/types/profile";
 
@@ -45,6 +46,7 @@ export interface Profile {
   // Quest behavior settings
   completed_tasks_stay_in_place: boolean | null;
   readable_quest_cards_enabled: boolean | null;
+  companion_memory_enabled: boolean;
 }
 
 export const useProfile = () => {
@@ -93,7 +95,8 @@ export const useProfile = () => {
           task_reminders_enabled,
           checkin_reminders_enabled,
           completed_tasks_stay_in_place,
-          readable_quest_cards_enabled
+          readable_quest_cards_enabled,
+          companion_memory_enabled
         `)
         .eq("id", user.id)
         .maybeSingle();
@@ -109,7 +112,7 @@ export const useProfile = () => {
           .from("profiles")
           .upsert({
             id: user.id,
-            email: user.email ?? null,
+            email: getAuthUserAccountEmail(user),
           }, {
             onConflict: 'id',
             ignoreDuplicates: false
@@ -150,7 +153,8 @@ export const useProfile = () => {
             task_reminders_enabled,
             checkin_reminders_enabled,
             completed_tasks_stay_in_place,
-            readable_quest_cards_enabled
+            readable_quest_cards_enabled,
+            companion_memory_enabled
           `)
           .maybeSingle();
 

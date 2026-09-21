@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Star } from "lucide-react";
 import confetti from "canvas-confetti";
 import { haptics } from "@/utils/haptics";
+import { PRODUCT } from "@/config/product";
+import { getCompanionMotionEventTypeFromReason } from "@/config/companionMotion";
 
 interface XPToastProps {
   xp: number;
@@ -17,20 +19,25 @@ export const XPToast = ({ xp, reason, show, onComplete }: XPToastProps) => {
       // Light haptic feedback
       haptics.light();
       
-      // Light confetti burst
-      confetti({
-        particleCount: 20,
-        spread: 50,
-        origin: { y: 0.7 },
-        colors: ['#A76CFF', '#C084FC'],
-        ticks: 100,
-        gravity: 1.2,
-      });
+      const motionType = getCompanionMotionEventTypeFromReason(reason);
+      const isMilestone = motionType === "streak" || xp >= 40;
+      if (isMilestone) {
+        confetti({
+          particleCount: PRODUCT.mode === "christian" ? 12 : 20,
+          spread: 50,
+          origin: { y: 0.72 },
+          colors: PRODUCT.mode === "christian"
+            ? ['#D6B86A', '#7DA37A']
+            : ['#A76CFF', '#C084FC'],
+          ticks: 100,
+          gravity: 1.2,
+        });
+      }
 
       const timer = setTimeout(onComplete, 2000);
       return () => clearTimeout(timer);
     }
-  }, [show, onComplete]);
+  }, [reason, show, onComplete, xp]);
 
   return (
     <AnimatePresence>

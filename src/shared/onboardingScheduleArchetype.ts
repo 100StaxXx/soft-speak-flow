@@ -109,7 +109,7 @@ export const ONBOARDING_SCHEDULE_ARCHETYPE_PROFILES: Record<
     id: "flexible_transition",
     label: "flexible or transition season",
     plannerHint:
-      "Create gentle anchors and clear next actions without assuming a fixed routine or overloading the day.",
+      "Create steady anchors and clear next actions without assuming a fixed routine or overloading the day.",
     defaultWorkloadTolerance: "light",
     defaultPreferredTimeOfDay: "morning",
     defaultPreferredTimeReason:

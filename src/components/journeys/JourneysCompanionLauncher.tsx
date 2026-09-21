@@ -3,6 +3,8 @@ import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionIm
 import { cn } from "@/lib/utils";
 import { useJourneysCompanionVisual } from "@/hooks/useJourneysCompanionVisual";
 import { useCompanionImageBackgroundCutout } from "@/hooks/useCompanionImageBackgroundCutout";
+import { useCompanionMotionSafe } from "@/contexts/CompanionMotionContext";
+import { motion } from "framer-motion";
 import { shouldContainCompanionSceneImage } from "@/lib/companionImageFocal";
 
 type JourneysCompanionLauncherVariant = "floating" | "inline";
@@ -27,7 +29,7 @@ export function JourneysCompanionLauncher({
   variant,
   compact = false,
   text,
-  caption = "Companion chat",
+  caption = "Reflect and plan",
   imageUrlOverride,
   imageFocalXOverride,
   imageFocalYOverride,
@@ -46,8 +48,13 @@ export function JourneysCompanionLauncher({
     focalX,
     focalY,
     element,
+    currentStage,
     usesPortraitShell,
   } = useJourneysCompanionVisual();
+  const { activeEvent } = useCompanionMotionSafe();
+  const isRewardEvent = activeEvent?.type === "xp_gain"
+    || activeEvent?.type === "quest_complete"
+    || activeEvent?.type === "streak";
 
   const resolvedImageUrl = imageUrlOverride === undefined
     ? imageUrl
@@ -88,7 +95,7 @@ export function JourneysCompanionLauncher({
       )}
       data-companion-background-cutout={shouldCutOutHeroBackground ? heroCutoutStatus : undefined}
     >
-      <span className="h-1/2 w-1/2 rounded-full bg-white/12 shadow-[inset_0_0_24px_rgba(255,255,255,0.14)]" />
+      <span className="h-1/2 w-1/2 rounded-full bg-white/[0.12] shadow-[inset_0_0_24px_rgba(255,255,255,0.14)]" />
     </span>
   );
 
@@ -149,6 +156,29 @@ export function JourneysCompanionLauncher({
     </div>
   );
 
+  const animatedPortrait = (
+    <span
+      className="h-full w-full rounded-full"
+      data-testid="companion-motion-surface"
+      data-companion-stage={currentStage ?? 1}
+    >
+      <motion.span
+        key={isRewardEvent ? activeEvent?.id : "idle"}
+        className="block h-full w-full"
+        animate={isRewardEvent ? {
+          y: [0, -7, 0],
+          rotate: [0, -3, 3, 0],
+          scale: [1, 1.08, 1],
+        } : { y: [0, -2, 0] }}
+        transition={isRewardEvent
+          ? { duration: 0.8, ease: [0.22, 1, 0.36, 1] }
+          : { duration: 4.2, repeat: Infinity, ease: "easeInOut" }}
+      >
+        {portrait}
+      </motion.span>
+    </span>
+  );
+
   if (variant === "floating") {
     return (
       <button
@@ -157,7 +187,7 @@ export function JourneysCompanionLauncher({
           "group relative flex items-center justify-center transition-transform duration-300 hover:scale-[1.02]",
           isFloatingHero
             ? "h-36 w-36 overflow-visible rounded-full border-0 bg-transparent p-0 text-cyan-50 shadow-none hover:bg-transparent hover:text-white"
-            : "h-12 w-12 rounded-full border border-white/12 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),rgba(255,255,255,0.04)_48%,rgba(15,23,42,0.92))] shadow-[0_12px_28px_rgba(0,0,0,0.22)]",
+            : "h-12 w-12 rounded-full border border-white/[0.12] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.12),rgba(255,255,255,0.04)_48%,rgba(15,23,42,0.92))] shadow-[0_12px_28px_rgba(0,0,0,0.22)]",
           className,
         )}
         data-face-direction={faceDirection}
@@ -176,7 +206,7 @@ export function JourneysCompanionLauncher({
           )}
           style={{ transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)" }}
         >
-          {portrait}
+          {animatedPortrait}
         </span>
       </button>
     );
@@ -197,11 +227,11 @@ export function JourneysCompanionLauncher({
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(125,211,252,0.14),transparent_34%),radial-gradient(circle_at_85%_78%,rgba(250,204,21,0.1),transparent_28%)]"
       />
       <span className="relative shrink-0">
-        {portrait}
+        {animatedPortrait}
       </span>
       <span className="relative min-w-0">
         {!compact ? (
-          <span className="block text-[10px] font-semibold uppercase tracking-[0.22em] text-white/46">
+          <span className="block text-[10px] font-semibold uppercase tracking-[0.22em] text-white/[0.46]">
             {caption}
           </span>
         ) : null}

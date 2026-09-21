@@ -224,7 +224,7 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       if (!isCosmiqTitleCard(data?.card)) {
-        throw new Error("Received malformed Cosmiq title card data");
+        throw new Error("Received malformed companion title card data");
       }
       return {
         analysisDate,

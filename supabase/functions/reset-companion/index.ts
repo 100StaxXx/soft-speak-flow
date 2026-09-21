@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -21,12 +22,14 @@ serve(async (req) => {
     const { data: { user }, error: userErr } = await supabase.auth.getUser(token);
     if (userErr) throw userErr;
     if (!user) throw new Error('Unauthorized');
+    const productMode = await resolveUserProductMode(supabase, user.id);
 
     // Find companion
     const { data: companion, error: compErr } = await supabase
       .from('user_companion')
       .select('id')
       .eq('user_id', user.id)
+      .eq('product_mode', productMode)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -40,6 +43,58 @@ serve(async (req) => {
 
     // Delete related data (bypass RLS with service role)
     const compId = companion.id;
+
+    const [{ data: evolutionRows, error: evolutionLookupError }, {
+      data: cinemaRows,
+      error: cinemaLookupError,
+    }] = await Promise.all([
+      supabase.from('companion_evolutions').select('id').eq('companion_id', compId),
+      supabase.from('companion_cinema_events').select('id').eq('companion_id', compId),
+    ]);
+    if (evolutionLookupError) throw evolutionLookupError;
+    if (cinemaLookupError) throw cinemaLookupError;
+
+    const evolutionIds = new Set((evolutionRows ?? []).map((row) => row.id));
+    const cinemaIds = new Set((cinemaRows ?? []).map((row) => row.id));
+    const { data: ledgerRows, error: ledgerError } = await supabase
+      .from('user_storage_assets')
+      .select('id, bucket_id, storage_path, source_record_table, source_record_id')
+      .eq('user_id', user.id);
+    if (ledgerError) throw ledgerError;
+
+    const companionAssets = (ledgerRows ?? []).filter((asset) => {
+      if (
+        asset.source_record_table === 'companion_evolutions' &&
+        asset.source_record_id &&
+        evolutionIds.has(asset.source_record_id)
+      ) return true;
+      if (
+        asset.source_record_table === 'companion_cinema_events' &&
+        asset.source_record_id &&
+        cinemaIds.has(asset.source_record_id)
+      ) return true;
+      return typeof asset.storage_path === 'string' && asset.storage_path.includes(compId);
+    });
+
+    const pathsByBucket = new Map<string, string[]>();
+    for (const asset of companionAssets) {
+      const paths = pathsByBucket.get(asset.bucket_id) ?? [];
+      paths.push(asset.storage_path);
+      pathsByBucket.set(asset.bucket_id, paths);
+    }
+    for (const [bucketId, paths] of pathsByBucket) {
+      const { error: removeError } = await supabase.storage
+        .from(bucketId)
+        .remove(Array.from(new Set(paths)));
+      if (removeError) throw removeError;
+    }
+    if (companionAssets.length > 0) {
+      const { error: ledgerDeleteError } = await supabase
+        .from('user_storage_assets')
+        .delete()
+        .in('id', companionAssets.map((asset) => asset.id));
+      if (ledgerDeleteError) throw ledgerDeleteError;
+    }
 
     const { error: delXpErr } = await supabase
       .from('xp_events')

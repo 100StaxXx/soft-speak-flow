@@ -1,7 +1,7 @@
-import { Flame, Moon, Sparkles, type LucideIcon } from "lucide-react";
-import starfallImg from "@/assets/faction-starfall.png";
-import voidImg from "@/assets/faction-void.png";
-import stellarImg from "@/assets/faction-stellar.png";
+import { Flame, HandHeart, Waves, type LucideIcon } from "lucide-react";
+import steadfastImg from "@/assets/paths/path-steadfast.webp";
+import stillwaterImg from "@/assets/paths/path-stillwater.webp";
+import mercifulImg from "@/assets/paths/path-merciful.webp";
 
 export type FactionType = "starfall" | "void" | "stellar";
 
@@ -24,19 +24,19 @@ export interface Faction {
 export const factions: Faction[] = [
   {
     id: "starfall",
-    name: "STARFALL FLEET",
-    subtitle: "Blazing Through the Unknown",
-    description: "Warriors of momentum who believe that action is the ultimate teacher. The Fleet charges forward, turning obstacles into fuel and doubt into determination.",
-    motto: "We don't follow paths, we burn new ones.",
+    name: "THE STEADFAST",
+    subtitle: "Courage Made Consistent",
+    description: "A path for people who meet faith through action. The Steadfast practice courage, discipline, and faithful follow-through—one honest step at a time.",
+    motto: "Be strong, take heart, and keep walking.",
     philosophy: [
-      "Action over hesitation",
-      "Bold moves create breakthroughs",
-      "Fear is fuel for the fearless",
-      "Progress beats perfection",
+      "Faith becomes visible through action",
+      "Courage grows through small obedience",
+      "Consistency matters more than intensity",
+      "Rest and recovery belong on the path",
     ],
-    traits: ["Courageous", "Driven", "Resilient", "Bold"],
-    idealFor: "Those who thrive on challenge and want to build unstoppable momentum in their growth journey.",
-    image: starfallImg,
+    traits: ["Courageous", "Grounded", "Resilient", "Disciplined"],
+    idealFor: "People who grow through clear action, accountability, and practical daily challenges.",
+    image: steadfastImg,
     color: "#FF6600",
     fontClass: "font-bebas",
     nameStyle: {
@@ -48,19 +48,19 @@ export const factions: Faction[] = [
   },
   {
     id: "void",
-    name: "Void Collective",
-    subtitle: "Masters of the In Between",
-    description: "Seekers of depth who find power in pause. The Collective understands that true transformation happens in moments of stillness, where clarity emerges from chaos.",
-    motto: "In stillness, we find infinite power.",
+    name: "THE STILLWATER",
+    subtitle: "Wisdom Through Prayerful Attention",
+    description: "A path for people who hear most clearly in quiet. Stillwater members make room for Scripture, reflection, honest questions, and the gentle work of discernment.",
+    motto: "In quietness, notice what grace is doing.",
     philosophy: [
-      "Depth over speed",
-      "Reflection reveals truth",
-      "The void holds all answers",
-      "Patience is strength",
+      "Depth before urgency",
+      "Prayer makes room for truth",
+      "Attention is a form of love",
+      "Patience can be faithful action",
     ],
-    traits: ["Introspective", "Wise", "Centered", "Mysterious"],
-    idealFor: "Those who value mindfulness and want to cultivate inner wisdom alongside outer achievement.",
-    image: voidImg,
+    traits: ["Reflective", "Wise", "Patient", "Attentive"],
+    idealFor: "People who grow through contemplation, learning, Scripture, and thoughtful reflection.",
+    image: stillwaterImg,
     color: "#7F26D9",
     fontClass: "font-cinzel",
     nameStyle: {
@@ -69,23 +69,23 @@ export const factions: Faction[] = [
       fontWeight: 400,
       textShadow: "0 0 30px rgba(180, 100, 255, 0.7), 0 0 60px rgba(130, 50, 200, 0.4)",
     },
-    icon: Moon,
+    icon: Waves,
   },
   {
     id: "stellar",
-    name: "Stellar Voyagers",
-    subtitle: "Dreamers Among the Stars",
-    description: "Visionaries who see possibility in every constellation. The Voyagers chart courses through imagination, turning dreams into maps and wonder into wisdom.",
-    motto: "Every star was once a dream.",
+    name: "THE MERCIFUL",
+    subtitle: "Grace Expressed Through Service",
+    description: "A path for people whose faith comes alive in relationship. The Merciful practice compassion, generosity, reconciliation, and concrete care for the people around them.",
+    motto: "Receive grace freely; carry it outward.",
     philosophy: [
-      "Vision shapes reality",
-      "Wonder fuels discovery",
-      "Dreams are destinations",
-      "Imagination is power",
+      "Love becomes concrete through service",
+      "Compassion begins with attention",
+      "Generosity can be practiced daily",
+      "Community is part of formation",
     ],
-    traits: ["Creative", "Optimistic", "Curious", "Inspiring"],
-    idealFor: "Those who dream big and want to transform their aspirations into reality through wonder and creativity.",
-    image: stellarImg,
+    traits: ["Compassionate", "Generous", "Relational", "Hopeful"],
+    idealFor: "People who grow through relationships, service, encouragement, and acts of practical care.",
+    image: mercifulImg,
     color: "#3DB8F5",
     fontClass: "font-quicksand",
     nameStyle: {
@@ -94,7 +94,7 @@ export const factions: Faction[] = [
       fontWeight: 600,
       textShadow: "0 0 30px rgba(100, 200, 255, 0.7), 0 0 60px rgba(50, 150, 220, 0.4)",
     },
-    icon: Sparkles,
+    icon: HandHeart,
   },
 ];
 

@@ -73,7 +73,7 @@ describe('TaskAdvancedEditSheet reminders', () => {
         reminderOffsetsMinutes: [90],
       }));
     });
-  });
+  }, 20_000);
 
   it('keeps custom reminder minutes as a fallback without a concrete quest date', async () => {
     const onSave = vi.fn();

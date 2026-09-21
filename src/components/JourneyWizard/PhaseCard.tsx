@@ -60,9 +60,9 @@ export function PhaseCard({
   const phaseColors = [
     'border-[hsl(var(--celestial-blue)_/_0.28)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.96),hsl(var(--celestial-blue)_/_0.12))]',
     'border-[hsl(var(--celestial-blue)_/_0.28)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.96),hsl(var(--secondary)_/_0.72))]',
-    'border-epic-nature/28 bg-[linear-gradient(180deg,hsl(var(--card)_/_0.96),hsl(var(--epic-nature)_/_0.1))]',
+    'border-epic-nature/[0.28] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.96),hsl(var(--epic-nature)_/_0.1))]',
     'border-[hsl(var(--celestial-blue)_/_0.24)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.96),hsl(var(--stardust-gold)_/_0.1))]',
-    'border-category-body/32 bg-[linear-gradient(180deg,hsl(var(--card)_/_0.96),hsl(var(--category-body)_/_0.08))]',
+    'border-category-body/[0.32] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.96),hsl(var(--category-body)_/_0.08))]',
   ];
 
   const colorClass = phaseColors[(phase.phaseOrder - 1) % phaseColors.length];

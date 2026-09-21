@@ -13,17 +13,19 @@ import {
 import { upsertAccountEntitlement } from "../_shared/accountEntitlements.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import {
+  assertAppleProductBoundary,
   fetchAppleTransactionBinding,
   getDiscountedYearlyOfferId,
   getPriceCents,
   isGenesisYearlyOffer,
   isDiscountedYearlyOffer,
   resolvePlanFromProduct,
+  resolveAppleBundleProductMode,
   upsertSubscription,
 } from "../_shared/appleSubscriptions.ts";
 import { normalizeAppAccountToken } from "../_shared/appleServerAPI.ts";
 
-const defaultAppleBundleId = "com.darrylgraham.revolution";
+const defaultAppleBundleIds = ["com.darrylgraham.graceward", "com.darrylgraham.revolution"];
 const GENESIS_SPECIAL_CODE = "GENESIS";
 const WEBHOOK_PROVIDER = "apple";
 const APPLE_ROOT_CA_G3_SHA256_FINGERPRINT =
@@ -35,7 +37,7 @@ const appleWebhookAudiences = [
 ].filter((value): value is string => Boolean(value));
 
 if (appleWebhookAudiences.length === 0) {
-  appleWebhookAudiences.push(defaultAppleBundleId);
+  appleWebhookAudiences.push(...defaultAppleBundleIds);
 }
 
 /**
@@ -143,6 +145,7 @@ export async function handleAppleWebhookNotification(
       autoRenewStatus,
       transactionInfo,
       environment,
+      bundleId,
     } = notificationContext;
 
     const eventId = await eventIdForNotification(payload, notificationContext);
@@ -188,6 +191,11 @@ export async function handleAppleWebhookNotification(
       typeof transactionInfo?.appAccountToken === "string"
         ? transactionInfo.appAccountToken
         : null,
+    );
+
+    assertAppleProductBoundary(
+      productId,
+      resolveAppleBundleProductMode(bundleId),
     );
 
     const binding = await fetchAppleTransactionBinding(
@@ -417,6 +425,9 @@ async function buildNotificationContext(
   let environment = typeof body?.environment === "string"
     ? body.environment
     : undefined;
+  let bundleId = typeof body?.bundleId === "string"
+    ? body.bundleId
+    : undefined;
 
   if (body?.signedPayload) {
     const rootPayload = await verifyAppleNotification(
@@ -430,6 +441,7 @@ async function buildNotificationContext(
       | undefined;
 
     const data = (rootPayload.data ?? {}) as Record<string, unknown>;
+    bundleId = typeof data.bundleId === "string" ? data.bundleId : bundleId;
     const bundleAudience = typeof data.bundleId === "string"
       ? data.bundleId
       : appleWebhookAudiences;
@@ -473,6 +485,7 @@ async function buildNotificationContext(
     autoRenewStatus,
     transactionInfo,
     environment,
+    bundleId,
   };
 }
 

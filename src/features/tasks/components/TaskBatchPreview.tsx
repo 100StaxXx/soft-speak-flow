@@ -251,7 +251,7 @@ export function TaskBatchPreview({
                   Creating...
                 </>
               ) : (
-                `Create ${selectedTasks.length} Quest${selectedTasks.length !== 1 ? 's' : ''}`
+                `Create ${selectedTasks.length} action${selectedTasks.length !== 1 ? 's' : ''}`
               )}
             </Button>
           </div>

@@ -179,11 +179,11 @@ const DailyMissionsContent = memo(() => {
   return (
     <Card
       className={cn(
-        "group relative overflow-hidden border-accent/16 p-4 transition-all duration-500 hover:border-accent/28 hover:shadow-[0_0_32px_hsl(var(--accent)/0.12)] sm:p-5 md:p-6",
+        "group relative overflow-hidden border-accent/[0.16] p-4 transition-all duration-500 hover:border-accent/[0.28] hover:shadow-[0_0_32px_hsl(var(--accent)/0.12)] sm:p-5 md:p-6",
         outerShellCardClassName,
       )}
     >
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/8 to-primary/8" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/[0.08] to-primary/[0.08]" />
       {factionData && (
         <div
           className="pointer-events-none absolute -right-12 top-[-56px] h-44 w-44 rounded-full blur-3xl"
@@ -216,12 +216,12 @@ const DailyMissionsContent = memo(() => {
                   className="truncate text-[10px] font-semibold uppercase tracking-[0.26em]"
                   style={{ color: factionData.color }}
                 >
-                  {factionData.name} Dispatch
+                  {factionData.name} Practice
                 </p>
               )}
               <div className="flex items-center gap-1">
                 <h3 className="font-heading text-base font-black sm:text-lg">
-                  {hasFactionContext ? "Guild Missions" : "Daily Missions"}
+                  {hasFactionContext ? "Path Practices" : "Daily Practices"}
                 </h3>
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-1.5">

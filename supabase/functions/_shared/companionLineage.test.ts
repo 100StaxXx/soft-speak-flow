@@ -1,6 +1,7 @@
 import {
   buildAiEvolutionPrompt,
   buildBoundaryEvolutionGenerationPrompt,
+  buildCompanionFamilyBible,
   buildCompanionGenerationMetadata,
   buildEggFromStage1Prompt,
   buildInitialImageLineageMetadata,
@@ -138,6 +139,17 @@ Deno.test("future companion image prompts ask for transparent cutout output", ()
       prompt.includes("no scenic") || prompt.includes("No scenic"),
       "Expected companion prompt to reject scenic backdrops",
     );
+    assert(
+      prompt.includes("2D anime") && prompt.includes("soft cel shading"),
+      "Expected companion prompt to preserve the Graceward animated art bible",
+    );
+    assert(
+      prompt.includes("not chibi") &&
+        prompt.includes(
+          "specific existing game, anime, mascot, or copyrighted character",
+        ),
+      "Expected companion prompt to reject chibi distortion and franchise imitation",
+    );
   }
 });
 
@@ -218,7 +230,7 @@ Deno.test("empty visual anchors are rejected before persistence", () => {
   );
 });
 
-Deno.test("metadata-first boundary prompt uses anchors without reference-image edit instructions", () => {
+Deno.test("boundary prompt preserves extracted identity anchors for reference-image evolution", () => {
   const profile: VisualIdentityProfile = {
     schemaVersion: 1,
     spiritAnimal: "Wolf",
@@ -260,8 +272,9 @@ Deno.test("metadata-first boundary prompt uses anchors without reference-image e
   });
 
   assert(
-    prompt.includes("Metadata-first evolution rules"),
-    "Expected metadata-first generation instructions",
+    prompt.includes("Reference-image evolution rules") &&
+      prompt.includes("previous approved portrait"),
+    "Expected direct reference-image evolution instructions",
   );
   assert(
     prompt.includes("small wolf hatchling with a water ruff") &&
@@ -269,9 +282,48 @@ Deno.test("metadata-first boundary prompt uses anchors without reference-image e
     "Expected prompt to include previous visual anchors",
   );
   assert(
-    !prompt.includes("Use the reference image"),
-    "Expected metadata-first prompt to avoid image-edit reference instructions",
+    prompt.includes("same individual"),
+    "Expected the prompt to prohibit sibling-style redesigns",
   );
+});
+
+Deno.test("Christian companion forms receive explicit natural anatomy anchors", () => {
+  const expectedAnchors: Record<string, string[]> = {
+    Lamb: ["wool", "cloven hooves", "broad ear"],
+    Lion: ["mane", "broad paws", "feline"],
+    Stag: ["antlers", "cloven hooves", "deer"],
+    Dove: ["small pale beak", "folded wings", "dove"],
+    Eagle: ["hooked beak", "talon", "raptor"],
+    Wolf: ["ruff", "bushy tail", "canine"],
+  };
+
+  for (const [spiritAnimal, expectedTerms] of Object.entries(expectedAnchors)) {
+    const profile = buildCompanionFamilyBible({
+      spiritAnimal,
+      coreElement: "earth",
+      favoriteColor: "#6B7C59",
+      storyTone: "soft_gentle",
+    });
+    const identityText = [
+      profile.bodyPlan,
+      ...profile.silhouetteAnchors,
+      ...profile.faceAnchors,
+      ...profile.signatureFeatures,
+    ].join(" ").toLowerCase();
+
+    for (const expectedTerm of expectedTerms) {
+      assert(
+        identityText.includes(expectedTerm.toLowerCase()),
+        `Expected ${spiritAnimal} identity rules to include ${expectedTerm}`,
+      );
+    }
+    assert(
+      profile.elementManifestation.some((rule) =>
+        rule.includes("never divine, magical")
+      ),
+      `Expected ${spiritAnimal} visual-nature rules to stay creation-grounded`,
+    );
+  }
 });
 
 Deno.test("non-boundary levels remain non-portrait stages", () => {

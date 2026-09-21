@@ -1,0 +1,94 @@
+{
+  "identifier" : "3C4D2A4D-1A88-4CE4-A9A5-C05M1Q5K17",
+  "nonRenewingSubscriptions" : [ ],
+  "products" : [ ],
+  "settings" : {
+    "_applicationInternalID" : "com.darrylgraham.graceward"
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "A8D0DF40-0A9E-4E43-9C5A-C05M1Q5G001",
+      "localizations" : [
+        {
+          "description" : "Graceward Plus subscriptions",
+          "displayName" : "Graceward Plus"
+        }
+      ],
+      "name" : "Graceward Plus",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [ ],
+          "codeOffers" : [ ],
+          "displayPrice" : "8.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "A8D0DF40-0A9E-4E43-9C5A-C05M1Q5S001",
+          "introductoryOffer" : {
+            "internalID" : "E0609A80-47C6-47AC-80D2-3FCEEF4D3275",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1W"
+          },
+          "localizations" : [
+            {
+              "description" : "Graceward Plus monthly subscription",
+              "displayName" : "Graceward Plus Monthly"
+            }
+          ],
+          "productID" : "graceward_plus_monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Graceward Plus Monthly",
+          "subscriptionPrice" : "8.99",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [ ],
+          "codeOffers" : [ ],
+          "displayPrice" : "49.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "A8D0DF40-0A9E-4E43-9C5A-C05M1Q5S002",
+          "introductoryOffer" : {
+            "internalID" : "A6AD272A-AC23-45C2-BF9D-6664EB65D6FF",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1W"
+          },
+          "localizations" : [
+            {
+              "description" : "Graceward Plus annual subscription",
+              "displayName" : "Graceward Plus Yearly"
+            }
+          ],
+          "productID" : "graceward_plus_yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Graceward Plus Yearly",
+          "subscriptionPrice" : "49.99",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [ ],
+          "codeOffers" : [ ],
+          "displayPrice" : "29.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "A8D0DF40-0A9E-4E43-9C5A-C05M1Q5S003",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Graceward Plus founding annual subscription",
+              "displayName" : "Graceward Plus Founding Yearly"
+            }
+          ],
+          "productID" : "graceward_plus_founder_yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Graceward Plus Founding Yearly",
+          "subscriptionPrice" : "29.99",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

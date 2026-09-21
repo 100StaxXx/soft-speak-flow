@@ -46,7 +46,7 @@ export const MentorResult = ({
         data-testid="mentor-result-root"
       >
         <div className="w-full max-w-4xl space-y-6">
-          <div className="mx-auto flex w-fit items-center gap-2 rounded-full border border-white/12 bg-black/25 px-4 py-2 text-[11px] uppercase tracking-[0.32em] text-white/72 backdrop-blur-md">
+          <div className="mx-auto flex w-fit items-center gap-2 rounded-full border border-white/[0.12] bg-black/25 px-4 py-2 text-[11px] uppercase tracking-[0.32em] text-white/[0.72] backdrop-blur-md">
             <span
               className="h-2.5 w-2.5 rounded-full"
               style={{ backgroundColor: mentor.primary_color, boxShadow: `0 0 16px ${mentor.primary_color}` }}
@@ -69,31 +69,31 @@ export const MentorResult = ({
                   />
                 </div>
                 <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-[0.28em] text-white/56">
+                  <p className="text-xs uppercase tracking-[0.28em] text-white/[0.56]">
                     Your Guide Match
                   </p>
                   <h1 className="text-4xl font-semibold text-white md:text-5xl">
                     {mentor.name}
                   </h1>
-                  <p className="text-base uppercase tracking-[0.22em] text-white/64">
+                  <p className="text-base uppercase tracking-[0.22em] text-white/[0.64]">
                     {explanation.subtitle}
                   </p>
                 </div>
-                <p className="text-base leading-7 text-white/72 md:text-lg">
+                <p className="text-base leading-7 text-white/[0.72] md:text-lg">
                   {explanation.paragraph}
                 </p>
               </div>
 
               <div className="space-y-4">
-                <div className="rounded-[1.6rem] border border-white/10 bg-black/18 p-5 backdrop-blur-xl">
-                  <h2 className="mb-4 text-xs uppercase tracking-[0.3em] text-white/56">
+                <div className="rounded-[1.6rem] border border-white/10 bg-black/[0.18] p-5 backdrop-blur-xl">
+                  <h2 className="mb-4 text-xs uppercase tracking-[0.3em] text-white/[0.56]">
                     How They&apos;ll Help You
                   </h2>
                   <div className="space-y-3">
                     {explanation.bullets.map((bullet, idx) => (
                       <div
                         key={idx}
-                        className="flex items-start gap-3 rounded-[1.15rem] border border-white/8 bg-black/18 p-4"
+                        className="flex items-start gap-3 rounded-[1.15rem] border border-white/[0.08] bg-black/[0.18] p-4"
                       >
                         <div
                           className="mt-2 h-2 w-2 flex-shrink-0 rounded-full"
@@ -127,7 +127,7 @@ export const MentorResult = ({
                   <Button
                     variant="outline"
                     onClick={onSeeAll}
-                    className="h-14 rounded-full border-white/12 bg-black/20 px-6 text-white hover:bg-black/30"
+                    className="h-14 rounded-full border-white/[0.12] bg-black/20 px-6 text-white hover:bg-black/30"
                   >
                     {seeAllLabel}
                     <ArrowRight className="h-5 w-5" />

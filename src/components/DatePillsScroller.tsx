@@ -34,6 +34,11 @@ const EDGE_THRESHOLD_PX = 80;
 const DEFAULT_EXTENSION_CHUNK = 14;
 const CENTER_RETRY_ATTEMPTS = 8;
 
+const getInitialReducedMotionPreference = () =>
+  typeof window !== "undefined"
+  && typeof window.matchMedia === "function"
+  && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 const dateKeyToDate = (dateKey: string) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;
 
@@ -94,7 +99,9 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   const [rangeStart, setRangeStart] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).start);
   const [rangeEnd, setRangeEnd] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).end);
   const [edgeSpacerWidth, setEdgeSpacerWidth] = useState(0);
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(
+    getInitialReducedMotionPreference,
+  );
 
   const extensionChunk = Math.max(DEFAULT_EXTENSION_CHUNK, daysToShow);
   const selectedDateKey = useMemo(() => format(selectedDate, "yyyy-MM-dd"), [selectedDate]);
@@ -157,7 +164,6 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setPrefersReducedMotion(mediaQuery.matches);
 
     const handleChange = (event: MediaQueryListEvent) => {
       setPrefersReducedMotion(event.matches);

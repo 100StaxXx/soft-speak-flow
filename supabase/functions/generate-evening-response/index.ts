@@ -9,6 +9,11 @@ import { errorResponse, type RequestAuth, requireRequestAuth } from "../_shared/
 import {
   logRateLimitedInvocation,
 } from "../_shared/rateLimiter.ts";
+import {
+  CHRISTIAN_GUIDANCE_POLICY,
+  enforceChristianGuidanceOutput,
+} from "../_shared/christianGuidancePolicy.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 interface GenerateEveningResponseDeps {
   authenticate: (req: Request, corsHeaders: HeadersInit) => Promise<RequestAuth | Response>;
@@ -16,6 +21,7 @@ interface GenerateEveningResponseDeps {
   fetchImpl: typeof fetch;
   now: () => number;
   applyAbuseProtectionFn?: typeof applyAbuseProtection;
+  resolveProductMode?: (supabase: any, userId: string) => Promise<"graceward" | "cosmiq">;
 }
 
 const MODEL_NAME = "google/gemini-2.5-flash";
@@ -107,7 +113,7 @@ export async function handleGenerateEveningResponse(
 
     const { data: reflection, error: fetchError } = await supabase
       .from("evening_reflections")
-      .select("id, user_id, mood, wins, additional_reflection, tomorrow_adjustment, gratitude, profiles:user_id(selected_mentor_id)")
+      .select("id, user_id, reflection_date, mood, wins, additional_reflection, tomorrow_adjustment, gratitude, profiles:user_id(selected_mentor_id)")
       .eq("id", reflectionId)
       .eq("user_id", requestAuth.userId)
       .maybeSingle();
@@ -120,6 +126,11 @@ export async function handleGenerateEveningResponse(
     if (!reflection) {
       return errorResponse(404, "Reflection not found", corsHeaders);
     }
+
+    const productMode = await (deps.resolveProductMode ?? resolveUserProductMode)(
+      supabase,
+      requestAuth.userId,
+    );
 
     if (typeof supabase.rpc === "function") {
       const abuseResult = await (deps.applyAbuseProtectionFn ?? applyAbuseProtection)(req, supabase, {
@@ -135,20 +146,29 @@ export async function handleGenerateEveningResponse(
       requestId = abuseResult.requestId;
     }
 
+    const { data: dailyThread } = await supabase
+      .from("daily_guide_threads")
+      .select("focus_label, focus_category, practice_completed_at, companion_answer_label, mentor_name")
+      .eq("user_id", requestAuth.userId)
+      .eq("thread_date", reflection.reflection_date)
+      .maybeSingle();
+
+    let mentorName = dailyThread?.mentor_name || "the user's Guide";
     let mentorTone = "warm and supportive";
     if (reflection.profiles?.selected_mentor_id) {
       const { data: mentor } = await supabase
-        .from("mentors")
+        .from(productMode === "graceward" ? "graceward_guides" : "mentors")
         .select("name, tone_description")
         .eq("id", reflection.profiles.selected_mentor_id)
         .single();
 
       if (mentor) {
+        mentorName = mentor.name || mentorName;
         mentorTone = mentor.tone_description || mentorTone;
       }
     }
 
-    const prompt = `You are a supportive wellness mentor with the following tone: ${mentorTone}
+    const prompt = `You are an AI reflection assistant using this communication style: ${mentorTone}
 
 A user has completed their evening reflection:
 - Mood: ${reflection.mood}
@@ -156,8 +176,11 @@ ${reflection.wins ? `- What went well: ${reflection.wins}` : ""}
 ${reflection.additional_reflection ? `- Additional reflection: ${reflection.additional_reflection}` : ""}
 ${reflection.tomorrow_adjustment ? `- Tomorrow adjustment: ${reflection.tomorrow_adjustment}` : ""}
 ${reflection.gratitude ? `- Gratitude: ${reflection.gratitude}` : ""}
+${dailyThread?.focus_label ? `- Focus they chose with ${mentorName} this morning: ${dailyThread.focus_label}` : ""}
+${dailyThread?.focus_label ? `- Connected ${productMode === "graceward" ? "Faithful Step" : "next step"}: ${dailyThread.practice_completed_at ? "completed" : "not recorded as complete"}` : ""}
+${dailyThread?.companion_answer_label ? `- Companion check-in answer: ${dailyThread.companion_answer_label}` : ""}
 
-Write a brief, warm acknowledgment (2-3 sentences max). Be encouraging and validate their feelings. If they shared wins, extra reflection, a tomorrow adjustment, or gratitude, acknowledge those specifically. If they named a tomorrow adjustment, gently reinforce it without sounding prescriptive. Keep it personal and caring.`;
+Write a brief, warm acknowledgment (2-3 sentences max) in ${mentorName}'s Guide voice. When a morning focus or Companion check-in is present, gently return to at most one relevant detail without implying success or failure. Notice gratitude, difficulty, repair, rest, or a small next step without turning the day into a score.${productMode === "graceward" ? " Do not make theological claims about why events happened." : " Do not introduce religious or theological framing."}`;
 
     const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openAIApiKey) {
@@ -179,7 +202,9 @@ Write a brief, warm acknowledgment (2-3 sentences max). Be encouraging and valid
         messages: [
           {
             role: "system",
-            content: "You are a supportive wellness mentor. Keep responses brief, warm, and personal.",
+            content: productMode === "graceward"
+              ? `You are Graceward's AI reflection assistant. Keep responses brief, warm, and transparent about your limits.\n\n${CHRISTIAN_GUIDANCE_POLICY}`
+              : "You are Cosmiq's clearly identified AI reflection guide. Keep responses brief, practical, warm, and non-religious. Do not import Graceward's Christian framing or claim professional authority.",
           },
           { role: "user", content: prompt },
         ],
@@ -195,7 +220,10 @@ Write a brief, warm acknowledgment (2-3 sentences max). Be encouraging and valid
     }
 
     const aiData = await aiResponse.json();
-    const mentorResponse = aiData.choices?.[0]?.message?.content?.trim();
+    const rawResponse = aiData.choices?.[0]?.message?.content?.trim();
+    const mentorResponse = rawResponse
+      ? (productMode === "graceward" ? enforceChristianGuidanceOutput(rawResponse) : rawResponse)
+      : null;
 
     if (mentorResponse) {
       const { error: updateError } = await supabase

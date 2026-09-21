@@ -9,6 +9,7 @@ import {
   getCampaignBuilderDraftStorageKey,
   getCreationPopupMarkerStorageKey,
 } from "@/utils/accountLocalState";
+import { getEffectiveMissionDate } from "@/utils/timezone";
 
 if (!HTMLElement.prototype.scrollTo) {
   Object.defineProperty(HTMLElement.prototype, "scrollTo", {
@@ -18,17 +19,6 @@ if (!HTMLElement.prototype.scrollTo) {
   });
 }
 const elementScrollToSpy = vi.spyOn(HTMLElement.prototype, "scrollTo").mockImplementation(() => undefined);
-
-vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
-  useJourneysCompanionVisual: () => ({
-    companionLabel: "Nova",
-    imageUrl: "/placeholder-companion.svg",
-    focalX: null,
-    focalY: null,
-    element: "fire",
-    usesPortraitShell: false,
-  }),
-}));
 
 const localStorageState = vi.hoisted(() => ({
   store: new Map<string, string>(),
@@ -99,7 +89,6 @@ const mocks = vi.hoisted(() => ({
   epicsLoading: false,
   isMacHostedIOSApp: false,
   profileTimezone: null as string | null,
-  draggableFabRenderCount: 0,
   lastDatePillSelectedDate: null as Date | null,
   lastDatePillCenterRequestKey: null as number | null,
   lastDatePillCenterRequestDateKey: null as string | null,
@@ -149,22 +138,6 @@ const mocks = vi.hoisted(() => ({
       creationSource: string;
     }) => Promise<void>;
   },
-  lastCompanionPlannerModalProps: null as null | {
-    open?: boolean;
-    onOpenChange?: (open: boolean) => void;
-    presentation?: string;
-    selectedDate?: Date | null;
-    launchIntent?: unknown;
-    onQuestProposalEditHandoff?: (proposal: {
-      id: string;
-      kind: "create_quest" | "update_quest" | "suggest_reminder";
-      title: string;
-      summary: string;
-      payload: Record<string, unknown>;
-      status: "pending";
-      readyToConfirm: boolean;
-    }) => Promise<{ saved: boolean; savedTitle?: string | null }>;
-  },
   lastEditQuestDialogProps: null as null | {
     open?: boolean;
     task?: {
@@ -175,9 +148,6 @@ const mocks = vi.hoisted(() => ({
     plannerSubtaskDraft?: string[] | null;
     onSave?: (taskId: string, updates: Record<string, unknown>) => Promise<void>;
   },
-  lastDraggableFabOnOpenCompanionPlanner: null as null | ((intent?: unknown) => void),
-  lastDraggableFabCreatePlanDayLaunchIntent: null as null | (() => unknown),
-  lastDraggableFabPlanDayLabel: null as string | null,
   lastPathfinderProps: null as null | {
     open?: boolean;
     initialGoal?: string;
@@ -186,11 +156,6 @@ const mocks = vi.hoisted(() => ({
     persistenceRoute?: string;
     userId?: string | null;
     onOpenChange?: (open: boolean) => void;
-  },
-  tutorialGuidance: {
-    isActive: false,
-    currentStep: null as string | null,
-    currentSubstep: null as string | null,
   },
   dailyTasks: [] as Array<{
     id: string;
@@ -216,6 +181,13 @@ const mocks = vi.hoisted(() => ({
     is_main_quest: boolean;
   }>,
 }));
+
+const getExpectedMissionDateAtNoon = () => {
+  const [year, month, day] = getEffectiveMissionDate(
+    mocks.profileTimezone ?? undefined,
+  ).split("-").map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0, 0);
+};
 
 vi.mock("@/components/PageTransition", () => ({
   PageTransition: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -269,7 +241,7 @@ vi.mock("@/components/DatePillsScroller", async () => {
           <button
             type="button"
             onClick={() => {
-              const nextDate = new Date();
+              const nextDate = getExpectedMissionDateAtNoon();
               const nextHour = nextDate.getHours() === 0 ? 1 : 0;
               nextDate.setHours(nextHour, 0, 0, 0);
               onDateSelect(nextDate);
@@ -374,44 +346,6 @@ vi.mock("@/components/AddQuestSheet", () => ({
   },
 }));
 
-vi.mock("@/components/journeys/JourneysCompanionPlannerModal", () => ({
-  JourneysCompanionPlannerModal: (props: {
-    open?: boolean;
-    onOpenChange?: (open: boolean) => void;
-    presentation?: string;
-    selectedDate?: Date | null;
-    launchIntent?: unknown;
-    onLaunchIntentConsumed?: (intentId: string) => void;
-    onQuestProposalEditHandoff?: (proposal: {
-      id: string;
-      kind: "create_quest" | "update_quest" | "suggest_reminder";
-      title: string;
-      summary: string;
-      payload: Record<string, unknown>;
-      status: "pending";
-      readyToConfirm: boolean;
-    }) => Promise<{ saved: boolean; savedTitle?: string | null }>;
-  }) => {
-    mocks.lastCompanionPlannerModalProps = props;
-
-    if (!props.open) {
-      return null;
-    }
-
-    return (
-      <div data-testid="journeys-companion-planner-modal">
-        <button type="button" onClick={() => props.onOpenChange?.(false)}>
-          close-planner-modal
-        </button>
-      </div>
-    );
-  },
-}));
-
-vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
-  usePostOnboardingMentorGuidance: () => mocks.tutorialGuidance,
-}));
-
 vi.mock("@/hooks/useInboxTasks", () => ({
   useInboxTasks: () => ({
     inboxTasks: mocks.inboxTasks,
@@ -454,7 +388,7 @@ vi.mock("@/components/EditRitualSheet", () => ({
   EditRitualSheet: () => null,
 }));
 
-vi.mock("@/components/Pathfinder", () => ({
+vi.mock("@/components/Pathfinder/Pathfinder", () => ({
   Pathfinder: (props: {
     open?: boolean;
     initialGoal?: string;
@@ -466,40 +400,6 @@ vi.mock("@/components/Pathfinder", () => ({
   }) => {
     mocks.lastPathfinderProps = props;
     return null;
-  },
-}));
-
-vi.mock("@/components/CampaignCreatedAnimation", () => ({
-  CampaignCreatedAnimation: () => null,
-}));
-
-vi.mock("@/components/DraggableFAB", () => ({
-  DraggableFAB: ({
-    onOpenCompanionPlanner,
-    createPlanDayLaunchIntent,
-    planDayLabel,
-  }: {
-    onOpenCompanionPlanner?: (intent?: unknown) => void;
-    createPlanDayLaunchIntent?: () => unknown;
-    planDayLabel?: string;
-  }) => {
-    mocks.draggableFabRenderCount += 1;
-    mocks.lastDraggableFabOnOpenCompanionPlanner = onOpenCompanionPlanner ?? null;
-    mocks.lastDraggableFabCreatePlanDayLaunchIntent = createPlanDayLaunchIntent ?? null;
-    mocks.lastDraggableFabPlanDayLabel = planDayLabel ?? null;
-    return (
-      <div data-testid="draggable-fab">
-        <button
-          type="button"
-          data-testid="journeys-companion-launcher-floating"
-          data-tour="add-quest-fab"
-          aria-label="Open companion quick actions"
-          onClick={() => onOpenCompanionPlanner?.()}
-        >
-          fab
-        </button>
-      </div>
-    );
   },
 }));
 
@@ -794,23 +694,13 @@ describe("Journeys row drag integration", () => {
     mocks.epics = [];
     mocks.isMacHostedIOSApp = false;
     mocks.profileTimezone = null;
-    mocks.draggableFabRenderCount = 0;
     mocks.lastDatePillSelectedDate = null;
     mocks.lastDatePillCenterRequestKey = null;
     mocks.lastDatePillCenterRequestDateKey = null;
     mocks.lastDatePillResetRangeOnCenterRequest = null;
     mocks.lastAddQuestSheetProps = null;
-    mocks.lastCompanionPlannerModalProps = null;
     mocks.lastEditQuestDialogProps = null;
-    mocks.lastDraggableFabOnOpenCompanionPlanner = null;
-    mocks.lastDraggableFabCreatePlanDayLaunchIntent = null;
-    mocks.lastDraggableFabPlanDayLabel = null;
     mocks.lastPathfinderProps = null;
-    mocks.tutorialGuidance = {
-      isActive: false,
-      currentStep: null,
-      currentSubstep: null,
-    };
     mocks.dailyTasks = [
       {
         id: "task-1",
@@ -950,35 +840,7 @@ describe("Journeys row drag integration", () => {
     expect(mocks.lastAddQuestSheetProps?.autoFillTimeOnFirstTap).toBe(false);
   });
 
-  it("passes tutorial auto-fill as true during create quest select_time", async () => {
-    mocks.tutorialGuidance = {
-      isActive: true,
-      currentStep: "create_quest",
-      currentSubstep: "select_time",
-    };
-
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(mocks.lastAddQuestSheetProps).not.toBeNull();
-    });
-    expect(mocks.lastAddQuestSheetProps?.autoFillTimeOnFirstTap).toBe(true);
-  });
-
-  it("renders the desktop companion launcher CTA and suppresses the floating FAB on Mac-hosted iOS", async () => {
+  it("renders the desktop add-action control without a floating FAB on Mac-hosted iOS", async () => {
     mocks.isMacHostedIOSApp = true;
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
@@ -1001,13 +863,11 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    const launcher = await screen.findByRole("button", { name: /Plan (Today|Day)/i });
+    const launcher = await screen.findByRole("button", { name: "Add action" });
     expect(launcher).toBeInTheDocument();
-    expect(launcher).toHaveAttribute("data-tour", "add-quest-launcher");
+    expect(launcher).toHaveAttribute("data-tour", "add-quest-fab");
     expect(screen.queryByTestId("draggable-fab")).not.toBeInTheDocument();
-    expect(mocks.draggableFabRenderCount).toBe(0);
     expect(mocks.lastAddQuestSheetProps?.presentation).toBe("desktop-panel");
-    expect(mocks.lastCompanionPlannerModalProps?.presentation).toBe("dialog");
   });
 
   it("keeps the journeys add quest button targetable for the tutorial", async () => {
@@ -1026,402 +886,10 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByLabelText("Add quest")).toHaveAttribute("data-tour", "add-quest-fab");
-    expect(mocks.draggableFabRenderCount).toBeGreaterThan(0);
+    expect(await screen.findByLabelText("Add action")).toHaveAttribute("data-tour", "add-quest-fab");
   });
 
-  it("builds the FAB Plan Today intent from the visible journeys context", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.setSystemTime(new Date("2026-05-12T12:00:00"));
-    mocks.dailyTasks = [
-      {
-        id: "ritual-task",
-        task_text: "Morning ritual",
-        completed: false,
-        xp_reward: 10,
-        task_date: "2026-05-12",
-        scheduled_time: "07:30",
-        difficulty: "easy",
-        is_main_quest: false,
-        habit_source_id: "habit-1",
-        epic_id: "epic-1",
-        epic_title: "Launch Planner",
-      },
-      {
-        id: "campaign-task",
-        task_text: "Draft launch notes",
-        completed: false,
-        xp_reward: 20,
-        task_date: "2026-05-12",
-        scheduled_time: null,
-        difficulty: "medium",
-        is_main_quest: true,
-        epic_id: "epic-1",
-        epic_title: "Launch Planner",
-      },
-    ];
-    mocks.epics = [{
-      id: "epic-1",
-      title: "Launch Planner",
-      status: "active",
-      progress_percentage: 40,
-      target_days: 30,
-      start_date: "2026-05-01",
-      end_date: null,
-    }];
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(mocks.lastDraggableFabCreatePlanDayLaunchIntent).not.toBeNull();
-    });
-
-    const launchIntent =
-      mocks.lastDraggableFabCreatePlanDayLaunchIntent?.() as {
-        starterIntent?: string;
-        selectedDate?: string | null;
-        briefingContext?: {
-          content?: string;
-          dataSnapshot?: Record<string, unknown> | null;
-        } | null;
-      };
-
-    expect(mocks.lastDraggableFabPlanDayLabel).toBe("Plan Today");
-    expect(launchIntent).toEqual(expect.objectContaining({
-      starterIntent: "plan_day",
-      selectedDate: "2026-05-12",
-    }));
-    expect(launchIntent.briefingContext?.content).toContain("2 open quests");
-    expect(launchIntent.briefingContext?.dataSnapshot).toEqual(expect.objectContaining({
-      selectedDate: "2026-05-12",
-      ritualQuestCount: 1,
-      activeCampaignTitles: ["Launch Planner"],
-      activeCampaigns: [expect.objectContaining({
-        id: "epic-1",
-        title: "Launch Planner",
-      })],
-      topOpenQuests: expect.arrayContaining([
-        expect.stringContaining("Morning ritual"),
-        expect.stringContaining("campaign: Launch Planner"),
-      ]),
-      visibleQuests: expect.arrayContaining([
-        expect.objectContaining({
-          id: "ritual-task",
-          habit_source_id: "habit-1",
-          epic_id: "epic-1",
-          epic_title: "Launch Planner",
-        }),
-        expect.objectContaining({
-          id: "campaign-task",
-          epic_id: "epic-1",
-          epic_title: "Launch Planner",
-        }),
-      ]),
-    }));
-
-    act(() => {
-      mocks.lastDraggableFabOnOpenCompanionPlanner?.(launchIntent);
-    });
-
-    expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toEqual(launchIntent);
-  });
-
-  it("opens the companion planner modal from the desktop journeys launcher", async () => {
-    mocks.isMacHostedIOSApp = true;
-    Object.defineProperty(window, "innerWidth", {
-      configurable: true,
-      writable: true,
-      value: 1100,
-    });
-
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    const launcher = await screen.findByRole("button", { name: /Plan (Today|Day)/i });
-    fireEvent.click(launcher);
-
-    await waitFor(() => {
-      expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
-    });
-    expect(screen.getByTestId("journeys-companion-planner-modal")).toBeInTheDocument();
-  });
-
-  it("passes the selected journeys date into the companion planner modal", async () => {
-    mocks.isMacHostedIOSApp = true;
-    Object.defineProperty(window, "innerWidth", {
-      configurable: true,
-      writable: true,
-      value: 1100,
-    });
-    const expectedDateKey = format(new Date(), "yyyy-MM-dd");
-
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    const launcher = await screen.findByRole("button", { name: /Plan (Today|Day)/i });
-    fireEvent.click(launcher);
-
-    await waitFor(() => {
-      expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
-    });
-    expect(
-      mocks.lastCompanionPlannerModalProps?.selectedDate?.toISOString().slice(0, 10),
-    ).toBe(expectedDateKey);
-  });
-
-  it("keeps the planner closed on first load even when an old pinned preference exists", async () => {
-    localStorageState.store.set("journeys-companion-planner-pinned-v1", "true");
-
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(mocks.lastCompanionPlannerModalProps).not.toBeNull();
-    });
-    expect(mocks.lastCompanionPlannerModalProps?.open).toBe(false);
-    expect(screen.queryByTestId("journeys-companion-planner-modal")).not.toBeInTheDocument();
-  });
-
-  it("opens the planner when journeys receives a route launch intent", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={[{
-          pathname: "/journeys",
-          state: {
-            companionPlannerLaunchIntent: {
-              id: "launch-intent-1",
-              message: "Help me plan my afternoon.",
-              starterIntent: "plan_my_day",
-              target: "planner",
-              briefingContext: null,
-            },
-          },
-        }]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
-    });
-    expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toEqual(expect.objectContaining({
-      id: "launch-intent-1",
-      message: "Help me plan my afternoon.",
-    }));
-    expect(screen.getByTestId("journeys-companion-planner-modal")).toBeInTheDocument();
-  });
-
-  it("closes the planner when the guided tutorial leaves Plan My Day", async () => {
-    mocks.tutorialGuidance = {
-      isActive: true,
-      currentStep: "plan_my_day",
-      currentSubstep: null,
-    };
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    const renderTree = () => (
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
-
-    const { rerender } = render(renderTree());
-
-    await waitFor(() => {
-      expect(mocks.lastCompanionPlannerModalProps).not.toBeNull();
-    });
-
-    act(() => {
-      mocks.lastCompanionPlannerModalProps?.onOpenChange?.(true);
-    });
-
-    await waitFor(() => {
-      expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
-    });
-
-    mocks.tutorialGuidance = {
-      isActive: true,
-      currentStep: "first_plan_closeout",
-      currentSubstep: null,
-    };
-    rerender(renderTree());
-
-    await waitFor(() => {
-      expect(mocks.lastCompanionPlannerModalProps?.open).toBe(false);
-    });
-    expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toBeNull();
-    expect(screen.queryByTestId("journeys-companion-planner-modal")).not.toBeInTheDocument();
-  });
-
-  it("closes stale blocking overlays when the guided tutorial changes steps", async () => {
-    mocks.tutorialGuidance = {
-      isActive: true,
-      currentStep: "plan_my_day",
-      currentSubstep: null,
-    };
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    const renderTree = () => (
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
-
-    const { rerender } = render(renderTree());
-
-    await waitFor(() => {
-      expect(mocks.lastAddQuestSheetProps).not.toBeNull();
-      expect(mocks.lastPathfinderProps).not.toBeNull();
-    });
-
-    act(() => {
-      mocks.lastAddQuestSheetProps?.onOpenChange?.(true);
-      mocks.lastPathfinderProps?.onOpenChange?.(true);
-    });
-
-    await waitFor(() => {
-      expect(mocks.lastAddQuestSheetProps?.open).toBe(true);
-      expect(mocks.lastPathfinderProps?.open).toBe(true);
-    });
-
-    mocks.tutorialGuidance = {
-      isActive: true,
-      currentStep: "first_plan_closeout",
-      currentSubstep: null,
-    };
-    rerender(renderTree());
-
-    await waitFor(() => {
-      expect(mocks.lastAddQuestSheetProps?.open).toBe(false);
-      expect(mocks.lastPathfinderProps?.open).toBe(false);
-    });
-
-    act(() => {
-      mocks.lastPathfinderProps?.onOpenChange?.(true);
-    });
-    await waitFor(() => {
-      expect(mocks.lastPathfinderProps?.open).toBe(true);
-    });
-
-    rerender(renderTree());
-    expect(mocks.lastPathfinderProps?.open).toBe(true);
-  });
-
-  it("opens the companion planner from a route launch intent", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.setSystemTime(new Date("2026-04-09T12:00:00"));
-
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={[{
-          pathname: "/journeys",
-          state: {
-            companionPlannerLaunchIntent: {
-              id: "planner-route-1",
-              message: "Plan my day",
-              starterIntent: "plan_day",
-              target: "planner",
-              briefingContext: null,
-            },
-          },
-        }]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
-    });
-
-    expect(mocks.lastCompanionPlannerModalProps?.launchIntent).toEqual(
-      expect.objectContaining({
-        id: "planner-route-1",
-        message: "Plan my day",
-        starterIntent: "plan_day",
-      }),
-    );
-    expect(mocks.lastAddQuestSheetProps?.open).not.toBe(true);
-  });
-
-  it("opens create quest from the floating fab route request without opening the companion planner", async () => {
+  it("opens action creation from the route request", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1455,117 +923,10 @@ describe("Journeys row drag integration", () => {
       expect(mocks.lastAddQuestSheetProps?.open).toBe(true);
     });
 
-    expect(mocks.lastCompanionPlannerModalProps?.open).not.toBe(true);
     expect(mocks.lastAddQuestSheetProps?.prefillDraft).toBeNull();
   });
 
-  it("keeps the planner open while a planner quest edit handoff is active and resolves back after save", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={[{
-          pathname: "/journeys",
-          state: {
-            companionPlannerLaunchIntent: {
-              id: "planner-handoff-1",
-              message: "Help me plan my afternoon.",
-              starterIntent: "plan_day",
-              target: "planner",
-              briefingContext: null,
-            },
-          },
-        }]}>
-          <Journeys />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
-    });
-
-    let handoffPromise:
-      | Promise<{ saved: boolean; savedTitle?: string | null }>
-      | undefined;
-
-    await act(async () => {
-      handoffPromise = mocks.lastCompanionPlannerModalProps?.onQuestProposalEditHandoff?.({
-        id: "proposal-create-1",
-        kind: "create_quest",
-        title: "Respond to emails",
-        summary: "Carve out a short inbox block first thing.",
-        payload: {
-          taskText: "Respond to emails",
-          taskDate: "2026-02-13",
-          scheduledTime: "09:00",
-          estimatedDuration: 30,
-          notes: "Start with urgent threads.",
-          location: "Desk",
-          subtasks: ["Reply to founders", "Clear urgent threads"],
-        },
-        status: "pending",
-        readyToConfirm: true,
-      });
-    });
-
-    await waitFor(() => {
-      expect(mocks.lastAddQuestSheetProps?.open).toBe(true);
-    });
-    expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
-    expect(mocks.lastAddQuestSheetProps?.prefillDraft).toEqual(expect.objectContaining({
-      text: "Respond to emails",
-      taskDate: "2026-02-13",
-      scheduledTime: "09:00",
-      estimatedDuration: 30,
-      moreInformation: "Start with urgent threads.",
-      location: "Desk",
-      subtasks: ["Reply to founders", "Clear urgent threads"],
-    }));
-
-    await act(async () => {
-      await mocks.lastAddQuestSheetProps?.onAdd?.({
-        text: "Respond to emails",
-        taskDate: "2026-02-13",
-        difficulty: "medium",
-        scheduledTime: "09:00",
-        estimatedDuration: 30,
-        recurrencePattern: null,
-        recurrenceDays: [],
-        recurrenceMonthDays: [],
-        recurrenceCustomPeriod: null,
-        reminderEnabled: false,
-        reminderMinutesBefore: 15,
-        moreInformation: "Start with urgent threads.",
-        location: "Desk",
-        contactId: null,
-        autoLogInteraction: false,
-        sendToInbox: false,
-        sendToCalendar: false,
-        sendToCalendarTarget: null,
-        subtasks: ["Reply to founders", "Clear urgent threads"],
-        imageUrl: null,
-        attachments: [],
-        creationSource: "nlp",
-      });
-    });
-
-    await expect(handoffPromise).resolves.toEqual({
-      saved: true,
-      savedTitle: "Respond to emails",
-    });
-    await waitFor(() => {
-      expect(mocks.lastAddQuestSheetProps?.open).toBe(false);
-    });
-    expect(mocks.lastCompanionPlannerModalProps?.open).toBe(true);
-  });
-
-  it("opens Pathfinder immediately for campaign-builder launcher intents without opening companion chat", async () => {
+  it("opens Pathfinder immediately for journey-builder launch intents", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1595,8 +956,7 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       expect(mocks.lastPathfinderProps?.open).toBe(true);
     });
-    expect(mocks.lastPathfinderProps?.initialGoal ?? "").toBe("");
-    expect(mocks.lastCompanionPlannerModalProps?.open).not.toBe(true);
+    expect(mocks.lastPathfinderProps?.initialGoal).toBe("Let's lock in a new goal");
   });
 
   it("opens the add flow with meta+n on Mac-hosted iOS", async () => {
@@ -1687,7 +1047,7 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText("Plan your quests for the week ahead.")).toBeInTheDocument();
+    expect(screen.getByText("Shape a realistic week of actions and rhythms.")).toBeInTheDocument();
     const row = await screen.findByTestId("timeline-row-task-1");
 
     act(() => {
@@ -1697,7 +1057,7 @@ describe("Journeys row drag integration", () => {
     });
 
     expect(mocks.updateTask).not.toHaveBeenCalled();
-    expect(screen.getByText("Plan your quests for the week ahead.")).toBeInTheDocument();
+    expect(screen.getByText("Shape a realistic week of actions and rhythms.")).toBeInTheDocument();
   });
 
   it("does not reschedule a quest from a sub-threshold timeline row wiggle on /journeys", async () => {
@@ -1945,7 +1305,7 @@ describe("Journeys row drag integration", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Plan your quests for the week ahead.")).toBeInTheDocument();
+      expect(screen.getByText("Shape a realistic week of actions and rhythms.")).toBeInTheDocument();
     });
 
     expect(mocks.surfaceAllEpicHabits).not.toHaveBeenCalled();
@@ -2053,7 +1413,7 @@ describe("Journeys row drag integration", () => {
 
     const initialSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     const initialSelectedDate = new Date(initialSelectedDateIso);
-    expect(isSameDay(initialSelectedDate, new Date())).toBe(true);
+    expect(isSameDay(initialSelectedDate, getExpectedMissionDateAtNoon())).toBe(true);
 
     fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
 
@@ -2063,7 +1423,7 @@ describe("Journeys row drag integration", () => {
       staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       staleSelectedDate = new Date(staleSelectedDateIso);
       expect(staleSelectedDate.getTime()).not.toBe(initialSelectedDate.getTime());
-      expect(isSameDay(staleSelectedDate, new Date())).toBe(false);
+      expect(isSameDay(staleSelectedDate, getExpectedMissionDateAtNoon())).toBe(false);
     });
 
     fireEvent.click(screen.getByRole("button", { name: "go-inbox" }));
@@ -2080,60 +1440,7 @@ describe("Journeys row drag integration", () => {
       const reenteredDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       const reenteredDate = new Date(reenteredDateIso);
       expect(reenteredDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(reenteredDate, new Date())).toBe(true);
-    });
-  });
-
-  it("navigates to campaigns from the journeys campaign section label", async () => {
-    mocks.dailyTasks = [
-      {
-        id: "ritual-1",
-        task_text: "Daily campaign ritual",
-        completed: false,
-        xp_reward: 12,
-        task_date: "2026-02-13",
-        scheduled_time: "08:00",
-        difficulty: "medium",
-        is_main_quest: false,
-        habit_source_id: "habit-1",
-        epic_id: "epic-1",
-        epic_title: "Active Campaign",
-      },
-    ];
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    const RouteHarness = () => {
-      const location = useLocation();
-
-      return (
-        <>
-          <div data-testid="route-path">{location.pathname}</div>
-          <Journeys />
-        </>
-      );
-    };
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
-          <RouteHarness />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("route-path").textContent).toBe("/journeys");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Open campaigns page" }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("route-path").textContent).toBe("/campaigns");
+      expect(isSameDay(reenteredDate, getExpectedMissionDateAtNoon())).toBe(true);
     });
   });
 
@@ -2181,11 +1488,9 @@ describe("Journeys row drag integration", () => {
     let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
       sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
+      expect(isSameDay(new Date(sameDaySelectedDateIso), getExpectedMissionDateAtNoon())).toBe(true);
     });
     const centerKeyBeforeReentry = Number(screen.getByTestId("center-request-key").textContent);
-    elementScrollToSpy.mockClear();
-
     fireEvent.click(screen.getByRole("button", { name: "go-inbox" }));
     await waitFor(() => {
       expect(screen.getByTestId("route-path").textContent).toBe("/inbox");
@@ -2199,8 +1504,7 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeReentry);
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
-      expect(elementScrollToSpy).toHaveBeenCalled();
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(getEffectiveMissionDate());
     });
   });
 
@@ -2229,7 +1533,7 @@ describe("Journeys row drag integration", () => {
     let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
       staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
+      expect(isSameDay(new Date(staleSelectedDateIso), getExpectedMissionDateAtNoon())).toBe(false);
     });
     const centerKeyBeforeResetRequest = Number(screen.getByTestId("center-request-key").textContent);
     const scrollerMountIdBeforeResetRequest = screen.getByTestId("date-pills-mount-id").textContent;
@@ -2241,9 +1545,9 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
+      expect(isSameDay(new Date(refreshedDateIso), getExpectedMissionDateAtNoon())).toBe(true);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(getEffectiveMissionDate());
       expect(screen.getByTestId("reset-range-on-center-request")).toHaveTextContent("true");
       expect(screen.getByTestId("date-pills-mount-id").textContent).toBe(scrollerMountIdBeforeResetRequest);
       expect(screen.getByTestId("journeys-mobile-date-strip")).not.toHaveStyle({ opacity: "0" });
@@ -2319,11 +1623,9 @@ describe("Journeys row drag integration", () => {
     let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
       sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
+      expect(isSameDay(new Date(sameDaySelectedDateIso), getExpectedMissionDateAtNoon())).toBe(true);
     });
     const centerKeyBeforeResetRequest = Number(screen.getByTestId("center-request-key").textContent);
-    elementScrollToSpy.mockClear();
-
     act(() => {
       window.dispatchEvent(new Event(JOURNEYS_RESET_TO_TODAY_EVENT));
     });
@@ -2331,9 +1633,8 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeResetRequest);
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(getEffectiveMissionDate());
       expect(screen.getByTestId("reset-range-on-center-request")).toHaveTextContent("true");
-      expect(elementScrollToSpy).toHaveBeenCalled();
     });
   });
 
@@ -2373,7 +1674,7 @@ describe("Journeys row drag integration", () => {
     let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
       staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
+      expect(isSameDay(new Date(staleSelectedDateIso), getExpectedMissionDateAtNoon())).toBe(false);
     });
     const centerKeyBeforeTaskCompletion = Number(screen.getByTestId("center-request-key").textContent);
 
@@ -2387,7 +1688,7 @@ describe("Journeys row drag integration", () => {
       );
       const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
+      expect(isSameDay(new Date(refreshedDateIso), getExpectedMissionDateAtNoon())).toBe(true);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeTaskCompletion);
     });
   });
@@ -2428,7 +1729,7 @@ describe("Journeys row drag integration", () => {
     let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
       staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
+      expect(isSameDay(new Date(staleSelectedDateIso), getExpectedMissionDateAtNoon())).toBe(false);
     });
     const centerKeyBeforeTaskCompletion = Number(screen.getByTestId("center-request-key").textContent);
 
@@ -2488,7 +1789,7 @@ describe("Journeys row drag integration", () => {
     let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
       staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
+      expect(isSameDay(new Date(staleSelectedDateIso), getExpectedMissionDateAtNoon())).toBe(false);
     });
 
     fireEvent.click(screen.getByRole("button", { name: "go-inbox-section" }));
@@ -2499,7 +1800,7 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
+      expect(isSameDay(new Date(refreshedDateIso), getExpectedMissionDateAtNoon())).toBe(true);
     });
   });
 
@@ -2545,7 +1846,7 @@ describe("Journeys row drag integration", () => {
     let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
       staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(staleSelectedDateIso), new Date())).toBe(false);
+      expect(isSameDay(new Date(staleSelectedDateIso), getExpectedMissionDateAtNoon())).toBe(false);
     });
 
     act(() => {
@@ -2569,7 +1870,7 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       expect(refreshedDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(new Date(refreshedDateIso), new Date())).toBe(true);
+      expect(isSameDay(new Date(refreshedDateIso), getExpectedMissionDateAtNoon())).toBe(true);
     });
   });
 
@@ -2600,7 +1901,7 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       staleSelectedDate = new Date(staleSelectedDateIso);
-      expect(isSameDay(staleSelectedDate, new Date())).toBe(false);
+      expect(isSameDay(staleSelectedDate, getExpectedMissionDateAtNoon())).toBe(false);
     });
 
     mocks.isTabActive = false;
@@ -2625,7 +1926,7 @@ describe("Journeys row drag integration", () => {
       const activeDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       const activeDate = new Date(activeDateIso);
       expect(activeDateIso).not.toBe(staleSelectedDateIso);
-      expect(isSameDay(activeDate, new Date())).toBe(true);
+      expect(isSameDay(activeDate, getExpectedMissionDateAtNoon())).toBe(true);
     });
   });
 
@@ -2653,7 +1954,7 @@ describe("Journeys row drag integration", () => {
 
     await waitFor(() => {
       const staleDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
-      expect(isSameDay(staleDate, new Date())).toBe(false);
+      expect(isSameDay(staleDate, getExpectedMissionDateAtNoon())).toBe(false);
     });
 
     act(() => {
@@ -2662,7 +1963,7 @@ describe("Journeys row drag integration", () => {
 
     await waitFor(() => {
       const refreshedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
-      expect(isSameDay(refreshedDate, new Date())).toBe(true);
+      expect(isSameDay(refreshedDate, getExpectedMissionDateAtNoon())).toBe(true);
     });
   });
 
@@ -2690,7 +1991,7 @@ describe("Journeys row drag integration", () => {
 
     await waitFor(() => {
       const staleDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
-      expect(isSameDay(staleDate, new Date())).toBe(false);
+      expect(isSameDay(staleDate, getExpectedMissionDateAtNoon())).toBe(false);
     });
 
     act(() => {
@@ -2699,7 +2000,7 @@ describe("Journeys row drag integration", () => {
 
     await waitFor(() => {
       const refreshedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
-      expect(isSameDay(refreshedDate, new Date())).toBe(true);
+      expect(isSameDay(refreshedDate, getExpectedMissionDateAtNoon())).toBe(true);
     });
   });
 
@@ -2729,7 +2030,7 @@ describe("Journeys row drag integration", () => {
     let sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
     await waitFor(() => {
       sameDaySelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      expect(isSameDay(new Date(sameDaySelectedDateIso), new Date())).toBe(true);
+      expect(isSameDay(new Date(sameDaySelectedDateIso), getExpectedMissionDateAtNoon())).toBe(true);
     });
     const centerKeyBeforeFocus = Number(screen.getByTestId("center-request-key").textContent);
 
@@ -2740,7 +2041,7 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       expect(screen.getByTestId("selected-date-iso").textContent).toBe(sameDaySelectedDateIso);
       expect(Number(screen.getByTestId("center-request-key").textContent)).toBeGreaterThan(centerKeyBeforeFocus);
-      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(format(new Date(), "yyyy-MM-dd"));
+      expect(screen.getByTestId("center-request-date-key")).toHaveTextContent(getEffectiveMissionDate());
     });
   });
 
@@ -2770,7 +2071,7 @@ describe("Journeys row drag integration", () => {
       const futureDateIso = screen.getByTestId("selected-date-iso").textContent as string;
       const futureDate = new Date(futureDateIso);
       expect(futureDate.getTime()).toBeGreaterThan(Date.now());
-      expect(isSameDay(futureDate, new Date())).toBe(false);
+      expect(isSameDay(futureDate, getExpectedMissionDateAtNoon())).toBe(false);
     });
 
     act(() => {
@@ -2779,7 +2080,7 @@ describe("Journeys row drag integration", () => {
 
     await waitFor(() => {
       const refreshedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
-      expect(isSameDay(refreshedDate, new Date())).toBe(true);
+      expect(isSameDay(refreshedDate, getExpectedMissionDateAtNoon())).toBe(true);
     });
   });
 });

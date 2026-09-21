@@ -12,6 +12,10 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import {
+  CHRISTIAN_GUIDANCE_POLICY,
+  enforceChristianGuidanceOutput,
+} from "../_shared/christianGuidancePolicy.ts";
 
 const ReflectionReplySchema = z.object({
   reflectionId: z.string().uuid(),
@@ -108,7 +112,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: `${systemPrompt}\n\n${CHRISTIAN_GUIDANCE_POLICY}` },
           { role: 'user', content: userPrompt }
         ],
         max_tokens: 350,
@@ -121,7 +125,7 @@ serve(async (req) => {
     }
 
     const aiData = await aiResponse.json();
-    const aiReply = aiData.choices[0].message.content;
+    const aiReply = enforceChristianGuidanceOutput(aiData.choices[0].message.content);
 
     // Validate output
     const validator = new OutputValidator(validationRules, outputConstraints);

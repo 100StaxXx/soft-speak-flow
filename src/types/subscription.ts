@@ -9,6 +9,13 @@ export interface StoreKitProduct {
   pricePerYearString?: string | null;
   subscriptionPeriodUnit?: number;
   subscriptionPeriodValue?: number;
+  introductoryOffer?: {
+    displayPrice: string;
+    price: number;
+    paymentMode: string;
+    periodUnit: number;
+    periodValue: number;
+  } | null;
 }
 
 export interface StoreKitTransaction {

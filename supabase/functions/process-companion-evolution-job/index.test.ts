@@ -135,9 +135,9 @@ const createFakeSupabaseFactory = ({
             };
           }
 
-          if (filters.stage === 4) {
+          if (filters.stage === 1) {
             return {
-              data: { image_url: "https://example.com/stage-4.png" },
+              data: { image_url: "https://example.com/stage-1.png" },
               error: null,
             };
           }
@@ -327,8 +327,8 @@ Deno.test("process-companion-evolution-job internal scheduler claims and complet
   );
   assertEquals(
     animationEnqueueCalls[0]?.previousImageUrl,
-    "https://example.com/stage-4.png",
-    "Expected animation enqueue to include the previous evolution image",
+    "https://example.com/stage-1.png",
+    "Expected animation enqueue to include the previous visual-boundary image",
   );
   assertEquals(
     animationEnqueueCalls[0]?.element,

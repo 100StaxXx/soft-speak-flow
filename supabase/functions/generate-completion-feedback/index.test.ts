@@ -147,7 +147,7 @@ function createSupabaseHarness(options: {
           if (table === "profiles") {
             return Promise.resolve({ data: options.profile === undefined ? defaultProfile : options.profile, error: null });
           }
-          if (table === "mentors") {
+          if (table === "mentors" || table === "graceward_guides") {
             return Promise.resolve({ data: options.mentor ?? null, error: null });
           }
           return Promise.resolve({ data: null, error: null });
@@ -175,6 +175,7 @@ const authedDeps = (supabase = createSupabaseHarness(), fetchImpl: typeof fetch 
   }),
   fetchImpl,
   now: () => new Date("2026-04-29T16:00:00.000Z"),
+  resolveProductMode: async () => "cosmiq" as const,
 });
 
 const postRequest = (body: unknown) =>
@@ -381,7 +382,7 @@ Deno.test("generate-completion-feedback accepts valid AI output for high-signal 
           current_habit_streak: 8,
         },
         todayTasks: [
-          { id: "task-1", completed: true, completed_at: "2026-04-29T16:00:00.000Z" },
+          { id: "task-1", completed: true, completed_at: "2026-04-29T16:01:00.000Z" },
         ],
         mentor: {
           id: "mentor-1",

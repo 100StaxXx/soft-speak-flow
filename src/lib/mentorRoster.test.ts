@@ -3,12 +3,33 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_MENTOR_AVATAR_POSITION,
   MENTOR_AVATAR_POSITION_MAP,
+  MENTOR_DISPLAY_NAMES,
   getMentorDisplaySortIndex,
   resolveActiveMentorSlug,
   resolveMentorSlugAlias,
 } from "./mentorRoster";
 
 describe("mentorRoster", () => {
+  it("keeps the Graceward Guide names attached to stable mentor slugs", () => {
+    expect(MENTOR_DISPLAY_NAMES).toEqual({
+      sage: "Micah",
+      lyra: "Clara",
+      icon: "Lydia",
+      charles: "Jude",
+      princess: "Grace",
+      operator: "Ezra",
+      rival: "Caleb",
+    });
+
+    expect(resolveMentorSlugAlias("Micah")).toBe("sage");
+    expect(resolveMentorSlugAlias("Clara")).toBe("lyra");
+    expect(resolveMentorSlugAlias("Lydia")).toBe("icon");
+    expect(resolveMentorSlugAlias("Jude")).toBe("charles");
+    expect(resolveMentorSlugAlias("Grace")).toBe("princess");
+    expect(resolveMentorSlugAlias("Ezra")).toBe("operator");
+    expect(resolveMentorSlugAlias("Caleb")).toBe("rival");
+  });
+
   it("maps legacy slugs to the new canonical mentors", () => {
     expect(resolveMentorSlugAlias("atlas")).toBe("sage");
     expect(resolveMentorSlugAlias("carmen")).toBe("icon");

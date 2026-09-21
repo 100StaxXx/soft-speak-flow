@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, type CSSProperties } from "react";
 import {
   cinematicPageBackgrounds,
+  type StaticBackgroundAsset,
   type CinematicPageBackgroundKey,
 } from "@/assets/backgrounds";
 import { StaticBackgroundImage } from "@/components/StaticBackgroundImage";
@@ -12,6 +13,9 @@ import { useTimeColors } from "@/hooks/useTimeColors";
 
 interface CinematicPageBackgroundProps {
   preset: CinematicPageBackgroundKey;
+  overrideBackground?: StaticBackgroundAsset;
+  overrideSource?: string;
+  imageFilter?: string;
 }
 
 interface AmbientStar {
@@ -40,7 +44,12 @@ const generateAmbientStars = (count: number): AmbientStar[] => (
   }))
 );
 
-export const CinematicPageBackground = memo(({ preset }: CinematicPageBackgroundProps) => {
+export const CinematicPageBackground = memo(({
+  preset,
+  overrideBackground,
+  overrideSource,
+  imageFilter,
+}: CinematicPageBackgroundProps) => {
   const presetConfig = cinematicPageBackgrounds[preset];
   const { isTabActive } = useMainTabVisibility();
   const resolvedWallpaper = useResolvedWallpaper(preset);
@@ -127,9 +136,20 @@ export const CinematicPageBackground = memo(({ preset }: CinematicPageBackground
       : "scale(1.03)",
     transition: "transform 220ms ease-out",
     willChange: shouldRunParallax ? "transform" : undefined,
-  }), [shouldRunParallax]);
+    filter: imageFilter,
+  }), [imageFilter, shouldRunParallax]);
 
-  const backgroundSource = resolvedWallpaper?.source ?? (currentDateReady ? "none" : "loading");
+  const activeBackground = overrideBackground ?? resolvedWallpaper?.background ?? presetConfig.fallbackBackground;
+  const mobileObjectPosition = overrideBackground
+    ? presetConfig.mobileObjectPosition
+    : resolvedWallpaper?.mobileObjectPosition ?? presetConfig.mobileObjectPosition;
+  const desktopObjectPosition = overrideBackground
+    ? presetConfig.desktopObjectPosition
+    : resolvedWallpaper?.desktopObjectPosition ?? presetConfig.desktopObjectPosition;
+  const backgroundSource = overrideBackground
+    ? overrideSource ?? "override"
+    : resolvedWallpaper?.source
+    ?? (presetConfig.fallbackBackground ? "bundled-fallback" : currentDateReady ? "none" : "loading");
 
   const scrim = presetConfig.scrim;
   const motionMode = shouldAnimateOverlay ? "animated" : "static";
@@ -151,22 +171,26 @@ export const CinematicPageBackground = memo(({ preset }: CinematicPageBackground
         style={{ background: presetConfig.loadingGradient }}
       />
 
-      {resolvedWallpaper ? (
+      {activeBackground ? (
         <>
           <StaticBackgroundImage
-            background={resolvedWallpaper.background}
+            background={activeBackground}
             className="absolute inset-0 h-full w-full object-cover select-none md:hidden"
-            objectPosition={resolvedWallpaper.mobileObjectPosition}
+            objectPosition={mobileObjectPosition}
             style={imageStyle}
-            onError={() => reportWallpaperRenderError(preset, resolvedWallpaper.imageUrl)}
+            onError={!overrideBackground && resolvedWallpaper
+              ? () => reportWallpaperRenderError(preset, resolvedWallpaper.imageUrl)
+              : undefined}
             testId="cinematic-background-image-mobile"
           />
           <StaticBackgroundImage
-            background={resolvedWallpaper.background}
+            background={activeBackground}
             className="absolute inset-0 hidden h-full w-full object-cover select-none md:block"
-            objectPosition={resolvedWallpaper.desktopObjectPosition}
+            objectPosition={desktopObjectPosition}
             style={imageStyle}
-            onError={() => reportWallpaperRenderError(preset, resolvedWallpaper.imageUrl)}
+            onError={!overrideBackground && resolvedWallpaper
+              ? () => reportWallpaperRenderError(preset, resolvedWallpaper.imageUrl)
+              : undefined}
             testId="cinematic-background-image-desktop"
           />
         </>

@@ -10,6 +10,7 @@ TEST_FILES=(
   "$ROOT_DIR/supabase/tests/security/01_rls_and_storage.sql"
   "$ROOT_DIR/supabase/tests/security/02_entitlements_and_rpc.sql"
   "$ROOT_DIR/supabase/tests/security/04_companion_claim_validation.sql"
+  "$ROOT_DIR/supabase/tests/security/05_companion_cinema_engine.sql"
 )
 
 mkdir -p "$ROOT_DIR/tmp"

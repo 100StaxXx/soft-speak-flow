@@ -10,8 +10,10 @@
 import { safeLocalStorage } from './storage';
 import { Capacitor } from '@capacitor/core';
 import { logger } from './logger';
+import { productScopedStorageKey } from '@/config/productRuntime';
 
 const log = logger.scope('iOS Audio');
+const GLOBAL_AUDIO_MUTED_STORAGE_KEY = productScopedStorageKey('global_audio_muted');
 
 // Check if running on iOS
 export const isIOS = Capacitor.getPlatform() === 'ios' || 
@@ -224,12 +226,12 @@ class IOSAudioStateManager {
   }
   
   private loadState() {
-    const saved = safeLocalStorage.getItem('global_audio_muted');
+    const saved = safeLocalStorage.getItem(GLOBAL_AUDIO_MUTED_STORAGE_KEY);
     this.isMuted = saved === 'true';
   }
   
   private saveState() {
-    safeLocalStorage.setItem('global_audio_muted', this.isMuted.toString());
+    safeLocalStorage.setItem(GLOBAL_AUDIO_MUTED_STORAGE_KEY, this.isMuted.toString());
   }
   
   private handleVisibilityChange = () => {

@@ -3,23 +3,22 @@
  * Only imports the requested fallback portrait instead of the whole roster upfront.
  */
 
-import { resolveMentorSlugAlias } from "@/lib/mentorRoster";
+import { isActiveMentorSlug, resolveMentorSlugAlias } from "@/lib/mentorRoster";
 
 const imageCache = new Map<string, string>();
-const KNOWN_STALE_AVATAR_PATHS: Record<string, readonly string[]> = {
-  lyra: ["/mentors-avatars/lyra-mentor.png"],
-};
 
 const shouldUseBundledImage = (slug: string, avatarUrl?: string | null): boolean => {
   const resolvedSlug = resolveMentorSlugAlias(slug);
   if (!resolvedSlug) return !avatarUrl?.trim();
 
+  // Canonical Guides ship with a cohesive, reviewed portrait set. Prefer it over
+  // legacy storage URLs so existing accounts receive the new art immediately.
+  if (isActiveMentorSlug(resolvedSlug)) return true;
+
   const trimmedAvatarUrl = avatarUrl?.trim();
   if (!trimmedAvatarUrl) return true;
 
-  return KNOWN_STALE_AVATAR_PATHS[resolvedSlug]?.some((path) =>
-    trimmedAvatarUrl.includes(path),
-  ) ?? false;
+  return false;
 };
 
 export const getDirectMentorAvatarUrl = (
@@ -45,31 +44,31 @@ export const loadMentorImage = async (slug: string): Promise<string> => {
     let module;
     switch (resolvedSlug) {
       case "sage":
-        module = await import("@/assets/sage-mentor.png");
+        module = await import("@/assets/guides/sage-guide.jpg");
         break;
       case "lyra":
-        module = await import("@/assets/lyra-mentor.png");
+        module = await import("@/assets/guides/lyra-guide.jpg");
         break;
       case "icon":
-        module = await import("@/assets/icon-mentor.png");
+        module = await import("@/assets/guides/icon-guide.jpg");
         break;
       case "charles":
-        module = await import("@/assets/charles-mentor.png");
+        module = await import("@/assets/guides/charles-guide.jpg");
         break;
       case "princess":
-        module = await import("@/assets/princess-mentor.png");
+        module = await import("@/assets/guides/princess-guide.jpg");
         break;
       case "operator":
-        module = await import("@/assets/stryker-sage.png");
+        module = await import("@/assets/guides/operator-guide.jpg");
         break;
       case "rival":
-        module = await import("@/assets/rival-mentor.png");
+        module = await import("@/assets/guides/rival-guide.jpg");
         break;
       case "reign":
         module = await import("@/assets/reign-sage.png");
         break;
       default:
-        module = await import("@/assets/sage-mentor.png");
+        module = await import("@/assets/guides/sage-guide.jpg");
         break;
     }
 

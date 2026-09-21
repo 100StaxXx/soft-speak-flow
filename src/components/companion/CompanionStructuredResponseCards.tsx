@@ -260,7 +260,7 @@ const renderCampaignHealthSnapshot = (
       } quiet`
       : null,
     snapshot.activeCampaignCount > 1
-      ? `${snapshot.activeCampaignCount} active campaigns`
+      ? `${snapshot.activeCampaignCount} active commitments`
       : null,
   ].filter((value): value is string => Boolean(value));
 
@@ -516,7 +516,7 @@ export const CompanionStructuredResponseCards = memo(
                     className={cn("mt-4", styles.item)}
                     data-testid="structured-plan-day-campaign-focus"
                   >
-                    <p className={styles.title}>Campaign Focus</p>
+                    <p className={styles.title}>Journey Focus</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <span className={styles.accent}>
                         {planDayCampaignFocus.campaignTitle}
@@ -576,7 +576,7 @@ export const CompanionStructuredResponseCards = memo(
                   )
                   : (
                     <p className={styles.subtext}>
-                      No strong quest suggestions right now without crowding the
+                      No useful action suggestions right now without crowding the
                       day.
                     </p>
                   )}
@@ -608,7 +608,7 @@ export const CompanionStructuredResponseCards = memo(
               {structuredResponse.weeklyPlan.focusCampaignTitle
                 ? (
                   <div className={cn("mt-4", styles.item)}>
-                    <p className={styles.title}>Campaign Focus</p>
+                    <p className={styles.title}>Journey Focus</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <span className={styles.accent}>
                         {structuredResponse.weeklyPlan.focusCampaignTitle}
@@ -717,7 +717,7 @@ export const CompanionStructuredResponseCards = memo(
               {structuredResponse.priorityOverview.focusCampaignTitle
                 ? (
                   <div className={cn("mt-4", styles.item)}>
-                    <p className={styles.title}>Focus Campaign</p>
+                    <p className={styles.title}>Focus commitment</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <span className={styles.accent}>
                         {structuredResponse.priorityOverview.focusCampaignTitle}
@@ -755,7 +755,7 @@ export const CompanionStructuredResponseCards = memo(
               {structuredResponse.priorityOverview.campaignPressure
                 ? (
                   <div className={cn("mt-4", styles.item)}>
-                    <p className={styles.title}>Campaign Pressure</p>
+                    <p className={styles.title}>Commitment pressure</p>
                     <p className={cn("mt-1", styles.subtext)}>
                       {structuredResponse.priorityOverview.campaignPressure}
                     </p>
@@ -924,7 +924,7 @@ export const CompanionStructuredResponseCards = memo(
               className={cn("p-4", styles.card)}
               data-testid="structured-campaign-momentum"
             >
-              <p className={styles.title}>Advance My Campaign</p>
+              <p className={styles.title}>Continue My Journey</p>
               <p className={cn("mt-2", styles.body)}>
                 {structuredResponse.campaignMomentum.message}
               </p>

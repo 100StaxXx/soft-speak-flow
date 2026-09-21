@@ -2,6 +2,7 @@ import { Capacitor } from "@capacitor/core";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { toPng } from "html-to-image";
+import { PRODUCT } from "@/config/product";
 
 import {
   EvolutionShareVideo,
@@ -9,8 +10,9 @@ import {
   type RenderEvolutionShareVideoResult,
 } from "@/plugins/EvolutionShareVideoPlugin";
 
-export const DEFAULT_EVOLUTION_SHARE_TEXT = "My companion just evolved. #Cosmiq";
-export const DEFAULT_STATS_CARD_SHARE_TEXT = "My current Cosmiq title. #Cosmiq";
+const PRODUCT_HASHTAG = PRODUCT.mode === "christian" ? "#Graceward" : "#Cosmiq";
+export const DEFAULT_EVOLUTION_SHARE_TEXT = `My companion just evolved in ${PRODUCT.name}. ${PRODUCT_HASHTAG}`;
+export const DEFAULT_STATS_CARD_SHARE_TEXT = `My current ${PRODUCT.name} companion title. ${PRODUCT_HASHTAG}`;
 
 export type ShareCardFormat = "story" | "square";
 
@@ -227,10 +229,11 @@ const normalizeShareableMedia = (media: ShareableRenderedMedia) => {
     };
   }
 
+  const nativeMedia = media as RenderedNativeMedia;
   return {
-    uri: media.uri,
-    filename: media.filename,
-    mimeType: media.mimeType,
+    uri: nativeMedia.uri,
+    filename: nativeMedia.filename,
+    mimeType: nativeMedia.mimeType,
   };
 };
 
@@ -278,7 +281,7 @@ const dataUrlToBlob = async (dataUrl: string) => {
 const filenameFromUri = (uri: string) => {
   const path = uri.split("?")[0] ?? uri;
   const filename = path.split("/").filter(Boolean).pop();
-  return filename || "cosmiq-share";
+  return filename || `${PRODUCT.name.toLowerCase()}-share`;
 };
 
 const mimeTypeFromFilename = (filename: string) => {

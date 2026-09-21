@@ -36,6 +36,27 @@ export function EditCampaignSheet({
     return true;
   };
 
+  const frameActiveEpics: EditCampaignSheetEpic[] = activeEpics.map((activeEpic) => ({
+    id: activeEpic.id,
+    title: activeEpic.title,
+    description: activeEpic.description,
+    target_days: activeEpic.target_days,
+    start_date: activeEpic.start_date,
+    end_date: activeEpic.end_date,
+    status: activeEpic.status,
+    epic_habits: activeEpic.epic_habits?.map((link) => ({
+      habit_id: link.habit_id,
+      habits: link.habits ? {
+        ...link.habits,
+        category: link.habits.category === "mind"
+          || link.habits.category === "body"
+          || link.habits.category === "soul"
+          ? link.habits.category
+          : null,
+      } : null,
+    })) ?? null,
+  }));
+
   return (
     <EditCampaignSheetFrame
       epic={epic}
@@ -45,10 +66,22 @@ export function EditCampaignSheet({
       startWithAddRitual={startWithAddRitual}
       companionFrostedThemeStyle={companionFrostedThemeStyle}
       dependencies={{
-        activeEpics,
-        updateEpic,
-        deleteEpic,
-        createCampaignRitual,
+        activeEpics: frameActiveEpics,
+        updateEpic: async ({ epicId, updates }) => {
+          await updateEpic({
+            epicId,
+            updates: {
+              title: updates.title,
+              description: updates.description ?? "",
+            },
+          });
+        },
+        deleteEpic: async (params) => {
+          await deleteEpic(params);
+        },
+        createCampaignRitual: async (params) => {
+          await createCampaignRitual(params);
+        },
         deleteRitual,
       }}
     />

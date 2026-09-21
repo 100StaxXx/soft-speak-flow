@@ -7,15 +7,16 @@ import { CompanionCreationLoader } from "./CompanionCreationLoader";
 import { CompanionImage, CompanionPortraitShell } from "./CompanionImage";
 import {
   COMPANION_ELEMENTS,
-  COMPANION_PRESETS,
+  COMPANION_CATALOG_PRESETS,
   COMPANION_STORY_TONES,
   getCompanionElementAnchorColor,
-  getCompanionEggLabel,
+  getCompanionElement,
   type CompanionElementId,
   type CompanionPresetId,
   type CompanionStoryTone,
 } from "@/config/companionCatalog";
 import {
+  COMPANION_LEGACY_STATE_LABEL,
   getDefaultPilotCompanionElementId,
   getDefaultPilotCompanionPresetId,
   isPilotCompanionElement,
@@ -62,6 +63,9 @@ const getPresetPreviewUrl = (presetId: CompanionPresetId, element: CompanionElem
 const getEggPreviewUrl = (element: CompanionElementId) =>
   getUniversalEggAssetUrl(element);
 
+const getCosmiqEggLabel = (element: CompanionElementId) =>
+  `${getCompanionElement(element).label} Egg`;
+
 export const CompanionPersonalization = ({
   onComplete,
   isLoading = false,
@@ -71,9 +75,12 @@ export const CompanionPersonalization = ({
   initialStoryTone = "epic_adventure",
   initialCompanionName = null,
 }: CompanionPersonalizationProps) => {
+  const restrictToPilot = mode === "onboarding" || mode === "reset";
   const [selectedPresetId, setSelectedPresetId] = useState<CompanionPresetId>(getDefaultPilotCompanionPresetId());
   const [selectedElement, setSelectedElement] = useState<CompanionElementId>(
-    isPilotCompanionElement(initialElement) ? initialElement : getDefaultPilotCompanionElementId(),
+    !restrictToPilot || isPilotCompanionElement(initialElement)
+      ? initialElement
+      : getDefaultPilotCompanionElementId(),
   );
   const [selectedTone, setSelectedTone] = useState<CompanionStoryTone>(initialStoryTone);
   const [customCompanionName, setCustomCompanionName] = useState(initialCompanionName ?? "");
@@ -85,7 +92,7 @@ export const CompanionPersonalization = ({
   const normalizedCustomCompanionName = normalizeCompanionCustomName(customCompanionName);
 
   const selectedPreset = useMemo(
-    () => COMPANION_PRESETS.find((preset) => preset.id === selectedPresetId) ?? COMPANION_PRESETS[0],
+    () => COMPANION_CATALOG_PRESETS.find((preset) => preset.id === selectedPresetId) ?? COMPANION_CATALOG_PRESETS[0],
     [selectedPresetId],
   );
   const selectedElementMeta = useMemo(
@@ -97,7 +104,7 @@ export const CompanionPersonalization = ({
     [selectedTone],
   );
   const selectedEggLabel = useMemo(
-    () => getCompanionEggLabel(selectedElement),
+    () => getCosmiqEggLabel(selectedElement),
     [selectedElement],
   );
   const selectedDisplayName = normalizedCustomCompanionName
@@ -108,29 +115,32 @@ export const CompanionPersonalization = ({
   }
 
   const heading = isResetMode
-    ? "Choose Your New Egg"
+    ? "Choose a Fresh Start"
     : isEggSelectionMode
-      ? "Choose Your Egg"
+      ? "Choose Your Starting Form"
     : isHatchMode
-      ? "Your Egg Is Hatching"
+      ? "Your Companion Is Ready to Grow"
       : "Choose Your Companion Form";
   const subheading = isResetMode
-    ? "Start fresh by choosing the elemental egg, the species sleeping inside it, and the story tone that will guide the bond."
+    ? "Start fresh by choosing a visual nature, symbolic creature, and companion personality."
     : isEggSelectionMode
-      ? "Select the elemental egg your journey begins with. The creature form will be chosen when it hatches."
+      ? "Select the visual nature your companion begins with. Its creature form will be revealed at the first growth milestone."
     : isHatchMode
-      ? "Choose the creature form your egg will awaken into. Its element and story tone stay locked from the egg you chose."
-      : "Your companion needs a preset form before we can continue. Pick the creature, element skin, and story tone you want to carry forward.";
+      ? "Choose the symbolic creature your companion will become. Its visual nature and personality stay the same."
+      : "Pick the creature, visual nature, and personality you want to carry forward.";
   const cta = isResetMode
     ? "Begin Again"
     : isEggSelectionMode
-      ? "Begin Your Journey"
+      ? "Begin My Daily Path"
     : isHatchMode
-      ? "Hatch Companion"
+      ? "Reveal Companion"
       : "Save Companion Form";
   const renderPresetCarousel = () => (
-    <div className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory">
-      {COMPANION_PRESETS.map((preset) => {
+    <div
+      data-testid="companion-preset-carousel"
+      className="flex w-full min-w-0 max-w-full gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-3 scroll-px-1 snap-x snap-mandatory touch-auto [-webkit-overflow-scrolling:touch]"
+    >
+      {COMPANION_CATALOG_PRESETS.map((preset) => {
         const previewUrl = getPresetPreviewUrl(preset.id, selectedElement);
         const previewKey = `${preset.id}:${selectedElement}`;
         const isSupported = isPilotCompanionPreset(preset.id);
@@ -206,6 +216,11 @@ export const CompanionPersonalization = ({
                       {preset.role}
                     </div>
                   </div>
+                  {!isSupported ? (
+                    <span className="rounded-full border border-white/15 bg-black/40 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">
+                      {COMPANION_LEGACY_STATE_LABEL}
+                    </span>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -213,6 +228,11 @@ export const CompanionPersonalization = ({
               <p className="text-sm text-foreground/90">
                 {preset.revealCopy}
               </p>
+              {!isSupported ? (
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  Existing companions keep their last approved portrait. New selection is unavailable.
+                </p>
+              ) : null}
             </div>
           </button>
         );
@@ -221,8 +241,8 @@ export const CompanionPersonalization = ({
   );
 
   return (
-    <div className={isFullscreen ? "min-h-screen px-4 pt-safe pb-safe flex items-center justify-center relative z-10" : "w-full"}>
-      <div className={`w-full ${isFullscreen ? "max-w-5xl p-8" : "p-2"} space-y-8 animate-scale-in cosmic-glass rounded-3xl border border-white/10`}>
+    <div className={isFullscreen ? "relative z-10 flex min-h-[100dvh] w-full max-w-full touch-pan-y items-start justify-center overflow-x-hidden px-4 pb-safe-bottom pt-safe-top" : "w-full min-w-0 max-w-full"}>
+      <div className={`min-w-0 w-full ${isFullscreen ? "max-w-5xl p-4 sm:p-8" : "p-2"} space-y-8 animate-scale-in cosmic-glass rounded-3xl border border-white/10`}>
         <div className="text-center space-y-4">
           <h1 className="text-3xl md:text-4xl font-heading font-black bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
             {heading}
@@ -230,10 +250,10 @@ export const CompanionPersonalization = ({
           <div className="space-y-2 max-w-2xl mx-auto">
             <p className="text-lg font-medium text-foreground">
               {isEggSelectionMode
-                ? "Your companion begins as a living elemental egg."
+                ? "Your companion begins as a small symbol with room to grow."
                 : isHatchMode
-                  ? "The shell is cracking and the reveal is yours to choose."
-                  : "This keeps your bond while moving to the new preset system."}
+                  ? "Your completed practices have reached a new visual milestone."
+                  : "This keeps your progress while updating its visual form."}
             </p>
             <p className="text-sm text-muted-foreground">
               {subheading}
@@ -241,17 +261,17 @@ export const CompanionPersonalization = ({
           </div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-          <div className="space-y-4">
+        <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+          <div className="min-w-0 space-y-4">
             <div className="space-y-2">
               <Label className="text-lg font-semibold text-foreground">
-                {isEggSelectionMode ? "Elemental Eggs" : isHatchMode ? "Hatch Reveal" : "Reveal Carousel"}
+                {isEggSelectionMode ? "Starting Forms" : isHatchMode ? "Growth Reveal" : "Companion Forms"}
               </Label>
               <p className="text-sm text-muted-foreground">
                 {isEggSelectionMode
-                  ? "Choose the egg that feels most like the energy you want to carry into your journey."
+                  ? "Choose the visual nature you want to carry into your daily path."
                   : isHatchMode
-                    ? "Pick the creature form your egg will awaken into."
+                    ? "Pick the symbolic creature your companion will grow into."
                     : "Scroll through the companion roster and tap a card to lock your companion."}
               </p>
             </div>
@@ -260,7 +280,8 @@ export const CompanionPersonalization = ({
               <>
                 <div className="grid grid-cols-2 gap-4">
                   {COMPANION_ELEMENTS.map((element) => {
-                    const isSupported = isPilotCompanionElement(element.id);
+                    const isSupported = isPilotCompanionElement(element.id)
+                      || (!restrictToPilot && element.id === selectedElement);
                     const isSelected = isSupported && element.id === selectedElement;
                     return (
                       <button
@@ -286,7 +307,7 @@ export const CompanionPersonalization = ({
                         <div className="relative h-[220px] bg-gradient-to-br from-slate-950/80 via-slate-900/80 to-slate-950/95">
                           <CompanionImage
                             src={getEggPreviewUrl(element.id)}
-                            alt={getCompanionEggLabel(element.id)}
+                            alt={getCosmiqEggLabel(element.id)}
                             fit="contain"
                             className="h-full w-full p-4"
                             loading="lazy"
@@ -295,12 +316,17 @@ export const CompanionPersonalization = ({
                             <div className="flex items-center justify-between gap-3">
                               <div>
                                 <div className="text-lg font-heading font-bold text-white">
-                                  {getCompanionEggLabel(element.id)}
+                                  {getCosmiqEggLabel(element.id)}
                                 </div>
                                 <div className="text-xs uppercase tracking-[0.2em] text-white/55">
                                   Stage 0 • Egg
                                 </div>
                               </div>
+                              {!isSupported ? (
+                                <span className="rounded-full border border-white/15 bg-black/40 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">
+                                  {COMPANION_LEGACY_STATE_LABEL}
+                                </span>
+                              ) : null}
                             </div>
                           </div>
                         </div>
@@ -309,7 +335,7 @@ export const CompanionPersonalization = ({
                             {element.summary}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            This egg permanently sets your companion&apos;s element.
+                            This choice sets your companion&apos;s visual nature.
                           </p>
                         </div>
                       </button>
@@ -319,9 +345,9 @@ export const CompanionPersonalization = ({
                 {isResetMode ? (
                   <div className="space-y-4 pt-2">
                     <div className="space-y-2">
-                      <Label className="text-lg font-semibold text-foreground">Sleeping Species</Label>
+                      <Label className="text-lg font-semibold text-foreground">Symbolic Creature</Label>
                       <p className="text-sm text-muted-foreground">
-                        Lock the species inside your new egg now so the first hatch reveals the companion you want.
+                        Choose the creature that will appear at your first growth milestone.
                       </p>
                     </div>
                     {renderPresetCarousel()}
@@ -331,17 +357,17 @@ export const CompanionPersonalization = ({
             ) : renderPresetCarousel()}
           </div>
 
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             <div className="rounded-3xl border border-white/10 bg-white/5 p-5 space-y-4">
               <div className="space-y-1">
                 <Label className="text-lg font-semibold text-foreground">
-                  {isResetMode ? "Selected Egg And Species" : isEggSelectionMode ? "Selected Egg" : "Selected Companion"}
+                  {isResetMode ? "Selected Form and Creature" : isEggSelectionMode ? "Selected Starting Form" : "Selected Companion"}
                 </Label>
                 <p className="text-sm text-muted-foreground">
                   {isResetMode
-                    ? `${selectedElementMeta.label} energy sealed around a sleeping ${selectedPreset.displayName}.`
+                    ? `${selectedElementMeta.label} visuals paired with a ${selectedPreset.displayName}.`
                     : isEggSelectionMode
-                    ? `${selectedElementMeta.label} energy sealed inside a living cosmic shell.`
+                    ? `${selectedElementMeta.label} colors prepared for the first growth stage.`
                     : `${selectedPreset.displayName} with a ${selectedElementMeta.label.toLowerCase()} skin.`}
                 </p>
               </div>
@@ -357,7 +383,7 @@ export const CompanionPersonalization = ({
                       />
                     </div>
                     <div className="text-sm font-medium text-foreground">{selectedDisplayName}</div>
-                    <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Creature form revealed at first hatch</div>
+                    <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Creature revealed at the first growth milestone</div>
                     <p className="text-sm text-foreground/85">{selectedElementMeta.summary}</p>
                     <p className="text-xs text-muted-foreground">
                       {isResetMode
@@ -366,7 +392,7 @@ export const CompanionPersonalization = ({
                     </p>
                     {isResetMode ? (
                       <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-left">
-                        <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Sleeping Species</div>
+                        <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Symbolic Creature</div>
                         <div className="mt-1 font-semibold text-foreground">{selectedPreset.displayName}</div>
                         <p className="mt-1 text-xs text-muted-foreground">{selectedPreset.revealCopy}</p>
                       </div>
@@ -402,7 +428,7 @@ export const CompanionPersonalization = ({
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>
                     {normalizedCustomCompanionName
-                      ? `${normalizedCustomCompanionName} will appear right away, even before hatch.`
+                      ? `${normalizedCustomCompanionName} will appear right away, even before its first growth milestone.`
                       : "Your companion will use its generated name until you set one."}
                   </span>
                   <span>{customCompanionName.length}/{COMPANION_CUSTOM_NAME_MAX_LENGTH}</span>
@@ -413,19 +439,19 @@ export const CompanionPersonalization = ({
             {!isEggSelectionMode && isHatchMode && (
               <div className="rounded-3xl border border-white/10 bg-white/5 p-5 space-y-4">
                 <div className="space-y-1">
-                  <Label className="text-lg font-semibold text-foreground">Locked From Your Egg</Label>
+                  <Label className="text-lg font-semibold text-foreground">Kept From Your Starting Form</Label>
                   <p className="text-sm text-muted-foreground">
-                    Hatch selection only sets the creature form. Your element and story tone stay the same.
+                    This growth reveal only sets the creature form. Its visual nature and personality stay the same.
                   </p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                    <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Element</div>
+                    <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Visual Nature</div>
                     <div className="mt-2 font-semibold text-foreground">{selectedElementMeta.label}</div>
                     <p className="mt-1 text-xs text-muted-foreground">{selectedElementMeta.summary}</p>
                   </div>
                   <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                    <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Story Tone</div>
+                    <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Personality</div>
                     <div className="mt-2 font-semibold text-foreground">{selectedToneMeta.label}</div>
                     <p className="mt-1 text-xs text-muted-foreground">{selectedToneMeta.summary}</p>
                   </div>
@@ -435,10 +461,11 @@ export const CompanionPersonalization = ({
 
             {!isEggSelectionMode && !isHatchMode && (
               <div className="space-y-3">
-                <Label className="text-lg font-semibold text-foreground">Element Skin</Label>
+                <Label className="text-lg font-semibold text-foreground">Visual Nature</Label>
                 <div className="grid grid-cols-2 gap-3">
                   {COMPANION_ELEMENTS.map((element) => {
-                    const isSupported = isPilotCompanionElement(element.id);
+                    const isSupported = isPilotCompanionElement(element.id)
+                      || (!restrictToPilot && element.id === selectedElement);
                     const isSelected = isSupported && selectedElement === element.id;
                     return (
                       <button
@@ -469,6 +496,11 @@ export const CompanionPersonalization = ({
                             />
                             <div className="font-semibold text-foreground">{element.label}</div>
                           </div>
+                          {!isSupported ? (
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                              {COMPANION_LEGACY_STATE_LABEL}
+                            </span>
+                          ) : null}
                         </div>
                         <p className="mt-2 text-xs text-muted-foreground">{element.summary}</p>
                       </button>
@@ -480,7 +512,7 @@ export const CompanionPersonalization = ({
 
             {!isHatchMode && (
               <div className="space-y-3">
-                <Label className="text-lg font-semibold text-foreground">Story Tone</Label>
+                <Label className="text-lg font-semibold text-foreground">Personality</Label>
                 <div className="grid gap-3">
                   {COMPANION_STORY_TONES.map((tone) => {
                     const isSelected = selectedTone === tone.value;

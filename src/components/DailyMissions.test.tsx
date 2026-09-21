@@ -68,11 +68,11 @@ describe("DailyMissions", () => {
     });
   });
 
-  it("renders the guild-themed mission header without the comparison module", () => {
+  it("renders the Christian Path practice header without the comparison module", () => {
     render(<DailyMissions />);
 
-    expect(screen.getByText("Guild Missions")).toBeInTheDocument();
-    expect(screen.getByText(/STARFALL FLEET Dispatch/i)).toBeInTheDocument();
+    expect(screen.getByText("Path Practices")).toBeInTheDocument();
+    expect(screen.getByText(/THE STEADFAST Practice/i)).toBeInTheDocument();
     expect(screen.queryByText("Today's Competition")).not.toBeInTheDocument();
     expect(screen.queryByText("Network Average")).not.toBeInTheDocument();
     expect(screen.queryByText(/pts above average/i)).not.toBeInTheDocument();
@@ -88,9 +88,9 @@ describe("DailyMissions", () => {
 
     render(<DailyMissions />);
 
-    expect(screen.getByText("Daily Missions")).toBeInTheDocument();
-    expect(screen.queryByText("Guild Missions")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Dispatch/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Daily Practices")).toBeInTheDocument();
+    expect(screen.queryByText("Path Practices")).not.toBeInTheDocument();
+    expect(screen.queryByText(/THE STEADFAST Practice/i)).not.toBeInTheDocument();
   });
 
   it("renders mission progress and mission content", () => {

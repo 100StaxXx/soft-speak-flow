@@ -37,7 +37,7 @@ export const useGameLoop = (
   isRunning: boolean
 ) => {
   const callbackRef = useRef(callback);
-  const frameRef = useRef<number>();
+  const frameRef = useRef<number | undefined>(undefined);
   const lastTimeRef = useRef<number>(0);
 
   // Keep callback ref up to date without causing re-subscriptions
@@ -80,7 +80,7 @@ export const useGameTimer = (
   onComplete?: () => void
 ) => {
   const [timeLeft, setTimeLeft] = useState(initialTime);
-  const intervalRef = useRef<NodeJS.Timeout>();
+  const intervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const onCompleteRef = useRef(onComplete);
 
   useEffect(() => {
@@ -139,7 +139,7 @@ interface Particle {
 export const useParticleSystem = (maxParticles: number = 50) => {
   const [particles, setParticles] = useState<Particle[]>([]);
   const idRef = useRef(0);
-  const frameRef = useRef<number>();
+  const frameRef = useRef<number | undefined>(undefined);
   const particlesRef = useRef<Particle[]>([]);
 
   // Keep particles ref in sync
@@ -234,7 +234,7 @@ export const useDebouncedCallback = <T extends (...args: unknown[]) => unknown>(
   callback: T,
   delay: number
 ): T => {
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const callbackRef = useRef(callback);
 
   useEffect(() => {

@@ -1114,6 +1114,44 @@ Deno.test("delete-user retries transient rpc failures and succeeds", async () =>
   );
 });
 
+Deno.test("delete-user does not retry PostgreSQL statement timeouts", async () => {
+  const harness = createHandleDeleteUserHarness({
+    rpcResults: [
+      createRpcResult({
+        code: "57014",
+        message: "canceling statement due to statement timeout",
+      }),
+    ],
+  });
+
+  const response = await module.handleDeleteUser(
+    createRequest(),
+    harness.dependencies,
+  );
+  const body = await response.json();
+
+  assertEquals(
+    response.status,
+    500,
+    "Expected an exhausted database budget to return a stage failure",
+  );
+  assertEquals(
+    body.code,
+    "ACCOUNT_DELETION_RELATIONAL_CLEANUP_FAILED",
+    "Expected relational cleanup error code",
+  );
+  assertEquals(
+    harness.getRpcCallCount(),
+    1,
+    "Expected the full relational cleanup not to repeat after a statement timeout",
+  );
+  assertArrayEquals(
+    harness.sleepCalls,
+    [],
+    "Expected no retry backoff for a statement timeout",
+  );
+});
+
 Deno.test("delete-user retries transient auth delete failures and succeeds", async () => {
   const harness = createHandleDeleteUserHarness({
     authDeleteResults: [
@@ -1417,6 +1455,14 @@ Deno.test("delete-user classifies transient infrastructure failures conservative
     }),
     true,
     "Expected network failures to be retriable",
+  );
+  assertEquals(
+    module.isTransientDeleteUserInfrastructureError({
+      code: "57014",
+      message: "canceling statement due to statement timeout",
+    }),
+    false,
+    "Expected PostgreSQL statement timeouts not to repeat the full cleanup",
   );
   assertEquals(
     module.isTransientDeleteUserInfrastructureError({

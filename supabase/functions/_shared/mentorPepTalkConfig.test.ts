@@ -7,6 +7,7 @@ import {
 import {
   LEGACY_MENTOR_ALIASES,
   LEGACY_SUPPORTED_MENTOR_SLUGS,
+  MENTOR_DISPLAY_NAMES,
   resolveSupportedMentorSlug,
   type SupportedMentorSlug,
 } from "./mentorRoster.ts";
@@ -36,6 +37,29 @@ const EXPECTED_VOICE_IDS: Record<SupportedMentorSlug, string> = {
   reign: "GTQ4ImqrRljZAa9VJX6B",
 };
 
+Deno.test("active Guide names stay attached to stable backend slugs", () => {
+  const expectedNames = {
+    sage: "Micah",
+    lyra: "Clara",
+    icon: "Lydia",
+    charles: "Jude",
+    princess: "Grace",
+    operator: "Ezra",
+    rival: "Caleb",
+  } as const;
+
+  for (const mentorSlug of ACTIVE_MENTOR_SLUGS) {
+    assert(
+      MENTOR_DISPLAY_NAMES[mentorSlug] === expectedNames[mentorSlug],
+      `Expected ${mentorSlug} to retain its Graceward Guide name`,
+    );
+    assert(
+      getMentorNarrativeProfile(mentorSlug)?.name === expectedNames[mentorSlug],
+      `Expected ${mentorSlug} narrative name to match the Guide roster`,
+    );
+  }
+});
+
 Deno.test("mentor pep talk config resolves active mentor themes", () => {
   for (const mentorSlug of ACTIVE_MENTOR_SLUGS) {
     const themes = getMentorThemes(mentorSlug);
@@ -52,6 +76,17 @@ Deno.test("mentor pep talk config resolves active mentor themes", () => {
       `Expected complete theme entries for ${mentorSlug}`,
     );
   }
+});
+
+Deno.test("daily Guide themes use Graceward stewardship and wellbeing language", () => {
+  const categories = ACTIVE_MENTOR_SLUGS.flatMap((mentorSlug) =>
+    getMentorThemes(mentorSlug).map((theme) => theme.topic_category)
+  );
+
+  assert(!categories.includes("business"), "Expected business to be reframed as stewardship");
+  assert(!categories.includes("physique"), "Expected physique to be reframed as wellbeing");
+  assert(categories.includes("stewardship"), "Expected a stewardship encouragement theme");
+  assert(categories.includes("wellbeing"), "Expected a wellbeing encouragement theme");
 });
 
 Deno.test("mentor pep talk config provides voices for all supported mentors", () => {
@@ -122,48 +157,48 @@ Deno.test("mentor voice config resolves canonical slugs and legacy aliases", () 
   }
 });
 
-Deno.test("mentor pep talk config includes Lyra across backend mentor surfaces", () => {
+Deno.test("mentor pep talk config includes Clara across backend Guide surfaces", () => {
   assert(
     ACTIVE_MENTOR_SLUGS.includes("lyra"),
-    "Expected Lyra to be active for backend generation",
+    "Expected Clara's stable slug to be active for backend generation",
   );
   assert(
     resolveMentorSlug("lyra") === "lyra",
-    "Expected Lyra to resolve as a supported mentor",
+    "Expected Clara's stable slug to resolve as a supported Guide",
   );
 
   const themes = getMentorThemes("lyra");
   assert(
     themes.some((theme) => theme.topic_category === "strategy"),
-    "Expected Lyra strategy themes",
+    "Expected Clara strategy themes",
   );
 
   const voiceConfig = resolveMentorVoiceConfig("lyra");
   assert(
     Boolean(voiceConfig?.voiceId),
-    "Expected Lyra to have a mentor voice config",
+    "Expected Clara to have a Guide voice config",
   );
   assert(
     voiceConfig?.voiceId === "54YYBuRuAG6KJooiOhFI",
-    "Expected Lyra to use her dedicated ElevenLabs voice",
+    "Expected Clara to use her dedicated ElevenLabs voice",
   );
   assert(
     resolveTutorialVoice("lyra") === "nova",
-    "Expected Lyra to resolve a tutorial voice",
+    "Expected Clara to resolve a tutorial voice",
   );
 
   const narrativeProfile = getMentorNarrativeProfile("lyra");
   assert(
-    narrativeProfile?.storyRole === "synthetic_oracle",
-    "Expected Lyra narrative profile",
+    narrativeProfile?.storyRole === "discernment_guide",
+    "Expected Clara narrative profile",
   );
 });
 
-Deno.test("mentor voice config keeps Princess pep talks brisker than default", () => {
+Deno.test("mentor voice config keeps Grace pep talks brisker than default", () => {
   const voiceConfig = resolveMentorVoiceConfig("princess");
   assert(
     voiceConfig?.speed === 1.2,
-    "Expected Princess voice speed to use the fastest supported ElevenLabs setting",
+    "Expected Grace's voice speed to use the fastest supported ElevenLabs setting",
   );
 });
 

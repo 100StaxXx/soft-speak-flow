@@ -75,7 +75,7 @@ describe("useSubscription", () => {
 
   it("shows subscription details from hardened access state when StoreKit has a tokenless sandbox entitlement", () => {
     mocks.storeKit.currentEntitlement = {
-      productId: "cosmiq_premium_yearly",
+      productId: "graceward_plus_yearly",
       expirationDate: "2099-01-01T00:00:00.000Z",
       transactionId: "sandbox-tx",
       appAccountToken: null,
@@ -95,18 +95,18 @@ describe("useSubscription", () => {
     expect(result.current.isActive).toBe(true);
     expect(result.current.hasPremium).toBe(true);
     expect(result.current.plan).toBe("yearly");
-    expect(result.current.planPrice).toBe("$99.99/year");
+    expect(result.current.planPrice).toBe("$49.99/year");
     expect(result.current.subscription).toMatchObject({
       status: "active",
       plan: "yearly",
-      product_identifier: "cosmiq_premium_yearly",
+      product_identifier: "graceward_plus_yearly",
     });
   });
 
   it("does not show an active subscription from raw RevenueCat state when backend access is inactive", () => {
     mocks.storeKit = {
       currentEntitlement: {
-        productId: "cosmiq_premium_yearly",
+        productId: "graceward_plus_yearly",
         expirationDate: "2099-01-01T00:00:00.000Z",
         transactionId: "other-account-tx",
         appAccountToken: null,

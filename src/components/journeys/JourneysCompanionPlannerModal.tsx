@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/drawer";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { PRODUCT } from "@/config/product";
 import {
   Tooltip,
   TooltipContent,
@@ -120,8 +121,8 @@ const getPlannerBriefingMetrics = (
     ["openQuestCount", "Open"],
     ["scheduledQuestCount", "Timed"],
     ["anytimeQuestCount", "Anytime"],
-    ["ritualQuestCount", "Rituals"],
-    ["activeCampaignCount", "Campaigns"],
+    ["ritualQuestCount", "Rhythms"],
+    ["activeCampaignCount", "Commitments"],
     ["estimatedLoadLabel", "Load"],
   ]
     .map(([key, label]) => {
@@ -1378,9 +1379,9 @@ export const JourneysCompanionPlannerModal = memo(
             hideCloseButton
           >
             <DialogHeader className="sr-only">
-              <DialogTitle>Cosmiq companion</DialogTitle>
+              <DialogTitle>{PRODUCT.name} companion</DialogTitle>
               <DialogDescription>
-                Talk with Cosmiq about your day, schedule, and plans.
+                Talk with your companion about your day, schedule, and plans.
               </DialogDescription>
             </DialogHeader>
             {body}
@@ -1402,9 +1403,9 @@ export const JourneysCompanionPlannerModal = memo(
           data-testid="journeys-companion-planner-drawer-content"
         >
           <DrawerHeader className="sr-only">
-            <DrawerTitle>Cosmiq companion</DrawerTitle>
+            <DrawerTitle>{PRODUCT.name} companion</DrawerTitle>
             <DrawerDescription>
-              Talk with Cosmiq about your day, schedule, and plans.
+              Talk with your companion about your day, schedule, and plans.
             </DrawerDescription>
           </DrawerHeader>
           {body}

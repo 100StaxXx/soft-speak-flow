@@ -1,28 +1,17 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   addAppListener: vi.fn(),
-  addCustomerInfoUpdateListener: vi.fn(),
-  configure: vi.fn(),
-  getCustomerInfo: vi.fn(),
-  getOfferings: vi.fn(),
-  getProducts: vi.fn(),
-  logIn: vi.fn(),
-  purchaseStoreProduct: vi.fn(),
-  removeCustomerInfoUpdateListener: vi.fn(),
+  addTransactionListener: vi.fn(),
+  currentEntitlements: vi.fn(),
+  loadProducts: vi.fn(),
+  manageSubscriptions: vi.fn(),
+  presentCodeRedemptionSheet: vi.fn(),
+  purchase: vi.fn(),
   restorePurchases: vi.fn(),
-  setLogLevel: vi.fn(),
-  syncPurchases: vi.fn(),
 }));
-
-const inactiveCustomerInfo = {
-  entitlements: { active: {}, all: {} },
-  subscriptionsByProductIdentifier: {},
-  originalAppUserId: "11111111-1111-4111-8111-111111111111",
-  requestDate: "2026-01-01T00:00:00.000Z",
-};
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
@@ -48,51 +37,29 @@ vi.mock("@/utils/platformTargets", () => ({
   isNativeIOS: () => true,
 }));
 
-vi.mock("@revenuecat/purchases-capacitor", () => ({
-  LOG_LEVEL: {
-    DEBUG: "DEBUG",
-    ERROR: "ERROR",
-    INFO: "INFO",
-  },
-  PAYWALL_RESULT: {
-    NOT_PRESENTED: "NOT_PRESENTED",
-    PURCHASED: "PURCHASED",
-    RESTORED: "RESTORED",
-  },
-  PRODUCT_CATEGORY: {
-    SUBSCRIPTION: "SUBSCRIPTION",
-  },
-  STOREKIT_VERSION: {
-    STOREKIT_2: "STOREKIT_2",
-  },
-  Purchases: {
-    addCustomerInfoUpdateListener: (...args: unknown[]) => (
-      mocks.addCustomerInfoUpdateListener(...args) ?? Promise.resolve("listener-1")
-    ),
-    configure: (...args: unknown[]) => mocks.configure(...args),
-    getCustomerInfo: (...args: unknown[]) => mocks.getCustomerInfo(...args),
-    getOfferings: (...args: unknown[]) => mocks.getOfferings(...args),
-    getProducts: (...args: unknown[]) => mocks.getProducts(...args) ?? Promise.resolve({ products: [] }),
-    logIn: (...args: unknown[]) => mocks.logIn(...args),
-    purchaseStoreProduct: (...args: unknown[]) => mocks.purchaseStoreProduct(...args),
-    removeCustomerInfoUpdateListener: (...args: unknown[]) => mocks.removeCustomerInfoUpdateListener(...args),
+vi.mock("@/plugins/AppleStoreKitPlugin", () => ({
+  AppleStoreKit: {
+    addListener: (...args: unknown[]) => mocks.addTransactionListener(...args),
+    currentEntitlements: (...args: unknown[]) => mocks.currentEntitlements(...args),
+    loadProducts: (...args: unknown[]) => mocks.loadProducts(...args),
+    manageSubscriptions: (...args: unknown[]) => mocks.manageSubscriptions(...args),
+    presentCodeRedemptionSheet: (...args: unknown[]) => mocks.presentCodeRedemptionSheet(...args),
+    purchase: (...args: unknown[]) => mocks.purchase(...args),
     restorePurchases: (...args: unknown[]) => mocks.restorePurchases(...args),
-    setLogLevel: (...args: unknown[]) => mocks.setLogLevel(...args),
-    syncPurchases: (...args: unknown[]) => mocks.syncPurchases(...args),
-  },
-}));
-
-vi.mock("@revenuecat/purchases-capacitor-ui", () => ({
-  RevenueCatUI: {
-    presentCustomerCenter: vi.fn(),
-    presentPaywall: vi.fn(),
-    presentPaywallIfNeeded: vi.fn(),
   },
 }));
 
 import { StoreKitProvider, useStoreKitContext } from "./StoreKitProvider";
 
-const never = <T,>() => new Promise<T>(() => {});
+const activeYearlyTransaction = {
+  productId: "graceward_plus_yearly",
+  transactionId: "2000001171944416",
+  originalTransactionId: "2000001171944400",
+  purchaseDate: "2026-08-08T12:00:00.000Z",
+  expirationDate: "2099-08-08T12:00:00.000Z",
+  appAccountToken: "11111111-1111-4111-8111-111111111111",
+  isSandbox: true,
+};
 
 const Probe = () => {
   const storeKit = useStoreKitContext();
@@ -101,432 +68,92 @@ const Probe = () => {
   return (
     <div>
       <span data-testid="storekit-loading">{String(storeKit.isLoading)}</span>
-      <span data-testid="products-loading">{String(storeKit.productsLoading)}</span>
-      <span data-testid="entitlement-error">{String(storeKit.entitlementError)}</span>
-      <span data-testid="entitlement-product">{storeKit.currentEntitlement?.productId ?? ""}</span>
-      <span data-testid="entitlement-app-token">{storeKit.currentEntitlement?.appAccountToken ?? ""}</span>
-      <span data-testid="entitlement-rc-original-user">
-        {storeKit.currentEntitlement?.revenueCatOriginalAppUserId ?? ""}
-      </span>
-      <span data-testid="entitlement-sandbox">{String(storeKit.currentEntitlement?.isSandbox)}</span>
       <span data-testid="product-count">{String(storeKit.products.length)}</span>
       <span data-testid="product-ids">{storeKit.products.map((product) => product.identifier).join(",")}</span>
+      <span data-testid="entitlement-product">{storeKit.currentEntitlement?.productId ?? ""}</span>
+      <span data-testid="entitlement-sandbox">{String(storeKit.currentEntitlement?.isSandbox)}</span>
       <span data-testid="purchase-transaction-id">{purchaseTransactionId}</span>
-      <button
-        type="button"
-        onClick={() => {
-          void storeKit.purchase("cosmiq_premium_yearly").then((transaction) => {
-            setPurchaseTransactionId(transaction?.transactionId ?? "");
-          });
-        }}
-      >
+      <button type="button" onClick={() => {
+        void storeKit.purchase("graceward_plus_founder_yearly").then((transaction) => {
+          setPurchaseTransactionId(transaction?.transactionId ?? "");
+        });
+      }}>
         Purchase
       </button>
-      <button
-        type="button"
-        onClick={() => {
-          void storeKit.refreshEntitlement();
-        }}
-      >
-        Refresh Entitlement
+      <button type="button" onClick={() => { void storeKit.restorePurchases(); }}>
+        Restore
       </button>
-      <button
-        type="button"
-        onClick={() => {
-          void storeKit.refreshProducts();
-        }}
-      >
-        Refresh Products
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          void storeKit.recoverPurchases();
-        }}
-      >
-        Recover
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          void storeKit.presentPaywallIfNeeded();
-        }}
-      >
-        Paywall
+      <button type="button" onClick={() => { void storeKit.manageSubscriptions(); }}>
+        Manage
       </button>
     </div>
   );
 };
 
-describe("StoreKitProvider", () => {
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-
+describe("StoreKitProvider Apple-only checkout", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
     vi.clearAllMocks();
-    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.spyOn(console, "info").mockImplementation(() => {});
-    vi.spyOn(console, "warn").mockImplementation(() => {});
     mocks.addAppListener.mockResolvedValue({ remove: vi.fn() });
-    mocks.addCustomerInfoUpdateListener.mockResolvedValue("listener-1");
-    mocks.configure.mockResolvedValue(undefined);
-    mocks.getCustomerInfo.mockResolvedValue({ customerInfo: inactiveCustomerInfo });
-    mocks.getOfferings.mockResolvedValue({ current: null, all: {} });
-    mocks.getProducts.mockResolvedValue({ products: [] });
-    mocks.logIn.mockResolvedValue({ customerInfo: inactiveCustomerInfo });
-    mocks.purchaseStoreProduct.mockResolvedValue({
-      productIdentifier: "cosmiq_premium_yearly",
-      customerInfo: inactiveCustomerInfo,
-      transaction: {
-        transactionIdentifier: "2000001171944416",
-        productId: "cosmiq_premium_yearly",
-        purchaseDate: "2026-05-18T00:23:39Z",
-      },
-    });
-    mocks.removeCustomerInfoUpdateListener.mockResolvedValue({ wasRemoved: true });
-    mocks.restorePurchases.mockResolvedValue({ customerInfo: inactiveCustomerInfo });
-    mocks.setLogLevel.mockResolvedValue(undefined);
-    mocks.syncPurchases.mockResolvedValue(undefined);
-  });
-
-  afterEach(() => {
-    consoleErrorSpy.mockRestore();
-    vi.restoreAllMocks();
-    vi.useRealTimers();
-  });
-
-  it("does not initialize RevenueCat on startup", () => {
-    render(
-      <StoreKitProvider>
-        <Probe />
-      </StoreKitProvider>,
-    );
-
-    expect(screen.getByTestId("storekit-loading")).toHaveTextContent("false");
-    expect(screen.getByTestId("products-loading")).toHaveTextContent("false");
-    expect(mocks.configure).not.toHaveBeenCalled();
-    expect(mocks.getCustomerInfo).not.toHaveBeenCalled();
-    expect(mocks.getProducts).not.toHaveBeenCalled();
-  });
-
-  it("times out a stalled explicit entitlement refresh", async () => {
-    mocks.getCustomerInfo.mockReturnValue(never());
-
-    render(
-      <StoreKitProvider>
-        <Probe />
-      </StoreKitProvider>,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Refresh Entitlement" }));
-    expect(screen.getByTestId("storekit-loading")).toHaveTextContent("true");
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(5100);
-    });
-
-    expect(screen.getByTestId("storekit-loading")).toHaveTextContent("false");
-    expect(screen.getByTestId("entitlement-error")).toHaveTextContent("true");
-  });
-
-  it("configures RevenueCat with StoreKit 2", async () => {
-    vi.useRealTimers();
-
-    render(
-      <StoreKitProvider>
-        <Probe />
-      </StoreKitProvider>,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Refresh Entitlement" }));
-
-    await waitFor(() => {
-      expect(mocks.configure).toHaveBeenCalledWith(expect.objectContaining({
-        appUserID: "11111111-1111-4111-8111-111111111111",
-        storeKitVersion: "STOREKIT_2",
-      }));
-    });
-  });
-
-  it("maps RevenueCat sandbox metadata without treating originalAppUserId as Apple's app-account token", async () => {
-    vi.useRealTimers();
-    mocks.getCustomerInfo.mockResolvedValue({
-      customerInfo: {
-        ...inactiveCustomerInfo,
-        entitlements: {
-          active: {
-            cosmiq_pro: {
-              isActive: true,
-              productIdentifier: "cosmiq_premium_yearly",
-              latestPurchaseDate: "2026-05-18T12:00:00.000Z",
-              latestPurchaseDateMillis: 1779105600000,
-              expirationDate: "2099-01-01T00:00:00.000Z",
-              isSandbox: true,
-            },
-          },
-          all: {},
-        },
-        subscriptionsByProductIdentifier: {
-          cosmiq_premium_yearly: {
-            storeTransactionId: "store-tx-1",
-            purchaseDate: "2026-05-18T12:00:00.000Z",
-            expiresDate: "2099-01-01T00:00:00.000Z",
-            isSandbox: true,
-          },
-        },
-      },
-    });
-
-    render(
-      <StoreKitProvider>
-        <Probe />
-      </StoreKitProvider>,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Refresh Entitlement" }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("entitlement-product")).toHaveTextContent("cosmiq_premium_yearly");
-    });
-    expect(screen.getByTestId("entitlement-app-token")).toHaveTextContent("");
-    expect(screen.getByTestId("entitlement-rc-original-user")).toHaveTextContent(
-      "11111111-1111-4111-8111-111111111111",
-    );
-    expect(screen.getByTestId("entitlement-sandbox")).toHaveTextContent("true");
-  });
-
-  it("uses the live RevenueCat entitlement key for hosted paywall eligibility", async () => {
-    vi.useRealTimers();
-    const { RevenueCatUI } = await import("@revenuecat/purchases-capacitor-ui");
-    vi.mocked(RevenueCatUI.presentPaywallIfNeeded).mockResolvedValue({ result: "NOT_PRESENTED" });
-
-    render(
-      <StoreKitProvider>
-        <Probe />
-      </StoreKitProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("storekit-loading")).toHaveTextContent("false");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Paywall" }));
-
-    await waitFor(() => {
-      expect(RevenueCatUI.presentPaywallIfNeeded).toHaveBeenCalledWith({
-        requiredEntitlementIdentifier: "Cosmiq Pro",
-      });
-    });
-  });
-
-  it("maps an active RevenueCat subscription when entitlement aliases are not present", async () => {
-    vi.useRealTimers();
-    mocks.getCustomerInfo.mockResolvedValue({
-      customerInfo: {
-        ...inactiveCustomerInfo,
-        activeSubscriptions: ["cosmiq_premium_yearly"],
-        entitlements: {
-          active: {},
-          all: {},
-        },
-        subscriptionsByProductIdentifier: {
-          cosmiq_premium_yearly: {
-            productIdentifier: "cosmiq_premium_yearly",
-            storeTransactionId: "subscription-tx-1",
-            purchaseDate: "2026-05-18T12:00:00.000Z",
-            expiresDate: "2099-01-01T00:00:00.000Z",
-            isActive: true,
-            isSandbox: true,
-          },
-        },
-      },
-    });
-
-    render(
-      <StoreKitProvider>
-        <Probe />
-      </StoreKitProvider>,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Refresh Entitlement" }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("entitlement-product")).toHaveTextContent("cosmiq_premium_yearly");
-    });
-    expect(screen.getByTestId("entitlement-sandbox")).toHaveTextContent("true");
-    expect(screen.getByTestId("entitlement-rc-original-user")).toHaveTextContent(
-      "11111111-1111-4111-8111-111111111111",
-    );
-  });
-
-  it("maps a legacy active RevenueCat subscription when entitlement aliases are not present", async () => {
-    vi.useRealTimers();
-    mocks.getCustomerInfo.mockResolvedValue({
-      customerInfo: {
-        ...inactiveCustomerInfo,
-        activeSubscriptions: ["com.darrylgraham.revolution.yearly"],
-        entitlements: {
-          active: {},
-          all: {},
-        },
-        subscriptionsByProductIdentifier: {
-          "com.darrylgraham.revolution.yearly": {
-            productIdentifier: "com.darrylgraham.revolution.yearly",
-            storeTransactionId: "legacy-subscription-tx-1",
-            purchaseDate: "2026-05-18T12:00:00.000Z",
-            expiresDate: "2099-01-01T00:00:00.000Z",
-            isActive: true,
-            isSandbox: true,
-          },
-        },
-      },
-    });
-
-    render(
-      <StoreKitProvider>
-        <Probe />
-      </StoreKitProvider>,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Refresh Entitlement" }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("entitlement-product")).toHaveTextContent("com.darrylgraham.revolution.yearly");
-    });
-    expect(screen.getByTestId("entitlement-sandbox")).toHaveTextContent("true");
-  });
-
-  it("recovers an existing TestFlight subscription before the hard paywall wins", async () => {
-    vi.useRealTimers();
-    const recoveredCustomerInfo = {
-      ...inactiveCustomerInfo,
-      activeSubscriptions: ["cosmiq_premium_yearly"],
-      entitlements: {
-        active: {},
-        all: {},
-      },
-      subscriptionsByProductIdentifier: {
-        cosmiq_premium_yearly: {
-          productIdentifier: "cosmiq_premium_yearly",
-          storeTransactionId: "testflight-subscription-tx-1",
-          purchaseDate: "2026-05-18T12:00:00.000Z",
-          expiresDate: "2099-01-01T00:00:00.000Z",
-          isActive: true,
-          isSandbox: true,
-        },
-      },
-    };
-    mocks.getCustomerInfo
-      .mockResolvedValueOnce({ customerInfo: inactiveCustomerInfo })
-      .mockResolvedValueOnce({ customerInfo: inactiveCustomerInfo })
-      .mockResolvedValueOnce({ customerInfo: recoveredCustomerInfo });
-    mocks.restorePurchases.mockResolvedValue({ customerInfo: recoveredCustomerInfo });
-
-    render(
-      <StoreKitProvider>
-        <Probe />
-      </StoreKitProvider>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("storekit-loading")).toHaveTextContent("false");
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Recover" }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("entitlement-product")).toHaveTextContent("cosmiq_premium_yearly");
-    });
-    expect(mocks.syncPurchases).toHaveBeenCalled();
-    expect(mocks.restorePurchases).toHaveBeenCalled();
-    expect(screen.getByTestId("entitlement-sandbox")).toHaveTextContent("true");
-  });
-
-  it("returns the raw purchase transaction when customer info has not hydrated the entitlement yet", async () => {
-    vi.useRealTimers();
-    mocks.getProducts.mockResolvedValue({
+    mocks.addTransactionListener.mockResolvedValue({ remove: vi.fn() });
+    mocks.currentEntitlements.mockResolvedValue({ transactions: [] });
+    mocks.loadProducts.mockResolvedValue({
       products: [
-        {
-          identifier: "cosmiq_premium_yearly",
-          title: "Cosmiq Pro Yearly",
-          description: "Yearly access",
-          price: 99.99,
-          priceString: "$99.99",
-          productType: "AUTO_RENEWABLE_SUBSCRIPTION",
-          subscriptionPeriod: "P1Y",
-        },
+        { identifier: "graceward_plus_monthly", displayName: "Monthly", description: "", price: 8.99, displayPrice: "$8.99", type: "autoRenewable" },
+        { identifier: "graceward_plus_yearly", displayName: "Yearly", description: "", price: 49.99, displayPrice: "$49.99", type: "autoRenewable" },
+        { identifier: "graceward_plus_founder_yearly", displayName: "Founding", description: "", price: 29.99, displayPrice: "$29.99", type: "autoRenewable" },
       ],
     });
+    mocks.purchase.mockResolvedValue({ status: "purchased", transaction: activeYearlyTransaction });
+    mocks.restorePurchases.mockResolvedValue({ transactions: [activeYearlyTransaction] });
+    mocks.manageSubscriptions.mockResolvedValue(undefined);
+  });
 
-    render(
-      <StoreKitProvider>
-        <Probe />
-      </StoreKitProvider>,
-    );
+  it("loads all three Graceward subscription products directly from StoreKit", async () => {
+    render(<StoreKitProvider><Probe /></StoreKitProvider>);
 
-    fireEvent.click(screen.getByRole("button", { name: "Refresh Products" }));
+    await waitFor(() => expect(screen.getByTestId("product-count")).toHaveTextContent("3"));
+    expect(mocks.loadProducts).toHaveBeenCalledWith({
+      productIds: [
+        "graceward_plus_yearly",
+        "graceward_plus_monthly",
+        "graceward_plus_founder_yearly",
+      ],
+    });
+    expect(screen.getByTestId("product-ids")).toHaveTextContent("graceward_plus_founder_yearly");
+  });
+
+  it("maps a current Apple entitlement without a third-party customer record", async () => {
+    mocks.currentEntitlements.mockResolvedValue({ transactions: [activeYearlyTransaction] });
+    render(<StoreKitProvider><Probe /></StoreKitProvider>);
 
     await waitFor(() => {
-      expect(screen.getByTestId("product-count")).toHaveTextContent("1");
+      expect(screen.getByTestId("entitlement-product")).toHaveTextContent("graceward_plus_yearly");
     });
+    expect(screen.getByTestId("entitlement-sandbox")).toHaveTextContent("true");
+  });
 
+  it("purchases through StoreKit 2 with the signed-in account UUID", async () => {
+    render(<StoreKitProvider><Probe /></StoreKitProvider>);
     fireEvent.click(screen.getByRole("button", { name: "Purchase" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("purchase-transaction-id")).toHaveTextContent("2000001171944416");
+      expect(mocks.purchase).toHaveBeenCalledWith({
+        productId: "graceward_plus_founder_yearly",
+        appAccountToken: "11111111-1111-4111-8111-111111111111",
+      });
     });
-    expect(mocks.purchaseStoreProduct).toHaveBeenCalled();
+    expect(screen.getByTestId("purchase-transaction-id")).toHaveTextContent("2000001171944416");
   });
 
-  it("does not keep entitlement loading true while products are still loading", async () => {
-    mocks.getProducts.mockReturnValue(never());
-
-    render(
-      <StoreKitProvider>
-        <Probe />
-      </StoreKitProvider>,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Refresh Products" }));
-
-    expect(screen.getByTestId("storekit-loading")).toHaveTextContent("false");
-    expect(screen.getByTestId("products-loading")).toHaveTextContent("true");
+  it("restores Apple purchases and opens Apple's subscription management", async () => {
+    render(<StoreKitProvider><Probe /></StoreKitProvider>);
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(8100);
+      fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+      fireEvent.click(screen.getByRole("button", { name: "Manage" }));
     });
 
-    expect(screen.getByTestId("products-loading")).toHaveTextContent("false");
-  });
-
-  it("keeps direct products when offerings fail", async () => {
-    vi.useRealTimers();
-    mocks.getOfferings.mockRejectedValue(new Error("No offerings configured"));
-    mocks.getProducts.mockResolvedValue({
-      products: [
-        {
-          identifier: "cosmiq_premium_monthly",
-          title: "Cosmiq Pro Monthly",
-          description: "Monthly access",
-          price: 9.99,
-          priceString: "$9.99",
-          productType: "AUTO_RENEWABLE_SUBSCRIPTION",
-          subscriptionPeriod: "P1M",
-        },
-      ],
-    });
-
-    render(
-      <StoreKitProvider>
-        <Probe />
-      </StoreKitProvider>,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Refresh Products" }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("product-count")).toHaveTextContent("1");
-    });
-    expect(screen.getByTestId("product-ids")).toHaveTextContent("cosmiq_premium_monthly");
+    await waitFor(() => expect(mocks.restorePurchases).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mocks.manageSubscriptions).toHaveBeenCalledTimes(1));
   });
 });

@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { storePendingSocialAuthAttempt } from "@/utils/socialAuth";
@@ -12,10 +18,12 @@ const mocks = vi.hoisted(() => {
   const onAuthStateChangeMock = vi.fn();
   const exchangeCodeForSessionMock = vi.fn();
   const invokeMock = vi.fn();
-  const setSessionMock = vi.fn();
+  const signInWithIdTokenMock = vi.fn();
   const signOutMock = vi.fn();
   const signInWithOAuthMock = vi.fn();
   const appleAuthorizeMock = vi.fn();
+  const validateSessionProductBoundaryMock = vi.fn();
+  const announceAuthProductMismatchMock = vi.fn();
 
   return {
     getAuthRedirectPathMock,
@@ -26,10 +34,12 @@ const mocks = vi.hoisted(() => {
     onAuthStateChangeMock,
     exchangeCodeForSessionMock,
     invokeMock,
-    setSessionMock,
+    signInWithIdTokenMock,
     signOutMock,
     signInWithOAuthMock,
     appleAuthorizeMock,
+    validateSessionProductBoundaryMock,
+    announceAuthProductMismatchMock,
     isNativePlatform: false,
     platform: "web",
     applePluginAvailable: false,
@@ -96,7 +106,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       signUp: vi.fn(),
       resetPasswordForEmail: vi.fn(),
       signInWithOAuth: mocks.signInWithOAuthMock,
-      setSession: mocks.setSessionMock,
+      signInWithIdToken: mocks.signInWithIdTokenMock,
       signOut: mocks.signOutMock,
     },
     from: vi.fn(() => ({
@@ -112,7 +122,12 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-import Auth from "./Auth";
+vi.mock("@/services/authProductBoundary", () => ({
+  validateSessionProductBoundary: mocks.validateSessionProductBoundaryMock,
+  announceAuthProductMismatch: mocks.announceAuthProductMismatchMock,
+}));
+
+import Auth, { getAuthPresentation } from "./Auth";
 
 const signedInSession = {
   user: {
@@ -173,7 +188,7 @@ describe("Auth social auth intent guard", () => {
       },
       error: null,
     });
-    mocks.setSessionMock.mockResolvedValue({
+    mocks.signInWithIdTokenMock.mockResolvedValue({
       data: {
         session: signedInSession,
       },
@@ -194,6 +209,12 @@ describe("Auth social auth intent guard", () => {
         user: "apple-user-1",
       },
     });
+    mocks.validateSessionProductBoundaryMock.mockResolvedValue({
+      allowed: true,
+      expectedProductMode: "graceward",
+      actualProductMode: "graceward",
+      reason: "trusted_binding",
+    });
   });
 
   afterEach(() => {
@@ -205,11 +226,17 @@ describe("Auth social auth intent guard", () => {
     renderAuth();
     await flushMicrotasks();
 
-    expect(screen.queryByRole("button", { name: /sign in with google/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /sign in with google/i }),
+    ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /need an account\? sign up/i }),
+    );
 
-    expect(screen.queryByRole("button", { name: /sign up with google/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /sign up with google/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("opens signup mode when requested by the auth query string", async () => {
@@ -217,38 +244,45 @@ describe("Auth social auth intent guard", () => {
     await flushMicrotasks();
 
     expect(screen.getByLabelText(/^confirm password$/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^get started$/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /already have an account\? sign in/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^get started$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: /already have an account\? sign in/i,
+      }),
+    ).toBeInTheDocument();
   });
 
   it("sends sign_in intent for Apple in login mode and blocks account-not-found logins", async () => {
     mocks.isNativePlatform = true;
     mocks.platform = "ios";
     mocks.applePluginAvailable = true;
-    mocks.invokeMock.mockResolvedValue({
-      data: null,
-      error: {
-        message: "Function failed",
-        context: {
-          json: vi.fn().mockResolvedValue({
-            code: "ACCOUNT_NOT_FOUND",
-            error: "No account",
-          }),
+    mocks.signInWithIdTokenMock.mockResolvedValue({
+      data: {
+        session: {
+          ...signedInSession,
+          user: {
+            ...signedInSession.user,
+            created_at: new Date().toISOString(),
+          },
         },
       },
+      error: null,
     });
 
     renderAuth();
     await flushMicrotasks();
 
-    fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /sign in with apple/i }),
+    );
 
     await waitFor(() => {
-      expect(mocks.invokeMock).toHaveBeenCalledWith("apple-native-auth", {
-        body: expect.objectContaining({
-          identityToken: "apple-identity-token",
-          intent: "sign_in",
-        }),
+      expect(mocks.signInWithIdTokenMock).toHaveBeenCalledWith({
+        provider: "apple",
+        token: "apple-identity-token",
+        nonce: expect.any(String),
       });
     });
 
@@ -258,27 +292,53 @@ describe("Auth social auth intent guard", () => {
     expect(mocks.safeNavigateMock).not.toHaveBeenCalled();
   });
 
-  it("shows a friendly inline error when native Apple auth cannot reach the edge function", async () => {
+  it("shows a friendly inline error when native Apple auth cannot reach Supabase Auth", async () => {
     mocks.isNativePlatform = true;
     mocks.platform = "ios";
     mocks.applePluginAvailable = true;
-    mocks.invokeMock.mockResolvedValue({
-      data: null,
+    mocks.signInWithIdTokenMock.mockResolvedValue({
+      data: { session: null },
       error: {
-        name: "FunctionsFetchError",
-        message: "Failed to send a request to the Edge Function",
+        name: "AuthRetryableFetchError",
+        message: "Failed to fetch",
       },
     });
 
     renderAuth();
     await flushMicrotasks();
 
-    fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /sign in with apple/i }),
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "We couldn't reach the server to sign you in with Apple. Check your connection and try again.",
+      "Network issue while signing in with Apple. Check your connection and try again.",
     );
     expect(mocks.safeNavigateMock).not.toHaveBeenCalled();
+  });
+
+  it("shows an actionable outage message when the Apple provider is unavailable", async () => {
+    mocks.isNativePlatform = true;
+    mocks.platform = "ios";
+    mocks.applePluginAvailable = true;
+    mocks.signInWithIdTokenMock.mockResolvedValue({
+      data: { session: null },
+      error: {
+        name: "AuthApiError",
+        message: "Unsupported provider: provider is not enabled",
+      },
+    });
+
+    renderAuth();
+    await flushMicrotasks();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /sign in with apple/i }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Sign in with Apple is temporarily unavailable. Please try again in a moment.",
+    );
   });
 
   it("routes native Apple sign-in timeout fallbacks to guarded home instead of onboarding", async () => {
@@ -286,25 +346,32 @@ describe("Auth social auth intent guard", () => {
     mocks.isNativePlatform = true;
     mocks.platform = "ios";
     mocks.applePluginAvailable = true;
-    mocks.getAuthRedirectPathMock.mockImplementation(() => new Promise(() => {}));
+    mocks.getAuthRedirectPathMock.mockImplementation(
+      () => new Promise(() => {}),
+    );
     mocks.getProfileAwareAuthFallbackPathMock.mockResolvedValue("/onboarding");
 
     renderAuth();
     await flushMicrotasks();
 
-    fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /sign in with apple/i }),
+    );
 
     await flushMicrotasks();
     await flushMicrotasks();
 
-    expect(mocks.setSessionMock).toHaveBeenCalledTimes(1);
+    expect(mocks.signInWithIdTokenMock).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);
     });
     await flushMicrotasks();
 
-    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/");
+    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(
+      expect.any(Function),
+      "/",
+    );
     expect(mocks.safeNavigateMock).toHaveBeenCalledTimes(1);
   });
 
@@ -317,20 +384,26 @@ describe("Auth social auth intent guard", () => {
     renderAuth();
     await flushMicrotasks();
 
-    fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
-    fireEvent.click(screen.getByRole("button", { name: /sign up with apple/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /need an account\? sign up/i }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /sign up with apple/i }),
+    );
 
     await waitFor(() => {
-      expect(mocks.invokeMock).toHaveBeenCalledWith("apple-native-auth", {
-        body: expect.objectContaining({
-          identityToken: "apple-identity-token",
-          intent: "sign_up",
-        }),
+      expect(mocks.signInWithIdTokenMock).toHaveBeenCalledWith({
+        provider: "apple",
+        token: "apple-identity-token",
+        nonce: expect.any(String),
       });
     });
 
     await waitFor(() => {
-      expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/onboarding");
+      expect(mocks.safeNavigateMock).toHaveBeenCalledWith(
+        expect.any(Function),
+        "/onboarding",
+      );
     });
   });
 
@@ -352,6 +425,52 @@ describe("Auth social auth intent guard", () => {
     expect(mocks.exchangeCodeForSessionMock).toHaveBeenCalledWith("oauth-code");
     expect(mocks.signOutMock).toHaveBeenCalledTimes(1);
     expect(mocks.safeNavigateMock).not.toHaveBeenCalled();
-    expect(window.sessionStorage.getItem("pending_social_auth_attempt")).toBeNull();
+    expect(
+      window.sessionStorage.getItem("pending_social_auth_attempt"),
+    ).toBeNull();
+  });
+
+  it("signs out a Cosmiq Apple session before redirect-based Graceward navigation", async () => {
+    window.history.replaceState({}, "", "/auth?code=oauth-code");
+    storePendingSocialAuthAttempt({
+      provider: "apple",
+      intent: "sign_in",
+    });
+    const boundary = {
+      allowed: false,
+      expectedProductMode: "graceward",
+      actualProductMode: "cosmiq",
+      reason: "trusted_binding",
+    };
+    mocks.validateSessionProductBoundaryMock.mockResolvedValue(boundary);
+
+    renderAuth("/auth");
+    await flushMicrotasks();
+    await flushMicrotasks();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "That session belongs to your Cosmiq account",
+    );
+    expect(mocks.signOutMock).toHaveBeenCalledTimes(1);
+    expect(mocks.announceAuthProductMismatchMock).toHaveBeenCalledWith(
+      boundary,
+    );
+    expect(mocks.getAuthRedirectPathMock).not.toHaveBeenCalled();
+    expect(mocks.safeNavigateMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the Cosmiq and Graceward auth presentations visually isolated", () => {
+    const cosmiq = getAuthPresentation("cosmiq");
+    const graceward = getAuthPresentation("christian");
+
+    expect(cosmiq.rootClassName).toContain("bg-[#090311]");
+    expect(cosmiq.primaryButtonClassName).toContain("from-[#b254ea]");
+    expect(cosmiq.showBrandHeader).toBe(false);
+    expect(cosmiq.rootClassName).not.toContain("#f4efe3");
+
+    expect(graceward.rootClassName).toContain("bg-[#f4efe3]");
+    expect(graceward.primaryButtonClassName).toContain("bg-[#2f5938]");
+    expect(graceward.showBrandHeader).toBe(true);
+    expect(graceward.rootClassName).not.toContain("#090311");
   });
 });

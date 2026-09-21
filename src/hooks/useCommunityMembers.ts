@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "@/components/ui/sonner";
+import { PRODUCT_RUNTIME } from "@/config/productRuntime";
 
 export interface CommunityMember {
   id: string;
@@ -53,6 +54,7 @@ export const useCommunityMembers = (communityId?: string) => {
       const { data: companions } = await supabase
         .from("user_companion")
         .select("id, user_id, current_xp, current_stage, spirit_animal, current_image_url")
+        .eq("product_mode", PRODUCT_RUNTIME.authProductMode)
         .in("user_id", userIds);
 
       // Map data together

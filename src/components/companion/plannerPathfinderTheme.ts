@@ -14,7 +14,7 @@ export const plannerPathfinderTheme = {
     dark: darkModeVars,
   },
   shell:
-    "relative min-w-0 overflow-hidden rounded-[2.25rem] border-2 border-[hsl(var(--celestial-blue)_/_0.58)] bg-[radial-gradient(circle_at_top_left,hsl(var(--celestial-blue)_/_0.28),transparent_32%),radial-gradient(circle_at_top_right,hsl(var(--nebula-pink)_/_0.1),transparent_36%),linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--card))_50%,hsl(var(--secondary))_100%)] text-foreground shadow-[0_24px_70px_-48px_rgba(var(--primary-rgb),0.54),inset_0_1px_0_rgba(255,255,255,0.86)]",
+    "relative min-w-0 overflow-hidden rounded-[2.25rem] border-2 border-input bg-[radial-gradient(circle_at_top_left,hsl(var(--celestial-blue)_/_0.18),transparent_32%),linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--card))_50%,hsl(var(--secondary))_100%)] text-foreground shadow-[0_24px_70px_-48px_rgba(var(--primary-rgb),0.54),inset_0_1px_0_rgba(255,255,255,0.86)]",
   shellGloss:
     "pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.58),rgba(255,255,255,0.18)_18%,transparent_52%,rgba(255,255,255,0.2)_100%)]",
   shellGlow:
@@ -23,34 +23,34 @@ export const plannerPathfinderTheme = {
     "rounded-[2rem] border-2 border-[hsl(var(--celestial-blue)_/_0.5)] bg-[radial-gradient(circle_at_top_left,hsl(var(--celestial-blue)_/_0.22),transparent_34%),radial-gradient(circle_at_bottom_right,hsl(var(--stardust-gold)_/_0.1),transparent_38%),linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--card))_100%)] p-4 text-foreground shadow-[0_22px_64px_-46px_rgba(var(--primary-rgb),0.5),inset_0_1px_0_rgba(255,255,255,0.82)]",
   shellBody: "relative flex min-h-0 min-w-0 flex-col p-4 sm:p-5",
   headerBar:
-    "flex min-w-0 items-center gap-3 rounded-[1.8rem] border border-[hsl(var(--celestial-blue)_/_0.48)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,hsl(var(--card)_/_0.94)_48%,hsl(var(--secondary)_/_0.7)_100%)] px-4 py-3 shadow-[0_14px_32px_-28px_rgba(var(--primary-rgb),0.5),inset_0_1px_0_rgba(255,255,255,0.92)] backdrop-blur-xl",
+    "flex min-w-0 items-center gap-3 rounded-[1.8rem] border border-input bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,hsl(var(--card)_/_0.94)_48%,hsl(var(--secondary)_/_0.7)_100%)] px-4 py-3 shadow-[0_14px_32px_-28px_rgba(var(--primary-rgb),0.5),inset_0_1px_0_rgba(255,255,255,0.92)] backdrop-blur-xl",
   contentWell:
-    "mt-3 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[2rem] border-2 border-[hsl(var(--celestial-blue)_/_0.42)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.88),hsl(var(--secondary)_/_0.5))] shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_18px_46px_-38px_rgba(var(--primary-rgb),0.42)]",
+    "mt-3 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[2rem] border-2 border-input bg-[linear-gradient(180deg,hsl(var(--card)_/_0.88),hsl(var(--secondary)_/_0.5))] shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_18px_46px_-38px_rgba(var(--primary-rgb),0.42)]",
   footerBar:
-    "border-t border-[hsl(var(--celestial-blue)_/_0.36)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.88),hsl(var(--secondary)_/_0.76))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] sm:p-5",
+    "border-t border-input bg-[linear-gradient(180deg,hsl(var(--card)_/_0.88),hsl(var(--secondary)_/_0.76))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] sm:p-5",
   scrollWell:
     "relative z-10 mx-4 mt-3 min-h-0 flex-1 rounded-[2rem] border-2 border-[hsl(var(--celestial-blue)_/_0.42)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.9),hsl(var(--secondary)_/_0.5))] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_18px_46px_-38px_rgba(var(--primary-rgb),0.42)] sm:mx-5",
   portalSurface:
-    "rounded-[1.25rem] border border-[hsl(var(--celestial-blue)_/_0.4)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.98)_0%,hsl(var(--secondary)_/_0.72)_100%)] text-foreground shadow-[0_18px_42px_-32px_rgba(var(--primary-rgb),0.46),inset_0_1px_0_rgba(255,255,255,0.82)]",
+    "rounded-[1.25rem] border border-input bg-[linear-gradient(180deg,hsl(var(--card)_/_0.98)_0%,hsl(var(--secondary)_/_0.72)_100%)] text-foreground shadow-[0_18px_42px_-32px_rgba(var(--primary-rgb),0.46),inset_0_1px_0_rgba(255,255,255,0.82)]",
   raisedPanel:
-    "rounded-[1.8rem] border border-[hsl(var(--celestial-blue)_/_0.4)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.98)_0%,hsl(var(--secondary)_/_0.52)_100%)] text-foreground shadow-[0_16px_38px_-32px_rgba(var(--primary-rgb),0.42),inset_0_1px_0_rgba(255,255,255,0.84)]",
+    "rounded-[1.8rem] border border-input bg-[linear-gradient(180deg,hsl(var(--card)_/_0.98)_0%,hsl(var(--secondary)_/_0.52)_100%)] text-foreground shadow-[0_16px_38px_-32px_rgba(var(--primary-rgb),0.42),inset_0_1px_0_rgba(255,255,255,0.84)]",
   mutedPanel:
-    "rounded-[1.5rem] border border-[hsl(var(--celestial-blue)_/_0.32)] bg-card/[0.78] text-foreground shadow-[0_12px_30px_-28px_rgba(var(--primary-rgb),0.34),inset_0_1px_0_rgba(255,255,255,0.7)]",
+    "rounded-[1.5rem] border border-input bg-card/[0.78] text-foreground shadow-[0_12px_30px_-28px_rgba(var(--primary-rgb),0.34),inset_0_1px_0_rgba(255,255,255,0.7)]",
   successCard:
     "rounded-[1.6rem] border border-epic-nature/30 bg-[linear-gradient(180deg,hsl(var(--epic-nature)_/_0.12)_0%,hsl(var(--category-soul)_/_0.08)_100%)] text-foreground shadow-[0_14px_32px_-30px_rgba(48,130,112,0.34)]",
   primaryButton:
-    "rounded-full border border-[hsl(var(--celestial-blue)_/_0.58)] bg-[linear-gradient(180deg,color-mix(in_srgb,hsl(var(--celestial-blue))_16%,white)_0%,hsl(var(--celestial-blue)_/_0.44)_46%,hsl(var(--primary)_/_0.72)_100%)] text-[hsl(var(--deep-space))] shadow-[0_12px_26px_-20px_rgba(var(--primary-rgb),0.58),inset_0_1px_0_rgba(255,255,255,0.9)] hover:bg-[linear-gradient(180deg,color-mix(in_srgb,hsl(var(--celestial-blue))_10%,white)_0%,hsl(var(--celestial-blue)_/_0.52)_46%,hsl(var(--primary)_/_0.82)_100%)] disabled:shadow-none disabled:opacity-70",
+    "rounded-full border border-primary bg-primary text-primary-foreground shadow-[0_12px_26px_-20px_rgba(var(--primary-rgb),0.58)] hover:bg-primary/92 disabled:[background-image:none] disabled:shadow-none",
   outlineButton:
-    "rounded-full border border-[hsl(var(--celestial-blue)_/_0.42)] bg-card/[0.82] text-foreground shadow-[0_10px_24px_-22px_rgba(var(--primary-rgb),0.38),inset_0_1px_0_rgba(255,255,255,0.76)] hover:border-[hsl(var(--celestial-blue)_/_0.62)] hover:bg-card disabled:shadow-none",
+    "rounded-full border border-input bg-card/[0.82] text-foreground shadow-[0_10px_24px_-22px_rgba(var(--primary-rgb),0.38),inset_0_1px_0_rgba(255,255,255,0.76)] hover:border-primary hover:bg-card disabled:shadow-none",
   headerIconButton:
-    "rounded-[1rem] border border-[hsl(var(--celestial-blue)_/_0.42)] bg-[linear-gradient(180deg,rgba(255,255,255,0.94),hsl(var(--card)_/_0.78))] text-foreground shadow-[0_10px_22px_-20px_rgba(var(--primary-rgb),0.44),inset_0_1px_0_rgba(255,255,255,0.82)] hover:border-[hsl(var(--celestial-blue)_/_0.62)] hover:bg-card",
+    "rounded-[1rem] border border-input bg-[linear-gradient(180deg,rgba(255,255,255,0.94),hsl(var(--card)_/_0.78))] text-foreground shadow-[0_10px_22px_-20px_rgba(var(--primary-rgb),0.44),inset_0_1px_0_rgba(255,255,255,0.82)] hover:border-primary hover:bg-card",
   heroIcon:
     "inline-flex h-11 w-11 items-center justify-center rounded-[1rem] border border-[hsl(var(--celestial-blue)_/_0.5)] bg-[linear-gradient(180deg,#ffffff_0%,hsl(var(--celestial-blue)_/_0.2)_58%,hsl(var(--stardust-gold)_/_0.12)_100%)] text-[hsl(var(--category-soul))] shadow-[0_10px_22px_-20px_rgba(var(--primary-rgb),0.44),inset_0_1px_0_rgba(255,255,255,0.9)]",
   composerBar:
     "flex items-center gap-2 rounded-[1.7rem] border border-[hsl(var(--celestial-blue)_/_0.42)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.98)_0%,hsl(var(--secondary)_/_0.68)_100%)] p-2 shadow-[0_14px_32px_-30px_rgba(var(--primary-rgb),0.4),inset_0_1px_0_rgba(255,255,255,0.8)]",
   textField:
-    "rounded-[1.4rem] border border-[hsl(var(--celestial-blue)_/_0.48)] bg-card/[0.9] px-4 py-3 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_2px_rgba(var(--primary-rgb),0.08)] focus-visible:border-[hsl(var(--celestial-blue)_/_0.72)] focus-visible:ring-2 focus-visible:ring-[hsl(var(--celestial-blue)_/_0.24)] focus-visible:ring-offset-0",
-  chip: "border border-[hsl(var(--celestial-blue)_/_0.38)] bg-card/[0.78] text-foreground",
+    "rounded-[1.4rem] border border-input bg-card/[0.9] px-4 py-3 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_2px_rgba(var(--primary-rgb),0.08)] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-0",
+  chip: "border border-input bg-card/[0.78] text-foreground",
   sectionEyebrow: "text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--category-soul))]",
   assistantBubble:
     "rounded-bl-[0.7rem] border-[hsl(var(--celestial-blue)_/_0.42)] bg-[linear-gradient(180deg,hsl(var(--card)_/_0.98)_0%,hsl(var(--secondary)_/_0.54)_100%)] text-foreground",

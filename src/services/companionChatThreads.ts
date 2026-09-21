@@ -167,7 +167,9 @@ const mapThreadMessage = (
   return {
     id: row.id,
     sessionId: row.session_id,
-    role: row.role,
+    // The database constrains companion_chats.role to this exact union, while
+    // generated Supabase table types intentionally expose CHECKed text as string.
+    role: row.role as CompanionChatRole,
     content: row.content,
     createdAt: row.created_at,
     inputMode: row.input_mode as CompanionChatInputMode | null ?? undefined,

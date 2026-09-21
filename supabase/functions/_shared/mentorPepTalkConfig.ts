@@ -113,14 +113,14 @@ const THEMES_BY_MENTOR: Record<SupportedMentorSlug, MentorDailyTheme[]> = {
       triggers: ["Anxious & Overthinking", "Motivated & Ready"],
     },
     {
-      topic_category: "business",
+      topic_category: "stewardship",
       intensity: "strong",
       triggers: ["In Transition", "Avoiding Action"],
     },
   ],
   rival: [
     {
-      topic_category: "physique",
+      topic_category: "wellbeing",
       intensity: "strong",
       triggers: ["Unmotivated", "Frustrated", "Needing Discipline"],
     },
@@ -137,12 +137,12 @@ const THEMES_BY_MENTOR: Record<SupportedMentorSlug, MentorDailyTheme[]> = {
   ],
   reign: [
     {
-      topic_category: "physique",
+      topic_category: "wellbeing",
       intensity: "strong",
       triggers: ["Unmotivated", "Needing Discipline", "Frustrated"],
     },
     {
-      topic_category: "business",
+      topic_category: "stewardship",
       intensity: "strong",
       triggers: ["Motivated & Ready", "Feeling Stuck"],
     },

@@ -3,6 +3,8 @@ import {
   getEffectiveDailyDate,
   getEffectiveDayOfWeek,
   getEffectiveMissionDate,
+  getLocalCalendarDate,
+  getLocalHour,
   getUserTimezone,
 } from "./timezone";
 
@@ -58,11 +60,11 @@ describe("getEffectiveMissionDate", () => {
     expect(getEffectiveDailyDate("Asia/Tokyo")).toBe("2026-11-01");
   });
 
-  it("falls back to UTC for date math when no timezone is provided", () => {
+  it("falls back to the device timezone when no timezone is provided", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-10T08:30:00Z"));
 
-    expect(getEffectiveDailyDate()).toBe(getEffectiveDailyDate("UTC"));
+    expect(getEffectiveDailyDate()).toBe(getEffectiveDailyDate(getUserTimezone()));
   });
 
   it("uses the device timezone for mission helpers when no timezone is provided", () => {
@@ -74,5 +76,14 @@ describe("getEffectiveMissionDate", () => {
 
   it("still exposes the device timezone for profile bootstrapping", () => {
     expect(getUserTimezone()).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  });
+
+  it("returns calendar date and hour in the requested local timezone", () => {
+    const instant = new Date("2026-03-10T02:30:00Z");
+
+    expect(getLocalCalendarDate("America/Los_Angeles", instant)).toBe("2026-03-09");
+    expect(getLocalHour("America/Los_Angeles", instant)).toBe(19);
+    expect(getLocalCalendarDate("Asia/Tokyo", instant)).toBe("2026-03-10");
+    expect(getLocalHour("Asia/Tokyo", instant)).toBe(11);
   });
 });

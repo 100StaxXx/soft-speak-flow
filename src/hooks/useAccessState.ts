@@ -59,7 +59,7 @@ function canRetryAccessRecovery(parsed: ParsedFunctionInvokeError): boolean {
 }
 
 export function useAccessState() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, status: authStatus } = useAuth();
   const queryClient = useQueryClient();
   const [sessionRejectedTransactionId, setSessionRejectedTransactionId] = useState<string | null>(null);
   const recoveryTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -132,7 +132,10 @@ export function useAccessState() {
         throw error;
       }
     },
-    enabled: !!user,
+    // A native app resume refreshes the Supabase session and app data at the
+    // same time. Do not let an entitlement request race the session refresh:
+    // an expired access token can otherwise look like a real no-access result.
+    enabled: !!user && authStatus === "authenticated",
     staleTime: 5 * 60 * 1000,
     refetchInterval: false,
   });
@@ -254,7 +257,7 @@ export function useAccessState() {
 
   return {
     accessState,
-    isLoading: authLoading ||
+    isLoading: authLoading || authStatus === "recovering" ||
       (!!user && (
         query.isLoading ||
         waitingForStoreKitFallback

@@ -9,11 +9,19 @@ import {
   createCostGuardrailSession,
   isCostGuardrailBlockedError,
 } from "../_shared/costGuardrails.ts";
+import {
+  CHRISTIAN_GUIDANCE_POLICY,
+  enforceChristianGuidanceOutput,
+} from "../_shared/christianGuidancePolicy.ts";
+import { buildLocalDailyEncouragementScript } from "../_shared/dailyEncouragementScript.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const DAILY_ENCOURAGEMENT_FALLBACK =
+  "God’s grace is not measured by how much you accomplish today. Take a breath, receive your limits without shame, and choose one honest act of love, faithfulness, or repair. You do not have to force certainty about the future. Bring what feels heavy to God in prayer, seek wise support when you need it, and take the next small step with humility and hope.";
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -72,8 +80,10 @@ serve(async (req) => {
       intensity, 
       emotionalTriggers,
       time_of_day,
-      habit_context 
+      habit_context,
+      productMode: requestedProductMode,
     } = await req.json();
+    const productMode = requestedProductMode === "cosmiq" ? "cosmiq" : "graceward";
     
     // topic_category can now be a string or an array
     const categories = Array.isArray(topic_category) ? topic_category : (topic_category ? [topic_category] : []);
@@ -107,7 +117,7 @@ serve(async (req) => {
     });
 
     const { data: mentor, error: mentorError } = await supabase
-      .from("mentors")
+      .from(productMode === "graceward" ? "graceward_guides" : "mentors")
       .select("*")
       .eq("slug", mentorSlug)
       .single();
@@ -118,21 +128,33 @@ serve(async (req) => {
 
     console.log(`Generating script for mentor ${mentor.name}`);
 
+    const buildAuthoredFallback = () => productMode === "graceward"
+      ? enforceChristianGuidanceOutput(
+        buildLocalDailyEncouragementScript({
+          mentorSlug,
+          category: categories[0],
+          intensity,
+          emotionalTriggers: Array.isArray(emotionalTriggers) ? emotionalTriggers : [],
+        }),
+        { fallback: DAILY_ENCOURAGEMENT_FALLBACK },
+      )
+      : "Take a breath and narrow the field. Choose one useful next step, make it small enough to begin now, and let steady action rebuild momentum without turning today into a verdict on your worth.";
+
     // WEIGHTING MODEL: Categories 60%, Emotional Triggers 25-30%, Intensity 10-15%
 
     // 1. CATEGORIES (60% - THE MAIN THEME)
     const categoryRules: Record<string, string> = {
-      discipline: "habits, consistency, self-respect, taking action",
-      confidence: "self-worth, believing in yourself, celebrating past wins",
-      physique: "training, body goals, self-image, health and fitness",
-      focus: "clarity, priorities, reducing distractions",
-      mindset: "perspective, resilience, thinking patterns",
-      business: "money, career, taking risks, the long game, responsibility",
-      strategy: "pattern recognition, decision clarity, separating signal from noise, choosing the highest-leverage move",
-      boundaries: "self-respect, discernment, protecting energy, choosing what aligns with your standard",
-      habits: "small routines, sustainable consistency, rebuilding trust through repeated action",
-      identity: "becoming, self-concept, aligned choices, acting like the person you are growing into",
-      reflection: "perspective, honest review, emotional clarity, learning from the current season",
+      discipline: "faithful habits, consistency without perfectionism, and taking one honest next step",
+      confidence: "courage grounded beyond achievement, receiving grace, and acting without self-exaltation",
+      wellbeing: "grateful care for the body, honoring limits, rest, health, and sustainable effort",
+      focus: "clarity, wise priorities, reducing distractions, and attending to what is truly ours to do",
+      mindset: "hope, humility, resilience, truthful perspective, and freedom from shame",
+      stewardship: "work, money, time, gifts, responsibility, generosity, integrity, and the long view",
+      strategy: "discernment, patient decision-making, separating signal from noise, and choosing a wise next step",
+      boundaries: "loving limits, discernment, honest communication, rest, safety, and seeking wise counsel",
+      habits: "small faithful rhythms, sustainable consistency, and returning without shame after disruption",
+      identity: "worth beyond productivity or approval, belonging, humility, and choices shaped by love",
+      reflection: "honest review, gratitude, lament, repentance, repair, emotional clarity, and learning from the current season",
     };
 
     let categoryGuidance = "";
@@ -157,13 +179,13 @@ SECONDARY CATEGORIES (light references only, 1-2 mentions max): ${secondaryTheme
       "Exhausted": "address low energy states, encourage sustainable pacing",
       "Avoiding Action": "speak to procrastination, emphasize starting small",
       "Anxious & Overthinking": "provide calming perspective and grounding",
-      "Self-Doubt": "affirm capability and worth, point to evidence",
+      "Self-Doubt": "affirm dignity without promising outcomes or making achievement the source of worth",
       "Feeling Stuck": "offer fresh perspective, encourage decisive action",
       "Frustrated": "help channel emotion productively, reframe challenges",
-      "Heavy or Low": "validate difficulty, spark hope through small wins",
+      "Heavy or Low": "validate difficulty, allow lament, and offer realistic hope without spiritual bypassing",
       "Emotionally Hurt": "acknowledge pain, guide toward healing without assumptions",
       "Late Night Spiral": "reduce urgency, interrupt rumination, and guide toward one calming next step",
-      "Unmotivated": "ignite momentum, focus on getting started",
+      "Unmotivated": "reduce shame and focus on one sustainable beginning",
       "In Transition": "normalize change, guide through uncertainty",
       "Needing Discipline": "emphasize structure and commitment",
       "Motivated & Ready": "amplify existing energy, maintain momentum",
@@ -192,8 +214,8 @@ ${backgroundTriggers.map((t: string) => `- ${t}`).join(', ')}`;
       soft: "soft, calm, reassuring delivery - grounded and emotionally safe",
       gentle: "soft, calm, reassuring delivery - like a supportive friend",
       medium: "motivating, direct, confident - balanced energy",
-      strong: "firm, energized, and decisive - high standards without contempt",
-      high: "hype, urgent, energetic - peak state energy, strong but never abusive",
+      strong: "firm, energized, and decisive - clear encouragement without contempt, shame, or spiritual pressure",
+      high: "energetic and urgent without hype, coercion, fear, shame, or promises of guaranteed results",
     };
 
     const intensityGuidance = `
@@ -224,7 +246,7 @@ HABIT CONTEXT: ${habitMap[habit_context] || habit_context}`;
     }
 
     const variationSeed = crypto.randomUUID();
-    const systemPrompt = `You are writing a spoken motivational message for "Cosmiq" in the voice of ${mentor.name}.
+    const gracewardSystemPrompt = `You are writing a short spoken Christian encouragement for "Graceward" using the communication style of the fictional Guide ${mentor.name}. You are not ${mentor.name}, a pastor, or a spiritual authority, and the script must not claim otherwise.
 
 MENTOR PROFILE:
 - Name: ${mentor.name}
@@ -244,29 +266,34 @@ ${contextGuidance}
 ⸻
 
 SIMPLE RULE:
-• Categories = what the message is ABOUT (60%)
+• Categories = what the encouragement is ABOUT (60%)
 • Triggers = the EMOTIONAL ANGLE (25-30%)
-• Intensity = how it's DELIVERED (10-15%)
-• Mentor = the FLAVOR
+• Intensity = how it is DELIVERED (10-15%)
+• Guide = the communication style only
 
 ⸻
 
 YOUR TASK:
-Write a 45-90 second spoken message that:
+Write a 45-90 second daily encouragement that:
 - Is built primarily around the PRIMARY CATEGORY theme
 - Opens with the PRIMARY EMOTIONAL TRIGGER(s)
 - Uses the intensity level to shape delivery (tone, pace, energy)
-- Sounds like ${mentor.name} speaking directly to someone
+- Uses ${mentor.name}'s communication style while remaining transparently an AI-generated Graceward reflection
 - Contains 8-12 sentences
-- Feels PERSONAL, SPECIFIC, and MOTIVATING
+- Feels warm, specific, hopeful, and grounded in a broadly Christian worldview
+- Naturally connects the subject to grace, faithful stewardship, love of God and neighbor, prayer, humility, hope, rest, repentance, or repair when relevant
+- Makes clear through the wording that worth is not earned through productivity, discipline, wealth, appearance, or a perfect spiritual record
+- Offers one small, optional next step rather than turning the encouragement into a command or spiritual test
 - Uses NO emojis or special formatting
 - Sounds conversational and human when spoken aloud
 - Does NOT explicitly say "category" or "trigger"
-- Does NOT say, introduce, label, or mention the mentor's name in the script
-- Do NOT start with phrases like "${mentor.name} wants", "I'm ${mentor.name}", "${mentor.name} here", or "this is ${mentor.name}"
-- Speak as the mentor, not about the mentor
+- Does NOT say, introduce, label, or mention the Guide's name in the script
+- Does NOT impersonate the Guide, God, Jesus, the Holy Spirit, clergy, or any human authority
+- Does NOT quote, paraphrase as a quotation, or cite Scripture because no approved Scripture text is supplied to this request
 - CRITICAL: Do NOT make specific assumptions about the listener's personal feelings (avoid "I can feel your pain", "I know you're hurting", "I sense your struggle")
 - Instead, speak to the challenge or state in general terms while remaining empathetic and supportive
+
+${CHRISTIAN_GUIDANCE_POLICY}
 
 CRITICAL VARIATION REQUIREMENT - CREATE MAXIMUM DIVERSITY:
 Every script MUST sound completely different. Vary these aggressively:
@@ -294,9 +321,24 @@ NEVER USE:
 • Generic motivational clichés
 • The mentor's name or third-person mentor references
 
-GOAL: Two scripts on the same topic should feel like different conversations entirely
+GOAL: Two scripts on the same topic should feel like different conversations while both remaining recognizably Christian, grace-centered, emotionally safe, and practical.
 
 Write ONLY the script text, nothing else.`;
+    const systemPrompt = productMode === "graceward"
+      ? gracewardSystemPrompt
+      : `You are writing a short spoken encouragement for Cosmiq using the communication style of the fictional guide ${mentor.name}. You are software, not ${mentor.name}, a human mentor, or a professional adviser.
+
+MENTOR PROFILE:
+- Tone: ${mentor.tone_description}
+- Voice Style: ${mentor.voice_style}
+- Description: ${mentor.description}
+
+${categoryGuidance}
+${triggerGuidance}
+${intensityGuidance}
+${contextGuidance}
+
+Write 8-12 conversational sentences for a 45-90 second spoken message. Be practical, specific, and grounded. Offer one small optional next step. Never use Scripture, prayer, theology, religious claims, or Graceward framing. Never diagnose, shame, promise an outcome, infer private feelings, mention the guide's name, or claim professional authority. Return only the script text.`;
 
     const response = await guardedFetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -310,30 +352,20 @@ Write ONLY the script text, nothing else.`;
           { role: "system", content: systemPrompt },
           {
             role: "user",
-            content: `Generate the motivational script. Variation seed: ${variationSeed}. Do not mention the seed.`,
+            content: `Generate the daily ${productMode === "graceward" ? "Christian " : ""}encouragement. Variation seed: ${variationSeed}. Do not mention the seed.`,
           },
         ],
       }),
     });
 
     if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded, please try again later." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Payment required, please add credits." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
+      console.warn("AI script provider unavailable; using authored Christian encouragement", {
+        mentorSlug,
+        status: response.status,
+      });
       return new Response(
-        JSON.stringify({ error: "AI gateway error" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ script: buildAuthoredFallback(), source: "authored_fallback" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -341,8 +373,8 @@ Write ONLY the script text, nothing else.`;
     let script = extractGeneratedScript(data);
     if (!script) {
       return new Response(
-        JSON.stringify({ error: "AI response missing script text" }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        JSON.stringify({ script: buildAuthoredFallback(), source: "authored_fallback" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -369,11 +401,13 @@ Write ONLY the script text, nothing else.`;
       });
 
       if (!retryResponse.ok) {
-        const retryErrorText = await retryResponse.text();
-        console.error("AI gateway retry error:", retryResponse.status, retryErrorText);
+        console.warn("AI script retry unavailable; using authored Christian encouragement", {
+          mentorSlug,
+          status: retryResponse.status,
+        });
         return new Response(
-          JSON.stringify({ error: "AI gateway error" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          JSON.stringify({ script: buildAuthoredFallback(), source: "authored_fallback" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
 
@@ -381,11 +415,17 @@ Write ONLY the script text, nothing else.`;
       const retryScript = extractGeneratedScript(retryData);
       if (!retryScript || scriptMentionsMentorName(retryScript, mentor.name)) {
         return new Response(
-          JSON.stringify({ error: "AI response included mentor name" }),
-          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          JSON.stringify({ script: buildAuthoredFallback(), source: "authored_fallback" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
       script = retryScript;
+    }
+
+    if (productMode === "graceward") {
+      script = enforceChristianGuidanceOutput(script, {
+        fallback: DAILY_ENCOURAGEMENT_FALLBACK,
+      });
     }
 
     console.log(`Script generated successfully for ${mentor.name}`);

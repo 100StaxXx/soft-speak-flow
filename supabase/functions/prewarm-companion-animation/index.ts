@@ -11,13 +11,20 @@ import {
 } from "../_shared/companionAnimationJobs.ts";
 import { createCostGuardrailSession } from "../_shared/costGuardrails.ts";
 import { invokeInternalFunction } from "../_shared/internalFunctionAuth.ts";
-import { getHiddenBoundaryAnchor } from "../_shared/companionLineage.ts";
+import { getApprovedHiddenBoundaryAnchor } from "../_shared/companionLineage.ts";
 import {
   coerceCompanionElementId,
   coerceCompanionPresetId,
   COMPANION_PRESET_BUCKET,
+  hasBundledYouthCompanionPresetAssets,
+  hasRemoteCompanionPresetStageAssetCoverage,
+  resolveBundledYouthCompanionAssetPath,
   resolveCompanionAssetPath,
 } from "../../../src/config/companionCatalog.ts";
+import {
+  COSMIQ_CANONICAL_ASSET_BUCKET,
+  getCosmiqCanonicalCompanionAssetDescriptor,
+} from "../../../src/config/cosmiqCanonicalCompanionAssets.ts";
 import {
   getCurrentVisualStageBoundaryLevel,
   getProgressionThreshold,
@@ -36,6 +43,7 @@ interface CompanionRecord {
   core_element: string | null;
   current_stage: number | null;
   current_xp: number | null;
+  initial_image_url: string | null;
   image_lineage_metadata: unknown;
 }
 
@@ -350,11 +358,41 @@ const resolvePrewarmImageUrl = ({
 }): string | null => {
   const presetId = coerceCompanionPresetId(companion.preset_id);
   if (presetId) {
+    const element = coerceCompanionElementId(companion.core_element);
+    const canonicalAsset = getCosmiqCanonicalCompanionAssetDescriptor({
+      species: presetId,
+      element,
+      stage,
+    });
+    if (canonicalAsset) {
+      return canonicalAsset.source === "bundled"
+        ? `/${COSMIQ_CANONICAL_ASSET_BUCKET}/${canonicalAsset.storagePath}`
+        : supabase.storage.from(COSMIQ_CANONICAL_ASSET_BUCKET).getPublicUrl(
+          canonicalAsset.storagePath,
+        ).data.publicUrl;
+    }
+
+    if (stage === 1 && hasBundledYouthCompanionPresetAssets(presetId)) {
+      return `/${COMPANION_PRESET_BUCKET}/${
+        resolveBundledYouthCompanionAssetPath({ presetId, element })
+      }`;
+    }
+
+    if (
+      !hasRemoteCompanionPresetStageAssetCoverage({
+        presetId,
+        stage,
+        state: "normal",
+      })
+    ) {
+      return null;
+    }
+
     const assetPath = resolveCompanionAssetPath({
       presetId,
       stage,
       state: "normal",
-      element: coerceCompanionElementId(companion.core_element),
+      element,
     });
     return supabase.storage.from(COMPANION_PRESET_BUCKET).getPublicUrl(
       assetPath,
@@ -362,7 +400,10 @@ const resolvePrewarmImageUrl = ({
   }
 
   if (stage === 1) {
-    return getHiddenBoundaryAnchor(companion.image_lineage_metadata, 1)
+    return getApprovedHiddenBoundaryAnchor(
+      companion.image_lineage_metadata,
+      1,
+    )
       ?.imageUrl ?? null;
   }
 
@@ -512,7 +553,7 @@ export const handlePrewarmCompanionAnimation = async (
     const { data: companion, error: companionError } = await supabase
       .from("user_companion")
       .select(
-        "id, user_id, preset_id, core_element, current_stage, current_xp, image_lineage_metadata",
+        "id, user_id, preset_id, core_element, current_stage, current_xp, initial_image_url, image_lineage_metadata",
       )
       .eq("id", companionId)
       .eq("user_id", auth.userId)
@@ -583,10 +624,20 @@ export const handlePrewarmCompanionAnimation = async (
       });
     }
 
-    const imageUrl = typeof existingEvolution.data?.image_url === "string" &&
-        existingEvolution.data.image_url.trim().length > 0
+    const resolvedPrewarmImageUrl = resolvePrewarmImageUrl({
+      supabase,
+      companion: companionRecord,
+      stage,
+    });
+    // An older prewarmed stage-one evolution may point at unreviewed or adult
+    // art. AI/Graceward hatches must always be rebuilt from the explicitly
+    // approved hidden infant anchor, even if a stale evolution row exists.
+    const imageUrl = stage === 1 && currentStage === 0 && !companionRecord.preset_id
+      ? resolvedPrewarmImageUrl
+      : typeof existingEvolution.data?.image_url === "string" &&
+          existingEvolution.data.image_url.trim().length > 0
       ? existingEvolution.data.image_url
-      : resolvePrewarmImageUrl({ supabase, companion: companionRecord, stage });
+      : resolvedPrewarmImageUrl;
 
     if (!imageUrl) {
       return jsonResponse({
@@ -598,11 +649,13 @@ export const handlePrewarmCompanionAnimation = async (
 
     const existingGenerationMetadata = existingEvolution.data
       ?.generation_metadata ?? null;
-    const previousImageUrl = await fetchPreviousBoundaryEvolutionImageUrl(
-      supabase,
-      companionId,
-      stage,
-    );
+    const previousImageUrl = stage === 1
+      ? companionRecord.initial_image_url
+      : await fetchPreviousBoundaryEvolutionImageUrl(
+        supabase,
+        companionId,
+        stage,
+      );
     const imageIneligibility = getCompanionAnimationIneligibility({
       stage,
       generationMetadata: existingGenerationMetadata,

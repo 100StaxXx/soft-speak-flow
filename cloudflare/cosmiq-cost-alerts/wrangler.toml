@@ -1,0 +1,11 @@
+name = "cosmiq-cost-alerts"
+main = "src/index.mjs"
+compatibility_date = "2026-08-19"
+workers_dev = true
+
+[[kv_namespaces]]
+binding = "ALERTS"
+id = "359c11abd33848c9899d2315500e0803"
+
+[observability]
+enabled = true

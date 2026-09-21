@@ -12,6 +12,7 @@ import type {
   CompletionFeedbackEvent,
   CompletionFeedbackResponse,
 } from "@/types/completionFeedback";
+import { announceCompanionPresenceSpeech } from "@/lib/companionPresenceEvents";
 
 const AI_FEEDBACK_REPLACE_WINDOW_MS = 900;
 
@@ -59,6 +60,7 @@ export const useCompletionFeedback = () => {
     const fallback = buildCompletionFeedbackFallback({ ...event, completedAt });
 
     await talkPopup.show(toPopupOptions(fallback, options));
+    announceCompanionPresenceSpeech("completion");
     const fallbackShownAt = Date.now();
     triggerEvent({
       type: event.habitSourceId || event.completionSource === "ritual" ? "streak" : "quest_complete",

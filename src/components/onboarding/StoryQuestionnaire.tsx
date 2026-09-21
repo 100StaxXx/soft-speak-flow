@@ -15,6 +15,7 @@ import {
   ONBOARDING_VISUAL_PERSONA_OPTIONS,
   ONBOARDING_VISUAL_PERSONA_QUESTION_ID,
 } from "@/shared/onboardingVisualPersona";
+import { PRODUCT } from "@/config/product";
 
 interface QuestionOption {
   optionId: string;
@@ -34,43 +35,36 @@ type InteractionSource = "click" | "pointerdown" | "touchstart";
 const NATIVE_PRESS_DEDUPE_WINDOW_MS = 800;
 const questionnaireLog = logger.scope("StoryQuestionnaire");
 
-// Faction-themed narratives (1 per questionnaire step)
-const getFactionNarrative = (faction: FactionType, questionIndex: number): string => {
-  const narratives: Record<FactionType, string[]> = {
-    starfall: [
-      "Before your title art takes shape, the cosmos tunes its portrait lens...",
-      "Before you chart your course, the cosmos asks one question...",
-      "As flames dance in the distance, your ship awaits its next destination...",
-      "The engines hum with potential energy. Your crew looks to you for direction...",
-      "Your path grows clearer with each choice...",
-      "One last calibration: the map needs to know the terrain of your real days...",
-    ],
-    void: [
-      "In the dark between stars, a silhouette waits to be drawn...",
-      "In the stillness, a presence awaits. What form does it take?",
-      "In the silent depths between stars, clarity emerges from stillness...",
-      "The void speaks to those who listen. A whisper guides your path...",
-      "The shadows reveal what light cannot...",
-      "The void studies the shape of your time before it offers a path...",
-    ],
-    stellar: [
-      "The first constellation sketches the form your title art will take...",
-      "The stars align to reveal your guide. Who do you see among them?",
-      "Nebulas paint the cosmos in infinite colors. Each holds a dream...",
-      "Your companion gazes at the stars with wonder. What do you see?",
-      "The constellations align to show your way...",
-      "The stars ask what kind of orbit your days usually follow...",
-    ],
-  };
-  const factionNarratives = narratives[faction] ?? narratives.stellar;
-  return factionNarratives[questionIndex] || factionNarratives[0];
+const GRACEWARD_QUESTION_NARRATIVES = [
+  "A faithful path begins with the dignity of being known...",
+  "A trusted guide can make prayer and reflection feel clearer...",
+  "Honest attention helps reveal where growth is most needed...",
+  "Guidance works best when its tone makes room for truth and grace...",
+  "Wisdom becomes practical when support fits how you learn...",
+  "A daily rhythm must fit the shape of your actual days...",
+] as const;
+
+const COSMIQ_QUESTION_NARRATIVES = [
+  "A meaningful path begins by understanding who is walking it...",
+  "The right guide can turn noise into a clearer next move...",
+  "Honest attention reveals where momentum matters most...",
+  "Guidance works best when its tone matches how you move...",
+  "Progress becomes practical when support fits how you learn...",
+  "A useful daily rhythm must fit the shape of your actual days...",
+] as const;
+
+const getProductNarrative = (questionIndex: number): string => {
+  const narratives = PRODUCT.mode === "christian"
+    ? GRACEWARD_QUESTION_NARRATIVES
+    : COSMIQ_QUESTION_NARRATIVES;
+  return narratives[questionIndex] ?? narratives[0];
 };
 
 const questions: StoryQuestion[] = [
   {
     id: ONBOARDING_VISUAL_PERSONA_QUESTION_ID,
     narrative: "",
-    question: "For generated title art, what kind of persona should we show?",
+    question: "Which option best describes you?",
     options: ONBOARDING_VISUAL_PERSONA_OPTIONS.map((option) => ({
       ...option,
       tags: [...option.tags],
@@ -89,12 +83,12 @@ const questions: StoryQuestion[] = [
   {
     id: "focus_area",
     narrative: "",
-    question: "What do you want to work on right now?",
+    question: "Where would you most like to grow right now?",
     options: [
-      { optionId: "clarity_mindset", text: "Clarity & mindset", tags: ["calm", "discipline"] },
-      { optionId: "emotions_healing", text: "Emotions & healing", tags: ["healing", "supportive"] },
-      { optionId: "discipline_performance", text: "Discipline & performance", tags: ["discipline", "momentum"] },
-      { optionId: "confidence_self_belief", text: "Confidence & self-belief", tags: ["confidence", "supportive"] },
+      { optionId: "clarity_mindset", text: PRODUCT.mode === "christian" ? "Prayer & spiritual attention" : "Clarity & mindset", tags: ["calm", "discipline"] },
+      { optionId: "emotions_healing", text: PRODUCT.mode === "christian" ? "Peace & emotional healing" : "Peace & wellbeing", tags: ["healing", "supportive"] },
+      { optionId: "discipline_performance", text: PRODUCT.mode === "christian" ? "Discipline & faithful action" : "Discipline & performance", tags: ["discipline", "momentum"] },
+      { optionId: "confidence_self_belief", text: PRODUCT.mode === "christian" ? "Relationships & serving others" : "Relationships & connection", tags: ["confidence", "supportive"] },
     ],
   },
   {
@@ -111,7 +105,7 @@ const questions: StoryQuestion[] = [
   {
     id: "progress_style",
     narrative: "",
-    question: "What helps you make progress?",
+    question: "What most helps you follow through?",
     options: [
       { optionId: "principles_logic", text: "Clear principles and logic", tags: ["calm", "discipline"] },
       { optionId: "emotional_reassurance", text: "Emotional reassurance", tags: ["supportive", "healing"] },
@@ -138,14 +132,14 @@ export interface OnboardingAnswer {
 }
 
 interface StoryQuestionnaireProps {
-  faction: FactionType;
+  /** @deprecated Retained only so legacy callers can resume safely. */
+  faction?: FactionType;
   onComplete: (answers: OnboardingAnswer[]) => void;
   isSubmitting?: boolean;
   initialAnswers?: OnboardingAnswer[];
 }
 
 export const StoryQuestionnaire = ({
-  faction,
   onComplete,
   isSubmitting = false,
   initialAnswers = [],
@@ -179,8 +173,7 @@ export const StoryQuestionnaire = ({
   const recentNativePressRef = useRef<{ key: string; at: number } | null>(null);
   const activeQuestionIdRef = useRef<string | null>(null);
 
-  // Memoize star positions to prevent them from jumping on re-render
-  const starPositions = useMemo(() => 
+  const lightMotePositions = useMemo(() =>
     [...Array(30)].map(() => ({
       left: `${Math.random() * 100}%`,
       top: `${Math.random() * 100}%`,
@@ -196,13 +189,7 @@ export const StoryQuestionnaire = ({
   const nativeIOSHandheld = useMemo(() => isNativeIOSHandheld(), []);
   activeQuestionIdRef.current = currentQuestion.id;
 
-  // Get faction-specific colors
-  const factionColors: Record<FactionType, string> = {
-    starfall: "#FF6600",
-    void: "#7F26D9",
-    stellar: "#3DB8F5",
-  };
-  const factionColor = factionColors[faction] ?? factionColors.stellar;
+  const productAccentColor = PRODUCT.mode === "christian" ? "#D6B85F" : "#8B5CF6";
 
   const controlsLocked = isSubmitting || isTransitioning;
   const canGoBack = currentQuestionIndex > 0 && !controlsLocked;
@@ -338,23 +325,23 @@ export const StoryQuestionnaire = ({
 
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col px-6 pb-safe-lg pt-safe-top">
-      {/* Background Stars */}
+      {/* Warm ambient light motes */}
       <div className="absolute inset-0 overflow-hidden">
-        {starPositions.map((star, i) => (
+        {lightMotePositions.map((mote, i) => (
           <motion.div
             key={i}
-            className="absolute w-1 h-1 bg-white rounded-full"
+            className="absolute h-1 w-1 rounded-full bg-amber-200/70"
             style={{
-              left: star.left,
-              top: star.top,
+              left: mote.left,
+              top: mote.top,
             }}
             animate={{
               opacity: [0.2, 0.8, 0.2],
             }}
             transition={{
-              duration: star.duration,
+              duration: mote.duration,
               repeat: Infinity,
-              delay: star.delay,
+              delay: mote.delay,
             }}
           />
         ))}
@@ -413,7 +400,7 @@ export const StoryQuestionnaire = ({
               transition={{ delay: 0.2 }}
               className="text-white/60 text-sm italic mb-5 text-center leading-relaxed px-2"
             >
-              {getFactionNarrative(faction, currentQuestionIndex)}
+              {getProductNarrative(currentQuestionIndex)}
             </motion.p>
 
             {/* Question */}
@@ -451,15 +438,15 @@ export const StoryQuestionnaire = ({
                           : "border-white/15 bg-black/30 hover:border-white/40 hover:bg-black/40",
                       )}
                       style={{
-                        ["--hover-bg" as string]: `${factionColor}20`,
+                        ["--hover-bg" as string]: `${productAccentColor}20`,
                         touchAction: "manipulation",
                         WebkitTapHighlightColor: "transparent",
                         boxShadow: isSelected
-                          ? `0 0 0 1px ${factionColor}55, 0 16px 36px rgba(0, 0, 0, 0.34)`
+                          ? `0 0 0 1px ${productAccentColor}55, 0 16px 36px rgba(0, 0, 0, 0.34)`
                           : "0 10px 40px rgba(0, 0, 0, 0.35)",
-                        borderColor: isSelected ? `${factionColor}99` : undefined,
+                        borderColor: isSelected ? `${productAccentColor}99` : undefined,
                         background: isSelected
-                          ? `linear-gradient(135deg, ${factionColor}26, rgba(255,255,255,0.08))`
+                          ? `linear-gradient(135deg, ${productAccentColor}26, rgba(255,255,255,0.08))`
                           : undefined,
                       }}
                       onContextMenu={(event) => event.preventDefault()}
@@ -475,9 +462,9 @@ export const StoryQuestionnaire = ({
                           isSelected ? "border-white/45 text-white" : "border-white/20 text-white",
                         )}
                         style={{
-                          boxShadow: isSelected ? `0 0 18px ${factionColor}55` : `0 0 15px ${factionColor}33`,
-                          color: isSelected ? "#FFFFFF" : factionColor,
-                          background: isSelected ? `${factionColor}55` : undefined,
+                          boxShadow: isSelected ? `0 0 18px ${productAccentColor}55` : `0 0 15px ${productAccentColor}33`,
+                          color: isSelected ? "#FFFFFF" : productAccentColor,
+                          background: isSelected ? `${productAccentColor}55` : undefined,
                         }}
                       >
                         {String.fromCharCode(65 + index)}
@@ -485,7 +472,7 @@ export const StoryQuestionnaire = ({
                       <span
                         className={cn(
                           "text-sm sm:text-base leading-relaxed whitespace-normal break-words flex-1 transition-colors",
-                          isSelected ? "text-white font-semibold" : "text-white/88",
+                          isSelected ? "text-white font-semibold" : "text-white/[0.88]",
                         )}
                       >
                         {option.text}

@@ -3,16 +3,27 @@ import { Play, Pause, Square, Zap, Brain, Coffee, SkipForward } from 'lucide-rea
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { useFocusSession } from '../hooks/useFocusSession';
+import { useFocusSession, type FocusSession } from '../hooks/useFocusSession';
 
 interface FocusTimerProps {
   taskId?: string;
   taskName?: string;
+  taskCategory?: string;
   compact?: boolean;
-  onComplete?: () => void;
+  onStart?: (session: FocusSession) => void;
+  onComplete?: (session: FocusSession) => void;
+  onCancel?: (session: FocusSession) => void;
 }
 
-export function FocusTimer({ taskId, taskName, compact = false, onComplete: _onComplete }: FocusTimerProps) {
+export function FocusTimer({
+  taskId,
+  taskName,
+  taskCategory,
+  compact = false,
+  onStart,
+  onComplete,
+  onCancel,
+}: FocusTimerProps) {
   const {
     timerState,
     startSession,
@@ -22,7 +33,11 @@ export function FocusTimer({ taskId, taskName, compact = false, onComplete: _onC
     logDistraction,
     skipCooldown,
     stats,
-  } = useFocusSession();
+  } = useFocusSession({
+    onSessionStarted: onStart,
+    onSessionCompleted: onComplete,
+    onSessionCancelled: onCancel,
+  });
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -42,7 +57,7 @@ export function FocusTimer({ taskId, taskName, compact = false, onComplete: _onC
     : timerState.timeRemaining;
 
   const handleStart = () => {
-    startSession(taskId, 'pomodoro');
+    startSession(taskId, 'pomodoro', undefined, taskCategory, taskName);
   };
 
   const handleToggle = () => {

@@ -10,6 +10,7 @@ import { logger } from '@/utils/logger';
 import { isNativeIOSHandheld } from '@/utils/platformTargets';
 import { safeLocalStorage } from '@/utils/storage';
 import { toast } from '@/components/ui/sonner';
+import { productScopedStorageKey } from '@/config/productRuntime';
 import {
   buildPushNotificationNavigationDetail,
   type PushNotificationNavigationDetail,
@@ -20,7 +21,7 @@ let initializedUserId: string | null = null;
 let initializationPromise: Promise<void> | null = null;
 let listenerHandles: PluginListenerHandle[] = [];
 let listenersBound = false;
-const PUSH_INSTALLATION_ID_STORAGE_KEY = 'native_push_installation_id';
+const PUSH_INSTALLATION_ID_STORAGE_KEY = productScopedStorageKey('native_push_installation_id');
 const FOREGROUND_PUSH_TOAST_DEDUPE_MS = 10_000;
 const foregroundPushToastShownAt = new Map<string, number>();
 export const NATIVE_PUSH_RECEIVED_EVENT = 'native-push-received';

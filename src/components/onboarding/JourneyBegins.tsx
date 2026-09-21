@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Star, Rocket } from "lucide-react";
+import { Sparkles, Sunrise, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PRODUCT } from "@/config/product";
 
 interface JourneyBeginsProps {
   userName: string;
@@ -9,13 +10,21 @@ interface JourneyBeginsProps {
   onComplete: () => void;
 }
 
-const narrativeLines = [
-  "A bond has been forged across the cosmos...",
-  "Within the shell, your companion stirs and answers your presence.",
-  "Together, you will write a story the stars themselves will remember.",
-  "Every quest completed, every habit built, every moment of growth...",
-  "...will shape both your destinies.",
-];
+const narrativeLines = PRODUCT.mode === "christian"
+  ? [
+      "Your daily path is ready...",
+      "Your Guide helps you listen and choose a direction.",
+      "Today turns that direction into one faithful step.",
+      "Your companion notices, responds, and carries the thread forward.",
+      "In the evening, your Guide helps you return to the same day with grace.",
+    ]
+  : [
+      "Your path is ready...",
+      "Your Guide helps you turn intention into direction.",
+      "Your plan turns that direction into meaningful action.",
+      "Your companion notices, responds, and carries the story forward.",
+      "Reflection helps you learn from the day and build momentum.",
+    ];
 
 const LINE_DISPLAY_MS = 3000;
 const FINAL_LINE_HOLD_MS = 3200;
@@ -64,7 +73,7 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 pt-safe-top safe-area-bottom relative overflow-hidden">
-      {/* Ambient glow - pulsing cosmic energy */}
+      {/* Quiet dawn-like ambient glow */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <motion.div 
           className="w-[400px] h-[400px] bg-primary/15 rounded-full blur-[100px]"
@@ -117,11 +126,11 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
                   transition={{ delay: 0.2 }}
                   className="flex items-center justify-center gap-3"
                 >
-                  <Star className="h-4 w-4 text-primary" />
+                  <Sunrise className="h-4 w-4 text-primary" />
                   <span className="text-xs uppercase tracking-[0.4em] font-medium text-primary/80">
-                    Your Journey Awaits
+                    Your Daily Path Is Ready
                   </span>
-                  <Star className="h-4 w-4 text-primary" />
+                  <Sunrise className="h-4 w-4 text-primary" />
                 </motion.div>
                 
                 <motion.h1
@@ -141,7 +150,9 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
                   transition={{ delay: 0.8 }}
                   className="text-white/60 text-base"
                 >
-                  {companionAnimal} is already part of your story now. For a little while longer, they rest inside the shell and wait for the bond that will awaken their form.
+                  {PRODUCT.mode === "christian"
+                    ? `Your ${companionAnimal} is a visual companion for the practices you complete. It reflects consistency—not God's love, favor, or approval, which cannot be earned.`
+                    : `Your ${companionAnimal} is a living record of the actions, choices, and momentum you build.`}
                 </motion.p>
                 
                 <motion.div
@@ -151,10 +162,12 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
                   className="pt-2"
                 >
                   <p className="text-white/70 text-lg">
-                    The first steps of your bond begin now.
+                    {PRODUCT.mode === "christian"
+                      ? "Guide, practice, companion, and reflection now move together."
+                      : "Guide, plan, companion, and reflection now move together."}
                   </p>
                   <p className="text-white/50 text-sm mt-1">
-                    Your first quest awaits...
+                    Begin with what {PRODUCT.name} prepared for today. No perfect streak required.
                   </p>
                 </motion.div>
               </motion.div>
@@ -176,15 +189,15 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
                 size="lg"
                 className="px-10 py-6 text-lg gap-2"
               >
-                <Rocket className="h-5 w-5" />
-                Begin My Journey
+                <ArrowRight className="h-5 w-5" />
+                See Today
               </Button>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Floating star particles */}
+      {/* Floating light motes */}
       {particlePositions.map((particle, i) => (
         <motion.div
           key={i}

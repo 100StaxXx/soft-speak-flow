@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   submitReflection: vi.fn(),
   toast: vi.fn(),
   drawerRootProps: [] as Array<Record<string, unknown>>,
+  dailyGuideThread: null as Record<string, unknown> | null,
 }));
 
 vi.mock("@/components/ui/drawer", () => ({
@@ -38,6 +39,13 @@ vi.mock("@/hooks/useEveningReflection", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useDailyGuideThread", () => ({
+  useDailyGuideThread: () => ({
+    thread: mocks.dailyGuideThread,
+    previousThread: null,
+  }),
+}));
+
 vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({
     toast: mocks.toast,
@@ -52,20 +60,36 @@ describe("EveningReflectionDrawer", () => {
     mocks.submitReflection.mockResolvedValue(undefined);
     mocks.toast.mockReset();
     mocks.drawerRootProps.length = 0;
+    mocks.dailyGuideThread = null;
   });
 
   it("keeps deeper prompts collapsed until requested", () => {
     render(<EveningReflectionDrawer open={true} onOpenChange={vi.fn()} />);
 
-    expect(screen.getByText(/what went well today\?/i)).toBeInTheDocument();
-    expect(screen.getByText(/what are you grateful for\?/i)).toBeInTheDocument();
-    expect(screen.queryByText(/anything else you'd like to reflect on from today\?/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/what's one small adjustment you'd like to make tomorrow\?/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/where did you notice grace or goodness today\?/i)).toBeInTheDocument();
+    expect(screen.getByText(/what would you like to thank God for\?/i)).toBeInTheDocument();
+    expect(screen.queryByText(/what was difficult, or may need confession or repair\?/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/what is one small faithful step for tomorrow\?/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /go a little deeper/i }));
 
-    expect(screen.getByText(/anything else you'd like to reflect on from today\?/i)).toBeInTheDocument();
-    expect(screen.getByText(/what's one small adjustment you'd like to make tomorrow\?/i)).toBeInTheDocument();
+    expect(screen.getByText(/what was difficult, or may need confession or repair\?/i)).toBeInTheDocument();
+    expect(screen.getByText(/what is one small faithful step for tomorrow\?/i)).toBeInTheDocument();
+  });
+
+  it("returns to the focus chosen with the Guide earlier in the day", () => {
+    mocks.dailyGuideThread = {
+      focus_label: "A gentler pace",
+      mentor_name: "Grace",
+      practice_completed_at: null,
+    };
+
+    render(<EveningReflectionDrawer open={true} onOpenChange={vi.fn()} />);
+
+    expect(screen.getByText("Returning to today’s thread")).toBeInTheDocument();
+    expect(screen.getByText(/you chose/i)).toHaveTextContent("A gentler pace");
+    expect(screen.getByText(/where did “A gentler pace” show up/i)).toBeInTheDocument();
+    expect(screen.getByText(/practice remained unfinished/i)).toBeInTheDocument();
   });
 
   it("does not call scrollIntoView when moving between textareas", () => {
@@ -82,16 +106,16 @@ describe("EveningReflectionDrawer", () => {
       render(<EveningReflectionDrawer open={true} onOpenChange={vi.fn()} />);
 
       fireEvent.focus(screen.getByPlaceholderText(
-        "A small win, a moment of joy, something you appreciated about today...",
+        "A kindness, provision, moment of beauty, or small good worth receiving…",
       ));
 
       fireEvent.click(screen.getByRole("button", { name: /go a little deeper/i }));
 
-      fireEvent.focus(screen.getByPlaceholderText("Anything else that feels worth naming tonight..."));
+      fireEvent.focus(screen.getByPlaceholderText("Name what was hard without rushing past it. What might need care or repair?"));
       fireEvent.focus(screen.getByPlaceholderText(
-        "One small shift, boundary, or choice you'd like to try tomorrow...",
+        "A small act of love, boundary, responsibility, rest, or return…",
       ));
-      fireEvent.focus(screen.getByPlaceholderText("Something or someone you appreciate today..."));
+      fireEvent.focus(screen.getByPlaceholderText("A person, gift, mercy, or ordinary thing you received today…"));
 
       expect(scrollIntoViewMock).not.toHaveBeenCalled();
     } finally {
@@ -121,16 +145,16 @@ describe("EveningReflectionDrawer", () => {
       render(<EveningReflectionDrawer open={true} onOpenChange={vi.fn()} />);
 
       fireEvent.focus(screen.getByPlaceholderText(
-        "A small win, a moment of joy, something you appreciated about today...",
+        "A kindness, provision, moment of beauty, or small good worth receiving…",
       ));
 
       fireEvent.click(screen.getByRole("button", { name: /go a little deeper/i }));
 
-      fireEvent.focus(screen.getByPlaceholderText("Anything else that feels worth naming tonight..."));
+      fireEvent.focus(screen.getByPlaceholderText("Name what was hard without rushing past it. What might need care or repair?"));
       fireEvent.focus(screen.getByPlaceholderText(
-        "One small shift, boundary, or choice you'd like to try tomorrow...",
+        "A small act of love, boundary, responsibility, rest, or return…",
       ));
-      fireEvent.focus(screen.getByPlaceholderText("Something or someone you appreciate today..."));
+      fireEvent.focus(screen.getByPlaceholderText("A person, gift, mercy, or ordinary thing you received today…"));
 
       await waitFor(() => {
         expect(windowScrollToSpy).not.toHaveBeenCalled();
@@ -158,10 +182,10 @@ describe("EveningReflectionDrawer", () => {
         "div.mx-auto[data-vaul-no-drag]",
       ) as HTMLDivElement | null;
       const winsInput = screen.getByPlaceholderText(
-        "A small win, a moment of joy, something you appreciated about today...",
+        "A kindness, provision, moment of beauty, or small good worth receiving…",
       ) as HTMLTextAreaElement;
       const gratitudeInput = screen.getByPlaceholderText(
-        "Something or someone you appreciate today...",
+        "A person, gift, mercy, or ordinary thing you received today…",
       ) as HTMLTextAreaElement;
 
       expect(scrollContainer).not.toBeNull();
@@ -250,7 +274,7 @@ describe("EveningReflectionDrawer", () => {
 
     const longWins = "a".repeat(900);
     const winsInput = screen.getByPlaceholderText(
-      "A small win, a moment of joy, something you appreciated about today...",
+      "A kindness, provision, moment of beauty, or small good worth receiving…",
     );
     fireEvent.change(winsInput, { target: { value: longWins } });
 
@@ -260,20 +284,20 @@ describe("EveningReflectionDrawer", () => {
     fireEvent.click(screen.getByRole("button", { name: /go a little deeper/i }));
 
     fireEvent.change(
-      screen.getByPlaceholderText("Anything else that feels worth naming tonight..."),
+      screen.getByPlaceholderText("Name what was hard without rushing past it. What might need care or repair?"),
       { target: { value: "I felt stretched thin by the afternoon." } },
     );
     fireEvent.change(
-      screen.getByPlaceholderText("One small shift, boundary, or choice you'd like to try tomorrow..."),
+      screen.getByPlaceholderText("A small act of love, boundary, responsibility, rest, or return…"),
       { target: { value: "Take a short walk before jumping back into messages." } },
     );
     fireEvent.change(
-      screen.getByPlaceholderText("Something or someone you appreciate today..."),
+      screen.getByPlaceholderText("A person, gift, mercy, or ordinary thing you received today…"),
       { target: { value: "My friends checking in on me." } },
     );
 
     fireEvent.click(screen.getByRole("button", { name: /great/i }));
-    fireEvent.click(screen.getByRole("button", { name: /complete reflection/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save reflection/i }));
 
     await waitFor(() => {
       expect(mocks.submitReflection).toHaveBeenCalledWith({

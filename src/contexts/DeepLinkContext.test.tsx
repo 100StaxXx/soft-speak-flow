@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => {
   let deepLinkHandler:
     | ((data: {
-      type: "auth_recovery" | "task" | "calendar_oauth" | "calendar_oauth_callback" | "join_epic" | "journeys" | "unknown";
+      type: "auth_recovery" | "task" | "today" | "calendar_oauth" | "calendar_oauth_callback" | "join_epic" | "journeys" | "unknown";
       path?: string;
       rawUrl: string;
       taskId?: string;
@@ -144,7 +144,7 @@ describe("DeepLinkProvider", () => {
     expect(mocks.browserCloseMock).not.toHaveBeenCalled();
   });
 
-  it("dispatches journeys navigation events without a pending task", () => {
+  it("dispatches legacy journey links to Garden without a pending task", () => {
     render(
       <DeepLinkProvider>
         <div>child</div>
@@ -157,7 +157,7 @@ describe("DeepLinkProvider", () => {
     act(() => {
       handler?.({
         type: "journeys",
-        path: "/journeys",
+        path: "/garden",
         rawUrl: "cosmiq://journeys",
       });
     });
@@ -166,9 +166,28 @@ describe("DeepLinkProvider", () => {
     const event = dispatchSpy.mock.calls[0][0] as CustomEvent<{ path: string; taskId?: string }>;
     expect(event.type).toBe("deep-link-navigation");
     expect(event.detail).toEqual({
-      path: "/journeys",
+      path: "/garden",
     });
     expect(event.detail.taskId).toBeUndefined();
     expect(mocks.browserCloseMock).not.toHaveBeenCalled();
+  });
+
+  it("dispatches Today widget navigation events", () => {
+    render(
+      <DeepLinkProvider>
+        <div>child</div>
+      </DeepLinkProvider>,
+    );
+
+    act(() => {
+      mocks.getHandler()?.({
+        type: "today",
+        path: "/mentor",
+        rawUrl: "graceward://today",
+      });
+    });
+
+    const event = dispatchSpy.mock.calls[0][0] as CustomEvent<{ path: string }>;
+    expect(event.detail).toEqual({ path: "/mentor" });
   });
 });

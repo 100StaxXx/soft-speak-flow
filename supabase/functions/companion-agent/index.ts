@@ -20,6 +20,7 @@ import {
   type CompanionAgentFailureStage,
   getCompanionAgentFailureReason,
 } from "./failureDiagnostics.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -80,12 +81,17 @@ serve(async (req) => {
     }
 
     stage = "agent_run";
+    const productMode = await resolveUserProductMode(
+      protectedRequest.supabase,
+      protectedRequest.auth.userId,
+    );
     const result = await runCompanionAgent({
       guardedFetch,
       supabase: protectedRequest.supabase,
       userId: protectedRequest.auth.userId,
       request: parsed.data,
       requestId,
+      productMode,
     });
 
     return new Response(

@@ -151,7 +151,7 @@ export function buildTaskNotificationCandidates(input: {
           task_date: task.task_date,
           xp_reward: task.xp_reward,
           type: "task_start",
-          url: `/journeys?taskId=${task.id}`,
+          url: `/advanced-planner?taskId=${task.id}`,
           ...ritualPayload,
         },
       });
@@ -187,7 +187,7 @@ export function buildTaskNotificationCandidates(input: {
               reminder_minutes_before: minutesBefore,
               reminder_offset_minutes: minutesBefore,
               type: "task_reminder",
-              url: `/journeys?taskId=${task.id}`,
+              url: `/advanced-planner?taskId=${task.id}`,
               ...ritualPayload,
             },
           });

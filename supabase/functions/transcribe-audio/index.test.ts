@@ -28,7 +28,9 @@ Deno.test("transcribe-audio passes through internal auth failures", async () => 
 
 Deno.test("transcribe-audio allows internal requests to reach server-side validation", async () => {
   const originalOpenAiKey = Deno.env.get("OPENAI_API_KEY");
+  const originalElevenLabsKey = Deno.env.get("ELEVENLABS_API_KEY");
   Deno.env.delete("OPENAI_API_KEY");
+  Deno.env.delete("ELEVENLABS_API_KEY");
 
   try {
     const response = await module.handleTranscribeAudio(
@@ -40,7 +42,7 @@ Deno.test("transcribe-audio allows internal requests to reach server-side valida
       {
         authenticate: async () => ({ isInternal: true }),
         createSupabaseClient: () => {
-          throw new Error("createSupabaseClient should not be called before OpenAI key validation");
+          throw new Error("createSupabaseClient should not be called before provider key validation");
         },
         fetchImpl: fetch,
       },
@@ -49,14 +51,19 @@ Deno.test("transcribe-audio allows internal requests to reach server-side valida
     assert(response.status === 500, `Expected 500 validation response, got ${response.status}`);
     const payload = await response.json();
     assert(
-      payload.error === "OpenAI API key not configured",
-      `Expected OpenAI key validation error, got ${payload.error}`,
+      payload.error === "No transcription provider configured",
+      `Expected provider key validation error, got ${payload.error}`,
     );
   } finally {
     if (originalOpenAiKey === undefined) {
       Deno.env.delete("OPENAI_API_KEY");
     } else {
       Deno.env.set("OPENAI_API_KEY", originalOpenAiKey);
+    }
+    if (originalElevenLabsKey === undefined) {
+      Deno.env.delete("ELEVENLABS_API_KEY");
+    } else {
+      Deno.env.set("ELEVENLABS_API_KEY", originalElevenLabsKey);
     }
   }
 });

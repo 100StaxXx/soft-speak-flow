@@ -18,11 +18,11 @@ interface OnboardingStoryToneSelectionProps {
 }
 
 const TONE_INTROS: Record<CompanionStoryTone, string> = {
-  soft_gentle: "A warmer path with quieter magic and more tender turns.",
-  epic_adventure: "A bold path with larger-than-life stakes and heroic momentum.",
-  emotional_heartfelt: "A bond-first path where feeling and closeness stay in focus.",
-  dark_intense: "A higher-tension path with sharper trials and deeper shadows.",
-  whimsical_playful: "A brighter path full of odd wonder, surprise, and delight.",
+  soft_gentle: "A calm presence with warmth, patience, and tender encouragement.",
+  epic_adventure: "A courageous presence that makes faithful action feel possible.",
+  emotional_heartfelt: "A compassionate presence centered on honesty and connection.",
+  dark_intense: "A steady presence for difficult seasons and resilient growth.",
+  whimsical_playful: "A joyful presence with lightness, curiosity, and delight.",
 };
 
 export const OnboardingStoryToneSelection = ({
@@ -49,14 +49,14 @@ export const OnboardingStoryToneSelection = ({
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="space-y-3">
                 <span className="inline-flex rounded-full border border-white/[0.12] bg-white/[0.08] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/[0.72]">
-                  Companion Tone
+                  Companion Personality
                 </span>
                 <div className="space-y-2">
                   <h1 className="text-3xl font-semibold text-white sm:text-4xl">
-                    Choose The Story Tone
+                    How Should Your Companion Feel?
                   </h1>
                   <p className="max-w-2xl text-sm leading-6 text-white/[0.72] sm:text-base">
-                    This shapes the emotional fantasy of your companion line. Species and color come next.
+                    Choose the kind of presence you want beside you. Its symbolic form and color come next.
                   </p>
                 </div>
               </div>
@@ -104,7 +104,7 @@ export const OnboardingStoryToneSelection = ({
             <div className="grid gap-3 lg:grid-cols-2">
               <div className="rounded-[28px] border border-white/[0.10] bg-black/20 p-5">
                 <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-[0.22em] text-white/[0.48]">Selected Mood</p>
+                  <p className="text-xs uppercase tracking-[0.22em] text-white/[0.48]">Selected Presence</p>
                   <h2 className="text-xl font-semibold text-white">{selectedToneMeta.label}</h2>
                   <p className="text-sm leading-6 text-white/[0.72]">
                     {TONE_INTROS[selectedToneMeta.value]} {selectedToneMeta.summary}
@@ -116,10 +116,10 @@ export const OnboardingStoryToneSelection = ({
                 <div className="space-y-2">
                   <p className="text-xs uppercase tracking-[0.22em] text-white/[0.48]">Next Step</p>
                   <h2 className="text-xl font-semibold text-white">
-                    Shape The Hidden Lineage
+                    Choose Its Symbolic Form
                   </h2>
                   <p className="text-sm leading-6 text-white/[0.72]">
-                    Choose the spirit animal and favorite color that will define your AI-generated egg.
+                    Choose a creature and color that will visually represent your daily growth.
                   </p>
                 </div>
               </div>

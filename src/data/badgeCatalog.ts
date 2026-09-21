@@ -2,8 +2,6 @@
  * Badge Catalog - Defines all possible badges in the app
  * Used to show both earned and locked badges in the collection
  */
-import { BADGE_PREVIEW_URLS } from "@/data/badgePreviewUrls";
-
 export type BadgeCategory = 'streaks' | 'companion' | 'starpaths' | 'challenges' | 'firsts' | 'special' | 'astral';
 export type BadgeTier = 'bronze' | 'silver' | 'gold' | 'platinum';
 
@@ -913,7 +911,9 @@ const BADGE_CATALOG_BASE: Omit<BadgeDefinition, "image_url">[] = [
 
 export const BADGE_CATALOG: BadgeDefinition[] = BADGE_CATALOG_BASE.map((badge) => ({
   ...badge,
-  image_url: BADGE_PREVIEW_URLS[badge.id] ?? null,
+  // Graceward bundles its badge previews locally so the app never depends on
+  // Cosmiq storage for collection artwork.
+  image_url: null,
 }));
 
 export const CATEGORY_LABELS: Record<BadgeCategory, string> = {

@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { Capacitor } from "@capacitor/core";
 import { safeLocalStorage } from "@/utils/storage";
+import { productScopedStorageKey } from "@/config/productRuntime";
 import {
   QUEST_LAUNCHER_BOTTOM_GAP_PX,
   QUEST_LAUNCHER_SIDE_INSET_PX,
@@ -20,7 +21,7 @@ export interface FABPopupAlignment {
 
 export const DRAGGABLE_FAB_LEGACY_STORAGE_KEY = "add-quest-fab-position";
 export const DRAGGABLE_FAB_STORAGE_KEY_V2 = "add-quest-fab-position-v2";
-export const DRAGGABLE_FAB_STORAGE_KEY_V3 = "companion-planner-fab-position-v1";
+export const DRAGGABLE_FAB_STORAGE_KEY_V3 = productScopedStorageKey("companion-planner-fab-position-v1");
 
 const LONG_PRESS_DURATION = 500;
 const LONG_PRESS_MOVE_THRESHOLD_PX = 12;

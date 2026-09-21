@@ -30,6 +30,8 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "https://cosmiq.quest",
   "https://www.cosmiq.quest",
   "https://app.cosmiq.quest", // Native app redirect base
+  "https://graceward.app",
+  "https://www.graceward.app",
   // Capacitor apps (iOS/Android)
   "capacitor://localhost",
   "ionic://localhost",

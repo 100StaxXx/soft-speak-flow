@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   COMPANION_PICKER_PRESET_IDS,
   COMPANION_PICKER_PRESETS,
+  getCosmiqCompanionAvailability,
   getCompanionElement,
   getCompanionElementProductLabel,
+  hasCompanionPresetStageExpressiveAssetCoverage,
   hasRemoteCompanionPresetAssetCoverage,
   hasRemoteCompanionPresetStageAssetCoverage,
 } from "./companionCatalog";
@@ -74,31 +76,45 @@ describe("companion preset asset coverage", () => {
     ).toBe(false);
   });
 
-  it("preserves full remote coverage for existing remote presets", () => {
+  it("does not advertise later-stage or care-state art until the files exist", () => {
     expect(
       hasRemoteCompanionPresetAssetCoverage({
         presetId: "dragon",
         tier: "t4_guardian",
         state: "dormant",
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       hasRemoteCompanionPresetStageAssetCoverage({
         presetId: "raven",
         stage: 0,
         state: "normal",
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it("keeps canonical internal labels while exposing renamed product-facing labels", () => {
+  it("does not request expressive portraits from empty local or remote packs", () => {
+    expect(hasCompanionPresetStageExpressiveAssetCoverage({
+      presetId: "phoenix",
+      stage: 1,
+    })).toBe(false);
+    expect(hasCompanionPresetStageExpressiveAssetCoverage({
+      presetId: "phoenix",
+      stage: 5,
+    })).toBe(false);
+  });
+
+  it("exposes grounded visual-nature labels without changing the stable element ids", () => {
     expect(getCompanionElement("fire").label).toBe("Fire");
+    expect(getCompanionElement("fire").productLabel).toBe("Ember");
     expect(getCompanionElement("ice").label).toBe("Ice");
+    expect(getCompanionElement("ice").productLabel).toBe("Clear Water");
     expect(getCompanionElement("nature").label).toBe("Nature");
+    expect(getCompanionElement("nature").productLabel).toBe("Living Green");
 
     expect(getCompanionElementProductLabel("fire")).toBe("Ember");
-    expect(getCompanionElementProductLabel("ice")).toBe("Ice");
-    expect(getCompanionElementProductLabel("nature")).toBe("Nature");
+    expect(getCompanionElementProductLabel("ice")).toBe("Clear Water");
+    expect(getCompanionElementProductLabel("nature")).toBe("Living Green");
   });
 
   it("exposes the curated onboarding and personalization picker roster", () => {
@@ -106,21 +122,13 @@ describe("companion preset asset coverage", () => {
       "leviathan",
       "phoenix",
       "fox",
-      "dragon",
-      "pegasus",
-      "mechanicaldragon",
-      "tanuki",
-      "buttercat",
     ]);
     expect(COMPANION_PICKER_PRESETS.map((preset) => preset.displayName)).toEqual([
       "Leviathan",
       "Phoenix",
       "Kitsune",
-      "Dragon",
-      "Pegasus",
-      "Mechanical Dragon",
-      "Tanuki",
-      "Buttercat",
     ]);
+    expect(getCosmiqCompanionAvailability("Kitsune")).toBe("current_selection");
+    expect(getCosmiqCompanionAvailability("dragon")).toBe("legacy_frozen");
   });
 });

@@ -218,14 +218,14 @@ describe("JourneyPathDrawer", () => {
       expect(container.querySelector('img[src="https://example.com/journey.png"]')).toBeInTheDocument();
       expect(screen.getByText("42% Complete")).toBeInTheDocument();
       expect(screen.getByText("16d left")).toBeInTheDocument();
-      expect(screen.getByText("Next ritual")).toBeInTheDocument();
+      expect(screen.getByText("Next rhythm")).toBeInTheDocument();
       expect(screen.getByText("Portfolio work")).toBeInTheDocument();
       expect(screen.getByText("7:00 PM")).toBeInTheDocument();
       expect(screen.getByText("This week")).toBeInTheDocument();
-      expect(screen.getByText("2 rituals attached")).toBeInTheDocument();
+      expect(screen.getByText("2 rhythms attached")).toBeInTheDocument();
       expect(screen.getByText("1/2 timed")).toBeInTheDocument();
       expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(2);
-      expect(screen.getByRole("button", { name: "Add ritual" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add rhythm" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Milestones" })).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
@@ -285,7 +285,7 @@ describe("JourneyPathDrawer", () => {
       </JourneyPathDrawer>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Add ritual" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add rhythm" }));
 
     expect(screen.getByTestId("edit-campaign-sheet")).toBeInTheDocument();
     expect(mocks.editCampaignSheetMock).toHaveBeenLastCalledWith(expect.objectContaining({

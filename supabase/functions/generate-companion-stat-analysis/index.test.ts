@@ -253,6 +253,7 @@ Deno.test("generate-companion-stat-analysis returns same-day cached analysis", a
     {
       authenticate: async () => ({ userId: "user-1", isServiceRole: false }),
       createSupabaseClient: () => supabase,
+      resolveProductMode: async () => "cosmiq",
       fetchImpl: async () => {
         throw new Error("fetchImpl should not be called for cached responses");
       },
@@ -300,6 +301,7 @@ Deno.test("generate-companion-stat-analysis refreshes cached title-card state wi
     {
       authenticate: async () => ({ userId: "user-1", isServiceRole: false }),
       createSupabaseClient: () => supabase,
+      resolveProductMode: async () => "cosmiq",
       fetchImpl: async () => {
         throw new Error("fetchImpl should not be called for cached responses");
       },
@@ -346,6 +348,7 @@ Deno.test("generate-companion-stat-analysis regenerates malformed same-day cache
     {
       authenticate: async () => ({ userId: "user-1", isServiceRole: false }),
       createSupabaseClient: () => supabase,
+      resolveProductMode: async () => "cosmiq",
       fetchImpl: fetch,
       now: () => new Date("2026-04-18T18:30:00.000Z"),
     },
@@ -374,6 +377,7 @@ Deno.test("generate-companion-stat-analysis force refresh regenerates and overwr
     {
       authenticate: async () => ({ userId: "user-1", isServiceRole: false }),
       createSupabaseClient: () => supabase,
+      resolveProductMode: async () => "cosmiq",
       fetchImpl: fetch,
       now: () => new Date("2026-04-18T18:30:00.000Z"),
     },
@@ -432,6 +436,7 @@ Deno.test("generate-companion-stat-analysis attaches title-card cache state with
     {
       authenticate: async () => ({ userId: "user-1", isServiceRole: false }),
       createSupabaseClient: () => supabase,
+      resolveProductMode: async () => "cosmiq",
       fetchImpl: fetch,
       now: () => new Date("2026-04-18T18:30:00.000Z"),
       getCosmiqTitleCardCacheState: async ({ visualPersona }) => {

@@ -623,14 +623,14 @@ export function useHabitSurfacing(selectedDate?: Date) {
         const queuedCount = rows.filter((row) => row.queued).length;
         toast.success(
           queuedCount > 0
-            ? `${rows.length} ritual${rows.length > 1 ? "s" : ""} saved offline`
-            : `${rows.length} ritual${rows.length > 1 ? "s" : ""} added to today's quests`,
+            ? `${rows.length} rhythm${rows.length > 1 ? "s" : ""} saved offline`
+            : `${rows.length} rhythm${rows.length > 1 ? "s" : ""} added to today`,
         );
       }
     },
     onError: (error: Error) => {
       console.error("[Habit Surfacing] Mutation error:", error);
-      toast.error("Failed to surface habits as quests");
+      toast.error("Couldn’t add those rhythms to today");
     },
   });
 

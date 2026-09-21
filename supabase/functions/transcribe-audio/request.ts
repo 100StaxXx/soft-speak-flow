@@ -12,3 +12,14 @@ export function buildTranscriptionFormData(
   formData.append("language", DEFAULT_TRANSCRIPTION_LANGUAGE);
   return formData;
 }
+
+export function buildForcedAlignmentFormData(
+  audioBlob: Blob,
+  text: string,
+  fileName = "audio.mp3",
+): FormData {
+  const formData = new FormData();
+  formData.append("file", audioBlob, fileName);
+  formData.append("text", text);
+  return formData;
+}

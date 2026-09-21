@@ -1,6 +1,7 @@
 import { PROGRESSION_LEVEL_CAP } from "../config/progression.ts";
 
 export interface CompanionPredicateShape {
+  product_mode?: "graceward" | "cosmiq" | string | null;
   preset_id?: string | null;
   current_stage?: number | null;
   current_image_url?: string | null;
@@ -23,8 +24,15 @@ export const hasCompanionStoredVisual = (
 
 export const isPresetBackedCompanion = (
   companion: CompanionPredicateShape | null | undefined,
-): boolean =>
-  Boolean(typeof companion?.preset_id === "string" && companion.preset_id.trim().length > 0);
+): boolean => {
+  if (companion?.product_mode === "cosmiq") return true;
+  if (companion?.product_mode === "graceward") return false;
+
+  return Boolean(
+    typeof companion?.preset_id === "string"
+    && companion.preset_id.trim().length > 0
+  );
+};
 
 export const isPresetEggCompanion = (
   companion: CompanionPredicateShape | null | undefined,
@@ -34,7 +42,12 @@ export const isPresetEggCompanion = (
 export const isAiGeneratedCompanion = (
   companion: CompanionPredicateShape | null | undefined,
 ): boolean =>
-  Boolean(companion && !isPresetBackedCompanion(companion) && hasCompanionStoredVisual(companion));
+  Boolean(
+    companion
+    && companion.product_mode !== "cosmiq"
+    && !isPresetBackedCompanion(companion)
+    && hasCompanionStoredVisual(companion)
+  );
 
 export const hasValidCompanionStage = (
   companion: Pick<CompanionPredicateShape, "current_stage"> | null | undefined,

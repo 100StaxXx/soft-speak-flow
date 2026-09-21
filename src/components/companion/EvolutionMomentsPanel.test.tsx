@@ -55,19 +55,17 @@ vi.mock("@/integrations/supabase/client", () => ({
       };
 
       if (table === "user_companion") {
-        return {
-          select: () => ({
-            eq: () => ({
-              order: () => ({
-                limit: () => ({
-                  maybeSingle: async () => ({
-                    data: mocks.companion,
-                    error: null,
-                  }),
-                }),
-              }),
-            }),
+        const chain = {
+          eq: () => chain,
+          order: () => chain,
+          limit: () => chain,
+          maybeSingle: async () => ({
+            data: mocks.companion,
+            error: null,
           }),
+        };
+        return {
+          select: () => chain,
         };
       }
 

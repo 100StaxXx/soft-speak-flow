@@ -65,17 +65,17 @@ describe("progression helpers", () => {
   it("detects tier changes and formats stage labels", () => {
     expect(didTierChange(4, 5)).toBe(true);
     expect(didTierChange(5, 12)).toBe(false);
-    expect(getProgressionLevelDisplay(56)).toBe("Stage 56 • Mythic");
+    expect(getProgressionLevelDisplay(56)).toBe("Stage 56 • Majestic");
   });
 
   it("maps progression levels to visual stages", () => {
     expect(getVisualStage(0)).toBe(0);
-    expect(getVisualStageDisplay(0)).toBe("Stage 0 • Egg");
+    expect(getVisualStageDisplay(0)).toBe("Stage 0 • Beginning");
     expect(getVisualStage(1)).toBe(1);
     expect(getVisualStage(4)).toBe(1);
-    expect(getVisualStageDisplay(4)).toBe("Stage 1 • Hatchling");
+    expect(getVisualStageDisplay(4)).toBe("Stage 1 • Young");
     expect(getVisualStage(5)).toBe(2);
-    expect(getVisualStageDisplay(5)).toBe("Stage 2 • Initiate");
+    expect(getVisualStageDisplay(5)).toBe("Stage 2 • Growing");
     expect(getVisualStage(13)).toBe(3);
     expect(getVisualStage(21)).toBe(4);
     expect(getVisualStage(36)).toBe(5);
@@ -100,6 +100,6 @@ describe("progression helpers", () => {
 
   it("formats progression levels separately from visual stages", () => {
     expect(getProgressionLevelLabel(4)).toBe("Level 4");
-    expect(getProgressionLevelAndTierDisplay(100)).toBe("Level 100 • Ascended");
+    expect(getProgressionLevelAndTierDisplay(100)).toBe("Level 100 • Grand");
   });
 });

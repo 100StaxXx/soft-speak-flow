@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireInternalRequest } from "../_shared/auth.ts";
 import { parseIntEnv } from "../_shared/notificationsV2.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 import {
   buildOverduePushes,
   type DailyPlanRow,
@@ -116,6 +117,9 @@ serve(async (req) => {
     }
     const profiles = new Map<string, OverdueProfile>();
     for (const row of (rawProfiles as OverdueProfile[] | null) ?? []) {
+      if (await resolveUserProductMode(supabase, row.id) !== "cosmiq") {
+        continue;
+      }
       profiles.set(row.id, row);
     }
 

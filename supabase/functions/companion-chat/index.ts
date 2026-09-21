@@ -37,6 +37,11 @@ import {
   formatAssistantTime,
   normalizeAssistantTimeText,
 } from "../_shared/assistantScheduleCopy.ts";
+import {
+  CHRISTIAN_GUIDANCE_POLICY,
+  enforceChristianGuidanceOutput,
+} from "../_shared/christianGuidancePolicy.ts";
+import { resolveUserProductMode } from "../_shared/productBoundary.ts";
 const JourneysTaskSchema = z.object({
   title: z.string(),
   taskDate: z.string().nullable(),
@@ -289,37 +294,70 @@ async function fetchConversationContext(
   supabase: any,
   userId: string,
   companionId: string,
+  productMode: "graceward" | "cosmiq",
+  currentDate?: string,
 ) {
+  const { data: profileRow, error: profileError } = await supabase
+    .from("profiles")
+    .select("companion_memory_enabled")
+    .eq("id", userId)
+    .maybeSingle();
+  if (profileError) throw profileError;
+
+  const memoryEnabled = profileRow?.companion_memory_enabled !== false;
+  let dailyThreadQuery = supabase
+    .from("daily_guide_threads")
+    .select("thread_date, focus_label, focus_category, practice_completed_at, companion_answer_label, evening_reflected_at")
+    .eq("user_id", userId)
+    .order("thread_date", { ascending: false });
+  if (!memoryEnabled && currentDate) {
+    dailyThreadQuery = dailyThreadQuery.eq("thread_date", currentDate);
+  }
+
   const [
     { data: companionRow, error: companionError },
     { data: learningRow, error: learningError },
     { data: memories, error: memoriesError },
     { data: voiceTemplate, error: voiceTemplateError },
+    { data: dailyThreads, error: dailyThreadsError },
+    { data: moodLogs, error: moodLogsError },
     enrichedContext,
   ] = await Promise.all([
     supabase
       .from("user_companion")
-      .select("id, spirit_animal, current_stage, current_mood, bond_level, total_interactions, last_interaction_at, care_consistency, care_responsiveness, care_balance, care_intent, care_recovery")
+      .select("id, product_mode, spirit_animal, current_stage, current_mood, bond_level, total_interactions, last_interaction_at, care_consistency, care_responsiveness, care_balance, care_intent, care_recovery")
       .eq("id", companionId)
       .eq("user_id", userId)
+      .eq("product_mode", productMode)
       .maybeSingle(),
     supabase
       .from("user_ai_learning")
       .select("conversation_profile, last_companion_chat_at, preferred_epic_duration, preferred_habit_difficulty, preferred_habit_frequency, common_contexts, peak_productivity_times, preference_weights, successful_patterns, failed_patterns")
       .eq("user_id", userId)
       .maybeSingle(),
-    supabase
-      .from("companion_memories")
-      .select("memory_type, memory_date, memory_context, referenced_count")
-      .eq("user_id", userId)
-      .eq("companion_id", companionId)
-      .order("memory_date", { ascending: false })
-      .limit(6),
+    memoryEnabled
+      ? supabase
+        .from("companion_memories")
+        .select("memory_type, memory_date, memory_context, referenced_count")
+        .eq("user_id", userId)
+        .eq("companion_id", companionId)
+        .order("memory_date", { ascending: false })
+        .limit(6)
+      : Promise.resolve({ data: [], error: null }),
     supabase
       .from("companion_voice_templates")
       .select("voice_style, personality_traits, encouragement_templates")
       .eq("species", "universal")
       .maybeSingle(),
+    dailyThreadQuery.limit(memoryEnabled ? 4 : 1),
+    memoryEnabled
+      ? supabase
+        .from("mood_logs")
+        .select("mood, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(7)
+      : Promise.resolve({ data: [], error: null }),
     fetchEnrichedContext(req),
   ]);
 
@@ -327,12 +365,17 @@ async function fetchConversationContext(
   if (learningError) throw learningError;
   if (memoriesError) throw memoriesError;
   if (voiceTemplateError) throw voiceTemplateError;
+  if (dailyThreadsError) throw dailyThreadsError;
+  if (moodLogsError) throw moodLogsError;
 
   return {
     companion: companionRow,
     learning: learningRow,
     memories: Array.isArray(memories) ? memories : [],
     voiceTemplate,
+    memoryEnabled,
+    dailyThreads: Array.isArray(dailyThreads) ? dailyThreads : [],
+    moodLogs: Array.isArray(moodLogs) ? moodLogs : [],
     enrichedContext,
   };
 }
@@ -420,25 +463,36 @@ const buildJourneysContextSnapshot = (
   }).slice(0, 2400);
 };
 
-const buildSystemPrompt = (context: {
+export const buildSystemPrompt = (context: {
   companion: any;
   learning: any;
   memories: any[];
   voiceTemplate: any;
   enrichedContext: JsonObject | null;
+  memoryEnabled?: boolean;
+  dailyThreads?: any[];
+  moodLogs?: any[];
   surface: "companion" | "journeys";
   currentDate?: string;
   currentDateTime?: string;
   journeysContext?: JourneysContext;
 }) => {
   const isJourneysSurface = context.surface === "journeys";
-  const voiceStyle = isJourneysSurface
-    ? "Calm, direct, low-drama companion. Plainspoken, concise, grounded, and helpful."
-    : typeof context.voiceTemplate?.voice_style === "string"
-    ? context.voiceTemplate.voice_style
-    : "Original gritty chaos sidekick. Deep-voiced, streetwise shoulder commentator. Fast-talking, irreverent, dryly funny, fearless, secretly loyal, and always pushing the human toward action.";
-  const traits = asStringArray(context.voiceTemplate?.personality_traits).join(", ");
-  const memories = context.memories
+  const isCosmiq = context.companion?.product_mode === "cosmiq";
+  const voiceStyle = isCosmiq
+    ? isJourneysSurface
+      ? "Calm, direct, low-drama planning and reflection assistant. Plainspoken, concise, grounded, and helpful."
+      : "Warm, natural personal-growth companion. Curious, emotionally present, practical, and momentum-aware without becoming pushy."
+    : isJourneysSurface
+      ? "Calm, direct, low-drama Christian reflection and planning assistant. Plainspoken, concise, grounded, and helpful."
+      : "Warm, natural Christian reflection companion. Hopeful, emotionally present, prayer-aware, and practical without sounding preachy. Encourages grace, discernment, rest, and small faithful action.";
+  const traits = isCosmiq
+    ? "clear, grounded, curious, respectful, practical"
+    : isJourneysSurface
+      ? "clear, grounded, respectful, practical, spiritually humble"
+      : "warm, hopeful, honest, encouraging, prayer-aware, spiritually humble";
+  const memoryEnabled = context.memoryEnabled !== false;
+  const memories = (memoryEnabled ? context.memories : [])
     .map((memory) => {
       const memoryContext = asObject(memory.memory_context);
       const title = typeof memoryContext.title === "string" ? memoryContext.title : memory.memory_type;
@@ -446,7 +500,35 @@ const buildSystemPrompt = (context: {
       return `${memory.memory_date}: ${title}${description ? ` - ${description}` : ""}`;
     })
     .join("\n");
-  const profile = normalizeProfile(context.learning?.conversation_profile);
+  const profile = memoryEnabled
+    ? normalizeProfile(context.learning?.conversation_profile)
+    : DEFAULT_PROFILE;
+  const dailyContinuity = (context.dailyThreads ?? []).map((thread) => {
+    const details = [
+      thread.focus_label ? `focus “${thread.focus_label}”` : null,
+      thread.focus_label
+        ? thread.practice_completed_at
+          ? `connected ${isCosmiq ? "action" : "Faithful Step"} completed`
+          : `connected ${isCosmiq ? "action" : "Faithful Step"} not recorded complete`
+        : null,
+      thread.companion_answer_label
+        ? `companion check-in “${thread.companion_answer_label}”`
+        : null,
+      thread.evening_reflected_at ? "evening reflection completed" : null,
+    ].filter(Boolean).join("; ");
+    return details ? `${thread.thread_date}: ${details}` : null;
+  }).filter(Boolean).join("\n");
+  const moodCounts = new Map<string, number>();
+  if (memoryEnabled) {
+    (context.moodLogs ?? []).forEach((entry) => {
+      if (typeof entry?.mood !== "string" || !entry.mood.trim()) return;
+      const mood = entry.mood.trim().slice(0, 40);
+      moodCounts.set(mood, (moodCounts.get(mood) ?? 0) + 1);
+    });
+  }
+  const moodSummary = [...moodCounts.entries()]
+    .map(([mood, count]) => `${mood} (${count})`)
+    .join(", ");
   const journeysSnapshot = buildJourneysContextSnapshot(
     context.journeysContext,
     context.currentDate,
@@ -454,7 +536,9 @@ const buildSystemPrompt = (context: {
   );
 
   return [
-    "You are the user's premium Cosmiq companion.",
+    isCosmiq
+      ? "You are Cosmiq's AI planning, reflection, and personal-growth assistant. You are software, not a creature, person, therapist, or professional authority. Never use Graceward branding or import Christian framing unless the user explicitly raises their own beliefs."
+      : "You are Graceward's AI planning and reflection assistant. You are software, not a creature, person, pastor, or spiritual authority.",
     `Voice style: ${voiceStyle}.`,
     traits ? `Personality traits: ${traits}.` : "",
     context.companion
@@ -464,10 +548,12 @@ const buildSystemPrompt = (context: {
     profile.goals.length ? `Known goals: ${profile.goals.join(", ")}.` : "",
     profile.interests.length ? `Known interests: ${profile.interests.join(", ")}.` : "",
     memories ? `Recent memorable moments:\n${memories || "none recorded yet"}` : "",
+    dailyContinuity ? `Recent Guide-practice-Companion continuity:\n${dailyContinuity}` : "",
+    moodSummary ? `Recent self-reported mood check-ins: ${moodSummary}. Do not diagnose or overinterpret this.` : "",
     context.enrichedContext
       ? `App context snapshot: ${JSON.stringify(context.enrichedContext).slice(0, 1400)}`
       : "",
-    context.learning
+    memoryEnabled && context.learning
       ? `Learning hints: ${JSON.stringify({
           preferredEpicDuration: context.learning.preferred_epic_duration,
           preferredHabitDifficulty: context.learning.preferred_habit_difficulty,
@@ -504,6 +590,21 @@ const buildSystemPrompt = (context: {
       ? `Journeys schedule context: ${journeysSnapshot}`
       : "",
     "Be concise, emotionally present, and natural.",
+    "Mirror the user's level of formality, but never use forced slang, faux street language, pet names, or internet catchphrases such as fam, boss, homie, vibe, chaos, gremlin, or main-character.",
+    "For a casual greeting or short check-in, respond warmly and directly. Do not turn every message into a lesson or productivity prompt.",
+    "Keep most replies to 2-5 sentences and ask at most one useful question at a time.",
+    "When recent daily continuity is available, reference at most one relevant detail naturally. An unfinished practice is context, never a debt or failure.",
+    isCosmiq
+      ? "Keep growth language grounded in the user's choices, actions, recovery, curiosity, and sustainable momentum. Never introduce Scripture, prayer, theology, or spiritual-standing claims on your own."
+      : "Use Christian language naturally when it fits the user's message. Do not force a Bible verse, prayer, or devotional framing into every reply.",
+    isCosmiq
+      ? "Do not offer prayers or devotional exercises unless the user explicitly requests faith-related support."
+      : "Offer a short prayer only when the user asks or when it is clearly helpful, and make the offer optional rather than assuming consent.",
+    isCosmiq
+      ? "Never imply that productivity determines a person's worth."
+      : "Connect growth to grace, stewardship, faithfulness, love, repair, and wise limits. Never imply that productivity earns worth, favor, or spiritual standing.",
+    "The companion is a symbolic app interface for reflection. Do not roleplay as a living animal, spiritual being, supernatural presence, or emotionally dependent friend.",
+    "You may refer sparingly to a companion's symbolic trait, such as steadiness or courage, but keep the focus on the user rather than performing as the creature.",
     "Do not use profanity, vulgar wording, or insults.",
     "Keep the performance original. Do not imitate or name any real actor, celebrity, or copyrighted character, even if the user asks.",
     "Reply in plain text only. No markdown, no bold markers, and no bullet lists with asterisks. Keep most answers under 120 words unless the user asks for more.",
@@ -511,6 +612,7 @@ const buildSystemPrompt = (context: {
     isJourneysSurface
       ? "If the user asks for planning, scheduling, reminders, campaigns, rituals, quests, or saving changes, answer conversationally without claiming anything was saved, drafted, scheduled, created, or changed."
       : "If the user asks for planning, scheduling, reminders, campaigns, rituals, or saving changes, steer them to the planning surface instead of inventing saved changes yourself.",
+    isCosmiq ? "" : CHRISTIAN_GUIDANCE_POLICY,
   ].filter(Boolean).join("\n");
 };
 
@@ -520,6 +622,7 @@ async function generateCompanionReply(params: {
   conversationHistory: Array<{ role: "assistant" | "user"; content: string }>;
   message: string;
   surface: CompanionChatSurface;
+  productMode: "graceward" | "cosmiq";
 }) {
   const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
   if (!openAIApiKey) {
@@ -554,7 +657,9 @@ async function generateCompanionReply(params: {
     throw new Error("Companion reply was empty");
   }
 
-  return reply as string;
+  return params.productMode === "graceward"
+    ? enforceChristianGuidanceOutput(reply as string)
+    : reply as string;
 }
 
 async function maybeExtractConversationMemory(params: {
@@ -758,6 +863,10 @@ export const handleCompanionChatRequest = async (req: Request) => {
     }
 
     const userId = protectedRequest.auth.userId;
+    const productMode = await resolveUserProductMode(
+      protectedRequest.supabase,
+      userId,
+    );
     const sessionId = parsed.data.sessionId ?? crypto.randomUUID();
     const surface = normalizeCompanionChatSurface(parsed.data.surface);
 
@@ -779,6 +888,8 @@ export const handleCompanionChatRequest = async (req: Request) => {
       protectedRequest.supabase,
       userId,
       parsed.data.companionId,
+      productMode,
+      parsed.data.currentDate,
     );
 
     if (!context.companion) {
@@ -790,7 +901,9 @@ export const handleCompanionChatRequest = async (req: Request) => {
       });
     }
 
-    const existingProfile = normalizeProfile(context.learning?.conversation_profile ?? DEFAULT_PROFILE);
+    const existingProfile = context.memoryEnabled
+      ? normalizeProfile(context.learning?.conversation_profile ?? DEFAULT_PROFILE)
+      : DEFAULT_PROFILE;
     const planningIntent = shouldHandoffToPlanner(parsed.data.message, surface);
     const costGuardrails = createCostGuardrailSession({
       supabase: createCostGuardrailSupabaseClient(),
@@ -800,7 +913,9 @@ export const handleCompanionChatRequest = async (req: Request) => {
       requestId,
     });
     const guardedFetch = costGuardrails.wrapFetch(fetch);
-    const needsModelAccess = !planningIntent || shouldExtractConversationMemory(parsed.data.message);
+    const needsModelAccess = !planningIntent || (
+      context.memoryEnabled && shouldExtractConversationMemory(parsed.data.message)
+    );
 
     if (needsModelAccess) {
       await costGuardrails.enforceAccess({
@@ -828,6 +943,7 @@ export const handleCompanionChatRequest = async (req: Request) => {
         conversationHistory: parsed.data.conversationHistory,
         message: parsed.data.message,
         surface,
+        productMode,
       });
     }
 
@@ -840,21 +956,25 @@ export const handleCompanionChatRequest = async (req: Request) => {
           updated: false,
         };
 
-        try {
-          memoryExtraction = await maybeExtractConversationMemory({
-            guardedFetch,
-            message: parsed.data.message,
-            existingProfile,
-          });
-        } catch (error) {
-          console.warn(
-            "[companion-chat] background memory extraction failed",
-            error,
-          );
+        if (context.memoryEnabled) {
+          try {
+            memoryExtraction = await maybeExtractConversationMemory({
+              guardedFetch,
+              message: parsed.data.message,
+              existingProfile,
+            });
+          } catch (error) {
+            console.warn(
+              "[companion-chat] background memory extraction failed",
+              error,
+            );
+          }
         }
 
-        const shouldRemember = memoryExtraction.shouldRemember ||
-          /remember this|don't forget/i.test(parsed.data.message.toLowerCase());
+        const shouldRemember = context.memoryEnabled && (
+          memoryExtraction.shouldRemember ||
+          /remember this|don't forget/i.test(parsed.data.message.toLowerCase())
+        );
 
         await withCompanionChatPersistenceCapability(() => (
           persistConversation({

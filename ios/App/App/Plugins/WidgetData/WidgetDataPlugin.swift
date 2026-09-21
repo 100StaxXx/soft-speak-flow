@@ -14,7 +14,11 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "runWidgetSyncProbe", returnType: CAPPluginReturnPromise)
     ]
     
-    private let appGroupId = "group.com.darrylgraham.revolution"
+    private var appGroupId: String {
+        Bundle.main.bundleIdentifier == "com.darrylgraham.revolution"
+            ? "group.com.darrylgraham.revolution"
+            : "group.com.darrylgraham.graceward"
+    }
     private let dataKey = "widget_tasks_data"
     private var lastErrorCode: String?
     private var lastErrorMessage: String?

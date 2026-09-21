@@ -4,11 +4,15 @@ import { handleCors, jsonResponse } from "../_shared/cors.ts";
 import {
   APPLE_BINDING_CONFLICT_ERROR,
   APPLE_BINDING_MISSING_ERROR,
+  APPLE_PRODUCT_BOUNDARY_ERROR,
+  assertAppleProductBoundary,
   buildSubscriptionResponse,
   extractLatestTransaction,
   resolvePlanFromProduct,
+  resolveAppleBundleProductMode,
   upsertSubscription,
   verifyReceiptWithApple,
+  type AppleProductMode,
 } from "../_shared/appleSubscriptions.ts";
 import {
   isAppleApiError,
@@ -28,6 +32,12 @@ const APPLE_UNSUPPORTED_TRANSACTION_TYPE_ERROR =
 
 function isSandboxEnvironment(environment: string | undefined): boolean {
   return environment?.toLowerCase() === "sandbox";
+}
+
+function readUserProductMode(user: any): AppleProductMode | null {
+  const trustedMode = user?.app_metadata?.auth_product_mode;
+  if (trustedMode === "graceward" || trustedMode === "cosmiq") return trustedMode;
+  return null;
 }
 
 type VerifyAppleReceiptDeps = {
@@ -79,6 +89,14 @@ function buildErrorPayload(error: unknown): {
       statusCode: 400,
       message: APPLE_BINDING_MISSING_ERROR,
       code: APPLE_BINDING_MISSING_CODE,
+    };
+  }
+
+  if (errorMessage === APPLE_PRODUCT_BOUNDARY_ERROR) {
+    return {
+      statusCode: 403,
+      message: APPLE_PRODUCT_BOUNDARY_ERROR,
+      code: "APPLE_PRODUCT_MISMATCH",
     };
   }
 
@@ -196,6 +214,15 @@ export async function handleVerifyAppleReceipt(
           throw new Error(APPLE_MISSING_EXPIRATION_ERROR);
         }
 
+        assertAppleProductBoundary(
+          transactionInfo.productId,
+          readUserProductMode(user),
+        );
+        const transactionBundleMode = resolveAppleBundleProductMode(
+          transactionInfo.bundleId,
+        );
+        assertAppleProductBoundary(transactionInfo.productId, transactionBundleMode);
+
         const plan = resolvePlanFromProductImpl(transactionInfo.productId);
         const expiresAt = new Date(transactionInfo.expiresDate);
         const purchaseDate = new Date(transactionInfo.purchaseDate);
@@ -265,6 +292,16 @@ export async function handleVerifyAppleReceipt(
       if (!latestTransaction.transactionId) {
         throw new Error("Missing transaction identifier");
       }
+
+      assertAppleProductBoundary(
+        latestTransaction.productId,
+        readUserProductMode(user),
+      );
+      const receiptBundleId = typeof result.receipt?.bundle_id === "string"
+        ? result.receipt.bundle_id
+        : null;
+      const receiptBundleMode = resolveAppleBundleProductMode(receiptBundleId);
+      assertAppleProductBoundary(latestTransaction.productId, receiptBundleMode);
 
       const plan = resolvePlanFromProductImpl(latestTransaction.productId);
 

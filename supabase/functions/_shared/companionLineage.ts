@@ -28,6 +28,7 @@ export interface CompanionLineageAnchor {
   focalY: number | null;
   sourceType: string;
   visibility: "hidden_until_reached" | "visible";
+  approvedForReveal?: boolean;
 }
 
 export interface CompanionVisualAnchors {
@@ -84,6 +85,7 @@ export interface CompanionGenerationMetadata {
     continuity: number | null;
     difference: number | null;
     anatomy: number | null;
+    stageMaturity: number | null;
     centering: number | null;
     overall: number | null;
   };
@@ -97,7 +99,7 @@ interface VisualIdentitySeed {
   storyTone?: string | null;
 }
 
-export const COMPANION_IMAGE_PROMPT_VERSION = "companion_lineage_v3";
+export const COMPANION_IMAGE_PROMPT_VERSION = "companion_lineage_v6_infant_lock";
 const DEFAULT_IMAGE_LINEAGE_PROVIDER = "openai";
 const DEFAULT_IMAGE_LINEAGE_PIPELINE = "stage1_first_bootstrap_v1";
 
@@ -122,18 +124,46 @@ const lowerIncludes = (value: string, patterns: string[]): boolean => {
 
 const resolveBodyPlan = (spiritAnimal: string): string => {
   if (
-    lowerIncludes(spiritAnimal, ["owl", "raven", "phoenix", "eagle", "bird"])
+    lowerIncludes(spiritAnimal, [
+      "owl",
+      "raven",
+      "phoenix",
+      "eagle",
+      "dove",
+      "bird",
+    ])
   ) {
     return "avian with a strong wing silhouette, readable head shape, and balanced ground stance";
   }
-  if (lowerIncludes(spiritAnimal, ["dragon", "griffin", "pegasus"])) {
-    return "mythic quadruped with clear power read, long silhouette lines, and dramatic elevation potential";
+  if (lowerIncludes(spiritAnimal, ["pegasus"])) {
+    return "winged horse with four equine legs, single-toed hooves, a true horse head and mane, two separate feathered wings, and no horn";
+  }
+  if (lowerIncludes(spiritAnimal, ["griffin", "gryphon"])) {
+    return "classic eagle-lion hybrid with an eagle head and feathered forequarters, four leonine legs, two feathered wings, and leonine hindquarters";
+  }
+  if (lowerIncludes(spiritAnimal, ["sphinx"])) {
+    return "winged natural lion with four leonine legs, a feline head without a beak or human face, two feathered wings, and a tufted tail";
+  }
+  if (lowerIncludes(spiritAnimal, ["mechanical dragon"])) {
+    return "fully mechanical western dragon with four articulated legs, two engineered wings, one head, one tail, and no organic body parts";
+  }
+  if (lowerIncludes(spiritAnimal, ["dragon"])) {
+    return "western dragon with four scaled legs, two separate membranous wings, one horned reptilian head, and one long tail";
   }
   if (lowerIncludes(spiritAnimal, ["leviathan", "serpent", "snake", "eel"])) {
     return "serpentine aquatic body with flowing length, fin or crest accents, and no terrestrial limbs";
   }
-  if (lowerIncludes(spiritAnimal, ["deer", "horse", "pegasus"])) {
+  if (lowerIncludes(spiritAnimal, ["stag", "deer", "horse"])) {
     return "long-legged noble quadruped with elegant stride and readable chest-to-hip rhythm";
+  }
+  if (lowerIncludes(spiritAnimal, ["lamb", "sheep"])) {
+    return "gentle wool-coated quadruped with cloven hooves, broad ears, and compact natural proportions";
+  }
+  if (lowerIncludes(spiritAnimal, ["lion"])) {
+    return "powerful natural feline quadruped with broad paws, proud chest, balanced tail, and mane-framed head";
+  }
+  if (lowerIncludes(spiritAnimal, ["wolf"])) {
+    return "lean natural canine quadruped with deep chest, erect ears, thick neck ruff, and bushy tail";
   }
   return "grounded creature silhouette with clear anatomy, readable proportions, and one memorable outline feature";
 };
@@ -145,8 +175,14 @@ const resolveSignatureFeatures = (
   const animal = spiritAnimal.toLowerCase();
   const features = [
     `${spiritAnimal} family anatomy must stay recognizable at a glance`,
-    `${coreElement} power should feel native to the body rather than pasted on`,
+    `${coreElement} visual nature should feel native to the palette and lighting rather than pasted on`,
   ];
+
+  if (animal.includes("lamb") || animal.includes("sheep")) {
+    features.push(
+      "soft dense wool, broad gentle ears, cloven hooves, and a peaceful attentive expression",
+    );
+  }
 
   if (animal.includes("wolf")) {
     features.push(
@@ -164,6 +200,21 @@ const resolveSignatureFeatures = (
   }
   if (animal.includes("lion")) {
     features.push("broad paws, proud chest, and mane or sunburst framing");
+  }
+  if (animal.includes("stag") || animal.includes("deer")) {
+    features.push(
+      "balanced branching antlers, cloven hooves, long graceful legs, and alert ears",
+    );
+  }
+  if (animal.includes("dove")) {
+    features.push(
+      "compact white dove anatomy, small pale beak, layered folded wings, and gentle dark eyes",
+    );
+  }
+  if (animal.includes("eagle")) {
+    features.push(
+      "powerful hooked beak, layered brown-gold feathers, strong natural talons, and keen amber eyes",
+    );
   }
   if (animal.includes("phoenix")) {
     features.push("plumage and flame should feel fused into one form");
@@ -197,6 +248,31 @@ const resolveFaceAnchors = (spiritAnimal: string): string[] => {
   ) {
     anchors.push("clear muzzle read with expressive ears");
   }
+  if (animal.includes("lamb") || animal.includes("sheep")) {
+    anchors.push(
+      "broad ear placement, short gentle muzzle, dark attentive eyes, and consistent wool framing",
+    );
+  }
+  if (animal.includes("lion")) {
+    anchors.push(
+      "broad feline muzzle, calm amber eyes, rounded ears, and consistent mane framing",
+    );
+  }
+  if (animal.includes("stag") || animal.includes("deer")) {
+    anchors.push(
+      "long deer face, wide alert ears, dark gentle eyes, and symmetrical antler placement",
+    );
+  }
+  if (animal.includes("dove")) {
+    anchors.push(
+      "small pale beak, round dark eye, compact head, and clean white feather framing",
+    );
+  }
+  if (animal.includes("eagle")) {
+    anchors.push(
+      "hooked beak profile, strong brow line, keen amber eye, and layered crown feathers",
+    );
+  }
   if (
     animal.includes("owl") || animal.includes("raven") ||
     animal.includes("phoenix")
@@ -227,6 +303,31 @@ const resolveSilhouetteAnchors = (spiritAnimal: string): string[] => {
   if (animal.includes("wolf")) {
     anchors.push("lean quadruped silhouette with ruff and bushy tail");
   }
+  if (animal.includes("lamb") || animal.includes("sheep")) {
+    anchors.push(
+      "compact woolly quadruped silhouette with broad ears and steady cloven-hoof stance",
+    );
+  }
+  if (animal.includes("lion")) {
+    anchors.push(
+      "proud feline silhouette with broad paws, deep chest, mane-framed head, and tufted tail",
+    );
+  }
+  if (animal.includes("stag") || animal.includes("deer")) {
+    anchors.push(
+      "long-legged deer silhouette with symmetrical branching antlers and cloven hooves",
+    );
+  }
+  if (animal.includes("dove")) {
+    anchors.push(
+      "compact dove silhouette with small beak, folded wings, two legs, and short fan tail",
+    );
+  }
+  if (animal.includes("eagle")) {
+    anchors.push(
+      "strong raptor silhouette with hooked beak, folded wings, two taloned legs, and layered tail",
+    );
+  }
   if (animal.includes("fox")) {
     anchors.push("large ears and tail fan dominate the silhouette");
   }
@@ -253,7 +354,7 @@ const resolveSilhouetteAnchors = (spiritAnimal: string): string[] => {
   if (animal.includes("bear")) {
     anchors.push("heavy body mass and powerful forelimbs");
   }
-  if (animal.includes("deer")) {
+  if (animal.includes("stag") || animal.includes("deer")) {
     anchors.push("long-legged grace with head ornament focus");
   }
 
@@ -279,7 +380,7 @@ const resolveTonePersonality = (storyTone: string): string => {
 export const buildCompanionFamilyBible = (
   seed: VisualIdentitySeed,
 ): VisualIdentityProfile => {
-  const spiritAnimal = normalizeText(seed.spiritAnimal, "Dragon");
+  const spiritAnimal = normalizeText(seed.spiritAnimal, "Lamb");
   const coreElement = normalizeText(seed.coreElement, "fire");
   const favoriteColor = normalizeText(seed.favoriteColor, "#FF6B35");
   const storyTone = normalizeText(seed.storyTone, "epic_adventure");
@@ -300,15 +401,15 @@ export const buildCompanionFamilyBible = (
       "avoid monochrome washouts that erase silhouette readability",
     ],
     elementManifestation: [
-      `${coreElement} energy should grow in scale and confidence as the companion evolves`,
-      "element placement should feel consistent from one tier to the next",
-      "elemental effects should support the body silhouette, not hide it",
+      `${coreElement} should appear through a consistent natural palette, material texture, and lighting language`,
+      "visual-nature accents should stay in consistent locations from one tier to the next",
+      "keep every effect atmospheric and creation-grounded, never divine, magical, or anatomy-changing",
     ],
     personalityRead: resolveTonePersonality(storyTone),
     continuityRules: [
       "never redesign this into a different creature family",
       "do not randomize markings, facial structure, or elemental placement",
-      "each evolution should feel expensive and meaningful, like a major creature-collecting-game upgrade",
+      "each growth portrait should feel premium and meaningful, with a clearly more mature natural presence",
       "preserve the sense that this is the same individual becoming stronger",
     ],
   };
@@ -350,19 +451,31 @@ export const synthesizeVisualIdentityProfile = (
       fallback.bodyPlan,
     ),
     silhouetteAnchors: Array.isArray(record.silhouetteAnchors)
-      ? dedupe(record.silhouetteAnchors.map((value) => String(value)))
+      ? dedupe([
+        ...fallback.silhouetteAnchors,
+        ...record.silhouetteAnchors.map((value) => String(value)),
+      ])
       : fallback.silhouetteAnchors,
     faceAnchors: Array.isArray(record.faceAnchors)
-      ? dedupe(record.faceAnchors.map((value) => String(value)))
+      ? dedupe([
+        ...fallback.faceAnchors,
+        ...record.faceAnchors.map((value) => String(value)),
+      ])
       : fallback.faceAnchors,
     signatureFeatures: Array.isArray(record.signatureFeatures)
-      ? dedupe(record.signatureFeatures.map((value) => String(value)))
+      ? dedupe([
+        ...fallback.signatureFeatures,
+        ...record.signatureFeatures.map((value) => String(value)),
+      ])
       : fallback.signatureFeatures,
     paletteRules: Array.isArray(record.paletteRules)
       ? dedupe(record.paletteRules.map((value) => String(value)))
       : fallback.paletteRules,
     elementManifestation: Array.isArray(record.elementManifestation)
-      ? dedupe(record.elementManifestation.map((value) => String(value)))
+      ? dedupe([
+        ...fallback.elementManifestation,
+        ...record.elementManifestation.map((value) => String(value)),
+      ])
       : fallback.elementManifestation,
     personalityRead: normalizeText(
       typeof record.personalityRead === "string"
@@ -392,22 +505,22 @@ const getTierFantasy = (level: number): string => {
 
   switch (visualStage) {
     case 0:
-      return "A sealed magical egg. Show lineage hints only through shell shape, markings, aura, and energy. No full creature body visible.";
+      return "A quiet beginning form. Show lineage hints only through shell shape, markings, soft light, and natural texture. No full creature body visible.";
     case 1:
       return "Starter-form reveal. Cute, readable, iconic, and emotionally immediate. One standout signature feature should already be present.";
     case 2:
-      return "A real mid-evolution jump. The creature should look more capable, athletic, and battle-ready while staying clearly in the same family.";
+      return "A clear mid-growth step. The companion should look more capable, alert, and assured while staying clearly in the same family.";
     case 3:
       return "First iconic transformation. Unlock the signature feature fully and make the silhouette feel memorable even at small size.";
     case 4:
-      return "Mature guardian fantasy. Strong posture, protection, presence, and authority without losing the species read.";
+      return "Mature guardian form. Strong posture, protection, presence, and authority without losing the species read.";
     case 5:
-      return "Final-form equivalent. Powerful, iconic, and complete. This should feel like the strongest species-readable battle silhouette.";
+      return "A fully steady form. Strong, iconic, and complete, with the clearest species-readable silhouette in the line.";
     case 6:
-      return "Mythic overclock. The same creature line, but now operating at legendary scale with atmospheric elemental force.";
+      return "A flourishing form. The same companion line at a majestic natural scale, framed by a richer and more expansive living landscape.";
     case 7:
     default:
-      return "Ascended apex. Cosmic or transcendent amplification of the same lineage, not a chaotic redesign.";
+      return "A grand mature form. Awe-inspiring through scale, light, landscape, and quiet dignity, without supernatural or divine imagery.";
   }
 };
 
@@ -455,26 +568,32 @@ const getEvolutionDeltaBudget = (
     case 5:
       return [
         "Make this feel like a final-form payoff",
-        "Sharpen the silhouette into its definitive battle-ready read",
+        "Sharpen the silhouette into its definitive strong and steady read",
         "Increase scale, power, and confidence more than ornament density",
       ];
     case 6:
       return [
-        "Add mythic atmospheric force without abandoning the original body plan",
-        "Use non-biological projections or legendary effects only as amplifiers",
-        "Keep the same family silhouette visible beneath the mythic layer",
+        "Add atmospheric scale and flourishing natural detail without abandoning the original body plan",
+        "Use landscape, weather, light, and restrained decorative accents as amplifiers",
+        "Keep the same family silhouette clearly visible within the larger scene",
       ];
     case 7:
     default:
       return [
-        "Transcend into an apex form while remaining lineage-readable",
-        "Favor regal or cosmic amplification over random complexity",
-        "Make the creature feel ultimate, not noisy",
+        "Reach a grand mature form while remaining lineage-readable",
+        "Favor regal natural scale and environmental grandeur over random complexity",
+        "Make the companion feel awe-inspiring, calm, and complete rather than noisy",
       ];
   }
 };
 
 const buildArtDirection = (): string[] => [
+  "original premium 2D anime and storybook creature-companion illustration",
+  "clean confident linework, expressive warm eyes, and soft cel shading",
+  "polished, emotionally appealing, and mature in tone without looking photorealistic or rendered in 3D",
+  "natural species anatomy translated into a stylized animated design; appealing and proportionate, not chibi, and never anatomically distorted",
+  "preserve one consistent character-model language across every Graceward form and growth stage",
+  "do not imitate or resemble a specific existing game, anime, mascot, or copyrighted character",
   "single companion as the subject",
   "silhouette-first composition",
   "high readability at thumbnail size",
@@ -482,7 +601,8 @@ const buildArtDirection = (): string[] => [
   "no scenic or environmental backdrop, sky, clouds, horizon, landscape, room, floor, frame, border, card, shadow plane, or solid rectangular background",
   "the output must not read as a cropped scene or a sticker sitting on a visible rectangle",
   "aura, glow, and particles may surround the companion but must sit over transparency with no backdrop behind them",
-  "no text, logos, or extra characters",
+  "no clothing, armor costumes, halos, deity imagery, text, logos, franchise iconography, or extra characters",
+  "express Christian meaning through the creature species, peaceful nature, and growth symbolism rather than costume or supernatural power",
   "lighting should support form readability rather than drown the subject",
 ];
 
@@ -535,6 +655,7 @@ const normalizeLineageAnchor = (
     visibility: record.visibility === "visible"
       ? "visible"
       : "hidden_until_reached",
+    approvedForReveal: record.approvedForReveal === true,
   };
 };
 
@@ -732,7 +853,7 @@ export const buildInitialImageLineageMetadata = ({
   hiddenStageOneFocalY?: number | null;
   generationLog?: Record<string, unknown>;
 }): CompanionImageLineageMetadata => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   provider: DEFAULT_IMAGE_LINEAGE_PROVIDER,
   model: getDefaultImageLineageModel(),
   pipeline: DEFAULT_IMAGE_LINEAGE_PIPELINE,
@@ -744,6 +865,7 @@ export const buildInitialImageLineageMetadata = ({
       focalY: normalizeNullableNumber(hiddenStageOneFocalY),
       sourceType: "bootstrap_generation",
       visibility: "hidden_until_reached",
+      approvedForReveal: true,
     },
   },
   visualAnchorsByLevel: {},
@@ -761,6 +883,14 @@ export const getHiddenBoundaryAnchor = (
 ): CompanionLineageAnchor | null =>
   coerceImageLineageMetadata(existing).hiddenBoundaryAnchors[String(level)] ??
     null;
+
+export const getApprovedHiddenBoundaryAnchor = (
+  existing: unknown,
+  level: number,
+): CompanionLineageAnchor | null => {
+  const anchor = getHiddenBoundaryAnchor(existing, level);
+  return anchor?.approvedForReveal === true ? anchor : null;
+};
 
 export const updateLineageMetadataWithVisualAnchors = ({
   existing,
@@ -801,12 +931,14 @@ export const updateLineageMetadataAfterReveal = ({
   imageUrl,
   focalX,
   focalY,
+  sourceType,
 }: {
   existing: unknown;
   revealedLevel: number;
   imageUrl: string;
   focalX?: number | null;
   focalY?: number | null;
+  sourceType?: string;
 }): CompanionImageLineageMetadata => {
   const metadata = coerceImageLineageMetadata(existing);
   const levelKey = String(revealedLevel);
@@ -824,8 +956,9 @@ export const updateLineageMetadataAfterReveal = ({
         focalY: normalizeNullableNumber(
           focalY ?? existingAnchor?.focalY ?? null,
         ),
-        sourceType: existingAnchor?.sourceType ?? "generation",
+        sourceType: sourceType ?? existingAnchor?.sourceType ?? "generation",
         visibility: "visible",
+        approvedForReveal: true,
       },
     },
     lastReachedBoundaryLevel: revealedLevel,
@@ -863,6 +996,7 @@ export const updateLineageMetadataAfterBoundaryEvolution = ({
           sourceType: metadata.hiddenBoundaryAnchors["1"]?.sourceType ??
             "generation",
           visibility: "visible",
+          approvedForReveal: true,
         },
       }
       : metadata.hiddenBoundaryAnchors,
@@ -898,6 +1032,7 @@ export const buildCompanionGenerationMetadata = ({
     continuity: scores?.continuity ?? null,
     difference: scores?.difference ?? null,
     anatomy: scores?.anatomy ?? null,
+    stageMaturity: scores?.stageMaturity ?? null,
     centering: scores?.centering ?? null,
     overall: scores?.overall ?? null,
   },
@@ -920,10 +1055,10 @@ export const getEvolutionDifferenceFloor = (
 
 export const buildAiEggPrompt = (profile: VisualIdentityProfile): string => {
   return [
-    "STYLIZED FANTASY CREATURE EGG PORTRAIT",
+    "GRACEWARD SYMBOLIC COMPANION BEGINNING PORTRAIT",
     "",
     `Egg tier: ${getProgressionTierLabelForLevel(0)}`,
-    "Goal: create a custom stage-0 egg that hints at the future companion line without showing the creature's body.",
+    "Goal: create a custom stage-0 beginning form that quietly hints at the future companion line without showing the creature's body.",
     "",
     "Family Bible:",
     `- Spirit animal lineage: ${profile.spiritAnimal}`,
@@ -941,7 +1076,7 @@ export const buildAiEggPrompt = (profile: VisualIdentityProfile): string => {
     "",
     "Egg-specific rules:",
     "- The shell should feel bespoke to this future lineage, not generic",
-    "- Use markings, shape language, aura, cracks, fins, ridges, horns, feathers, or crest motifs only as egg-shell hints",
+    "- Use markings, shape language, soft light, cracks, fins, ridges, horns, feathers, or crest motifs only as shell hints",
     "- No visible full creature body or hatchling face",
     "- The shell should imply power sleeping inside",
     "",
@@ -951,7 +1086,7 @@ export const buildAiEggPrompt = (profile: VisualIdentityProfile): string => {
     "Continuity Checklist:",
     ...buildContinuityChecklist(profile).map((item) => `- ${item}`),
     "",
-    "Desired feeling: a premium creature-collecting-game egg with strong mystery, lineage hints, and dramatic readability.",
+    "Desired feeling: a beautiful, hopeful animated beginning with strong lineage hints and immediate readability; symbolic, never divine or magical.",
   ].join("\n");
 };
 
@@ -959,9 +1094,9 @@ export const buildStage1BootstrapPrompt = (
   profile: VisualIdentityProfile,
 ): string => {
   return [
-    "STYLIZED FANTASY COMPANION STARTER FORM",
+    "GRACEWARD SYMBOLIC COMPANION YOUNG FORM",
     "",
-    "Goal: create the canonical hidden stage-1 hatchling that defines the entire companion line.",
+    "Goal: create the canonical hidden stage-1 infant companion that defines the entire companion line.",
     "",
     "Family Bible:",
     `- Spirit animal lineage: ${profile.spiritAnimal}`,
@@ -979,7 +1114,10 @@ export const buildStage1BootstrapPrompt = (
     "",
     "Starter-form rules:",
     "- This is the hidden true form inside the egg",
-    "- Make it cute, iconic, and immediately lovable",
+    "- It must read unmistakably as an infant or very young juvenile for this exact species",
+    "- Use a rounder juvenile face, smaller compact body, larger eyes, shorter limbs, and softer starter proportions where species-appropriate",
+    "- Exclude adult maturity markers: no mane, antlers, adult flight plumage, mature musculature, or fully developed ornamental anatomy",
+    "- Make it gentle, iconic, and immediately lovable with natural species-specific proportions: not chibi and never distorted",
     "- Show one major signature feature clearly, but at starter intensity",
     "- Strong silhouette and facial read matter more than ornament density",
     "",
@@ -989,7 +1127,7 @@ export const buildStage1BootstrapPrompt = (
     "Continuity Checklist:",
     ...buildContinuityChecklist(profile).map((item) => `- ${item}`),
     "",
-    "Desired feeling: the premium starter form of a memorable creature-collecting-game lineage.",
+    "Desired feeling: a memorable infant companion whose future growth is easy to imagine and whose age cannot be mistaken for an adult.",
   ].join("\n");
 };
 
@@ -997,9 +1135,9 @@ export const buildEggFromStage1Prompt = (
   profile: VisualIdentityProfile,
 ): string => {
   return [
-    "TRANSFORM THIS STARTER FORM INTO ITS SEALED MAGICAL EGG",
+    "TRANSFORM THIS YOUNG COMPANION INTO ITS QUIET BEGINNING FORM",
     "",
-    "Goal: create a bespoke stage-0 egg portrait derived from the hidden hatchling reference.",
+    "Goal: create a bespoke stage-0 shell portrait derived from the hidden young-companion reference.",
     "",
     "Family Bible:",
     `- Spirit animal lineage: ${profile.spiritAnimal}`,
@@ -1009,12 +1147,16 @@ export const buildEggFromStage1Prompt = (
     `- Body plan: ${profile.bodyPlan}`,
     "",
     "Egg rules:",
-    "- Preserve the lineage through shell shape language, markings, aura, cracks, ridges, feather hints, horn hints, fin hints, or crest hints",
+    "- Preserve the lineage through shell shape language, markings, soft light, cracks, ridges, feather hints, horn hints, fin hints, or crest hints",
     "- No visible full creature body",
     "- No visible face, paws, wings, or full silhouette emerging from the shell",
-    "- The egg must feel like it contains the referenced hatchling specifically",
+    "- The shell must feel specifically connected to the referenced young companion",
     "- Render as an isolated transparent-alpha cutout with no scenic backdrop, sky, clouds, horizon, landscape, floor, frame, card, shadow plane, or solid rectangular background",
-    "- Strong mystery and premium readability, with any glow or particles attached to the egg over transparency",
+    "- Match the same clean linework, expressive shape language, and soft cel-shaded 2D anime/storybook finish as the young companion reference",
+    "- Strong hope and premium readability, with any soft light or subtle particles attached to the shell over transparency",
+    "",
+    "Art Direction:",
+    ...buildArtDirection().map((item) => `- ${item}`),
     "",
     "Continuity Checklist:",
     ...buildContinuityChecklist(profile).map((item) => `- ${item}`),
@@ -1025,14 +1167,14 @@ export const buildAiEvolutionSystemPrompt = (nextLevel: number): string => {
   const visualStage = getVisualStage(nextLevel);
 
   if (visualStage >= 6) {
-    return "You design creature evolutions that feel huge, premium, and lineage-consistent. Maximize payoff while keeping species recognition strong.";
+    return "You design original premium 2D anime/storybook companion growth portraits that feel majestic and lineage-consistent. Create awe through natural maturity, expressive character design, and environmental scale while keeping species recognition strong.";
   }
 
   if (visualStage >= 4) {
-    return "You design creature evolutions with strong continuity, major silhouette upgrades, and clear family resemblance. Favor bold but coherent transformations.";
+    return "You design original 2D anime/storybook companion growth portraits with strong continuity, major silhouette upgrades, and clear family resemblance. Favor bold but coherent natural maturation, clean linework, and soft cel shading.";
   }
 
-  return "You design creature evolutions that feel like major creature-collecting-game upgrades. Preserve family identity while making each boundary evolution noticeably more advanced.";
+  return "You design original 2D anime/storybook companion growth portraits. Preserve character-model identity while making each boundary portrait noticeably more mature, capable, and beautiful.";
 };
 
 export const buildAiEvolutionPrompt = ({
@@ -1049,7 +1191,7 @@ export const buildAiEvolutionPrompt = ({
   const boundaryStage = getBoundaryStageForLevel(nextLevel);
 
   return [
-    "STYLIZED FANTASY COMPANION EVOLUTION",
+    "GRACEWARD SYMBOLIC COMPANION GROWTH PORTRAIT",
     "",
     `Evolution jump: Level ${previousLevel} (${previousTier}) -> Level ${nextLevel} (${nextTier})`,
     `Portrait tier boundary: ${boundaryStage}`,
@@ -1080,7 +1222,7 @@ export const buildAiEvolutionPrompt = ({
     ...buildContinuityChecklist(profile).map((item) => `- ${item}`),
     "",
     "Quality bar:",
-    "- This should feel as satisfying as a major Pokemon-style evolution jump",
+    "- This should feel like a meaningful visual reward for sustained daily faithfulness",
     "- The new form should be obviously different from the previous portrait at thumbnail size",
     "- It must still be unmistakably the same companion line",
   ].join("\n");
@@ -1136,9 +1278,11 @@ export const buildBoundaryEvolutionGenerationPrompt = ({
   return [
     basePrompt,
     "",
-    "Metadata-first evolution rules:",
-    "- Generate a fresh next-stage portrait from this lineage metadata; do not copy the previous pose or exact silhouette",
-    "- Treat the previous-form anchors below as identity evidence, not as a composition lock",
+    "Reference-image evolution rules:",
+    "- Use the attached previous approved portrait as the primary identity reference for the same individual",
+    "- Preserve its exact animated character-model language: face and eye design, clean line weight, markings, stylized species anatomy, palette logic, and soft cel-shading finish while advancing maturity",
+    "- Generate a fresh next-stage pose and silhouette evolution; do not merely upscale or copy the previous composition",
+    "- Treat the previous-form anchors below as additional identity evidence, not as a composition lock",
     "- Preserve the companion's recognizable family, face logic, markings, palette identity, and signature features",
     "- Evolve scale, maturity, posture, proportions, ornamentation, and elemental expression enough to read as a new tier",
     "- The result must look like a direct evolution of the previous companion, not a sibling, variant, or unrelated redesign",

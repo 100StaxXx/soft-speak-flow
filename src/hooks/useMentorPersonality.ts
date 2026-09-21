@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 import { resolveMentorSlugAlias } from "@/lib/mentorRoster";
+import { fetchProductMentorById } from "@/services/productMentorCatalog";
 
 interface MentorPersonality {
   name: string;
@@ -74,13 +74,7 @@ export const useMentorPersonality = (): MentorPersonality | null => {
     queryKey: ['mentor-personality', resolvedMentorId],
     queryFn: async () => {
       if (!resolvedMentorId) return null;
-      const { data, error } = await supabase
-        .from('mentors')
-        .select('name, slug, tone_description, style, avatar_url, primary_color')
-        .eq('id', resolvedMentorId)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
+      return fetchProductMentorById(resolvedMentorId);
     },
     enabled: !!resolvedMentorId,
   });

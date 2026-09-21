@@ -12,15 +12,15 @@ export type YearlyOfferDisplay = {
 const YEARLY_OFFER_DISPLAYS: Record<YearlyOfferTier, YearlyOfferDisplay> = {
   referrals: {
     tier: "referrals",
-    price: "$69.99",
-    priceCents: 6999,
-    unitPrice: "$5.83/month for the first year",
+    price: "$29.99",
+    priceCents: 2999,
+    unitPrice: "$2.50/month, locked while active",
   },
   genesis: {
     tier: "genesis",
-    price: "$49.99",
-    priceCents: 4999,
-    unitPrice: "$4.17/month for the first year",
+    price: "$29.99",
+    priceCents: 2999,
+    unitPrice: "$2.50/month, locked while active",
   },
 };
 

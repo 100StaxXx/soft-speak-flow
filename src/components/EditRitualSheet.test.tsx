@@ -153,9 +153,9 @@ describe("EditRitualSheet", () => {
       />,
     );
 
-    expect(screen.getByTestId("edit-ritual-sheet-shell").className).toContain("border-[hsl(var(--celestial-blue)_/_0.58)]");
-    expect(screen.getByText("Edit Ritual")).toBeInTheDocument();
-    expect(screen.getByText("Changes sync to all instances of this ritual.")).toBeInTheDocument();
+    expect(screen.getByTestId("edit-ritual-sheet-shell")).toHaveClass("border-input");
+    expect(screen.getByText("Edit rhythm")).toBeInTheDocument();
+    expect(screen.getByText("Changes sync to all instances of this rhythm.")).toBeInTheDocument();
     expect(screen.getByTestId("natural-language-editor")).toHaveAttribute("data-visual-style", "quest-soft");
     expect(screen.getByRole("button", { name: "Frequency Presets" })).toHaveAttribute("data-variant", "planner");
     expect(screen.getByDisplayValue("Morning focus ritual")).toBeInTheDocument();
@@ -165,7 +165,7 @@ describe("EditRitualSheet", () => {
     expect(screen.getByRole("button", { name: "25 min" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save Changes" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Delete Ritual" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Delete rhythm" })).toBeEnabled();
   });
 
   it("applies supplied companion frosted variables to the ritual sheet portal", () => {
@@ -211,7 +211,7 @@ describe("EditRitualSheet", () => {
     expect(durationButton).toBeInTheDocument();
 
     fireEvent.click(timeButton);
-    fireEvent.change(screen.getByLabelText("Scheduled ritual time"), {
+    fireEvent.change(screen.getByLabelText("Scheduled rhythm time"), {
       target: { value: "08:15" },
     });
     expect(screen.getByDisplayValue("08:15")).toBeInTheDocument();

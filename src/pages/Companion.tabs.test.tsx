@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MainTabVisibilityProvider } from "@/contexts/MainTabVisibilityContext";
 
 const mocks = vi.hoisted(() => ({
@@ -9,13 +9,22 @@ const mocks = vi.hoisted(() => ({
     current_stage: 3,
     core_element: null as string | null,
     initial_image_url: null as string | null,
-  },
+    product_mode: "graceward" as "graceward" | "cosmiq",
+  } as {
+    id: string;
+    current_xp: number;
+    current_stage: number;
+    core_element: string | null;
+    initial_image_url: string | null;
+    product_mode?: "graceward" | "cosmiq";
+  } | null,
   isLoading: false,
   error: null as Error | null,
   refetch: vi.fn().mockResolvedValue(undefined),
   user: { id: "user-1" },
   prefetchQuery: vi.fn().mockResolvedValue(undefined),
   focusMountCount: 0,
+  focusCinemaEnabled: [] as boolean[],
   collectionMountCount: 0,
   navigate: vi.fn(),
   isTabActive: true,
@@ -59,7 +68,9 @@ vi.mock("@/components/ui/tabs", async () => {
     </TabsContext.Provider>
   );
 
-  const TabsList = ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  const TabsList = (
+    { children, ...props }: React.HTMLAttributes<HTMLDivElement>,
+  ) => (
     <div role="tablist" {...props}>
       {children}
     </div>
@@ -95,13 +106,20 @@ vi.mock("@/components/ui/tabs", async () => {
     forceMount,
     children,
     ...props
-  }: React.HTMLAttributes<HTMLDivElement> & { value: string; forceMount?: boolean }) => {
+  }: React.HTMLAttributes<HTMLDivElement> & {
+    value: string;
+    forceMount?: boolean;
+  }) => {
     const context = React.useContext(TabsContext);
     const isActive = context.value === value;
     if (!isActive && !forceMount) return null;
 
     return (
-      <div data-state={isActive ? "active" : "inactive"} hidden={!isActive} {...props}>
+      <div
+        data-state={isActive ? "active" : "inactive"}
+        hidden={!isActive}
+        {...props}
+      >
         {children}
       </div>
     );
@@ -154,7 +172,9 @@ vi.mock("@/contexts/EvolutionContext", () => ({
 }));
 
 vi.mock("@/hooks/useCompanionStory", () => ({
-  getCompanionStoriesAllQueryKey: (companionId?: string) => ["companion-stories-all", companionId],
+  getCompanionStoriesAllQueryKey: (
+    companionId?: string,
+  ) => ["companion-stories-all", companionId],
   fetchCompanionStoriesAll: vi.fn().mockResolvedValue([]),
   useCompanionStory: () => ({
     story: null,
@@ -167,7 +187,9 @@ vi.mock("@/hooks/useCompanionStory", () => ({
 }));
 
 vi.mock("@/hooks/useCompanionPostcards", () => ({
-  getCompanionPostcardsQueryKey: (userId?: string) => ["companion-postcards", userId],
+  getCompanionPostcardsQueryKey: (
+    userId?: string,
+  ) => ["companion-postcards", userId],
   fetchCompanionPostcards: vi.fn().mockResolvedValue([]),
   useCompanionPostcards: () => ({
     postcards: [],
@@ -182,25 +204,38 @@ vi.mock("react-router-dom", () => ({
 }));
 
 vi.mock("framer-motion", () => {
-  const MotionDiv = ({ children, initial: _initial, animate: _animate, exit: _exit, transition: _transition, ...props }: any) => (
-    <div {...props}>{children}</div>
-  );
+  const MotionDiv = (
+    {
+      children,
+      initial: _initial,
+      animate: _animate,
+      exit: _exit,
+      transition: _transition,
+      ...props
+    }: any,
+  ) => <div {...props}>{children}</div>;
 
   return {
     motion: {
       div: MotionDiv,
     },
-    AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    AnimatePresence: ({ children }: { children: React.ReactNode }) => (
+      <>{children}</>
+    ),
     useReducedMotion: () => false,
   };
 });
 
 vi.mock("@/components/PageTransition", () => ({
-  PageTransition: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  PageTransition: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
 }));
 
 vi.mock("@/components/CompanionErrorBoundary", () => ({
-  CompanionErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  CompanionErrorBoundary: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
 }));
 
 vi.mock("@/components/CinematicPageBackground", () => ({
@@ -214,12 +249,17 @@ vi.mock("@/components/MentorGuidanceCard", () => ({
 }));
 
 vi.mock("@/components/ui/parallax-card", () => ({
-  ParallaxCard: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  ParallaxCard: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
 }));
 
 vi.mock("@/components/CompanionDisplay", () => ({
   CompanionDisplay: ({ layoutMode }: { layoutMode?: "mobile" | "desktop" }) => (
-    <div data-testid="companion-display" data-layout-mode={layoutMode ?? "mobile"} />
+    <div
+      data-testid="companion-display"
+      data-layout-mode={layoutMode ?? "mobile"}
+    />
   ),
 }));
 
@@ -260,8 +300,12 @@ vi.mock("@/components/companion/MemoryWhisper", () => ({
 vi.mock("@/components/companion/FocusTab", async () => {
   const React = await import("react");
   return {
-    FocusTab: () => {
+    FocusTab: (
+      { enableCosmiqCinema = false }: { enableCosmiqCinema?: boolean },
+    ) => {
       const [mode, setMode] = React.useState("focus");
+
+      mocks.focusCinemaEnabled.push(enableCosmiqCinema);
 
       React.useEffect(() => {
         mocks.focusMountCount += 1;
@@ -270,7 +314,12 @@ vi.mock("@/components/companion/FocusTab", async () => {
       return (
         <div>
           <div data-testid="focus-mode">{mode}</div>
-          <button onClick={() => setMode((previous) => (previous === "focus" ? "resist" : "focus"))}>
+          <button
+            onClick={() =>
+              setMode((
+                previous,
+              ) => (previous === "focus" ? "resist" : "focus"))}
+          >
             Toggle Focus Mode
           </button>
         </div>
@@ -278,6 +327,14 @@ vi.mock("@/components/companion/FocusTab", async () => {
     },
   };
 });
+
+vi.mock("@/components/companion/CompanionCinemaStatus", () => ({
+  CompanionCinemaStatus: () => <div data-testid="companion-cinema-status" />,
+}));
+
+vi.mock("@/components/companion/CompanionCinemaActions", () => ({
+  CompanionCinemaActions: () => <div data-testid="companion-cinema-actions" />,
+}));
 
 vi.mock("@/components/companion/CollectionTab", async () => {
   const React = await import("react");
@@ -292,7 +349,12 @@ vi.mock("@/components/companion/CollectionTab", async () => {
       return (
         <div>
           <div data-testid="collection-mode">{mode}</div>
-          <button onClick={() => setMode((previous) => (previous === "badges" ? "loot" : "badges"))}>
+          <button
+            onClick={() =>
+              setMode((
+                previous,
+              ) => (previous === "badges" ? "loot" : "badges"))}
+          >
             Toggle Collection Mode
           </button>
         </div>
@@ -318,6 +380,7 @@ describe("Companion tabs performance behavior", () => {
       current_stage: 3,
       core_element: null,
       initial_image_url: null,
+      product_mode: "graceward",
     };
     mocks.isLoading = false;
     mocks.error = null;
@@ -325,6 +388,7 @@ describe("Companion tabs performance behavior", () => {
     mocks.refetch.mockClear();
     mocks.prefetchQuery.mockClear();
     mocks.focusMountCount = 0;
+    mocks.focusCinemaEnabled = [];
     mocks.collectionMountCount = 0;
     mocks.navigate.mockClear();
     mocks.isTabActive = true;
@@ -341,9 +405,14 @@ describe("Companion tabs performance behavior", () => {
   it("uses the companion cinematic wallpaper preset", () => {
     renderCompanion();
 
-    expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-preset", "companion");
-    expect(screen.getByTestId("companion-theme-shell")).toHaveStyle("--primary: 45 100% 65%; --accent: 40 96% 57%");
-    expect(screen.getByTestId("companion-tab-list")).toHaveClass("border-stardust-gold/16");
+    expect(screen.getByTestId("cinematic-background")).toHaveAttribute(
+      "data-preset",
+      "companion",
+    );
+    expect(screen.getByTestId("companion-theme-shell")).not.toHaveAttribute("style");
+    expect(screen.getByTestId("companion-tab-list")).toHaveClass(
+      "border-primary/15",
+    );
   });
 
   afterEach(() => {
@@ -352,14 +421,16 @@ describe("Companion tabs performance behavior", () => {
 
   it("renders collection in top-level companion tabs", () => {
     renderCompanion();
-    expect(screen.getByRole("tab", { name: /collection/i })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: /postcards/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /keepsakes/i }))
+      .toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /postcards/i })).not
+      .toBeInTheDocument();
   });
 
   it("keeps collection tab content mounted after first visit", async () => {
     renderCompanion();
 
-    fireEvent.click(screen.getByRole("tab", { name: /collection/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /keepsakes/i }));
     await waitFor(() => {
       expect(screen.getByTestId("collection-mode")).toBeInTheDocument();
     });
@@ -368,8 +439,8 @@ describe("Companion tabs performance behavior", () => {
     fireEvent.click(screen.getByText("Toggle Collection Mode"));
     expect(screen.getByTestId("collection-mode")).toHaveTextContent("loot");
 
-    fireEvent.click(screen.getByRole("tab", { name: /overview/i }));
-    fireEvent.click(screen.getByRole("tab", { name: /collection/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /formation/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /keepsakes/i }));
 
     expect(screen.getByTestId("collection-mode")).toHaveTextContent("loot");
     expect(mocks.collectionMountCount).toBe(1);
@@ -384,13 +455,38 @@ describe("Companion tabs performance behavior", () => {
     });
     expect(mocks.focusMountCount).toBe(1);
 
-    fireEvent.click(screen.getByRole("tab", { name: /overview/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /formation/i }));
     fireEvent.click(screen.getByRole("tab", { name: /focus/i }));
 
     await waitFor(() => {
       expect(screen.getByTestId("focus-mode")).toBeInTheDocument();
     });
     expect(mocks.focusMountCount).toBe(1);
+  });
+
+  it("enables generated cinema only for Cosmiq companion records", async () => {
+    const { unmount } = renderCompanion();
+    fireEvent.click(screen.getByRole("tab", { name: /focus/i }));
+    expect(mocks.focusCinemaEnabled.at(-1)).toBe(false);
+    expect(screen.queryByTestId("companion-cinema-status")).not
+      .toBeInTheDocument();
+    expect(screen.queryByTestId("companion-cinema-actions")).not
+      .toBeInTheDocument();
+    unmount();
+
+    mocks.companion = {
+      id: "companion-1",
+      current_xp: 120,
+      current_stage: 3,
+      core_element: "fire",
+      initial_image_url: null,
+      product_mode: "cosmiq",
+    };
+    renderCompanion();
+    fireEvent.click(screen.getByRole("tab", { name: /focus/i }));
+    expect(mocks.focusCinemaEnabled.at(-1)).toBe(true);
+    expect(screen.getByTestId("companion-cinema-status")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-cinema-actions")).toBeInTheDocument();
   });
 
   it("preserves focus tab local state across tab switches", async () => {
@@ -403,7 +499,7 @@ describe("Companion tabs performance behavior", () => {
     fireEvent.click(screen.getByText("Toggle Focus Mode"));
     expect(screen.getByTestId("focus-mode")).toHaveTextContent("resist");
 
-    fireEvent.click(screen.getByRole("tab", { name: /overview/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /formation/i }));
     fireEvent.click(screen.getByRole("tab", { name: /focus/i }));
 
     expect(screen.getByTestId("focus-mode")).toHaveTextContent("resist");
@@ -411,10 +507,15 @@ describe("Companion tabs performance behavior", () => {
   });
 
   it("prefetches resources on idle and on stories/collection trigger interactions", async () => {
-    const originalRequestIdle = (window as Window & { requestIdleCallback?: unknown }).requestIdleCallback;
-    const originalCancelIdle = (window as Window & { cancelIdleCallback?: unknown }).cancelIdleCallback;
-    (window as Window & { requestIdleCallback?: unknown }).requestIdleCallback = undefined;
-    (window as Window & { cancelIdleCallback?: unknown }).cancelIdleCallback = undefined;
+    const originalRequestIdle =
+      (window as Window & { requestIdleCallback?: unknown })
+        .requestIdleCallback;
+    const originalCancelIdle =
+      (window as Window & { cancelIdleCallback?: unknown }).cancelIdleCallback;
+    (window as Window & { requestIdleCallback?: unknown }).requestIdleCallback =
+      undefined;
+    (window as Window & { cancelIdleCallback?: unknown }).cancelIdleCallback =
+      undefined;
     try {
       renderCompanion();
       expect(mocks.prefetchQuery).not.toHaveBeenCalled();
@@ -426,7 +527,9 @@ describe("Companion tabs performance behavior", () => {
       await new Promise((resolve) => setTimeout(resolve, 300));
       expect(mocks.prefetchQuery).toHaveBeenCalledTimes(2);
 
-      const initialCalls = mocks.prefetchQuery.mock.calls.map(([config]) => config.queryKey);
+      const initialCalls = mocks.prefetchQuery.mock.calls.map(([config]) =>
+        config.queryKey
+      );
       expect(initialCalls).toEqual(
         expect.arrayContaining([
           ["companion-stories-all", "companion-1"],
@@ -434,18 +537,20 @@ describe("Companion tabs performance behavior", () => {
         ]),
       );
 
-      fireEvent.focus(screen.getByRole("tab", { name: /stories/i }));
+      fireEvent.focus(screen.getByRole("tab", { name: /memories/i }));
       await waitFor(() => {
         expect(mocks.prefetchQuery).toHaveBeenCalledTimes(3);
       }, { timeout: 1500 });
 
-      fireEvent.pointerDown(screen.getByRole("tab", { name: /collection/i }));
+      fireEvent.pointerDown(screen.getByRole("tab", { name: /keepsakes/i }));
       await waitFor(() => {
         expect(mocks.prefetchQuery).toHaveBeenCalledTimes(4);
       }, { timeout: 1500 });
     } finally {
-      (window as Window & { requestIdleCallback?: unknown }).requestIdleCallback = originalRequestIdle;
-      (window as Window & { cancelIdleCallback?: unknown }).cancelIdleCallback = originalCancelIdle;
+      (window as Window & { requestIdleCallback?: unknown })
+        .requestIdleCallback = originalRequestIdle;
+      (window as Window & { cancelIdleCallback?: unknown }).cancelIdleCallback =
+        originalCancelIdle;
     }
   });
 
@@ -473,9 +578,10 @@ describe("Companion tabs performance behavior", () => {
 
     renderCompanion();
 
-    expect(screen.getByRole("tab", { name: /overview/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /formation/i })).toBeInTheDocument();
     expect(screen.queryByText("No Companion Found")).not.toBeInTheDocument();
-    expect(screen.queryByText("Error Loading Companion")).not.toBeInTheDocument();
+    expect(screen.queryByText("Error Loading Companion")).not
+      .toBeInTheDocument();
   });
 
   it("keeps companion settings action clickable", () => {
@@ -491,8 +597,12 @@ describe("Companion tabs performance behavior", () => {
     renderCompanion();
 
     expect(screen.getByTestId("companion-desktop-rail")).toBeInTheDocument();
-    expect(screen.getByTestId("companion-desktop-workspace")).toBeInTheDocument();
-    expect(screen.getByTestId("companion-display")).toHaveAttribute("data-layout-mode", "desktop");
+    expect(screen.getByTestId("companion-desktop-workspace"))
+      .toBeInTheDocument();
+    expect(screen.getByTestId("companion-display")).toHaveAttribute(
+      "data-layout-mode",
+      "desktop",
+    );
   });
 
   it("forces stale stage 1 companion data back to stage 0 during the companion intro step", async () => {
@@ -511,9 +621,18 @@ describe("Companion tabs performance behavior", () => {
     await waitFor(() => {
       expect(mocks.refetch).toHaveBeenCalledTimes(1);
     });
-    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-current-stage", "0");
-    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-next-evolution-xp", "10");
-    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-progress-percent", "100");
+    expect(screen.getByTestId("next-evolution")).toHaveAttribute(
+      "data-current-stage",
+      "0",
+    );
+    expect(screen.getByTestId("next-evolution")).toHaveAttribute(
+      "data-next-evolution-xp",
+      "10",
+    );
+    expect(screen.getByTestId("next-evolution")).toHaveAttribute(
+      "data-progress-percent",
+      "100",
+    );
   });
 
   it("keeps the evolve tutorial step pre-hatch until evolution actually starts", () => {
@@ -529,11 +648,17 @@ describe("Companion tabs performance behavior", () => {
 
     renderCompanion();
 
-    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-current-stage", "0");
-    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-next-evolution-xp", "10");
+    expect(screen.getByTestId("next-evolution")).toHaveAttribute(
+      "data-current-stage",
+      "0",
+    );
+    expect(screen.getByTestId("next-evolution")).toHaveAttribute(
+      "data-next-evolution-xp",
+      "10",
+    );
   });
 
-  it("does not fake a stage 0 overview once the tutorial reaches the post-evolution companion intro", () => {
+  it("does not render a duplicate evolution preview after the companion has hatched", () => {
     mocks.guidedStep = "post_evolution_companion_intro";
     mocks.companion = {
       id: "companion-1",
@@ -545,8 +670,8 @@ describe("Companion tabs performance behavior", () => {
 
     renderCompanion();
 
-    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-current-stage", "1");
-    expect(screen.getByTestId("next-evolution")).toHaveAttribute("data-next-evolution-xp", "200");
+    expect(screen.queryByTestId("next-evolution")).not.toBeInTheDocument();
+    expect(screen.getByTestId("companion-display")).toBeInTheDocument();
   });
 
   it("disables companion query and idle prefetch while tab is inactive", async () => {

@@ -168,6 +168,18 @@ export function getOpenAITextTokenRatesPerThousand(model: string | null): {
   // OpenAI model docs publish GPT-5.x text prices per 1M tokens;
   // guardrails store the same rates converted to per-1K tokens.
   // Sources: https://developers.openai.com/api/docs/models.
+  if (modelName.includes("gpt-5.6-luna")) {
+    return { inputRate: 0.001, outputRate: 0.006 };
+  }
+
+  if (modelName.includes("gpt-5.6-terra")) {
+    return { inputRate: 0.0025, outputRate: 0.015 };
+  }
+
+  if (modelName.includes("gpt-5.6")) {
+    return { inputRate: 0.005, outputRate: 0.03 };
+  }
+
   if (modelName.includes("gpt-5.5-pro")) {
     return { inputRate: 0.03, outputRate: 0.18 };
   }
@@ -524,7 +536,10 @@ function resolveCapabilityFromOpenAIRequest(
 ): CostCapability | null {
   if (pathname.includes("/audio/transcriptions")) return "transcription";
   if (pathname.includes("/audio/speech")) return "tts";
-  if (pathname.includes("/images/generations")) return "image";
+  if (
+    pathname.includes("/images/generations") ||
+    pathname.includes("/images/edits")
+  ) return "image";
   if (pathname.includes("/videos")) return "video";
   if (
     !pathname.includes("/chat/completions") && !pathname.includes("/responses")
@@ -550,6 +565,8 @@ function resolveCapabilityFromOpenAIRequest(
 function resolveCapabilityFromElevenLabsRequest(
   pathname: string,
 ): CostCapability | null {
+  if (pathname.includes("/v1/forced-alignment")) return "transcription";
+  if (pathname.includes("/v1/speech-to-text")) return "transcription";
   if (pathname.includes("/v1/text-to-speech/")) return "tts";
   if (pathname.includes("/v1/music")) return "music";
   if (pathname.includes("/v1/video")) return "video";
@@ -794,8 +811,25 @@ function estimateElevenLabsCost(
   return 0;
 }
 
+export function getFalVideoRatePerSecond(
+  model: string | null,
+  generateAudio: boolean,
+): number {
+  const normalizedModel = (model ?? "").toLowerCase();
+  if (normalizedModel.includes("kling-video/v3/pro")) {
+    return generateAudio ? 0.168 : 0.112;
+  }
+  if (normalizedModel.includes("kling-video/v3/standard")) {
+    return generateAudio ? 0.126 : 0.084;
+  }
+  // Unknown fal video models remain conservatively priced above the legacy
+  // estimate so a new model cannot silently weaken a monthly budget.
+  return generateAudio ? 0.15 : 0.1;
+}
+
 function estimateFalCost(
   capability: CostCapability,
+  model: string | null,
   requestBody: JsonObject | null,
 ): number {
   if (capability !== "video") return 0;
@@ -803,7 +837,12 @@ function estimateFalCost(
     requestBody?.duration_seconds ?? requestBody?.duration,
     5,
   );
-  return roundUsd(Math.max(1, durationSeconds) * 0.1);
+  return roundUsd(
+    Math.max(1, durationSeconds) * getFalVideoRatePerSecond(
+      model,
+      requestBody?.generate_audio === true,
+    ),
+  );
 }
 
 function estimatePhotoRoomCost(capability: CostCapability): number {
@@ -837,6 +876,7 @@ function estimateProviderRequestCost(
   if (providerContext.provider === "fal") {
     return estimateFalCost(
       providerContext.capability,
+      providerContext.model,
       providerContext.requestBody,
     );
   }

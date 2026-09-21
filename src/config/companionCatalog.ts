@@ -222,11 +222,6 @@ export const COMPANION_PICKER_PRESET_IDS = [
   "leviathan",
   "phoenix",
   "fox",
-  "dragon",
-  "pegasus",
-  "mechanicaldragon",
-  "tanuki",
-  "buttercat",
 ] as const satisfies readonly CompanionPresetId[];
 
 export const COMPANION_PICKER_PRESETS: readonly CompanionPresetDefinition[] =
@@ -268,23 +263,25 @@ export const COMPANION_ONBOARDING_SILHOUETTE_SOURCES = {
   buttercat: "/onboarding/locked-species-silhouettes/buttercat.png",
 } as const satisfies Partial<Record<CompanionPresetId, string>>;
 
-const ALL_COMPANION_PRESETS: readonly CompanionPresetDefinition[] = [
+export const COMPANION_CATALOG_PRESETS: readonly CompanionPresetDefinition[] = [
   ...COMPANION_PRESETS,
   ...LEGACY_COMPANION_PRESETS,
 ];
 
-const COMPANION_PRESETS_WITH_FULL_REMOTE_ASSET_COVERAGE: readonly CompanionPresetId[] = [
-  "dragon",
-  "wolf",
-  "fox",
-  "owl",
-  "lion",
-  "phoenix",
-  "pegasus",
-  "raven",
-  "leviathan",
-  "buttercat",
-] as const;
+export type CosmiqCompanionAvailability = "current_selection" | "legacy_frozen";
+
+export const getCosmiqCompanionAvailability = (
+  presetId: CompanionPresetId | string | null | undefined,
+): CosmiqCompanionAvailability => {
+  const normalizedPresetId = presetId?.trim().toLowerCase() === "kitsune"
+    ? "fox"
+    : presetId?.trim().toLowerCase();
+
+  return normalizedPresetId
+    && (COMPANION_PICKER_PRESET_IDS as readonly string[]).includes(normalizedPresetId)
+    ? "current_selection"
+    : "legacy_frozen";
+};
 
 export const COMPANION_PRESETS_WITH_BUNDLED_YOUTH_ASSETS: readonly CompanionPresetId[] = [
   "dragon",
@@ -330,7 +327,7 @@ export const COMPANION_ELEMENTS: readonly CompanionElementDefinition[] = [
   {
     id: "ice",
     label: "Ice",
-    productLabel: "Ice",
+    productLabel: "Clear Water",
     anchorColor: "#60A5FA",
     accentColor: "#BFDBFE",
     summary: "Glacial blues and crisp luminous edges.",
@@ -338,7 +335,7 @@ export const COMPANION_ELEMENTS: readonly CompanionElementDefinition[] = [
   {
     id: "storm",
     label: "Storm",
-    productLabel: "Storm",
+    productLabel: "Open Sky",
     anchorColor: "#38BDF8",
     accentColor: "#C4B5FD",
     summary: "Lightning charge, wind streaks, and electric skies.",
@@ -346,7 +343,7 @@ export const COMPANION_ELEMENTS: readonly CompanionElementDefinition[] = [
   {
     id: "nature",
     label: "Nature",
-    productLabel: "Nature",
+    productLabel: "Living Green",
     anchorColor: "#34D399",
     accentColor: "#86EFAC",
     summary: "Verdant glow, mossy warmth, and living energy.",
@@ -354,7 +351,7 @@ export const COMPANION_ELEMENTS: readonly CompanionElementDefinition[] = [
   {
     id: "void",
     label: "Void",
-    productLabel: "Void",
+    productLabel: "Evening Indigo",
     anchorColor: "#7C3AED",
     accentColor: "#C084FC",
     summary: "Nebula shadows, deep contrast, and astral hush.",
@@ -362,7 +359,7 @@ export const COMPANION_ELEMENTS: readonly CompanionElementDefinition[] = [
   {
     id: "light",
     label: "Light",
-    productLabel: "Light",
+    productLabel: "Dawn Gold",
     anchorColor: "#FACC15",
     accentColor: "#FDE68A",
     summary: "Radiant gold, halo shimmer, and celestial bloom.",
@@ -372,28 +369,28 @@ export const COMPANION_ELEMENTS: readonly CompanionElementDefinition[] = [
 export const COMPANION_STORY_TONES: readonly CompanionStoryToneDefinition[] = [
   {
     value: "soft_gentle",
-    label: "Soft & Gentle",
-    summary: "Tender chapters with warmth and care.",
+    label: "Gentle",
+    summary: "Patient encouragement with warmth and care.",
   },
   {
     value: "epic_adventure",
-    label: "Epic Adventure",
-    summary: "Cinematic growth with bold heroic stakes.",
+    label: "Brave",
+    summary: "Courageous energy for taking the next faithful step.",
   },
   {
     value: "emotional_heartfelt",
-    label: "Emotional & Heartfelt",
-    summary: "Bond-focused stories that lean into feeling.",
+    label: "Heartfelt",
+    summary: "Compassionate guidance that makes room for real feelings.",
   },
   {
     value: "dark_intense",
-    label: "Dark & Intense",
-    summary: "Higher tension, shadowed trials, sharper drama.",
+    label: "Resolute",
+    summary: "Grounded strength for hard days and deeper growth.",
   },
   {
     value: "whimsical_playful",
-    label: "Whimsical & Playful",
-    summary: "Lighter wonder, odd magic, and bright turns.",
+    label: "Playful",
+    summary: "Joyful companionship with curiosity and bright moments.",
   },
 ] as const;
 
@@ -421,20 +418,14 @@ export const COMPANION_ART_TIER_RANGES: ReadonlyArray<{
   stageStart: number;
   stageEnd: number;
 }> = [
-  { id: "t0_egg", label: "Egg", stageStart: 0, stageEnd: 0 },
-  { id: "t1_hatchling", label: "Hatchling", stageStart: 1, stageEnd: 4 },
-  { id: "t2_initiate", label: "Initiate", stageStart: 5, stageEnd: 12 },
-  { id: "t3_awakened", label: "Awakened", stageStart: 13, stageEnd: 20 },
-  { id: "t4_guardian", label: "Guardian", stageStart: 21, stageEnd: 35 },
-  { id: "t5_champion", label: "Champion", stageStart: 36, stageEnd: 55 },
-  { id: "t6_mythic", label: "Mythic", stageStart: 56, stageEnd: 80 },
-  { id: "t7_ascended", label: "Ascended", stageStart: 81, stageEnd: 100 },
-] as const;
-
-const ALL_COMPANION_VISUAL_STATES: readonly CompanionVisualState[] = [
-  "normal",
-  "neglected",
-  "dormant",
+  { id: "t0_egg", label: "Beginning", stageStart: 0, stageEnd: 0 },
+  { id: "t1_hatchling", label: "Young", stageStart: 1, stageEnd: 4 },
+  { id: "t2_initiate", label: "Growing", stageStart: 5, stageEnd: 12 },
+  { id: "t3_awakened", label: "Rooted", stageStart: 13, stageEnd: 20 },
+  { id: "t4_guardian", label: "Steady", stageStart: 21, stageEnd: 35 },
+  { id: "t5_champion", label: "Flourishing", stageStart: 36, stageEnd: 55 },
+  { id: "t6_mythic", label: "Majestic", stageStart: 56, stageEnd: 80 },
+  { id: "t7_ascended", label: "Grand", stageStart: 81, stageEnd: 100 },
 ] as const;
 
 const ELEMENT_ALIASES: Record<string, CompanionElementId> = {
@@ -460,7 +451,7 @@ const PRESET_ALIASES: Record<string, CompanionPresetId> = {
 };
 
 const PRESET_LOOKUP = new Map(
-  ALL_COMPANION_PRESETS.map((preset) => [preset.id, preset] as const),
+  COMPANION_CATALOG_PRESETS.map((preset) => [preset.id, preset] as const),
 );
 
 const ELEMENT_LOOKUP = new Map(
@@ -515,17 +506,6 @@ const buildExpressiveCompanionPresetAssetCoverageKey = ({
 }): string => `${presetId}:${tier}`;
 
 const REMOTE_COMPANION_PRESET_ASSET_COVERAGE = new Set<string>([
-  ...COMPANION_PRESETS_WITH_FULL_REMOTE_ASSET_COVERAGE.flatMap((presetId) =>
-    COMPANION_ART_TIER_RANGES.flatMap(({ id: tier }) =>
-      ALL_COMPANION_VISUAL_STATES.map((state) =>
-        buildRemoteCompanionPresetAssetCoverageKey({
-          presetId,
-          tier,
-          state,
-        }),
-      ),
-    ),
-  ),
   ...COMPANION_PRESETS_WITH_INITIATE_NORMAL_REMOTE_ASSETS.map((presetId) =>
     buildRemoteCompanionPresetAssetCoverageKey({
       presetId,
@@ -534,23 +514,11 @@ const REMOTE_COMPANION_PRESET_ASSET_COVERAGE = new Set<string>([
     })),
 ]);
 
-const BUNDLED_EXPRESSIVE_COMPANION_PRESET_ASSET_COVERAGE = new Set<string>(
-  COMPANION_PRESETS_WITH_BUNDLED_YOUTH_ASSETS.map((presetId) =>
-    buildExpressiveCompanionPresetAssetCoverageKey({
-      presetId,
-      tier: "t1_hatchling",
-    }),
-  ),
-);
-
-const REMOTE_EXPRESSIVE_COMPANION_PRESET_ASSET_COVERAGE = new Set<string>(
-  COMPANION_PRESETS_WITH_INITIATE_NORMAL_REMOTE_ASSETS.map((presetId) =>
-    buildExpressiveCompanionPresetAssetCoverageKey({
-      presetId,
-      tier: "t2_initiate",
-    }),
-  ),
-);
+// Expressive art must be opt-in only after the files are actually bundled or uploaded.
+// Keeping this manifest honest prevents normal companion portraits from issuing a wave
+// of expected 404s before falling back.
+const BUNDLED_EXPRESSIVE_COMPANION_PRESET_ASSET_COVERAGE = new Set<string>();
+const REMOTE_EXPRESSIVE_COMPANION_PRESET_ASSET_COVERAGE = new Set<string>();
 
 const normalizeKey = (value: string) =>
   value
@@ -574,23 +542,23 @@ export const resolveCompanionStageFromXp = (xp: number): number =>
 export const getCompanionStoryTheme = (stage: number): string => {
   switch (getProgressionTier(stage)) {
     case "egg":
-      return "Fate sleeping";
+      return "A quiet beginning";
     case "hatchling":
-      return "First awakening";
+      return "First steps";
     case "initiate":
-      return "A first calling";
+      return "Growing trust";
     case "awakened":
-      return "Power stirring";
+      return "Strength taking shape";
     case "guardian":
-      return "A vow to protect";
+      return "Steady presence";
     case "champion":
-      return "Victory calls";
+      return "Faithful endurance";
     case "mythic":
-      return "Legend gathering";
+      return "Flourishing life";
     case "ascended":
-      return "Beyond the horizon";
+      return "A grand horizon";
     default:
-      return "Mythic growth";
+      return "Living growth";
   }
 };
 
@@ -877,12 +845,12 @@ export const getCompanionElementAnchorColor = (elementId: string | null | undefi
   getCompanionElement(elementId).anchorColor;
 
 export const getCompanionEvolutionCardRarity = (stage: number): string => {
-  if (stage >= 81) return "Origin";
-  if (stage >= 56) return "Primal";
-  if (stage >= 36) return "Celestial";
-  if (stage >= 21) return "Mythic";
-  if (stage >= 13) return "Legendary";
-  if (stage >= 5) return "Epic";
-  if (stage >= 1) return "Rare";
-  return "Common";
+  if (stage >= 81) return "Grand";
+  if (stage >= 56) return "Majestic";
+  if (stage >= 36) return "Flourishing";
+  if (stage >= 21) return "Steady";
+  if (stage >= 13) return "Rooted";
+  if (stage >= 5) return "Growing";
+  if (stage >= 1) return "Young";
+  return "Beginning";
 };

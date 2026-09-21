@@ -10,11 +10,12 @@
 	<string>production</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:app.cosmiq.quest</string>
+		<string>applinks:graceward.app</string>
+		<string>applinks:www.graceward.app</string>
 	</array>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.darrylgraham.revolution</string>
+		<string>group.com.darrylgraham.graceward</string>
 	</array>
 </dict>
 </plist>

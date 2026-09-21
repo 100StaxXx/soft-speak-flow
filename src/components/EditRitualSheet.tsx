@@ -30,7 +30,7 @@ import { FrequencyPresets } from "@/components/Pathfinder/FrequencyPresets";
 import { toast } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { DurationPickerField, TimePickerField, getNextTimeForStep } from "@/components/scheduling";
-import type { ParsedTask } from "@/features/tasks/hooks";
+import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import { inferCustomPeriod } from "@/utils/habitSchedule";
 import { useRitualUpdate } from "@/hooks/useRitualUpdate";
 import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
@@ -205,12 +205,12 @@ export const EditRitualSheet = memo(function EditRitualSheet({
       });
 
       const scheduleChangeCount = result.createdCount + result.updatedCount + result.deletedCount;
-      toast.success(result.queued ? "Ritual saved offline" : "Ritual updated", {
+      toast.success(result.queued ? "Rhythm saved offline" : "Rhythm updated", {
         description: result.queued
           ? "Your schedule changes will sync when you're back online."
           : scheduleChangeCount > 0
             ? `Updated ${scheduleChangeCount} upcoming ritual ${scheduleChangeCount === 1 ? "instance" : "instances"}.`
-            : "Your ritual details are up to date.",
+            : "Your rhythm details are up to date.",
       });
 
       onSaveComplete?.();
@@ -252,13 +252,13 @@ export const EditRitualSheet = memo(function EditRitualSheet({
             </div>
             <div className="min-w-0 flex-1 text-left">
               <SheetTitle className="text-xl text-foreground">
-                Edit Ritual
+                Edit rhythm
               </SheetTitle>
               <p className="text-sm text-muted-foreground">
-                Changes sync to all instances of this ritual.
+                Changes sync to all instances of this rhythm.
               </p>
               <SheetDescription className="sr-only">
-                Update this ritual details, schedule, and reminders.
+                Update this rhythm's details, schedule, and reminders.
               </SheetDescription>
             </div>
             <Button
@@ -267,7 +267,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
               variant="outline"
               className={cn("h-10 w-10 shrink-0", plannerPathfinderTheme.headerIconButton)}
               onClick={() => onOpenChange(false)}
-              aria-label="Close Edit Ritual"
+              aria-label="Close Edit Rhythm"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -280,12 +280,12 @@ export const EditRitualSheet = memo(function EditRitualSheet({
 
             <section className={cn(plannerPathfinderTheme.raisedPanel, "space-y-4 p-4")}>
               <div className="space-y-2">
-                <Label htmlFor="ritual-title" className={QUEST_FORM_STYLES.label}>Ritual Name</Label>
+                <Label htmlFor="ritual-title" className={QUEST_FORM_STYLES.label}>Rhythm name</Label>
                 <Input
                   id="ritual-title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="What's your ritual?"
+                  placeholder="What is your rhythm?"
                   className={plannerPathfinderTheme.textField}
                 />
               </div>
@@ -296,13 +296,13 @@ export const EditRitualSheet = memo(function EditRitualSheet({
                   id="ritual-description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="What does this ritual involve? Add details about how to perform it, timing, or any tips..."
+                  placeholder="What does this rhythm involve? Add helpful details, timing, or notes."
                   rows={3}
                   className={cn(plannerPathfinderTheme.textField, "min-h-[108px]")}
                 />
                 {!description && (
                   <p className={QUEST_FORM_STYLES.helperText}>
-                    Add details about what this ritual involves - this was drafted when you created your campaign.
+                    Add details about what this rhythm involves—this was drafted when you created your commitment.
                   </p>
                 )}
               </div>
@@ -322,7 +322,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
                   onChange={(time) => setPreferredTime(time ?? "")}
                   label="Scheduled Time"
                   placeholder="Time"
-                  ariaLabel="Scheduled ritual time"
+                  ariaLabel="Scheduled rhythm time"
                   seedValueOnOpen={() => getNextTimeForStep(30)}
                   variant="quest-soft"
                   tone={difficulty}
@@ -379,7 +379,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
                 })}
               </div>
               <p className={QUEST_FORM_STYLES.helperText}>
-                Which companion attribute grows when you complete this ritual.
+                Which companion attribute grows when you complete this rhythm.
               </p>
             </section>
 
@@ -444,7 +444,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
                   <h3 className="text-sm font-semibold">Danger zone</h3>
                 </div>
                 <p className="text-sm text-destructive/80">
-                  Permanently delete this ritual and remove all future instances. Completed tasks stay in your history.
+                  Permanently delete this rhythm and remove all future instances. Completed actions stay in your history.
                 </p>
                 <Button
                   variant="destructive"
@@ -453,7 +453,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
                   className="gap-2"
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
-                  Delete Ritual
+                  Delete rhythm
                 </Button>
               </section>
             )}
@@ -492,9 +492,9 @@ export const EditRitualSheet = memo(function EditRitualSheet({
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this ritual?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this rhythm?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete "{ritual?.title}" and remove all future instances. Completed tasks will remain in your history.
+              This will permanently delete “{ritual?.title}” and remove all future instances. Completed actions will remain in your history.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

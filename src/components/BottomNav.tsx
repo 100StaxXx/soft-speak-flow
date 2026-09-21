@@ -1,47 +1,24 @@
-import { memo, useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
-import { PawPrint, User, Compass } from "lucide-react";
+import { memo, useEffect, useRef } from "react";
+import { Compass, MessageCircle, PawPrint, Sunrise } from "lucide-react";
 
 import { NavLink } from "@/components/NavLink";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { MentorAvatar } from "@/components/MentorAvatar";
-import { MentorSwitcher } from "@/components/MentorSwitcher";
-import { useCompanion } from "@/hooks/useCompanion";
-import { useLongPress } from "@/hooks/useLongPress";
-import { Badge } from "@/components/ui/badge";
-import { haptics } from "@/utils/haptics";
 import { CompanionNavPresence } from "@/components/companion/CompanionNavPresence";
-import { useAuth } from "@/hooks/useAuth";
-import { format } from "date-fns";
-import {
-  warmDailyTasksQueryFromRemote,
-} from "@/utils/plannerSync";
-import { useMentorConnection } from "@/contexts/MentorConnectionContext";
-import { dispatchJourneysResetToToday } from "@/pages/journeysDateSync";
-
-type PrefetchTarget = "mentor" | "journeys" | "companion";
+import { haptics } from "@/utils/haptics";
+import { PRODUCT } from "@/config/product";
+const navItems = PRODUCT.mode === "cosmiq" ? [
+  { to: "/mentor", label: "Guide", icon: Sunrise, primary: false },
+  { to: "/journeys", label: "Plan", icon: Compass, primary: true },
+  { to: "/companion", label: "Companion", icon: PawPrint, primary: false },
+] as const : [
+  { to: "/mentor", label: "Today", icon: Sunrise, primary: false },
+  { to: "/companion", label: "Companion", icon: PawPrint, primary: true },
+  { to: "/guide", label: "Guide", icon: MessageCircle, primary: false },
+] as const;
 
 export const BottomNav = memo(() => {
   const navRef = useRef<HTMLElement | null>(null);
-  const suppressGuideNavigationRef = useRef(false);
-  const suppressGuideNavigationTimerRef = useRef<number | null>(null);
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const { mentorId: resolvedMentorId } = useMentorConnection();
-  const { companion, canEvolve } = useCompanion();
-  const [isMentorSwitcherOpen, setIsMentorSwitcherOpen] = useState(false);
-
-  const clearGuideNavigationSuppression = useCallback(() => {
-    suppressGuideNavigationRef.current = false;
-    if (suppressGuideNavigationTimerRef.current !== null) {
-      window.clearTimeout(suppressGuideNavigationTimerRef.current);
-      suppressGuideNavigationTimerRef.current = null;
-    }
-  }, []);
 
   useEffect(() => {
-    if (typeof document === "undefined") return;
-
     const navElement = navRef.current;
     if (!navElement) return;
 
@@ -52,205 +29,59 @@ export const BottomNav = memo(() => {
     };
 
     updateRuntimeOffset();
-
-    let resizeObserver: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== "undefined") {
-      resizeObserver = new ResizeObserver(updateRuntimeOffset);
-      resizeObserver.observe(navElement);
-    } else {
-      window.addEventListener("resize", updateRuntimeOffset);
-      window.addEventListener("orientationchange", updateRuntimeOffset);
-    }
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateRuntimeOffset) : null;
+    observer?.observe(navElement);
+    if (!observer) window.addEventListener("resize", updateRuntimeOffset);
 
     return () => {
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      } else {
-        window.removeEventListener("resize", updateRuntimeOffset);
-        window.removeEventListener("orientationchange", updateRuntimeOffset);
-      }
+      observer?.disconnect();
+      if (!observer) window.removeEventListener("resize", updateRuntimeOffset);
       rootStyle.removeProperty("--bottom-nav-runtime-offset");
     };
   }, []);
 
-  useEffect(() => clearGuideNavigationSuppression, [clearGuideNavigationSuppression]);
-
-  const prefetchJourneysTasks = useCallback(() => {
-    if (!user?.id) return;
-
-    const today = format(new Date(), "yyyy-MM-dd");
-    void Promise.resolve(warmDailyTasksQueryFromRemote(queryClient, user.id, today)).catch(() => undefined);
-  }, [queryClient, user?.id]);
-
-  // Prefetch on hover/focus for even faster perceived navigation
-  const handlePrefetch = useCallback((page: PrefetchTarget) => {
-    if (page === "journeys") {
-      prefetchJourneysTasks();
-      return;
-    }
-  }, [prefetchJourneysTasks]);
-
-  const openMentorSwitcher = useCallback(() => {
-    suppressGuideNavigationRef.current = true;
-    if (suppressGuideNavigationTimerRef.current !== null) {
-      window.clearTimeout(suppressGuideNavigationTimerRef.current);
-    }
-    suppressGuideNavigationTimerRef.current = window.setTimeout(() => {
-      clearGuideNavigationSuppression();
-    }, 250);
-    setIsMentorSwitcherOpen(true);
-  }, [clearGuideNavigationSuppression]);
-
-  const handleGuideTabClick = useCallback((event: ReactMouseEvent<HTMLAnchorElement>) => {
-    if (suppressGuideNavigationRef.current) {
-      event.preventDefault();
-      event.stopPropagation();
-      clearGuideNavigationSuppression();
-      return;
-    }
-
-    haptics.light();
-  }, [clearGuideNavigationSuppression]);
-
-  const handleJourneysTabClick = useCallback(() => {
-    haptics.light();
-    dispatchJourneysResetToToday();
-  }, []);
-
-  const {
-    handlers: guideAvatarLongPressHandlers,
-    isActivated: isGuideAvatarLongPressed,
-  } = useLongPress({
-    onLongPress: () => {
-      openMentorSwitcher();
-    },
-  });
-
-  const { data: selectedMentor, isLoading: mentorLoading } = useQuery({
-    queryKey: ["selected-mentor", resolvedMentorId],
-    enabled: !!resolvedMentorId,
-    staleTime: 10 * 60 * 1000, // Cache mentor data for 10 minutes
-    queryFn: async () => {
-      if (!resolvedMentorId) {
-        throw new Error('No guide selected');
-      }
-
-      const { data, error } = await supabase
-        .from("mentors")
-        .select("slug, name, primary_color") // Select only needed fields
-        .eq("id", resolvedMentorId)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
-
   return (
-    <>
-      {isMentorSwitcherOpen ? (
-        <MentorSwitcher
-          variant="none"
-          open={isMentorSwitcherOpen}
-          onOpenChange={setIsMentorSwitcherOpen}
-        />
-      ) : null}
-      <nav
-        ref={navRef}
-        className="fixed bottom-0 left-0 right-0 cosmiq-glass-nav z-50 border-t border-border/40 transition-transform duration-200"
-        role="navigation"
-        aria-label="Main navigation"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-      >
-        <div className="max-w-lg mx-auto flex items-center justify-around px-2 sm:px-4 py-2.5">
-          <NavLink
-            to="/mentor"
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px]"
-            activeClassName="bg-orange-500/12"
-            data-tour="mentor-tab"
-            onClick={handleGuideTabClick}
-            onMouseEnter={() => handlePrefetch('mentor')}
-            onFocus={() => handlePrefetch('mentor')}
-          >
-            {({ isActive }) => (
-              <>
-                {mentorLoading ? (
-                  <div className="h-7 w-7 rounded-full bg-muted animate-pulse" aria-hidden />
-                ) : selectedMentor ? (
-                  <div
-                    {...guideAvatarLongPressHandlers}
-                    data-testid="bottom-nav-guide-avatar"
-                    className={`rounded-full ${isGuideAvatarLongPressed ? 'opacity-70' : ''}`}
-                    style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+    <nav
+      ref={navRef}
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-border/55 bg-background/[0.88] shadow-[0_-12px_40px_rgba(20,30,20,0.08)] backdrop-blur-2xl"
+      role="navigation"
+      aria-label="Main navigation"
+      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+    >
+      <div className="mx-auto grid max-w-lg grid-cols-3 items-end px-3 py-2">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={`flex min-h-[60px] flex-col items-center justify-center gap-1 rounded-2xl px-2 py-1.5 text-muted-foreground transition active:scale-95 ${item.primary ? "font-semibold" : ""}`}
+              activeClassName={item.primary ? "text-primary" : "bg-primary/[0.12] text-primary"}
+              onClick={() => {
+                haptics.light();
+              }}
+            >
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={item.primary
+                      ? `grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_5px_16px_hsl(var(--primary)/0.28)] ${isActive ? "ring-4 ring-primary/20" : ""}`
+                      : "relative isolate grid h-8 w-8 place-items-center"}
                   >
-                    <MentorAvatar
-                      mentorSlug={selectedMentor.slug || ''}
-                      mentorName={selectedMentor.name}
-                      primaryColor={selectedMentor.primary_color || '#000'}
-                      size="sm"
-                      className="w-7 h-7"
-                      showBorder={false}
-                    />
-                  </div>
-                ) : (
-                  <User className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-orange-300' : 'text-muted-foreground'}`} />
-                )}
-                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-orange-200' : 'text-muted-foreground/85'}`}>
-                  Guide
-                </span>
-              </>
-            )}
-          </NavLink>
-
-          <NavLink
-            to="/journeys"
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px]"
-            activeClassName="bg-cosmiq-glow/12"
-            data-tour="quests-tab"
-            onClick={handleJourneysTabClick}
-            onPointerDown={prefetchJourneysTasks}
-            onMouseEnter={() => handlePrefetch('journeys')}
-            onFocus={() => handlePrefetch('journeys')}
-          >
-            {({ isActive }) => (
-              <>
-                <Compass className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground'}`} />
-                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground/85'}`}>
-                  Quests
-                </span>
-              </>
-            )}
-          </NavLink>
-
-          <NavLink
-            to="/companion"
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px] relative"
-            activeClassName="bg-stardust-gold/12"
-            data-tour="companion-tab"
-            onClick={() => haptics.light()}
-            onMouseEnter={() => handlePrefetch('companion')}
-            onFocus={() => handlePrefetch('companion')}
-          >
-            {({ isActive }) => (
-              <>
-                <div className="relative">
-                  <CompanionNavPresence isActive={isActive} />
-                  <PawPrint fill="currentColor" className={`h-6 w-6 -rotate-45 transition-colors duration-200 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground'}`} />
-                  {companion && canEvolve && (
-                    <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[9px] bg-stardust-gold text-black animate-pulse">
-                      !
-                    </Badge>
-                  )}
-                </div>
-                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground/85'}`}>
-                  Companion
-                </span>
-              </>
-            )}
-          </NavLink>
-        </div>
-      </nav>
-    </>
+                    {item.to === "/companion" ? <CompanionNavPresence isActive={isActive} /> : null}
+                    <Icon className={item.primary ? "h-5.5 w-5.5" : `h-6 w-6 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                  </span>
+                  <span className={`text-[11px] ${item.primary || isActive ? "font-semibold" : "font-medium"} ${isActive ? "text-primary" : item.primary ? "text-foreground" : "text-muted-foreground"}`}>
+                    {item.label}
+                  </span>
+                </>
+              )}
+            </NavLink>
+          );
+        })}
+      </div>
+    </nav>
   );
 });
 
-BottomNav.displayName = 'BottomNav';
+BottomNav.displayName = "BottomNav";

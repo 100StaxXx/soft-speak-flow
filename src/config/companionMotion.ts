@@ -5,6 +5,7 @@ export type CompanionMotionSceneId =
 
 export type CompanionMotionEventType =
   | "idle"
+  | "task_start"
   | "xp_gain"
   | "quest_complete"
   | "streak"
@@ -89,6 +90,7 @@ export const COMPANION_MOTION_SCENES: Record<CompanionMotionSceneId, CompanionMo
 
 export const COMPANION_MOTION_EVENT_DURATIONS: Record<CompanionMotionEventType, number> = {
   idle: 0,
+  task_start: 1200,
   xp_gain: 900,
   quest_complete: 1200,
   streak: 1500,
@@ -110,6 +112,7 @@ export const shouldAttemptRiveScene = (sceneId: CompanionMotionSceneId): boolean
 export const getCompanionMotionEventCode = (eventType: CompanionMotionEventType): number =>
   ({
     idle: 0,
+    task_start: 7,
     xp_gain: 1,
     quest_complete: 2,
     streak: 3,
@@ -153,6 +156,10 @@ export const getCompanionMotionEventTypeFromReason = (
     normalizedReason.includes("quest")
     || normalizedReason.includes("challenge")
     || normalizedReason.includes("ritual")
+    || normalizedReason.includes("practice complete")
+    || normalizedReason.includes("action complete")
+    || normalizedReason.includes("step complete")
+    || normalizedReason.includes("mission complete")
   ) {
     return "quest_complete";
   }

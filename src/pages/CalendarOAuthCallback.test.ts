@@ -18,13 +18,13 @@ describe("CalendarOAuthCallback helpers", () => {
       source: "native",
       syncMode: "send_only",
       userId: "user-1",
-      redirectUri: "https://app.cosmiq.quest/calendar/oauth/callback",
+      redirectUri: "https://graceward.app/calendar/oauth/callback",
     });
 
     expect(getCalendarOAuthStateHint(state)).toEqual({
       provider: "outlook",
       source: "native",
-      redirectUri: "https://app.cosmiq.quest/calendar/oauth/callback",
+      redirectUri: "https://graceward.app/calendar/oauth/callback",
     });
   });
 
@@ -54,7 +54,7 @@ describe("CalendarOAuthCallback helpers", () => {
     expect(
       getCalendarOAuthCallbackContext({
         search: `?code=oauth-code&state=${encodeURIComponent(state)}`,
-        origin: "https://app.cosmiq.quest",
+        origin: "https://graceward.app",
         pathname: "/calendar/oauth/callback",
       }),
     ).toMatchObject({
@@ -62,7 +62,7 @@ describe("CalendarOAuthCallback helpers", () => {
       source: "native",
       code: "oauth-code",
       state,
-      redirectUri: "https://app.cosmiq.quest/calendar/oauth/callback",
+      redirectUri: "https://graceward.app/calendar/oauth/callback",
     });
   });
 
@@ -70,7 +70,7 @@ describe("CalendarOAuthCallback helpers", () => {
     expect(
       getCalendarOAuthCallbackContext({
         search: "?calendar_provider=google&calendar_source=native&code=legacy-code",
-        origin: "https://app.cosmiq.quest",
+        origin: "https://graceward.app",
         pathname: "/calendar/oauth/callback",
       }),
     ).toMatchObject({
@@ -78,7 +78,7 @@ describe("CalendarOAuthCallback helpers", () => {
       source: "native",
       code: "legacy-code",
       redirectUri:
-        "https://app.cosmiq.quest/calendar/oauth/callback?calendar_provider=google&calendar_source=native",
+        "https://graceward.app/calendar/oauth/callback?calendar_provider=google&calendar_source=native",
     });
   });
 
@@ -94,7 +94,7 @@ describe("CalendarOAuthCallback helpers", () => {
     expect(
       getCalendarOAuthCallbackContext({
         search:
-          `?code=oauth-code&state=${encodeURIComponent(state)}&calendar_callback_origin=https%3A%2F%2Fapp.cosmiq.quest`,
+          `?code=oauth-code&state=${encodeURIComponent(state)}&calendar_callback_origin=https%3A%2F%2Fgraceward.app`,
         origin: "capacitor://localhost",
         pathname: "/calendar/oauth/callback",
       }),
@@ -103,7 +103,7 @@ describe("CalendarOAuthCallback helpers", () => {
       source: "native",
       code: "oauth-code",
       state,
-      redirectUri: "https://app.cosmiq.quest/calendar/oauth/callback",
+      redirectUri: "https://graceward.app/calendar/oauth/callback",
     });
   });
 
@@ -114,7 +114,7 @@ describe("CalendarOAuthCallback helpers", () => {
       source: "native",
       syncMode: "send_only",
       userId: "user-1",
-      redirectUri: "https://app.cosmiq.quest/calendar/oauth/callback",
+      redirectUri: "https://graceward.app/calendar/oauth/callback",
     });
 
     expect(
@@ -128,7 +128,26 @@ describe("CalendarOAuthCallback helpers", () => {
       source: "native",
       code: "oauth-code",
       state,
+      redirectUri: "https://graceward.app/calendar/oauth/callback",
+    });
+  });
+
+  it("ignores a signed callback URI belonging to the other product", () => {
+    const state = stateFor({
+      v: 1,
+      provider: "google",
+      source: "native",
+      syncMode: "send_only",
+      userId: "user-1",
       redirectUri: "https://app.cosmiq.quest/calendar/oauth/callback",
     });
+
+    expect(
+      getCalendarOAuthCallbackContext({
+        search: `?code=oauth-code&state=${encodeURIComponent(state)}`,
+        origin: "https://graceward.app",
+        pathname: "/calendar/oauth/callback",
+      }).redirectUri,
+    ).toBe("https://graceward.app/calendar/oauth/callback");
   });
 });
