@@ -15,7 +15,7 @@ const getVisibleSpeciesOrder = () => {
 };
 
 describe("CompanionPersonalization", () => {
-  it("renders egg selection cards with focal-aware contain images", () => {
+  it("keeps contained egg art centered while preserving manifest metadata", () => {
     render(
       <CompanionPersonalization
         onComplete={vi.fn()}
@@ -31,7 +31,7 @@ describe("CompanionPersonalization", () => {
     );
 
     expect(eggImage).toBeDefined();
-    expect(eggImage!).toHaveStyle({ transform: "translate(0.000%, 0.000%)" });
+    expect(eggImage!.style.transform).toBe("");
   });
 
   it("allows every egg element during onboarding mode without status labels", () => {

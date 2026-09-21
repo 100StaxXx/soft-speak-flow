@@ -1,0 +1,20 @@
+--- a/supabase/functions/_shared/companionCinemaRollout.ts
++++ b/supabase/functions/_shared/companionCinemaRollout.ts
+@@ -68,3 +68,17 @@
+   return hashCompanionCinemaRolloutBucket(normalizedUserId) <
+     config.rolloutPercent;
+ };
++
++// First hatch has its own opt-in: enabling it must not enable paid later
++// evolutions or encounters while their separate rollout remains paused.
++export const isCompanionHatchEnabled = (env: CompanionCinemaEnv = Deno.env): boolean =>
++  readBoolean(env.get("COSMIQ_CUSTOM_HATCH_ENABLED"), false);
++
++export const isCompanionCinemaBoundaryEligible = (
++  userId: string | null | undefined,
++  boundaryLevel: number | null,
++  env: CompanionCinemaEnv = Deno.env,
++): boolean => Boolean(userId) && (
++  (boundaryLevel === 1 && isCompanionHatchEnabled(env)) ||
++  isCompanionCinemaUserEligible(userId, env)
++);

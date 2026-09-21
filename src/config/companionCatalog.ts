@@ -273,19 +273,6 @@ const ALL_COMPANION_PRESETS: readonly CompanionPresetDefinition[] = [
   ...LEGACY_COMPANION_PRESETS,
 ];
 
-const COMPANION_PRESETS_WITH_FULL_REMOTE_ASSET_COVERAGE: readonly CompanionPresetId[] = [
-  "dragon",
-  "wolf",
-  "fox",
-  "owl",
-  "lion",
-  "phoenix",
-  "pegasus",
-  "raven",
-  "leviathan",
-  "buttercat",
-] as const;
-
 export const COMPANION_PRESETS_WITH_BUNDLED_YOUTH_ASSETS: readonly CompanionPresetId[] = [
   "dragon",
   "wolf",
@@ -431,12 +418,6 @@ export const COMPANION_ART_TIER_RANGES: ReadonlyArray<{
   { id: "t7_ascended", label: "Ascended", stageStart: 81, stageEnd: 100 },
 ] as const;
 
-const ALL_COMPANION_VISUAL_STATES: readonly CompanionVisualState[] = [
-  "normal",
-  "neglected",
-  "dormant",
-] as const;
-
 const ELEMENT_ALIASES: Record<string, CompanionElementId> = {
   fire: "fire",
   water: "ice",
@@ -515,17 +496,6 @@ const buildExpressiveCompanionPresetAssetCoverageKey = ({
 }): string => `${presetId}:${tier}`;
 
 const REMOTE_COMPANION_PRESET_ASSET_COVERAGE = new Set<string>([
-  ...COMPANION_PRESETS_WITH_FULL_REMOTE_ASSET_COVERAGE.flatMap((presetId) =>
-    COMPANION_ART_TIER_RANGES.flatMap(({ id: tier }) =>
-      ALL_COMPANION_VISUAL_STATES.map((state) =>
-        buildRemoteCompanionPresetAssetCoverageKey({
-          presetId,
-          tier,
-          state,
-        }),
-      ),
-    ),
-  ),
   ...COMPANION_PRESETS_WITH_INITIATE_NORMAL_REMOTE_ASSETS.map((presetId) =>
     buildRemoteCompanionPresetAssetCoverageKey({
       presetId,
@@ -534,23 +504,11 @@ const REMOTE_COMPANION_PRESET_ASSET_COVERAGE = new Set<string>([
     })),
 ]);
 
-const BUNDLED_EXPRESSIVE_COMPANION_PRESET_ASSET_COVERAGE = new Set<string>(
-  COMPANION_PRESETS_WITH_BUNDLED_YOUTH_ASSETS.map((presetId) =>
-    buildExpressiveCompanionPresetAssetCoverageKey({
-      presetId,
-      tier: "t1_hatchling",
-    }),
-  ),
-);
-
-const REMOTE_EXPRESSIVE_COMPANION_PRESET_ASSET_COVERAGE = new Set<string>(
-  COMPANION_PRESETS_WITH_INITIATE_NORMAL_REMOTE_ASSETS.map((presetId) =>
-    buildExpressiveCompanionPresetAssetCoverageKey({
-      presetId,
-      tier: "t2_initiate",
-    }),
-  ),
-);
+// Expressive behavior is currently rendered by the motion state machine. Do not
+// advertise bitmap mood coverage until an authored pack has actually shipped;
+// the old optimistic declarations produced guaranteed 404s for every mood.
+const BUNDLED_EXPRESSIVE_COMPANION_PRESET_ASSET_COVERAGE = new Set<string>();
+const REMOTE_EXPRESSIVE_COMPANION_PRESET_ASSET_COVERAGE = new Set<string>();
 
 const normalizeKey = (value: string) =>
   value

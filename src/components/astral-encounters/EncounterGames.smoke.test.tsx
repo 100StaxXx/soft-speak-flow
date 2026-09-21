@@ -162,7 +162,7 @@ describe('active encounter games smoke', () => {
     };
 
     mocks.fetchRandomTrack.mockResolvedValueOnce(track);
-    const audioConstructor = vi.fn((src?: string) => new FakeAudio(src));
+    const audioConstructor = vi.fn(function (src?: string) { return new FakeAudio(src); });
     vi.stubGlobal('Audio', audioConstructor);
 
     render(

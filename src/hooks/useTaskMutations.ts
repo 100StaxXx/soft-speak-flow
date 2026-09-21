@@ -2998,6 +2998,7 @@ export const useTaskMutations = (taskDate: string) => {
     reorderTasks: reorderTasks.mutate,
     moveTaskToSection: moveTaskToSection.mutate,
     moveTaskToDate: moveTaskToDate.mutate,
+    moveTaskToDateAsync: moveTaskToDate.mutateAsync,
     isAdding: addTask.isPending,
     isToggling: toggleTask.isPending,
     isDeleting: deleteTask.isPending,

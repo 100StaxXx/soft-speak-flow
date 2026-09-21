@@ -182,6 +182,7 @@ vi.mock("@/components/CompanionNameSetting", () => ({
 vi.mock("@/components/CalendarIntegrationsSettings", () => ({
   CalendarIntegrationsSettings: () => null,
 }));
+vi.mock("@/components/calendar/ConnectedTasks", () => ({ ConnectedTasks: () => null }));
 
 vi.mock("@/pages/profileMentorChange", () => ({
   applyMentorChange: vi.fn(),

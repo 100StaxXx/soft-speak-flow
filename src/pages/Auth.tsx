@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { exchangeAppleIdentityToken } from "@/utils/appleSignInExchange";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 import { safeNavigate } from "@/utils/nativeNavigation";
 import { SignInWithApple, SignInWithAppleResponse } from '@capacitor-community/apple-sign-in';
 import type { Session } from "@supabase/supabase-js";
@@ -23,7 +25,6 @@ import {
 import { retryWithBackoff } from "@/utils/retry";
 import {
   clearPendingSocialAuthAttempt,
-  getSocialAccountNotFoundMessage,
   getSocialAuthIntent,
   readPendingSocialAuthAttempt,
   storePendingSocialAuthAttempt,
@@ -31,6 +32,11 @@ import {
   type SocialAuthIntent,
 } from "@/utils/socialAuth";
 import { Eye, EyeOff } from "lucide-react";
+import { loginPasswordSchema, newPasswordSchema } from "@/utils/passwordPolicy";
+import {
+  consumeAuthReturnPath,
+  rememberAuthReturnPath,
+} from "@/utils/authReturnPath";
 
 const POST_AUTH_NAVIGATION_TIMEOUT_MS = 5000;
 const POST_AUTH_DEFAULT_PATH = '/onboarding';
@@ -44,11 +50,6 @@ const AUTH_GATEWAY_OUTAGE_CODES = new Set([
   "SERVICE_MISCONFIGURED",
   "ABUSE_CHECK_FAILED",
   "AUTH_GATEWAY_FAILED",
-]);
-const SOCIAL_AUTH_OUTAGE_CODES = new Set([
-  "ABUSE_CHECK_FAILED",
-  "APPLE_AUTH_UNAVAILABLE",
-  "GOOGLE_AUTH_UNAVAILABLE",
 ]);
 const AUTH_TEMPORARY_OUTAGE_MESSAGE =
   "Authentication is temporarily unavailable. Please try again in a moment.";
@@ -75,28 +76,32 @@ const hasOAuthCallbackParams = (): boolean => {
   if (typeof window === "undefined") return false;
 
   const url = new URL(window.location.href);
-  return Boolean(url.searchParams.get("code") || url.hash.includes("access_token"));
+  const hash = new URLSearchParams(url.hash.substring(1));
+  return Boolean(url.searchParams.get("code") || url.searchParams.get("error") || hash.get("access_token") || hash.get("error"));
 };
 
-const authSchema = z.object({
-  email: z.string()
-    .trim()
-    .toLowerCase()
-    .email("Invalid email address")
-    .min(3, "Email too short")
-    .max(255, "Email too long")
-    .regex(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, "Invalid email format"),
-  password: z.string()
-    .min(8, "Password must be at least 8 characters")
-    .max(100, "Password too long")
-    .regex(/^(?=.*[a-zA-Z])(?=.*[0-9]|.*[!@#$%^&*])/, "Password must contain letters and at least one number or special character"),
-  confirmPassword: z.string().optional()
+const emailSchema = z.string()
+  .trim()
+  .toLowerCase()
+  .email("Invalid email address")
+  .min(3, "Email too short")
+  .max(255, "Email too long")
+  .regex(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, "Invalid email format");
+
+const loginSchema = z.object({
+  email: emailSchema,
+  password: loginPasswordSchema,
+});
+
+const signupSchema = z.object({
+  email: emailSchema,
+  password: newPasswordSchema,
+  confirmPassword: z.string(),
+  consent: z.literal(true, {
+    errorMap: () => ({ message: "Please agree to the Terms and acknowledge the Privacy Policy." }),
+  }),
 }).refine((data) => {
-  // Only validate password match during signup (when confirmPassword is provided)
-  if (data.confirmPassword !== undefined) {
-    return data.password === data.confirmPassword;
-  }
-  return true;
+  return data.password === data.confirmPassword;
 }, {
   message: "Passwords do not match",
   path: ["confirmPassword"]
@@ -126,6 +131,13 @@ const getAppleErrorDescription = (error: unknown): string => {
 
   if (normalized.includes("nonce") || normalized.includes("security check")) {
     return "Apple Sign-In security verification failed. Please try again.";
+  }
+
+  if (
+    normalized.includes("provider is not enabled") ||
+    normalized.includes("unsupported provider")
+  ) {
+    return APPLE_AUTH_TEMPORARY_OUTAGE_MESSAGE;
   }
 
   if (normalized.includes("session")) {
@@ -212,45 +224,6 @@ const getAuthGatewayErrorMessage = async (
   });
 };
 
-const getAppleAuthActionDescription = (intent: SocialAuthIntent): string =>
-  intent === "sign_in" ? "sign you in with Apple" : "create your account with Apple";
-
-const getAppleAuthErrorMessage = async (
-  error: unknown,
-  intent: SocialAuthIntent,
-): Promise<string> => {
-  const parsed = await parseFunctionInvokeError(error);
-  logAuthFunctionError("[Auth Apple] Social auth request failed", parsed, {
-    intent,
-  });
-  const errorCode = getParsedFunctionErrorCode(parsed);
-
-  if (errorCode && SOCIAL_AUTH_OUTAGE_CODES.has(errorCode)) {
-    return APPLE_AUTH_TEMPORARY_OUTAGE_MESSAGE;
-  }
-
-  if (
-    typeof parsed.backendMessage === "string" &&
-    parsed.backendMessage.trim() &&
-    !isFunctionTransportErrorMessage(parsed.backendMessage)
-  ) {
-    return parsed.backendMessage;
-  }
-
-  const directMessage = getErrorMessage(error).trim();
-  if (
-    directMessage &&
-    !isFunctionTransportErrorMessage(directMessage) &&
-    !directMessage.toLowerCase().includes("functionsfetcherror")
-  ) {
-    return directMessage;
-  }
-
-  return toUserFacingFunctionError(parsed, {
-    action: getAppleAuthActionDescription(intent),
-  });
-};
-
 interface AuthGatewayPayload {
   action: AuthGatewayAction;
   email?: string;
@@ -264,7 +237,7 @@ const invokeAuthGateway = async (payload: AuthGatewayPayload) => {
     const data = await retryWithBackoff(
       async () => {
         const { data, error } = await supabase.functions.invoke("auth-gateway", {
-          body: payload,
+          body: { ...payload, productMode: "cosmiq" },
         });
 
         if (error) {
@@ -287,38 +260,33 @@ const invokeAuthGateway = async (payload: AuthGatewayPayload) => {
   }
 };
 
-const readFunctionErrorContext = async (error: unknown) => {
-  const maybeErrorWithContext = error as { context?: { json?: () => Promise<Record<string, unknown>> } };
-  if (!maybeErrorWithContext.context?.json) {
-    return null;
-  }
-
-  try {
-    return await maybeErrorWithContext.context.json();
-  } catch {
-    return null;
-  }
-};
-
-
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const requestedAuthMode = new URLSearchParams(location.search).get("mode");
+  const authSearchParams = new URLSearchParams(location.search);
+  const requestedAuthMode = authSearchParams.get("mode");
+  const requestedReturnPath = authSearchParams.get("returnTo");
   const [isLogin, setIsLogin] = useState(() => requestedAuthMode !== "signup");
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [signupConsent, setSignupConsent] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'apple' | null>(null);
   const { toast } = useToast();
+  const navigationSafetyTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    rememberAuthReturnPath(requestedReturnPath);
+  }, [requestedReturnPath]);
   const pendingPostAuthNavigationContextRef = useRef<
     (PostAuthNavigationContext & { userId: string }) | null
   >(null);
+  const directSocialAuthInProgressRef = useRef(false);
   const setPendingPostAuthNavigationContext = useCallback(
     (userId: string, context: PostAuthNavigationContext) => {
       pendingPostAuthNavigationContextRef.current = {
@@ -364,6 +332,10 @@ const Auth = () => {
     (path: string, context: PostAuthNavigationContext): string => {
       if (context.preferGuardedLanding && path === POST_AUTH_DEFAULT_PATH) {
         return "/";
+      }
+
+      if (path !== POST_AUTH_DEFAULT_PATH) {
+        return consumeAuthReturnPath() ?? path;
       }
 
       return path;
@@ -416,8 +388,12 @@ const Auth = () => {
       safeNavigate(navigate, normalizedPath);
 
       // Safety valve: if routing fails and we are still on /auth, allow retry.
-      setTimeout(() => {
-        if (window.location.pathname === '/auth') {
+      if (navigationSafetyTimeout.current) {
+        clearTimeout(navigationSafetyTimeout.current);
+      }
+      navigationSafetyTimeout.current = setTimeout(() => {
+        navigationSafetyTimeout.current = null;
+        if (typeof window !== "undefined" && window.location.pathname === '/auth') {
           logger.warn(`[Auth ${source}] Navigation did not leave /auth, resetting redirect guard`);
           hasRedirected.current = false;
         }
@@ -515,26 +491,6 @@ const Auth = () => {
 
   const [appleNativeReady, setAppleNativeReady] = useState(false);
 
-  const blockSocialSignIn = useCallback(
-    async (attempt: PendingSocialAuthAttempt, source: string) => {
-      logger.warn(`[Auth ${source}] Blocking social sign-in with no returning account match`, attempt);
-      clearPendingSocialAuthAttempt();
-      clearPendingPostAuthNavigationContext();
-
-      try {
-        await supabase.auth.signOut();
-      } catch (error) {
-        logger.warn(`[Auth ${source}] Failed to clear blocked social auth session`, { error });
-      }
-
-      hasRedirected.current = false;
-      setIsLogin(true);
-      setIsForgotPassword(false);
-      setInlineError(getSocialAccountNotFoundMessage(attempt.provider));
-    },
-    [clearPendingPostAuthNavigationContext],
-  );
-
   const handleResolvedSocialAuth = useCallback(
     async (session: Session | null, source: string, attempt: PendingSocialAuthAttempt | null) => {
       if (!session) {
@@ -554,20 +510,12 @@ const Auth = () => {
         return;
       }
 
-      try {
-        const path = await getAuthRedirectPath(session.user.id);
-        if (path === POST_AUTH_DEFAULT_PATH) {
-          await blockSocialSignIn(attempt, source);
-          return;
-        }
-      } catch (error) {
-        logger.warn(`[Auth ${source}] Failed to preflight social sign-in redirect, continuing`, { error });
-      }
-
+      // A verified session is a successful login, even if setup is unfinished.
+      // Let the normal profile routing send that account through onboarding.
       clearPendingSocialAuthAttempt();
       await handlePostAuthNavigation(session, source);
     },
-    [blockSocialSignIn, handlePostAuthNavigation],
+    [handlePostAuthNavigation],
   );
 
   // If we ever land back on /auth, allow redirects to run again
@@ -616,33 +564,51 @@ const Auth = () => {
 
   // Handle OAuth callback parameters that return the user to /auth with a valid code/token
   useEffect(() => {
+    // A native return link can arrive while this screen is already mounted.
+    if (hasOAuthCallbackParams()) {
+      oauthCallbackInProgress.current = true;
+      hasRedirected.current = false;
+    }
     const handleOAuthCallback = async () => {
       if (typeof window === "undefined" || hasRedirected.current || !oauthCallbackInProgress.current) return;
 
       const url = new URL(window.location.href);
       const hasAccessToken = url.hash.includes("access_token");
       const code = url.searchParams.get("code");
+      const hashParams = new URLSearchParams(url.hash.substring(1));
+      const callbackError = url.searchParams.get("error") ?? hashParams.get("error");
       const pendingAttempt = readPendingSocialAuthAttempt();
 
       // Only run when coming back from an OAuth provider
-      if (!code && !hasAccessToken) return;
+      if (!code && !hasAccessToken && !callbackError) return;
 
       try {
+        if (callbackError) {
+          throw new Error("Apple sign-in wasn't completed. Please try again.");
+        }
         // If Supabase didn't automatically exchange the code, do it manually
         if (code) {
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
           await handleResolvedSocialAuth(data.session, "oauthCodeExchange", pendingAttempt);
         } else {
-          // Hash-based tokens (implicit flow)
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            await handleResolvedSocialAuth(session, "oauthHashSession", pendingAttempt);
-          }
+          // On warm native returns, URL processing did not run at client startup.
+          const accessToken = hashParams.get("access_token");
+          const refreshToken = hashParams.get("refresh_token");
+          if (!accessToken || !refreshToken) throw new Error("Apple sign-in did not return session tokens.");
+          const { data: { session: existingSession } } = await supabase.auth.getSession();
+          const result = existingSession?.access_token === accessToken
+            ? { data: { session: existingSession }, error: null }
+            : await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+          if (result.error) throw result.error;
+          const session = result.data.session;
+          if (!session) throw new Error("Apple sign-in did not return a session.");
+          await handleResolvedSocialAuth(session, "oauthHashSession", pendingAttempt);
         }
       } catch (error) {
         clearPendingSocialAuthAttempt();
         logger.error("[OAuth Callback] Failed to complete OAuth login", { error });
+        setInlineError("Apple sign-in wasn't completed. Please try again.");
         toast({
           title: "Error",
           description: "Something went wrong signing you in. Please try again.",
@@ -654,7 +620,11 @@ const Auth = () => {
           url.searchParams.delete("code");
           const cleanedUrl = `${url.pathname}${url.search}${url.hash}`;
           window.history.replaceState(window.history.state, "", cleanedUrl);
-        } else if (hasAccessToken) {
+        } else if (hasAccessToken || callbackError) {
+          url.searchParams.delete("error");
+          url.searchParams.delete("error_description");
+          url.searchParams.delete("error_code");
+          window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
           window.location.hash = "";
         }
 
@@ -663,10 +633,12 @@ const Auth = () => {
     };
 
     handleOAuthCallback();
-  }, [handleResolvedSocialAuth, toast]);
+  }, [handleResolvedSocialAuth, toast, location.key]);
 
   // Separate effect for session check and auth state listener
   useEffect(() => {
+    let disposed = false;
+    let authNavigationTimeout: ReturnType<typeof setTimeout> | null = null;
     const checkSession = async () => {
       if (oauthCallbackInProgress.current) {
         logger.debug("[Auth checkSession] Deferring session redirect while OAuth callback is processing");
@@ -674,16 +646,21 @@ const Auth = () => {
       }
 
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
+      if (session && !disposed && !directSocialAuthInProgressRef.current && !oauthCallbackInProgress.current) {
         await handlePostAuthNavigation(session, 'checkSession');
       }
     };
 
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       // Handle all sign-in events including setSession() which triggers TOKEN_REFRESHED
       if (['SIGNED_IN', 'TOKEN_REFRESHED', 'INITIAL_SESSION'].includes(event) && session) {
+        if (directSocialAuthInProgressRef.current) {
+          logger.debug(`[Auth onAuthStateChange] Deferring ${event} while direct social auth is resolving`);
+          return;
+        }
+
         if (oauthCallbackInProgress.current) {
           logger.debug(`[Auth onAuthStateChange] Deferring ${event} while OAuth callback is processing`);
           return;
@@ -697,15 +674,27 @@ const Auth = () => {
         
         const timestamp = Date.now();
         logger.info(`[Auth onAuthStateChange] Event: ${event} at ${timestamp}, redirecting...`);
-        await new Promise(resolve => setTimeout(resolve, 100));
-        await handlePostAuthNavigation(session, `onAuthStateChange:${event}`);
+        // Supabase awaits listeners while holding its auth lock. Database work
+        // must start after this callback returns, or web logins can deadlock.
+        if (authNavigationTimeout) clearTimeout(authNavigationTimeout);
+        authNavigationTimeout = setTimeout(() => {
+          authNavigationTimeout = null;
+          if (disposed || directSocialAuthInProgressRef.current || oauthCallbackInProgress.current) return;
+          void handlePostAuthNavigation(session, `onAuthStateChange:${event}`);
+        }, 0);
       }
     });
 
     return () => {
+      disposed = true;
+      if (authNavigationTimeout) clearTimeout(authNavigationTimeout);
       subscription.unsubscribe();
       if (appleFallbackTimeout.current) {
         clearTimeout(appleFallbackTimeout.current);
+      }
+      if (navigationSafetyTimeout.current) {
+        clearTimeout(navigationSafetyTimeout.current);
+        navigationSafetyTimeout.current = null;
       }
     };
   }, [handlePostAuthNavigation]);
@@ -730,17 +719,17 @@ const Auth = () => {
 
     // Sanitize inputs before validation
     const sanitizedEmail = email.trim().toLowerCase();
-    const result = authSchema.safeParse({ 
-      email: sanitizedEmail, 
-      password,
-      confirmPassword: isLogin ? undefined : confirmPassword 
-    });
+    const result = isLogin
+      ? loginSchema.safeParse({ email: sanitizedEmail, password })
+      : signupSchema.safeParse({
+          email: sanitizedEmail,
+          password,
+          confirmPassword,
+          consent: signupConsent,
+        });
     if (!result.success) {
       const message = result.error.errors[0].message;
       setInlineError(message);
-      if (!isLogin) {
-        showAccountCreationError(message);
-      }
       return;
     }
 
@@ -767,6 +756,7 @@ const Auth = () => {
         });
 
         if (sessionError) throw sessionError;
+        if (!session) throw new Error("We couldn't start your session. Please try signing in again.");
 
         await handlePostAuthNavigation(session, 'passwordSignIn');
       } else {
@@ -788,6 +778,7 @@ const Auth = () => {
           });
 
           if (sessionError) throw sessionError;
+          if (!session) throw new Error("We couldn't start your session. Please try signing in again.");
 
           await handlePostAuthNavigation(session, 'signUpImmediate');
         } else {
@@ -855,6 +846,10 @@ const Auth = () => {
 
     clearPendingPostAuthNavigationContext();
     setInlineError(null);
+    if (socialAuthIntent === "sign_up" && !signupConsent) {
+      setInlineError("Please agree to the Terms and acknowledge the Privacy Policy.");
+      return;
+    }
     setOauthLoading(provider);
     console.log(`[OAuth Debug] Starting ${provider} sign-in flow`);
     console.log(`[OAuth Debug] Platform: ${Capacitor.isNativePlatform() ? 'Native' : 'Web'}`);
@@ -870,13 +865,13 @@ const Auth = () => {
         const applePostAuthNavigationContext: PostAuthNavigationContext = {
           provider: "apple",
           intent: socialAuthIntent,
-          preferGuardedLanding: socialAuthIntent === "sign_in",
+          preferGuardedLanding: false,
         };
         console.log('[Apple OAuth] Initiating native Apple sign-in');
         
         // Generate secure random nonce (Supabase provides this method)
         const rawNonce = crypto.randomUUID();
-        console.log('[Apple OAuth] Raw nonce generated:', rawNonce.substring(0, 8) + '...');
+        logger.debug('[Auth Apple] Nonce generated');
         
         // Hash the nonce for Apple (Apple requires SHA-256 hashed nonce)
         const encoder = new TextEncoder();
@@ -885,7 +880,7 @@ const Auth = () => {
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashedNonce = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         
-        console.log('[Apple OAuth] Hashed nonce:', hashedNonce.substring(0, 16) + '...');
+        logger.debug('[Auth Apple] Nonce prepared for authorization');
 
         console.log('[Apple OAuth] Calling SignInWithApple.authorize with clientId: com.darrylgraham.revolution');
         
@@ -911,86 +906,31 @@ const Auth = () => {
           throw new Error('Apple Sign-In failed - no identity token returned');
         }
 
-        console.log('[Apple OAuth] Calling apple-native-auth edge function');
+        const nativeAttempt: PendingSocialAuthAttempt = {
+          provider: 'apple',
+          intent: socialAuthIntent,
+        };
+        storedPendingSocialAuth = storePendingSocialAuthAttempt(nativeAttempt);
+        directSocialAuthInProgressRef.current = true;
 
-        // Call our edge function to handle native Apple auth
-        const edgeInvokeStart = Date.now();
-        const { data: sessionData, error: functionError } = await supabase.functions.invoke('apple-native-auth', {
-          body: {
-            identityToken: result.response.identityToken,
-            rawNonce,
-            intent: socialAuthIntent,
-          }
-        });
-        const functionErrorBody = functionError ? await readFunctionErrorContext(functionError) : null;
-        console.log(`[Apple OAuth] apple-native-auth completed in ${Date.now() - edgeInvokeStart}ms`);
+        console.log('[Apple OAuth] Exchanging the Apple ID token with Supabase Auth');
+        const idTokenExchangeStart = Date.now();
+        const {
+          data: { session: sessionToUse },
+          error: idTokenError,
+        } = await exchangeAppleIdentityToken(() => supabase.auth.signInWithIdToken({
+          provider: 'apple',
+          token: result.response.identityToken,
+          nonce: rawNonce,
+        }));
+        console.log(`[Apple OAuth] Supabase ID-token exchange completed in ${Date.now() - idTokenExchangeStart}ms`);
 
-        console.log('[Apple OAuth] Edge function response:', { 
-          hasAccessToken: !!sessionData?.access_token,
-          hasRefreshToken: !!sessionData?.refresh_token,
-          error: functionErrorBody?.error || functionError?.message,
-          errorCode: functionErrorBody?.code
-        });
-
-        if (functionError) {
-          if (functionErrorBody?.code === 'ACCOUNT_NOT_FOUND') {
-            setInlineError(getSocialAccountNotFoundMessage('apple'));
-            setIsLogin(true);
-            setIsForgotPassword(false);
-            return;
-          }
-
-          if (functionErrorBody?.code === 'APPLE_EMAIL_MISSING') {
-            console.warn('[Apple OAuth] Missing email for Apple ID, prompting user to re-register');
-            setInlineError("We couldn’t create an account with your Apple ID. Open Settings, remove Revolution from Sign in with Apple, then try again and share your email.");
-            setIsLogin(true);
-            setIsForgotPassword(false);
-            return;
-          }
-
-          if (functionErrorBody?.code === 'APPLE_NONCE_MISSING' || functionErrorBody?.code === 'APPLE_NONCE_MISMATCH') {
-            throw new Error('Apple Sign-In security check failed. Please try again.');
-          }
-
-          throw new Error(await getAppleAuthErrorMessage(functionError, socialAuthIntent));
+        if (idTokenError) {
+          throw idTokenError;
         }
-        if (!sessionData?.access_token || !sessionData?.refresh_token) {
-          clearPendingPostAuthNavigationContext();
-          throw new Error('Failed to get session tokens from edge function');
-        }
-
-        const nativeAppleSessionUserId =
-          sessionData?.user && typeof sessionData.user === "object" && "id" in sessionData.user
-            ? (sessionData.user.id as string | undefined)
-            : undefined;
-
-        if (nativeAppleSessionUserId) {
-          setPendingPostAuthNavigationContext(
-            nativeAppleSessionUserId,
-            applePostAuthNavigationContext,
-          );
-        }
-
-        // Set the session with tokens from edge function
-        const setSessionStart = Date.now();
-        const { error: sessionError, data: { session: newSession } } = await supabase.auth.setSession({
-          access_token: sessionData.access_token,
-          refresh_token: sessionData.refresh_token,
-        });
-        console.log(`[Apple OAuth] setSession completed in ${Date.now() - setSessionStart}ms`);
-
-        if (sessionError) {
-          clearPendingPostAuthNavigationContext(nativeAppleSessionUserId);
-          throw sessionError;
-        }
-
-        // Ensure Supabase client state reflects the session before navigating
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        const sessionToUse = newSession ?? currentSession;
 
         if (!sessionToUse) {
-          clearPendingPostAuthNavigationContext(nativeAppleSessionUserId);
-          throw new Error('Failed to establish Supabase session after Apple sign-in');
+          throw new Error('Apple Sign-In completed without a Supabase session');
         }
 
         setPendingPostAuthNavigationContext(
@@ -1000,12 +940,15 @@ const Auth = () => {
 
         const sessionSetTime = Date.now();
         console.log(`[Apple OAuth] Session set successfully at ${sessionSetTime}, proceeding to navigation`);
-        console.log('[Apple OAuth] Triggering post-auth navigation');
-        void handlePostAuthNavigation(
+        console.log('[Apple OAuth] Resolving post-auth navigation');
+        clearPendingSocialAuthAttempt();
+        storedPendingSocialAuth = false;
+        await handlePostAuthNavigation(
           sessionToUse,
           'appleNative',
           applePostAuthNavigationContext,
         );
+        directSocialAuthInProgressRef.current = false;
         console.log(`[Apple OAuth] Total native flow completed in ${Date.now() - appleFlowStart}ms`);
 
         // Fallback: manually redirect if onAuthStateChange doesn't fire (increased to 800ms to avoid race conditions)
@@ -1050,6 +993,7 @@ const Auth = () => {
         provider,
         options: {
           redirectTo: getRedirectUrlWithPath('/auth'),
+          ...(isNative ? { skipBrowserRedirect: true } : {}),
         },
       });
 
@@ -1060,6 +1004,10 @@ const Auth = () => {
       });
 
       if (error) throw error;
+      if (isNative) {
+        if (!oauthData?.url) throw new Error("Apple sign-in did not return a login URL.");
+        await Browser.open({ url: oauthData.url });
+      }
     } catch (error) {
       clearPendingPostAuthNavigationContext();
       if (storedPendingSocialAuth) {
@@ -1082,6 +1030,7 @@ const Auth = () => {
 
       setInlineError(getAppleErrorDescription(error));
     } finally {
+      directSocialAuthInProgressRef.current = false;
       setOauthLoading(null);
     }
   };
@@ -1090,8 +1039,8 @@ const Auth = () => {
   const fieldInputClassName =
     "h-[3.35rem] rounded-[1.15rem] border border-[#2a1a49] bg-[#12091f] px-5 text-[0.98rem] font-medium text-white shadow-[0_0_0_1px_rgba(255,255,255,0.01),0_10px_28px_rgba(5,2,16,0.45),inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-white/[0.34] focus-visible:border-[#4b2c7e] focus-visible:ring-[3px] focus-visible:ring-[#b86dff]/15 focus-visible:ring-offset-0";
   const passwordToggleButtonClassName =
-    "absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-white/[0.58] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b86dff]/35";
-  const passwordInputClassName = isLogin ? fieldInputClassName : `${fieldInputClassName} pr-14`;
+    "absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-white/[0.58] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b86dff]/35";
+  const passwordInputClassName = `${fieldInputClassName} pr-14`;
   const switchMode = () => {
     setInlineError(null);
     if (isForgotPassword) {
@@ -1100,26 +1049,42 @@ const Auth = () => {
       return;
     }
 
-    setIsLogin(!isLogin);
+    const nextIsLogin = !isLogin;
+    const nextSearchParams = new URLSearchParams(location.search);
+    if (nextIsLogin) {
+      nextSearchParams.delete("mode");
+    } else {
+      nextSearchParams.set("mode", "signup");
+    }
+
+    setIsLogin(nextIsLogin);
     setConfirmPassword("");
+    setSignupConsent(false);
     setShowSignupPassword(false);
     setShowSignupConfirmPassword(false);
+    navigate(
+      {
+        pathname: location.pathname,
+        search: nextSearchParams.toString() ? `?${nextSearchParams.toString()}` : "",
+      },
+      { replace: true },
+    );
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-[#090311] text-pure-white">
+    <div className="relative min-h-[100svh] overflow-x-hidden bg-[#090311] text-pure-white">
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_82%,rgba(179,92,255,0.16),transparent_28%),radial-gradient(circle_at_50%_18%,rgba(39,18,71,0.3),transparent_38%),linear-gradient(180deg,#090311_0%,#0a0314_38%,#09020f_100%)]" />
       <div className="absolute inset-x-0 bottom-0 -z-10 h-[30vh] bg-[radial-gradient(circle_at_50%_100%,rgba(209,100,255,0.12),transparent_52%)]" />
       <section
         id="auth-form"
-        className="min-h-screen relative flex items-center justify-center px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(4.5rem,env(safe-area-inset-top)+2.75rem)]"
+        className="relative flex min-h-[100svh] items-start justify-center px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top)+1rem)] sm:items-center sm:pb-[max(2rem,env(safe-area-inset-bottom))] sm:pt-[max(4.5rem,env(safe-area-inset-top)+2.75rem)]"
       >
-        <div className="relative z-10 w-full max-w-[20.5rem] py-4 sm:max-w-[21.75rem]">
+        <div className="relative z-10 w-full max-w-[20.5rem] py-2 sm:max-w-[21.75rem] sm:py-4">
           <h1 className="sr-only">
             {isForgotPassword ? "Reset password" : isLogin ? "Sign in" : "Create account"}
           </h1>
 
-          <div className="space-y-5">
+          <div className="space-y-4 sm:space-y-5">
             {isForgotPassword ? (
               <form onSubmit={handleForgotPassword} className="space-y-5">
                 <div className="space-y-2 pb-1">
@@ -1180,7 +1145,7 @@ const Auth = () => {
                   <div className="relative">
                     <Input
                       id="password"
-                      type={!isLogin && showSignupPassword ? "text" : "password"}
+                      type={showSignupPassword ? "text" : "password"}
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => {
@@ -1191,21 +1156,19 @@ const Auth = () => {
                       required
                       className={passwordInputClassName}
                     />
-                    {!isLogin && (
-                      <button
-                        type="button"
-                        aria-label={showSignupPassword ? "Hide password" : "Show password"}
-                        aria-pressed={showSignupPassword}
-                        onClick={() => setShowSignupPassword((isVisible) => !isVisible)}
-                        className={passwordToggleButtonClassName}
-                      >
-                        {showSignupPassword ? (
-                          <EyeOff aria-hidden="true" className="h-5 w-5" />
-                        ) : (
-                          <Eye aria-hidden="true" className="h-5 w-5" />
-                        )}
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      aria-label={showSignupPassword ? "Hide password" : "Show password"}
+                      aria-pressed={showSignupPassword}
+                      onClick={() => setShowSignupPassword((isVisible) => !isVisible)}
+                      className={passwordToggleButtonClassName}
+                    >
+                      {showSignupPassword ? (
+                        <EyeOff aria-hidden="true" className="h-5 w-5" />
+                      ) : (
+                        <Eye aria-hidden="true" className="h-5 w-5" />
+                      )}
+                    </button>
                   </div>
                   {isLogin && (
                     <button
@@ -1260,6 +1223,26 @@ const Auth = () => {
                 >
                   {loading ? "Loading..." : isLogin ? "Sign In" : "Get Started"}
                 </Button>
+                {!isLogin && (
+                  <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl px-1 py-1 text-xs leading-5 text-white/[0.66]">
+                    <input
+                      type="checkbox"
+                      checked={signupConsent}
+                      onChange={(event) => {
+                        setInlineError(null);
+                        setSignupConsent(event.target.checked);
+                      }}
+                      required
+                      className="mt-0.5 h-5 w-5 shrink-0 accent-[#c45ff3]"
+                    />
+                    <span>
+                      I agree to Cosmiq&apos;s{" "}
+                      <a className="underline underline-offset-2 hover:text-white" href="/terms">Terms</a>
+                      {" "}and acknowledge the{" "}
+                      <a className="underline underline-offset-2 hover:text-white" href="/privacy">Privacy Policy</a>.
+                    </span>
+                  </label>
+                )}
               </form>
             )}
 
@@ -1310,7 +1293,7 @@ const Auth = () => {
               <button
                 type="button"
                 onClick={switchMode}
-                className="text-[0.93rem] font-medium text-white/[0.72] underline underline-offset-[3px] transition-colors hover:text-white"
+                className="inline-flex min-h-11 items-center justify-center px-3 text-[0.93rem] font-medium text-white/[0.72] underline underline-offset-[3px] transition-colors hover:text-white"
               >
                 {isForgotPassword 
                   ? "Back to Sign In" 

@@ -102,6 +102,8 @@ export const useCalendarTasks = (
       const monthEnd = endOfMonth(date);
       rangeStart = startOfWeek(monthStart, { weekStartsOn: 0 });
       rangeEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+      // Agenda shows seven days from the selection, even at a month boundary.
+      if (addDays(date, 6) > rangeEnd) rangeEnd = addDays(date, 6);
     } else if (view === "week") {
       rangeStart = startOfWeek(date, { weekStartsOn: 0 });
       rangeEnd = addDays(rangeStart, 6);

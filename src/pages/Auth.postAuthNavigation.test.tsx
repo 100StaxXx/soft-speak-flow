@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
   const getSessionMock = vi.fn();
   const onAuthStateChangeMock = vi.fn();
   const invokeMock = vi.fn();
+  const signInWithIdTokenMock = vi.fn();
   const setSessionMock = vi.fn();
   const appleAuthorizeMock = vi.fn();
   const maybeSingleMock = vi.fn();
@@ -31,6 +32,7 @@ const mocks = vi.hoisted(() => {
     getSessionMock,
     onAuthStateChangeMock,
     invokeMock,
+    signInWithIdTokenMock,
     setSessionMock,
     appleAuthorizeMock,
     maybeSingleMock,
@@ -108,6 +110,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       signUp: vi.fn(),
       resetPasswordForEmail: vi.fn(),
       signInWithOAuth: vi.fn(),
+      signInWithIdToken: mocks.signInWithIdTokenMock,
       setSession: mocks.setSessionMock,
     },
     from: mocks.fromMock,
@@ -119,9 +122,9 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import Auth from "./Auth";
 
-const renderAuth = () =>
+const renderAuth = (path = "/auth") =>
   render(
-    <MemoryRouter initialEntries={["/auth"]}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/auth" element={<Auth />} />
       </Routes>
@@ -132,6 +135,10 @@ const flushMicrotasks = async () => {
   await act(async () => {
     await Promise.resolve();
   });
+};
+
+const acceptSignupConsent = () => {
+  fireEvent.click(screen.getByRole("checkbox", { name: /i agree to cosmiq/i }));
 };
 
 const signedInSession = {
@@ -157,15 +164,7 @@ const primeNativeAppleFlow = () => {
       user: "apple-user-1",
     },
   });
-  mocks.invokeMock.mockResolvedValue({
-    data: {
-      access_token: "access-token",
-      refresh_token: "refresh-token",
-      user: signedInSession.user,
-    },
-    error: null,
-  });
-  mocks.setSessionMock.mockResolvedValue({
+  mocks.signInWithIdTokenMock.mockResolvedValue({
     data: {
       session: signedInSession,
     },
@@ -176,6 +175,7 @@ const primeNativeAppleFlow = () => {
 describe("Auth post-auth navigation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     mocks.isNativePlatform = false;
     mocks.platform = "web";
     mocks.applePluginAvailable = false;
@@ -195,8 +195,9 @@ describe("Auth post-auth navigation", () => {
     });
 
     mocks.getAuthRedirectPathMock.mockResolvedValue("/tasks");
+    mocks.setSessionMock.mockResolvedValue({ data: { session: signedInSession }, error: null });
     mocks.getProfileAwareAuthFallbackPathMock.mockResolvedValue("/tasks");
-    mocks.setSessionMock.mockResolvedValue({
+    mocks.signInWithIdTokenMock.mockResolvedValue({
       data: {
         session: signedInSession,
       },
@@ -240,6 +241,15 @@ describe("Auth post-auth navigation", () => {
     expect(mocks.toastMock).not.toHaveBeenCalled();
   });
 
+  it("returns a signed-in invitee to the invitation after authentication", async () => {
+    renderAuth("/auth?returnTo=%2Fjoin%2FINVITE123");
+
+    await waitFor(() => {
+      expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/join/INVITE123");
+    });
+    expect(window.sessionStorage.getItem("cosmiq.authReturnPath.v1")).toBeNull();
+  });
+
   it("does not render a guest-mode CTA", async () => {
     mocks.getSessionMock.mockResolvedValue({
       data: {
@@ -252,6 +262,47 @@ describe("Auth post-auth navigation", () => {
 
     expect(screen.queryByRole("button", { name: /continue as guest/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^sign in$/i })).toBeInTheDocument();
+  });
+
+  it("finishes email sign-in without holding the auth listener open for database work", async () => {
+    mocks.getSessionMock.mockResolvedValue({ data: { session: null } });
+    mocks.invokeMock.mockResolvedValue({ data: { access_token: "access", refresh_token: "refresh" }, error: null });
+    let authLockHeld = false;
+    mocks.getAuthRedirectPathMock.mockImplementation(async () => {
+      expect(authLockHeld).toBe(false);
+      return "/tasks";
+    });
+    mocks.setSessionMock.mockImplementation(async () => {
+      authLockHeld = true;
+      const listener = mocks.onAuthStateChangeMock.mock.calls[0][0];
+      const result = listener("SIGNED_IN", signedInSession);
+      expect(result).toBeUndefined();
+      authLockHeld = false;
+      return { data: { session: signedInSession }, error: null };
+    });
+    renderAuth();
+    await flushMicrotasks();
+    fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: " USER@EXAMPLE.COM " } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "Password123" } });
+    fireEvent.submit(screen.getByRole("button", { name: /^sign in$/i }).closest("form")!);
+    await waitFor(() => expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/tasks"));
+    expect(mocks.invokeMock).toHaveBeenCalledWith("auth-gateway", {
+      body: { action: "sign_in_password", email: "user@example.com", password: "Password123", productMode: "cosmiq" },
+    });
+    expect(mocks.setSessionMock).toHaveBeenCalledWith({ access_token: "access", refresh_token: "refresh" });
+  });
+
+  it("does not silently succeed when password login returns no session", async () => {
+    mocks.getSessionMock.mockResolvedValue({ data: { session: null } });
+    mocks.invokeMock.mockResolvedValue({ data: { access_token: "access", refresh_token: "refresh" }, error: null });
+    mocks.setSessionMock.mockResolvedValue({ data: { session: null }, error: null });
+    renderAuth();
+    await flushMicrotasks();
+    fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: "user@example.com" } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: "Password123" } });
+    fireEvent.submit(screen.getByRole("button", { name: /^sign in$/i }).closest("form")!);
+    expect(await screen.findByRole("alert")).toHaveTextContent("couldn't start your session");
+    expect(mocks.safeNavigateMock).not.toHaveBeenCalled();
   });
 
   it("lets account creation users reveal and hide password fields", async () => {
@@ -316,12 +367,44 @@ describe("Auth post-auth navigation", () => {
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "user@example.com" },
     });
-    fireEvent.change(screen.getByLabelText(/password/i), {
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
       target: { value: "password1" },
     });
     fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Request could not be completed.");
+  });
+
+  it("lets the server authenticate an existing short password", async () => {
+    mocks.getSessionMock.mockResolvedValue({ data: { session: null } });
+    mocks.invokeMock.mockResolvedValue({
+      data: {
+        access_token: "access-token",
+        refresh_token: "refresh-token",
+      },
+      error: null,
+    });
+
+    renderAuth();
+    await flushMicrotasks();
+
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "legacy@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), {
+      target: { value: "legacy" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
+
+    await waitFor(() => {
+      expect(mocks.invokeMock).toHaveBeenCalledWith("auth-gateway", {
+        body: expect.objectContaining({
+          action: "sign_in_password",
+          email: "legacy@example.com",
+          password: "legacy",
+        }),
+      });
+    });
   });
 
   it("shows a friendly inline error when reset password cannot reach the auth service", async () => {
@@ -386,6 +469,7 @@ describe("Auth post-auth navigation", () => {
     await flushMicrotasks();
 
     fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    acceptSignupConsent();
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "new@example.com" },
     });
@@ -440,6 +524,7 @@ describe("Auth post-auth navigation", () => {
     await flushMicrotasks();
 
     fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    acceptSignupConsent();
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "new@example.com" },
     });
@@ -467,7 +552,7 @@ describe("Auth post-auth navigation", () => {
     );
   });
 
-  it("shows an accurate toast when sign-up validation fails before submit", async () => {
+  it("shows one inline error when sign-up validation fails before submit", async () => {
     mocks.getSessionMock.mockResolvedValue({
       data: {
         session: null,
@@ -478,6 +563,7 @@ describe("Auth post-auth navigation", () => {
     await flushMicrotasks();
 
     fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    acceptSignupConsent();
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "new@example.c" },
     });
@@ -491,13 +577,7 @@ describe("Auth post-auth navigation", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email address");
     expect(mocks.invokeMock).not.toHaveBeenCalled();
-    expect(mocks.toastMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "Couldn't create account",
-        description: "Invalid email address",
-        variant: "destructive",
-      }),
-    );
+    expect(mocks.toastMock).not.toHaveBeenCalled();
   });
 
   it("shows an accurate toast when email sign-up fails because the email already exists", async () => {
@@ -526,6 +606,7 @@ describe("Auth post-auth navigation", () => {
     await flushMicrotasks();
 
     fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    acceptSignupConsent();
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "existing@example.com" },
     });
@@ -575,6 +656,7 @@ describe("Auth post-auth navigation", () => {
     await flushMicrotasks();
 
     fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    acceptSignupConsent();
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "new@example.com" },
     });
@@ -599,7 +681,7 @@ describe("Auth post-auth navigation", () => {
     );
   });
 
-  it("routes native Apple sign-in timeout fallbacks to / instead of /onboarding", async () => {
+  it("routes incomplete Apple accounts through onboarding after timeout", async () => {
     vi.useFakeTimers();
     primeNativeAppleFlow();
     mocks.getAuthRedirectPathMock.mockImplementation(() => new Promise(() => {}));
@@ -613,18 +695,18 @@ describe("Auth post-auth navigation", () => {
     await flushMicrotasks();
     await flushMicrotasks();
 
-    expect(mocks.setSessionMock).toHaveBeenCalledTimes(1);
+    expect(mocks.signInWithIdTokenMock).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);
     });
     await flushMicrotasks();
 
-    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/");
+    expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/onboarding");
     expect(mocks.safeNavigateMock).toHaveBeenCalledTimes(1);
   });
 
-  it("routes native Apple sign-in core redirects to / instead of /onboarding", async () => {
+  it("routes incomplete Apple accounts directly to onboarding", async () => {
     primeNativeAppleFlow();
     mocks.getAuthRedirectPathMock.mockResolvedValue("/onboarding");
 
@@ -634,7 +716,7 @@ describe("Auth post-auth navigation", () => {
     fireEvent.click(screen.getByRole("button", { name: /sign in with apple/i }));
 
     await waitFor(() => {
-      expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/");
+      expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/onboarding");
     });
   });
 
@@ -646,6 +728,7 @@ describe("Auth post-auth navigation", () => {
     await flushMicrotasks();
 
     fireEvent.click(screen.getByRole("button", { name: /need an account\? sign up/i }));
+    acceptSignupConsent();
     fireEvent.click(screen.getByRole("button", { name: /sign up with apple/i }));
 
     await waitFor(() => {

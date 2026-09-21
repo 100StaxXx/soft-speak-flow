@@ -12,20 +12,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Concern level messages based on inactive days
-// Push notifications at: 3, 5, 6, 7, and 14+ days
+// Low-frequency, optional return invitations. Time away never harms the companion.
 const getConcernLevel = (inactiveDays: number) => {
-  if (inactiveDays === 1) return { level: 'gentle', tone: 'curious and casual', sendPush: false };
-  if (inactiveDays === 2) return { level: 'concerned', tone: 'noticeably worried but supportive', sendPush: false };
-  if (inactiveDays === 3) return { level: 'urgent', tone: 'genuinely concerned and caring', sendPush: true };
-  if (inactiveDays === 4) return { level: 'waiting', tone: 'patient but hopeful', sendPush: false };
-  // Dormancy warning push at day 5
-  if (inactiveDays === 5) return { level: 'dormancy_warning', tone: 'worried about losing connection, caring but urgent', sendPush: true };
-  // Critical push at day 6 (dormancy imminent)
-  if (inactiveDays === 6) return { level: 'dormancy_imminent', tone: 'deeply concerned, this is a final warning', sendPush: true };
-  if (inactiveDays === 7) return { level: 'emotional', tone: 'deeply worried and emotional', sendPush: true };
-  if (inactiveDays >= 8 && inactiveDays < 14) return { level: 'hopeful', tone: 'still hopeful, missing you', sendPush: false };
-  if (inactiveDays >= 14) return { level: 'final', tone: 'sad but hopeful, like a friend who misses you deeply', sendPush: true };
+  if (inactiveDays === 3) return { level: 'open_door', tone: 'warm, casual, and pressure-free', sendPush: true };
+  if (inactiveDays === 7) return { level: 'fresh_start', tone: 'welcoming and practical', sendPush: true };
+  if (inactiveDays === 14) return { level: 'whenever_ready', tone: 'steady and spacious', sendPush: true };
+  if (inactiveDays === 30) return { level: 'new_beginning', tone: 'warm and entirely free of obligation', sendPush: true };
   return null;
 };
 
@@ -71,8 +63,7 @@ serve(async (req) => {
         const today = new Date().toLocaleDateString('en-CA')
         const currentHour = new Date().getHours()
 
-        // ========== COMPANION NEGLECT CONCERN ESCALATION ==========
-        // Check if user has an inactive companion
+        // ========== PRESSURE-FREE RETURN INVITATIONS ==========
         const { data: companion } = await supabase
           .from('user_companion')
           .select('id, user_id, preset_id, current_stage, inactive_days, spirit_animal, core_element, companion_name, cached_creature_name')
@@ -93,7 +84,7 @@ serve(async (req) => {
               .from('mentor_nudges')
               .select('id')
               .eq('user_id', profile.id)
-              .eq('nudge_type', 'companion_concern')
+              .eq('nudge_type', 'companion_return_invitation')
               .gte('created_at', today)
               .maybeSingle()
 
@@ -110,42 +101,13 @@ serve(async (req) => {
                   companionIdentity,
                 } = buildProactiveNudgeCompanionIdentity(companionContext?.displayName);
                 
-                let contextPrompt = '';
-                switch (concernInfo.level) {
-                  case 'gentle':
-                    contextPrompt = `The user hasn't checked in for 1 day. ${companionIdentity} is starting to miss them. Generate a brief, ${concernInfo.tone} message (1 sentence) checking in.`;
-                    break;
-                  case 'concerned':
-                    contextPrompt = `The user has been away for 2 days. ${companionIdentity} is worried and their energy is starting to fade. Generate a ${concernInfo.tone} message (1-2 sentences) expressing concern about both the user and their companion.`;
-                    break;
-                  case 'urgent':
-                    contextPrompt = `The user has been inactive for 3 days! ${companionIdentity} is sad and losing energy daily. Generate an ${concernInfo.tone} message (1-2 sentences) that conveys urgency without being guilt-trippy. Mention the companion misses them.`;
-                    break;
-                  case 'waiting':
-                    contextPrompt = `The user has been away for ${companion.inactive_days} days. ${companionIdentity} is waiting patiently. Generate a ${concernInfo.tone} message (1 sentence) - gentle and understanding.`;
-                    break;
-                  case 'dormancy_warning':
-                    contextPrompt = `The user has been away for 5 days. ${companionIdentity} is in danger - if they don't return within 2 days, the companion will go dormant (a deep sleep state). Generate a ${concernInfo.tone} message (2 sentences max). Mention they only have 2 days left before their companion falls into a deep sleep. Be genuine, not guilt-trippy.`;
-                    break;
-                  case 'dormancy_imminent':
-                    contextPrompt = `URGENT: The user has been away for 6 days. ${companionIdentity} will go dormant TOMORROW if they don't return. Generate a ${concernInfo.tone} message (2 sentences max). This is the final warning before dormancy. Convey urgency without being manipulative - their companion truly needs them.`;
-                    break;
-                  case 'emotional':
-                    contextPrompt = `The user has been gone for a week (${companion.inactive_days} days). ${companionIdentity} is not doing well - visibly sad and weakening. Generate a ${concernInfo.tone} message (2 sentences max) from the heart. This should feel personal, not like a notification.`;
-                    break;
-                  case 'hopeful':
-                    contextPrompt = `The user has been away for ${companion.inactive_days} days. ${companionIdentity} is still waiting faithfully. Generate a ${concernInfo.tone} brief message (1 sentence) - patient, no pressure.`;
-                    break;
-                  case 'final':
-                    contextPrompt = `The user has been away for over two weeks (${companion.inactive_days} days). ${companionIdentity} is waiting faithfully but struggling. Generate a ${concernInfo.tone} final message (2 sentences max). Don't be dramatic, just genuine - like a friend who really misses them and wants them to know the door is always open.`;
-                    break;
-                }
+                const contextPrompt = `The user has not opened the app for ${companion.inactive_days} days. Write one ${concernInfo.tone} sentence offering an optional, tiny way to begin again. ${companionIdentity} may warmly witness their return but is healthy, safe, and living fully while they are away.`;
 
                 const prompt = `You are ${mentor.name}, a mentor with this personality: ${mentor.tone_description}.
 
 ${contextPrompt}
 
-IMPORTANT: Stay true to your mentor personality. Don't be preachy or use guilt tactics. Be genuine and caring.`;
+IMPORTANT: Stay true to your mentor personality. Never say the companion is lonely, waiting, fading, hungry, harmed, in danger, or dependent on the user. Never mention lost progress, urgency, streak risk, or an obligation to return. Make clear there is nothing to make up for.`;
 
                 const response = await fetch('https://api.openai.com/v1/chat/completions', {
                   method: 'POST',
@@ -168,7 +130,7 @@ IMPORTANT: Stay true to your mentor personality. Don't be preachy or use guilt t
                   if (message) {
                     await supabase.from('mentor_nudges').insert({
                       user_id: profile.id,
-                      nudge_type: 'companion_concern',
+                      nudge_type: 'companion_return_invitation',
                       message: message,
                       context: {
                         inactive_days: companion.inactive_days,

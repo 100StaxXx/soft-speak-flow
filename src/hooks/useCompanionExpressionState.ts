@@ -22,6 +22,10 @@ const ACTIVE_MOTION_EVENT_TYPES = new Set([
   "quest_complete",
   "streak",
   "wake",
+  "touch",
+  "pet",
+  "comfort",
+  "play",
   "evolution_reveal",
 ]);
 
@@ -140,15 +144,6 @@ export const deriveCompanionExpressionState = ({
   } else if (nearEvolution) {
     mood = "excited";
     reason = "near-evolution";
-  } else if (hasDormancyWarning) {
-    mood = "concerned";
-    reason = "dormancy-warning";
-  } else if (inactiveDays >= 2) {
-    mood = "concerned";
-    reason = "inactive-days";
-  } else if (overallCare < 0.4) {
-    mood = "concerned";
-    reason = "low-care";
   } else if (normalizedMoodSignal && NEGATIVE_MOOD_SIGNAL_IDS.has(normalizedMoodSignal)) {
     mood = "concerned";
     reason = "negative-mood";

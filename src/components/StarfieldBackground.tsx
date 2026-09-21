@@ -250,9 +250,6 @@ export const StarfieldBackground = memo(({ scene = "default" }: StarfieldBackgro
       case "quiet":
         hueShift = -10;
         break;
-      case "dormant":
-        hueShift = 0;
-        break;
     }
 
     return hueShift;

@@ -20,6 +20,8 @@ import {
 } from "../_shared/dailyNotificationToggles.ts";
 import { composeNotificationCopy, type CompanionNotificationContext } from "../_shared/notificationComposer.ts";
 import { resolveNotificationCompanionContextMap } from "../_shared/companionName.ts";
+import { createNotificationProductResolver } from "../_shared/notificationProduct.ts";
+import type { NotificationProductMode } from "../_shared/notificationComposer.ts";
 import {
   buildDailyPepQueueDedupeKey,
   buildDailyQuoteQueueDedupeKey,
@@ -192,6 +194,7 @@ async function markDailySourcesSkipped(
 }
 
 function rowForQueue(input: {
+  productMode: NotificationProductMode;
   userId: string;
   type: NotificationType;
   sourceTable: string;
@@ -203,6 +206,7 @@ function rowForQueue(input: {
 }): QueueInsertRow {
   const copy = composeNotificationCopy({
     type: input.type,
+    productMode: input.productMode,
     payload: input.payload,
     companion: input.companion,
   });
@@ -217,7 +221,7 @@ function rowForQueue(input: {
       source_table: input.sourceTable,
       source_id: input.sourceId,
     },
-    payload: input.payload,
+    payload: { ...input.payload, product_mode: input.productMode },
     status: "queued",
     source_table: input.sourceTable,
     source_id: input.sourceId,
@@ -260,6 +264,9 @@ serve(async (req) => {
     const profilePageSize = parseIntEnv("NOTIFICATIONS_V2_PROFILE_SCAN_LIMIT", 300);
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const productForUser = createNotificationProductResolver(supabase);
+    const queueForUser = async (input: Omit<Parameters<typeof rowForQueue>[0], "productMode">) =>
+      rowForQueue({ ...input, productMode: await productForUser(input.userId) });
     const now = new Date();
     const nowIso = now.toISOString();
     const {
@@ -326,17 +333,27 @@ serve(async (req) => {
         return (data as ProfileRow[] | null) ?? [];
       },
       processPage: async (dailyProfiles) => {
-        const mentorIds = [...new Set(dailyProfiles.map((row) => row.selected_mentor_id).filter((value): value is string => typeof value === "string"))];
+        const productModes = await Promise.all(
+          dailyProfiles.map(async (profile) => [
+            profile.id,
+            await productForUser(profile.id),
+          ] as const),
+        );
+        const gracewardUserIds = new Set(
+          productModes.filter(([, mode]) => mode === "graceward").map(([userId]) => userId),
+        );
+        const gracewardProfiles = dailyProfiles.filter((profile) => gracewardUserIds.has(profile.id));
+        const mentorIds = [...new Set(gracewardProfiles.map((row) => row.selected_mentor_id).filter((value): value is string => typeof value === "string"))];
         const mentors = mentorIds.length > 0
           ? (await supabase
-            .from("mentors")
+            .from("graceward_guides")
             .select("id, slug")
             .in("id", mentorIds)).data as MentorRow[] | null
           : [];
         const mentorSlugById = new Map((mentors ?? []).map((row) => [row.id, row.slug]));
 
         const dailySourceProfiles: DailySourceProfile[] = [];
-        for (const profile of dailyProfiles) {
+        for (const profile of gracewardProfiles) {
           const mentorId = profile.selected_mentor_id;
           if (!mentorId) continue;
 
@@ -349,7 +366,13 @@ serve(async (req) => {
 
           const timezone = normalizeTimezone(profile.timezone);
           const localDate = getLocalDateTimeParts(now, timezone).localDate;
-          dailySourceProfiles.push({ profile, mentorId, mentorSlug, localDate, timezone });
+          dailySourceProfiles.push({
+            profile: { ...profile, daily_quote_push_enabled: false },
+            mentorId,
+            mentorSlug,
+            localDate,
+            timezone,
+          });
         }
 
         dailyProfilesScanned += dailySourceProfiles.length;
@@ -361,6 +384,7 @@ serve(async (req) => {
           ? (await supabase
             .from("daily_pep_talks")
             .select("id, mentor_slug, title, summary, for_date")
+            .eq("product_mode", "graceward")
             .in("mentor_slug", dailyMentorSlugs)
             .in("for_date", dailyLocalDates)).data as DailyPepTalkRow[] | null
           : [];
@@ -394,6 +418,7 @@ serve(async (req) => {
             ? (await supabase
               .from("quotes")
               .select("id, mentor_id, text, author")
+              .eq("product_mode", "cosmiq")
               .in("mentor_id", missingQuoteMentorIds)
               .order("id", { ascending: true })).data as QuoteRow[] | null
             : [];
@@ -542,7 +567,7 @@ serve(async (req) => {
       },
     });
 
-    // 1) Daily pep talk notifications
+    // 1) Daily encouragement notifications (legacy database type: daily_pep)
     const { data: duePepPushes, error: pepError } = await supabase
       .from("user_daily_pushes")
       .select(`
@@ -553,7 +578,8 @@ serve(async (req) => {
         daily_pep_talks (
           title,
           summary,
-          mentor_slug
+          mentor_slug,
+          product_mode
         )
       `)
       .is("delivered_at", null)
@@ -563,6 +589,9 @@ serve(async (req) => {
     if (pepError) throw pepError;
 
     const pepUserIds = [...new Set((duePepPushes ?? []).map((row) => row.user_id as string))];
+    const pepProductModes = new Map(await Promise.all(
+      pepUserIds.map(async (userId) => [userId, await productForUser(userId)] as const),
+    ));
     const pepProfileMap = await loadDailyNotificationProfileMap(supabase, pepUserIds);
     const companionMap = await loadCompanionContextMap(
       supabase,
@@ -582,7 +611,11 @@ serve(async (req) => {
       }
 
       const pepTalk = Array.isArray(push.daily_pep_talks) ? push.daily_pep_talks[0] : push.daily_pep_talks;
-      inserts.push(rowForQueue({
+      if (!pepTalk || pepTalk.product_mode !== pepProductModes.get(push.user_id)) {
+        disabledPepSourceIds.push(push.id);
+        continue;
+      }
+      inserts.push(await queueForUser({
         userId: push.user_id,
         type: "daily_pep",
         sourceTable: "user_daily_pushes",
@@ -591,11 +624,11 @@ serve(async (req) => {
         scheduledFor: push.scheduled_at ?? nowIso,
         payload: {
           pep_talk_id: push.daily_pep_talk_id,
-          title: pepTalk?.title ?? "Your daily pep talk",
-          summary: pepTalk?.summary ?? "Your daily pep talk is ready.",
+          title: pepTalk?.title ?? "Your daily encouragement",
+          summary: pepTalk?.summary ?? "Your daily encouragement is ready.",
           mentor_slug: pepTalk?.mentor_slug ?? null,
           type: "daily_pep",
-          url: `/pep-talk/${push.daily_pep_talk_id}`,
+          url: "/mentor",
         },
         companion: companionMap.get(push.user_id) ?? null,
       }));
@@ -613,6 +646,9 @@ serve(async (req) => {
     if (dueQuoteError) throw dueQuoteError;
 
     const quoteUserIds = [...new Set((dueQuotePushes ?? []).map((row) => row.user_id as string))];
+    const quoteProductModes = new Map(await Promise.all(
+      quoteUserIds.map(async (userId) => [userId, await productForUser(userId)] as const),
+    ));
     const quoteProfileMap = await loadDailyNotificationProfileMap(supabase, quoteUserIds);
     const dueDailyQuoteIds = [...new Set((dueQuotePushes ?? []).map((row) => row.daily_quote_id as string))];
     const dueDailyQuotes = dueDailyQuoteIds.length > 0
@@ -628,12 +664,17 @@ serve(async (req) => {
       ? (await supabase
         .from("quotes")
         .select("id, text, author, mentor_id")
+        .eq("product_mode", "cosmiq")
         .in("id", dueQuoteIds)).data as QuoteRow[] | null
       : [];
     const dueQuoteById = new Map((dueQuotes ?? []).map((row) => [row.id, row]));
 
     const disabledQuoteSourceIds: string[] = [];
     for (const push of dueQuotePushes ?? []) {
+      if (quoteProductModes.get(push.user_id) !== "cosmiq") {
+        disabledQuoteSourceIds.push(push.id);
+        continue;
+      }
       const disabledReason = getDisabledDailyNotificationReason(
         "daily_quote",
         quoteProfileMap.get(push.user_id),
@@ -649,7 +690,7 @@ serve(async (req) => {
       const quote = dueQuoteById.get(dailyQuote.quote_id);
       if (!quote) continue;
 
-      inserts.push(rowForQueue({
+      inserts.push(await queueForUser({
         userId: push.user_id,
         type: "daily_quote",
         sourceTable: "user_daily_quote_pushes",
@@ -715,7 +756,7 @@ serve(async (req) => {
             queuedTaskReminders += 1;
           }
 
-          inserts.push(rowForQueue({
+          inserts.push(await queueForUser({
             userId: taskNotification.userId,
             type: taskNotification.type,
             sourceTable: "daily_tasks",
@@ -780,7 +821,7 @@ serve(async (req) => {
 
       if (completion) continue;
 
-      inserts.push(rowForQueue({
+      inserts.push(await queueForUser({
         userId: habit.user_id,
         type: "habit_reminder",
         sourceTable: "habits",
@@ -821,7 +862,7 @@ serve(async (req) => {
     );
 
     for (const nudge of nudges) {
-      inserts.push(rowForQueue({
+      inserts.push(await queueForUser({
         userId: nudge.user_id,
         type: "mentor_nudge",
         sourceTable: "mentor_nudges",
@@ -840,7 +881,7 @@ serve(async (req) => {
       }));
     }
 
-    // 6) Check-in reminders
+    // 6) Evening examen reminders. Morning value is already delivered by Daily Grace.
     let checkinProfilesScanned = 0;
 
     await scanPaginatedRows<Pick<ProfileRow, "id" | "timezone" | "checkin_reminders_enabled">>({
@@ -869,46 +910,11 @@ serve(async (req) => {
           const local = getLocalDateTimeParts(now, timezone);
           const nowLocalMinutes = local.hour * 60 + local.minute;
 
-          const morningJitter = await computeDeterministicJitterMinutes(profile.id, local.localDate, "morning", 60);
           const eveningJitter = await computeDeterministicJitterMinutes(profile.id, local.localDate, "evening", 60);
 
-          const morningTarget = Math.max(0, Math.min(23 * 60 + 59, 10 * 60 + morningJitter));
-          let eveningTarget = Math.max(0, Math.min(23 * 60 + 59, 20 * 60 + eveningJitter));
+          const eveningTarget = Math.max(0, Math.min(23 * 60 + 59, 20 * 60 + eveningJitter));
 
-          if (eveningTarget - morningTarget < 6 * 60) {
-            eveningTarget = Math.min(23 * 60 + 59, morningTarget + 6 * 60);
-          }
-
-          const morningDue = nowLocalMinutes >= morningTarget && nowLocalMinutes <= Math.min(16 * 60, morningTarget + 180);
           const eveningDue = nowLocalMinutes >= eveningTarget && nowLocalMinutes <= Math.min(23 * 60 + 30, eveningTarget + 180);
-
-          if (morningDue) {
-            const { data: existingMorning } = await supabase
-              .from("daily_check_ins")
-              .select("id")
-              .eq("user_id", profile.id)
-              .eq("check_in_type", "morning")
-              .eq("check_in_date", local.localDate)
-              .maybeSingle();
-
-            if (!existingMorning) {
-              inserts.push(rowForQueue({
-                userId: profile.id,
-                type: "checkin_morning_reminder",
-                sourceTable: "profiles",
-                sourceId: profile.id,
-                dedupeKey: `checkin_morning:${profile.id}:${local.localDate}`,
-                scheduledFor: nowIso,
-                payload: {
-                  local_date: local.localDate,
-                  local_target_minutes: morningTarget,
-                  timezone,
-                  type: "checkin_morning_reminder",
-                  url: getCheckinReminderUrl("morning"),
-                },
-              }));
-            }
-          }
 
           if (eveningDue) {
             const { data: existingEvening } = await supabase
@@ -919,7 +925,7 @@ serve(async (req) => {
               .maybeSingle();
 
             if (!existingEvening) {
-              inserts.push(rowForQueue({
+              inserts.push(await queueForUser({
                 userId: profile.id,
                 type: "checkin_evening_reminder",
                 sourceTable: "profiles",

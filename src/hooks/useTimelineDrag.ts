@@ -45,6 +45,8 @@ interface UseTimelineDragOptions {
   touchActivationPolicy?: TouchActivationPolicy;
   touchLongPressMs?: number;
   postActivationDeadzonePx?: number;
+  /** Use the real calendar grid scale instead of viewport-relative movement. */
+  pixelsPerMinute?: number;
 }
 
 interface DragHandleProps {
@@ -180,6 +182,7 @@ export function useTimelineDrag({
   touchActivationPolicy = "threshold",
   touchLongPressMs = DEFAULT_TOUCH_LONG_PRESS_MS,
   postActivationDeadzonePx = DEFAULT_POST_ACTIVATION_DEADZONE_PX,
+  pixelsPerMinute,
 }: UseTimelineDragOptions) {
   const resolvedSnapConfig = useMemo(() => resolveAdaptiveSnapConfig(snapConfig), [snapConfig]);
   const resolvedActivationThresholdPx = Math.max(0, activationThresholdPx);
@@ -209,6 +212,13 @@ export function useTimelineDrag({
   const lastPreviewMinuteRef = useRef(540);
   const dragStartYRef = useRef(0);
   const dragMovedRef = useRef(false);
+  const suppressClickUntilRef = useRef(0);
+  const getRuntimeScale = useCallback(() => {
+    const scale = buildAdaptiveSnapRuntimeScale(resolvedSnapConfig, getViewportHeight());
+    return pixelsPerMinute && pixelsPerMinute > 0
+      ? { ...scale, coarsePixelsPerMinute: pixelsPerMinute, finePixelsPerMinute: pixelsPerMinute }
+      : scale;
+  }, [pixelsPerMinute, resolvedSnapConfig]);
   const runtimeScaleRef = useRef<AdaptiveSnapRuntimeScale>(
     buildAdaptiveSnapRuntimeScale(resolvedSnapConfig, getViewportHeight()),
   );
@@ -273,8 +283,8 @@ export function useTimelineDrag({
   const resetSnapState = useCallback(() => {
     setSnapMode("coarse");
     setZoomRail(null);
-    runtimeScaleRef.current = buildAdaptiveSnapRuntimeScale(resolvedSnapConfig, getViewportHeight());
-  }, [resolvedSnapConfig]);
+    runtimeScaleRef.current = getRuntimeScale();
+  }, [getRuntimeScale]);
 
   const applyComposedDragMinute = useCallback(
     (pointerMinute: number, nudgeOffsetMinutes: number) => {
@@ -485,10 +495,7 @@ export function useTimelineDrag({
       activeDragDeadzonePxRef.current = resolvedPostActivationDeadzonePx > 0
         ? Math.max(0, inputActivationThresholdPx + resolvedPostActivationDeadzonePx)
         : 0;
-      runtimeScaleRef.current = buildAdaptiveSnapRuntimeScale(
-        resolvedSnapConfig,
-        getViewportHeight(),
-      );
+      runtimeScaleRef.current = getRuntimeScale();
 
       setDraggingTaskId(pendingDrag.taskId);
       dragOffsetY.set(0);
@@ -504,6 +511,7 @@ export function useTimelineDrag({
       dragOffsetY,
       resolvedPostActivationDeadzonePx,
       resolvedSnapConfig,
+      getRuntimeScale,
     ],
   );
 
@@ -536,6 +544,7 @@ export function useTimelineDrag({
     flushQueuedMove({ skipAutoscrollUpdate: true });
 
     const taskId = draggingTaskIdRef.current;
+    if (taskId) suppressClickUntilRef.current = Date.now() + 700;
     const finalMinute = snapMinuteByMode(currentRawMinutesRef.current, "fine", resolvedSnapConfig);
     const finalTime = dragMovedRef.current
       ? minuteToTime24(finalMinute, resolvedSnapConfig)
@@ -562,6 +571,7 @@ export function useTimelineDrag({
   ]);
 
   const cancelDragSession = useCallback(() => {
+    if (draggingTaskIdRef.current) suppressClickUntilRef.current = Date.now() + 700;
     resetDragSession({ clearDropMarker: true });
   }, [resetDragSession]);
 
@@ -607,6 +617,11 @@ export function useTimelineDrag({
       activeDragDeadzonePxRef.current = 0;
 
       const pointerMove = (e: PointerEvent) => {
+        const pending = pendingDragRef.current;
+        if (pending?.requiresLongPressBeforeMove && !pending.longPressSatisfied && Math.abs(e.clientY - pending.startY) > 10) {
+          cancelDragSession();
+          return;
+        }
         const isActive = maybeActivateDrag(e.clientY);
         if (!isActive) return;
         queueMove(e.clientY);
@@ -629,6 +644,11 @@ export function useTimelineDrag({
         const touch = e.touches[0];
         if (!touch) return;
         const pendingDrag = pendingDragRef.current;
+        // A swipe before the hold is scrolling, never a delayed drag.
+        if (pendingDrag?.requiresLongPressBeforeMove && !pendingDrag.longPressSatisfied && Math.abs(touch.clientY - pendingDrag.startY) > 10) {
+          cancelDragSession();
+          return;
+        }
         const isHeldBeforeActivation = !draggingTaskIdRef.current
           && !!pendingDrag
           && pendingDrag.requiresLongPressBeforeMove
@@ -664,25 +684,26 @@ export function useTimelineDrag({
         const touchTarget = getTouchListenerTarget();
         windowListenersRef.current.touchmove = touchMove;
         windowListenersRef.current.touchend = touchEnd;
-        windowListenersRef.current.touchcancel = touchEnd;
+        windowListenersRef.current.touchcancel = cancelDragSession;
         if (touchTarget) {
           windowListenersRef.current.touchTarget = touchTarget;
           touchTarget.addEventListener("touchmove", touchMove, { capture: true, passive: false });
           touchTarget.addEventListener("touchend", touchEnd, true);
-          touchTarget.addEventListener("touchcancel", touchEnd, true);
+          touchTarget.addEventListener("touchcancel", cancelDragSession, true);
         }
       } else {
         windowListenersRef.current.pointermove = pointerMove;
         windowListenersRef.current.pointerup = pointerEnd;
-        windowListenersRef.current.pointercancel = pointerEnd;
+        windowListenersRef.current.pointercancel = cancelDragSession;
         window.addEventListener("pointermove", pointerMove);
         window.addEventListener("pointerup", pointerEnd);
-        window.addEventListener("pointercancel", pointerEnd);
+        window.addEventListener("pointercancel", cancelDragSession);
       }
     },
     [
       clearLongPressFeedbackTimer,
       clearQueuedMove,
+      cancelDragSession,
       enabled,
       finishDrag,
       maybeActivateDrag,
@@ -798,6 +819,7 @@ export function useTimelineDrag({
   }, [clearDropResetTimer, clearLongPressFeedbackTimer, clearQueuedMove, removeWindowListeners, stopScroll]);
 
   return {
+    shouldSuppressClick: () => !!draggingTaskIdRef.current || Date.now() < suppressClickUntilRef.current,
     draggingTaskId,
     previewTime,
     longPressTaskId,

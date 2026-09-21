@@ -1,0 +1,218 @@
+[
+  {
+    "element": "fire",
+    "stage": "initiate",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: fire. Scene: volcanic basalt terrain, distant lava rivers, copper haze, muted amber light. Evolution form initiate: A sheltered path leaving a small clearing, with gentle hills and a first glimpse of the larger world. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/fire-initiate.webp"
+  },
+  {
+    "element": "fire",
+    "stage": "awakened",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: fire. Scene: volcanic basalt terrain, distant lava rivers, copper haze, muted amber light. Evolution form awakened: An expansive valley overlook with a winding river of the element and distant natural arches. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/fire-awakened.webp"
+  },
+  {
+    "element": "fire",
+    "stage": "guardian",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: fire. Scene: volcanic basalt terrain, distant lava rivers, copper haze, muted amber light. Evolution form guardian: A tranquil ancient sanctuary with weathered monumental pillars at the edges, and a protective ring of cliffs. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/fire-guardian.webp"
+  },
+  {
+    "element": "fire",
+    "stage": "champion",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: fire. Scene: volcanic basalt terrain, distant lava rivers, copper haze, muted amber light. Evolution form champion: A majestic high plateau above a vast elemental kingdom, distant stepped terraces and mountains. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/fire-champion.webp"
+  },
+  {
+    "element": "fire",
+    "stage": "mythic",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: fire. Scene: volcanic basalt terrain, distant lava rivers, copper haze, muted amber light. Evolution form mythic: A dreamlike realm with immense floating landforms and a distant celestial horizon, wondrous but restrained. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/fire-mythic.webp"
+  },
+  {
+    "element": "fire",
+    "stage": "ascended",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: fire. Scene: volcanic basalt terrain, distant lava rivers, copper haze, muted amber light. Evolution form ascended: A transcendent summit above the clouds, a vast horizon of luminous elemental worlds, serene and timeless. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/fire-ascended.webp"
+  },
+  {
+    "element": "ice",
+    "stage": "initiate",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: ice. Scene: glacial terrain, blue crystal ice, snow peaks, pale cyan aurora. Evolution form initiate: A sheltered path leaving a small clearing, with gentle hills and a first glimpse of the larger world. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/ice-initiate.webp"
+  },
+  {
+    "element": "ice",
+    "stage": "awakened",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: ice. Scene: glacial terrain, blue crystal ice, snow peaks, pale cyan aurora. Evolution form awakened: An expansive valley overlook with a winding river of the element and distant natural arches. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/ice-awakened.webp"
+  },
+  {
+    "element": "ice",
+    "stage": "guardian",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: ice. Scene: glacial terrain, blue crystal ice, snow peaks, pale cyan aurora. Evolution form guardian: A tranquil ancient sanctuary with weathered monumental pillars at the edges, and a protective ring of cliffs. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/ice-guardian.webp"
+  },
+  {
+    "element": "ice",
+    "stage": "champion",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: ice. Scene: glacial terrain, blue crystal ice, snow peaks, pale cyan aurora. Evolution form champion: A majestic high plateau above a vast elemental kingdom, distant stepped terraces and mountains. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/ice-champion.webp"
+  },
+  {
+    "element": "ice",
+    "stage": "mythic",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: ice. Scene: glacial terrain, blue crystal ice, snow peaks, pale cyan aurora. Evolution form mythic: A dreamlike realm with immense floating landforms and a distant celestial horizon, wondrous but restrained. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/ice-mythic.webp"
+  },
+  {
+    "element": "ice",
+    "stage": "ascended",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: ice. Scene: glacial terrain, blue crystal ice, snow peaks, pale cyan aurora. Evolution form ascended: A transcendent summit above the clouds, a vast horizon of luminous elemental worlds, serene and timeless. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/ice-ascended.webp"
+  },
+  {
+    "element": "storm",
+    "stage": "initiate",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: storm. Scene: windswept mountain terrain, indigo storm clouds, misty cliffs, subtle distant lightning. Evolution form initiate: A sheltered path leaving a small clearing, with gentle hills and a first glimpse of the larger world. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/storm-initiate.webp"
+  },
+  {
+    "element": "storm",
+    "stage": "awakened",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: storm. Scene: windswept mountain terrain, indigo storm clouds, misty cliffs, subtle distant lightning. Evolution form awakened: An expansive valley overlook with a winding river of the element and distant natural arches. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/storm-awakened.webp"
+  },
+  {
+    "element": "storm",
+    "stage": "guardian",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: storm. Scene: windswept mountain terrain, indigo storm clouds, misty cliffs, subtle distant lightning. Evolution form guardian: A tranquil ancient sanctuary with weathered monumental pillars at the edges, and a protective ring of cliffs. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/storm-guardian.webp"
+  },
+  {
+    "element": "storm",
+    "stage": "champion",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: storm. Scene: windswept mountain terrain, indigo storm clouds, misty cliffs, subtle distant lightning. Evolution form champion: A majestic high plateau above a vast elemental kingdom, distant stepped terraces and mountains. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/storm-champion.webp"
+  },
+  {
+    "element": "storm",
+    "stage": "mythic",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: storm. Scene: windswept mountain terrain, indigo storm clouds, misty cliffs, subtle distant lightning. Evolution form mythic: A dreamlike realm with immense floating landforms and a distant celestial horizon, wondrous but restrained. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/storm-mythic.webp"
+  },
+  {
+    "element": "storm",
+    "stage": "ascended",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: storm. Scene: windswept mountain terrain, indigo storm clouds, misty cliffs, subtle distant lightning. Evolution form ascended: A transcendent summit above the clouds, a vast horizon of luminous elemental worlds, serene and timeless. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/storm-ascended.webp"
+  },
+  {
+    "element": "nature",
+    "stage": "initiate",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: nature. Scene: emerald forest terrain, mossy ancient trees, ferns, filtered green sunbeams. Evolution form initiate: A sheltered path leaving a small clearing, with gentle hills and a first glimpse of the larger world. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/nature-initiate.webp"
+  },
+  {
+    "element": "nature",
+    "stage": "awakened",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: nature. Scene: emerald forest terrain, mossy ancient trees, ferns, filtered green sunbeams. Evolution form awakened: An expansive valley overlook with a winding river of the element and distant natural arches. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/nature-awakened.webp"
+  },
+  {
+    "element": "nature",
+    "stage": "guardian",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: nature. Scene: emerald forest terrain, mossy ancient trees, ferns, filtered green sunbeams. Evolution form guardian: A tranquil ancient sanctuary with weathered monumental pillars at the edges, and a protective ring of cliffs. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/nature-guardian.webp"
+  },
+  {
+    "element": "nature",
+    "stage": "champion",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: nature. Scene: emerald forest terrain, mossy ancient trees, ferns, filtered green sunbeams. Evolution form champion: A majestic high plateau above a vast elemental kingdom, distant stepped terraces and mountains. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/nature-champion.webp"
+  },
+  {
+    "element": "nature",
+    "stage": "mythic",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: nature. Scene: emerald forest terrain, mossy ancient trees, ferns, filtered green sunbeams. Evolution form mythic: A dreamlike realm with immense floating landforms and a distant celestial horizon, wondrous but restrained. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/nature-mythic.webp"
+  },
+  {
+    "element": "nature",
+    "stage": "ascended",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: nature. Scene: emerald forest terrain, mossy ancient trees, ferns, filtered green sunbeams. Evolution form ascended: A transcendent summit above the clouds, a vast horizon of luminous elemental worlds, serene and timeless. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/nature-ascended.webp"
+  },
+  {
+    "element": "void",
+    "stage": "initiate",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: void. Scene: violet cosmic terrain, floating dark stone, purple nebula, sparse stars. Evolution form initiate: A sheltered path leaving a small clearing, with gentle hills and a first glimpse of the larger world. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/void-initiate.webp"
+  },
+  {
+    "element": "void",
+    "stage": "awakened",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: void. Scene: violet cosmic terrain, floating dark stone, purple nebula, sparse stars. Evolution form awakened: An expansive valley overlook with a winding river of the element and distant natural arches. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/void-awakened.webp"
+  },
+  {
+    "element": "void",
+    "stage": "guardian",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: void. Scene: violet cosmic terrain, floating dark stone, purple nebula, sparse stars. Evolution form guardian: A tranquil ancient sanctuary with weathered monumental pillars at the edges, and a protective ring of cliffs. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/void-guardian.webp"
+  },
+  {
+    "element": "void",
+    "stage": "champion",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: void. Scene: violet cosmic terrain, floating dark stone, purple nebula, sparse stars. Evolution form champion: A majestic high plateau above a vast elemental kingdom, distant stepped terraces and mountains. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/void-champion.webp"
+  },
+  {
+    "element": "void",
+    "stage": "mythic",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: void. Scene: violet cosmic terrain, floating dark stone, purple nebula, sparse stars. Evolution form mythic: A dreamlike realm with immense floating landforms and a distant celestial horizon, wondrous but restrained. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/void-mythic.webp"
+  },
+  {
+    "element": "void",
+    "stage": "ascended",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: void. Scene: violet cosmic terrain, floating dark stone, purple nebula, sparse stars. Evolution form ascended: A transcendent summit above the clouds, a vast horizon of luminous elemental worlds, serene and timeless. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/void-ascended.webp"
+  },
+  {
+    "element": "light",
+    "stage": "initiate",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: light. Scene: ivory and gold terrain, pale sunlit clouds, softly glowing grasses, warm sunrise. Evolution form initiate: A sheltered path leaving a small clearing, with gentle hills and a first glimpse of the larger world. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/light-initiate.webp"
+  },
+  {
+    "element": "light",
+    "stage": "awakened",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: light. Scene: ivory and gold terrain, pale sunlit clouds, softly glowing grasses, warm sunrise. Evolution form awakened: An expansive valley overlook with a winding river of the element and distant natural arches. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/light-awakened.webp"
+  },
+  {
+    "element": "light",
+    "stage": "guardian",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: light. Scene: ivory and gold terrain, pale sunlit clouds, softly glowing grasses, warm sunrise. Evolution form guardian: A tranquil ancient sanctuary with weathered monumental pillars at the edges, and a protective ring of cliffs. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/light-guardian.webp"
+  },
+  {
+    "element": "light",
+    "stage": "champion",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: light. Scene: ivory and gold terrain, pale sunlit clouds, softly glowing grasses, warm sunrise. Evolution form champion: A majestic high plateau above a vast elemental kingdom, distant stepped terraces and mountains. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/light-champion.webp"
+  },
+  {
+    "element": "light",
+    "stage": "mythic",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: light. Scene: ivory and gold terrain, pale sunlit clouds, softly glowing grasses, warm sunrise. Evolution form mythic: A dreamlike realm with immense floating landforms and a distant celestial horizon, wondrous but restrained. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/light-mythic.webp"
+  },
+  {
+    "element": "light",
+    "stage": "ascended",
+    "prompt": "Use case: stylized-concept. Asset type: one square mobile fantasy companion portrait BACKGROUND, environment only. Element: light. Scene: ivory and gold terrain, pale sunlit clouds, softly glowing grasses, warm sunrise. Evolution form ascended: A transcendent summit above the clouds, a vast horizon of luminous elemental worlds, serene and timeless. Cohesive premium painterly 3D fantasy game art, soft atmospheric detail. Eye-level view, quiet open central 65% reserved for a large animal composited later. Subtle ground in bottom 20%. Diffuse upper-left lighting, restrained contrast and saturation. Environment fills entire square. No animal, people, eggs, lettering, symbols, UI, borders, logos or watermark. One landscape only, not a grid.",
+    "asset": "public/companion-habitats/light-ascended.webp"
+  }
+]

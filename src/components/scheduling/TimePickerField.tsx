@@ -192,6 +192,10 @@ export function TimePickerField({
   };
 
   const inputAriaLabel = inputProps?.["aria-label"] ?? ariaLabel;
+  const triggerLabel = getTimeTriggerLabel(value, placeholder);
+  const triggerAriaLabel = triggerProps?.["aria-label"] ?? (
+    open && value ? `Current time: ${triggerLabel}` : undefined
+  );
 
   return (
     <div className={cn(styles.root, className)}>
@@ -202,6 +206,8 @@ export function TimePickerField({
         <button
           type="button"
           {...triggerProps}
+          aria-expanded={open}
+          aria-label={triggerAriaLabel}
           onClick={handleToggle}
           className={cn(
             "flex-1",
@@ -212,7 +218,7 @@ export function TimePickerField({
           )}
         >
           <Clock className={styles.triggerIcon} />
-          <span>{getTimeTriggerLabel(value, placeholder)}</span>
+          <span>{triggerLabel}</span>
           <ChevronRight className={cn(styles.chevron, open && "rotate-90")} />
         </button>
         {suggestionAction}

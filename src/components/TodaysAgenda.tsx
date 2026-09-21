@@ -28,6 +28,7 @@ import {
   CalendarPlus,
   CalendarDays,
   CalendarArrowUp,
+  Compass,
   Trash2,
   ChevronLeft,
   ChevronRight,
@@ -35,6 +36,8 @@ import {
   MicOff,
   Plus,
   Inbox,
+  RefreshCcw,
+  AlertTriangle,
 } from "lucide-react";
 import { JourneysCompanionLauncher } from "@/components/journeys/JourneysCompanionLauncher";
 import {
@@ -99,6 +102,10 @@ import type { CompanionPlannerLaunchIntent } from "@/types/companionPlanner";
 import { createPlanDayCompanionLaunchIntent } from "@/utils/companionPlannerLaunchContext";
 import type { Habit } from "@/features/habits/types";
 import { durationMinutesToPixels } from "@/utils/taskDurationLayout";
+import type { ExternalCalendarEvent } from "@/types/externalCalendar";
+import { externalCalendarEventKey } from "@/types/externalCalendar";
+import { ExternalEventDetails } from "@/components/calendar/ExternalEventDetails";
+import { calendarProviderDisplayName } from "@/utils/calendarDestinationOptions";
 
 // Helper to calculate days remaining
 const getDaysLeft = (epic: { start_date: string; target_days: number; end_date?: string | null }) =>
@@ -152,6 +159,10 @@ interface Task {
   location?: string | null;
   attachments?: TaskAttachment[] | null;
   subtasks?: TaskSubtask[];
+  is_external_calendar_event?: boolean;
+  external_calendar_provider?: ExternalCalendarEvent["provider"];
+  external_calendar_name?: string;
+  external_calendar_url?: string | null;
 }
 
 interface TaskSubtask {
@@ -217,7 +228,16 @@ const patchSubtaskCompletionInTaskList = <T extends { id: string; subtasks?: Tas
 };
 
 interface TodaysAgendaProps {
+  calendarOnly?: boolean;
+  compactCalendar?: boolean;
   tasks: Task[];
+  primaryMissionTaskId?: string | null;
+  externalEvents?: ExternalCalendarEvent[];
+  connectedCalendarCount?: number;
+  isExternalCalendarSyncing?: boolean;
+  externalCalendarSyncError?: string | null;
+  onRefreshExternalCalendars?: () => void;
+  onManageCalendars?: () => void;
   selectedDate: Date;
   readableQuestCardsEnabled?: boolean;
   layoutMode?: JourneysLayoutMode;
@@ -238,6 +258,7 @@ interface TodaysAgendaProps {
   currentStreak?: number;
   onUndoToggle?: (taskId: string, xpReward: number) => void;
   onEditQuest?: (task: Task) => void;
+  onViewQuest?: (task: Task) => void;
   weekTasks?: CalendarTask[];
   activeEpics?: Array<{
     id: string;
@@ -318,11 +339,9 @@ const LANE_OFFSET_STEP_PX = 10;
 const FULL_DAY_START_MINUTE = 0;
 const FULL_DAY_END_MINUTE = 24 * 60;
 const FULL_DAY_SLOT_INTERVAL_MINUTES = 30;
-const OUTLOOK_TIMELINE_HOUR_HEIGHT_PX = 104;
-const OUTLOOK_TIMELINE_PX_PER_MINUTE = OUTLOOK_TIMELINE_HOUR_HEIGHT_PX / 60;
-const OUTLOOK_TIMELINE_SLOT_HEIGHT_PX = OUTLOOK_TIMELINE_PX_PER_MINUTE * FULL_DAY_SLOT_INTERVAL_MINUTES;
-const OUTLOOK_TIMELINE_HEIGHT_PX = FULL_DAY_END_MINUTE * OUTLOOK_TIMELINE_PX_PER_MINUTE;
-const OUTLOOK_TIMELINE_GUTTER_WIDTH_PX = 52;
+const DESKTOP_TIMELINE_HOUR_HEIGHT_PX = 104;
+const MOBILE_TIMELINE_HOUR_HEIGHT_PX = 72;
+const OUTLOOK_TIMELINE_GUTTER_WIDTH_PX = 64;
 const OUTLOOK_TIMELINE_EVENT_GAP_PX = 4;
 const OUTLOOK_TIMELINE_MIN_EVENT_HEIGHT_PX = 52;
 const COMPACT_TIMELINE_ROW_MAX_HEIGHT_PX = OUTLOOK_TIMELINE_MIN_EVENT_HEIGHT_PX;
@@ -493,10 +512,6 @@ const buildFullDaySlotMinutes = () => {
   return slots;
 };
 
-const getTimelineTopPx = (minute: number) => (
-  Math.max(FULL_DAY_START_MINUTE, Math.min(FULL_DAY_END_MINUTE, minute)) * OUTLOOK_TIMELINE_PX_PER_MINUTE
-);
-
 const isTimeSlotInteractiveTarget = (target: EventTarget | null): boolean => {
   if (typeof HTMLElement === "undefined" || !(target instanceof HTMLElement)) {
     return false;
@@ -520,7 +535,16 @@ const getLaneOffsetPx = (laneIndex: number, overlapCount: number) => {
 };
 
 export const TodaysAgenda = memo(function TodaysAgenda({
+  calendarOnly = false,
+  compactCalendar = false,
   tasks,
+  primaryMissionTaskId = null,
+  externalEvents = [],
+  connectedCalendarCount = 0,
+  isExternalCalendarSyncing = false,
+  externalCalendarSyncError = null,
+  onRefreshExternalCalendars,
+  onManageCalendars,
   selectedDate,
   readableQuestCardsEnabled = false,
   layoutMode,
@@ -543,6 +567,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   currentStreak = 0,
   onUndoToggle,
   onEditQuest,
+  onViewQuest,
   weekTasks = [],
   activeEpics = [],
   isCampaignsLoading = false,
@@ -616,6 +641,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     if (typeof window === "undefined") return false;
     return window.innerWidth >= DESKTOP_LAYOUT_MIN_WIDTH;
   });
+  const timelineHourHeightPx = isDesktopLayout
+    ? DESKTOP_TIMELINE_HOUR_HEIGHT_PX
+    : MOBILE_TIMELINE_HOUR_HEIGHT_PX;
+  const timelinePxPerMinute = timelineHourHeightPx / 60;
+  const timelineSlotHeightPx = timelinePxPerMinute * FULL_DAY_SLOT_INTERVAL_MINUTES;
+  const timelineHeightPx = FULL_DAY_END_MINUTE * timelinePxPerMinute;
+  const getTimelineTopPx = useCallback((minute: number) => (
+    Math.max(FULL_DAY_START_MINUTE, Math.min(FULL_DAY_END_MINUTE, minute)) * timelinePxPerMinute
+  ), [timelinePxPerMinute]);
   const isNativeIOS = useMemo(() => {
     if (typeof window === "undefined") return false;
     const capacitor = (window as Window & {
@@ -625,7 +659,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, []);
   const useLiteAnimations = isNativeIOS || Boolean(prefersReducedMotion) || !capabilities.allowBackgroundAnimation;
   const isTimelineDragEnabled = !disableTimelineDrag;
-  const isDesktopTimelineDragEnabled = isTimelineDragEnabled && !isDesktopLayout;
+  const isDesktopTimelineDragEnabled = isTimelineDragEnabled;
   const mobileFabScrollClearance = isDesktopLayout ? undefined : `${MOBILE_FAB_SCROLL_CLEARANCE_PX}px`;
   const { profile } = useProfile();
   const queryClient = useQueryClient();
@@ -1043,9 +1077,33 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     };
   }, [tasks, sortBy, keepInPlace]);
 
+  const [selectedExternalEvent, setSelectedExternalEvent] = useState<ExternalCalendarEvent | null>(null);
+  const externalTimedItems = useMemo(
+    () => externalEvents
+      .filter((event) => !event.isAllDay && !!event.scheduledTime)
+      .map((event): Task => ({
+        id: `external:${externalCalendarEventKey(event)}`,
+        task_text: event.title,
+        completed: false,
+        xp_reward: 0,
+        task_date: event.taskDate,
+        scheduled_time: event.scheduledTime,
+        estimated_duration: event.estimatedDuration,
+        location: event.location,
+        is_external_calendar_event: true,
+        external_calendar_provider: event.provider,
+        external_calendar_name: event.calendarName,
+        external_calendar_url: event.htmlLink,
+      })),
+    [externalEvents],
+  );
+  const allDayExternalEvents = useMemo(
+    () => externalEvents.filter((event) => event.isAllDay),
+    [externalEvents],
+  );
   const schedulerItems = useMemo(
-    () => [...questTasks, ...ritualTasks],
-    [questTasks, ritualTasks],
+    () => [...questTasks, ...ritualTasks, ...externalTimedItems],
+    [externalTimedItems, questTasks, ritualTasks],
   );
 
   const scheduledItems = useMemo(
@@ -1055,8 +1113,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     [schedulerItems],
   );
   const anytimeItems = useMemo(
-    () => schedulerItems.filter((task) => !task.scheduled_time),
-    [schedulerItems],
+    () => [...questTasks, ...ritualTasks].filter((task) => !task.scheduled_time),
+    [questTasks, ritualTasks],
   );
 
   useEffect(() => {
@@ -1070,13 +1128,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     [scheduledItems, anytimeItems],
   );
 
-  const draggableTimelineItems = baseTimelineItems;
+  const draggableTimelineItems = baseTimelineItems.filter(
+    (task) => !task.is_external_calendar_event,
+  );
 
   const timelineDrag = useTimelineDrag({
     containerRef: timelineDragContainerRef,
     enabled: isDesktopTimelineDragEnabled,
     snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
     ...SHARED_TIMELINE_DRAG_INTERACTION_PROFILE,
+    pixelsPerMinute: timelinePxPerMinute,
+    postActivationDeadzonePx: 0,
     onDrop: (taskId, newTime) => {
       const overlapCount = getTaskConflictSetForTask(taskId, draggableTimelineItems, { [taskId]: newTime }).size;
       onUpdateScheduledTime?.(taskId, newTime);
@@ -1451,7 +1513,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         const heightPx = durationMinutesToPixels(task.estimated_duration, {
           fallbackMinutes: timedTaskDurationFallbackMinutes,
           minHeightPx: OUTLOOK_TIMELINE_MIN_EVENT_HEIGHT_PX,
-          pxPerMinute: OUTLOOK_TIMELINE_PX_PER_MINUTE,
+          pxPerMinute: timelinePxPerMinute,
         });
 
         return {
@@ -1477,7 +1539,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         leftPercent: number;
         widthPercent: number;
       } => entry !== null)
-  ), [flowOrderedScheduledItems, scheduledFlow.byTaskId, timedTaskDurationFallbackMinutes]);
+  ), [flowOrderedScheduledItems, getTimelineTopPx, scheduledFlow.byTaskId, timedTaskDurationFallbackMinutes, timelinePxPerMinute]);
 
   const hasRenderableNowMarker = isTodaySelected;
 
@@ -1560,7 +1622,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     wasTodayRef.current = isToday;
     hadNowMarkerRef.current = hasRenderableNowMarker;
     lastCenterNowRequestKeyRef.current = centerNowRequestKey;
-  }, [centerNowRequestKey, hasRenderableNowMarker, isTodaySelected, isVisible, timelineBodyHeightPx, timelineIsDragging]);
+  }, [centerNowRequestKey, getTimelineTopPx, hasRenderableNowMarker, isTodaySelected, isVisible, timelineBodyHeightPx, timelineIsDragging]);
 
   const baseTimelineConflictMap = useMemo(
     () => buildTaskConflictMap(draggableTimelineItems),
@@ -2171,6 +2233,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     timelineContext?: TimelineTaskRenderContext,
   ) => {
     const isComplete = !!task.completed || optimisticCompleted.has(task.id);
+    const isPrimaryMission = primaryMissionTaskId === task.id;
     const isRitual = !!task.habit_source_id;
     const isCampaignRitual = isCampaignRitualTask(task);
     const campaignTitle = task.epic_title?.trim() || "Campaign";
@@ -2187,8 +2250,42 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     const canRenderInlineDetails = !isScheduledTimelineItem;
     const isInlineExpanded = canRenderInlineDetails && isExpanded;
     const hasDetails = hasExpandableDetails(task);
-    const canOpenQuestDetails = isScheduledTimelineItem || hasDetails;
+    const canOpenQuestDetails = !!onViewQuest || isScheduledTimelineItem || hasDetails;
     const isMobileDetailOpen = isScheduledTimelineItem && mobileDetailTaskId === task.id;
+
+    if (task.is_external_calendar_event) {
+      const providerName = task.external_calendar_provider
+        ? calendarProviderDisplayName(task.external_calendar_provider)
+        : "External";
+      const calendarName = task.external_calendar_name || `${providerName} Calendar`;
+      const card = (
+        <div
+          className={cn(
+            "flex h-full min-w-0 items-center gap-2 rounded-[16px] border border-celestial-blue/25 bg-celestial-blue/[0.08] px-2.5 py-2 text-left",
+            isCompactTimelineItem && "py-1",
+          )}
+          data-testid={`external-calendar-event-${task.id}`}
+          data-calendar-provider={task.external_calendar_provider}
+        >
+          <CalendarDays className="h-4 w-4 flex-shrink-0 text-celestial-blue" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className={cn("truncate font-semibold text-foreground", isCompactTimelineItem ? "text-sm" : "text-base")}>
+              {task.task_text}
+            </p>
+            {!isCompactTimelineItem ? (
+              <p className="truncate text-xs text-muted-foreground">
+                {calendarName} · Read only
+              </p>
+            ) : null}
+          </div>
+        </div>
+      );
+
+      return <button type="button" className="block h-full w-full min-w-0 text-left focus-visible:ring-2 focus-visible:ring-primary"
+        aria-label={`View ${task.task_text} details`}
+        onClick={() => setSelectedExternalEvent(externalEvents.find((event) => `external:${externalCalendarEventKey(event)}` === task.id) ?? null)}>{card}</button>;
+    }
+
     const handleCheckboxClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       // Don't allow clicks while dragging or during long press
@@ -2233,6 +2330,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       return (
         <div
           data-quest-card-shell="true"
+          data-quest-complete={isComplete}
+          data-quest-dragging={isDragging}
           className={cn(
             JOURNEYS_QUEST_CARD_SHELL_CLASS_NAME,
             "group flex h-full items-stretch gap-2 rounded-[18px] p-2",
@@ -2246,6 +2345,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             ),
             isDesktopDetailOpen && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
             isDesktopDetailOpen && !readableQuestCardsEnabled && "border-primary/40 bg-primary/[0.08]",
+            isPrimaryMission && "border-cyan-200/45 bg-cyan-300/[0.08] shadow-[0_0_0_1px_rgba(165,243,252,0.08)]",
             isComplete && "opacity-70",
           )}
           onContextMenu={suppressNativeContextMenu}
@@ -2300,6 +2400,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               >
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
+                    {isPrimaryMission ? (
+                      <Compass className="h-3.5 w-3.5 flex-shrink-0 text-cyan-200" aria-label="Today’s primary mission" />
+                    ) : null}
                     {isRitual ? (
                       <Repeat
                         className={cn(
@@ -2340,6 +2443,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         <div
           data-quest-card-shell="true"
           data-scheduled-timeline-card={isScheduledTimelineItem ? "true" : undefined}
+          data-quest-complete={isComplete}
+          data-quest-dragging={isDragging}
           data-compact-timeline-card={isCompactTimelineItem ? "true" : undefined}
           data-timeline-card-height-px={timelineContext?.heightPx ?? undefined}
           className={cn(
@@ -2356,6 +2461,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             ),
             isMobileQuestShellActive && JOURNEYS_QUEST_CARD_SHELL_ACTIVE_CLASS_NAME,
             isMobileQuestShellActive && !readableQuestCardsEnabled && "border-primary/35 bg-primary/[0.06]",
+            isPrimaryMission && "border-cyan-200/45 bg-cyan-300/[0.08] shadow-[0_0_0_1px_rgba(165,243,252,0.08)]",
             isComplete && "opacity-70",
           )}
         >
@@ -2463,6 +2569,20 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 <div
                   className="flex min-w-0 w-full items-center gap-2"
                   data-testid={`mobile-quest-title-row-${task.id}`}
+                  role={onViewQuest || isScheduledTimelineItem ? "button" : undefined}
+                  tabIndex={onViewQuest || isScheduledTimelineItem ? 0 : undefined}
+                  aria-label={onViewQuest || isScheduledTimelineItem ? `View ${task.task_text} summary` : undefined}
+                  onClick={() => {
+                    if (onViewQuest) onViewQuest(task);
+                    else if (isScheduledTimelineItem) setMobileDetailTaskId(task.id);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      if (onViewQuest) onViewQuest(task);
+                      else if (isScheduledTimelineItem) setMobileDetailTaskId(task.id);
+                    }
+                  }}
                 >
                   {isRitual && (
                     <Repeat className={cn("w-4 h-4 flex-shrink-0", isCampaignRitual ? "text-primary" : "text-accent")} />
@@ -2471,7 +2591,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     text={task.task_text}
                     className="min-w-0 w-full flex-1"
                     textClassName={cn(
-                      "text-sm",
+                      isCompactTimelineItem ? "text-sm" : "text-base font-medium",
                       isComplete && "text-muted-foreground",
                       isComplete && (justCompletedTasks.has(task.id) ? "animate-strikethrough" : "line-through")
                     )}
@@ -2483,7 +2603,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   </span>
                 )}
                 {task.scheduled_time && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <span className="mt-1 flex items-center gap-1 text-sm font-medium text-muted-foreground">
                     <Clock className="w-3 h-3" />
                     {formatTime(task.scheduled_time)}
                   </span>
@@ -2586,6 +2706,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     Main
                   </Badge>
                 )}
+                {isPrimaryMission && (
+                  <Badge variant="outline" className="h-5 border-cyan-200/35 bg-cyan-300/10 px-1.5 py-0.5 text-xs text-cyan-100">
+                    Mission
+                  </Badge>
+                )}
                 <span className="text-sm font-bold text-stardust-gold/80">+{effectiveTaskXP}</span>
 
                 {/* Chevron for expandable details - scheduled rows open a drawer to avoid changing timeline height */}
@@ -2604,6 +2729,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     data-testid={`mobile-quest-detail-toggle-${task.id}`}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (onViewQuest) {
+                        onViewQuest(task);
+                        return;
+                      }
                       if (isScheduledTimelineItem) {
                         setMobileDetailTaskId(task.id);
                         return;
@@ -2633,8 +2762,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     return taskContent;
   }, [
     onToggle,
+    primaryMissionTaskId,
     onUndoToggle,
     onEditQuest,
+    onViewQuest,
     onSendToCalendar,
     hasCalendarLink,
     onDeleteQuest,
@@ -2813,7 +2944,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     </aside>
   ) : null;
 
-  const scheduledPaneStyle: CSSProperties | undefined = timelineBodyHeightPx
+  const scheduledPaneStyle: CSSProperties | undefined = compactCalendar ? undefined : timelineBodyHeightPx
     ? isDesktopLayout
       ? { height: `${timelineBodyHeightPx}px` }
       : {
@@ -2824,7 +2955,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       ? { scrollPaddingBottom: mobileFabScrollClearance }
       : undefined;
 
-  const scheduledTimelineContentStyle: CSSProperties | undefined = isDesktopLayout
+  const scheduledTimelineContentStyle: CSSProperties | undefined = isDesktopLayout || compactCalendar
     ? undefined
     : { paddingBottom: mobileFabScrollClearance };
   const mobileDetailTaskXP = mobileDetailTask
@@ -2841,74 +2972,146 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       className={cn(
         COMPANION_FROSTED_PLANNER_DARK_CLASS,
         "relative",
-        isDesktopLayout && "grid grid-cols-[minmax(0,1fr)_340px] items-start gap-6",
+        compactCalendar && "flex h-full min-h-0 flex-col",
+        isDesktopLayout && !calendarOnly && "grid grid-cols-[minmax(0,1fr)_340px] items-start gap-6",
       )}
       data-testid="todays-agenda"
       style={companionFrostedThemeStyle}
     >
       <div
         className={cn(
-          "relative px-2 py-2 overflow-visible",
+          compactCalendar ? "relative flex min-h-0 flex-1 flex-col" : "relative px-2 py-2 overflow-visible",
           isDesktopLayout && "journeys-desktop-shell flex min-h-0 flex-col rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,21,39,0.95),rgba(13,11,23,0.92))] px-5 py-5 shadow-[0_28px_54px_rgba(0,0,0,0.24)]",
         )}
       >
-        {/* Compact Header: Date + Progress Ring + XP */}
-        <div className={cn("mb-3 flex items-center justify-between gap-3", isDesktopLayout && "mb-5")}>
-          <div className={cn("flex items-center gap-2", isDesktopLayout && "gap-3")}>
-            <button
-              type="button"
-              onClick={() => onOpenMonthView?.()}
-              className="flex items-center gap-1.5 rounded-2xl transition-opacity hover:opacity-80"
-            >
-              <span className={cn("text-lg font-bold", isDesktopLayout && "text-[1.8rem] tracking-tight")}>
-                {safeFormat(selectedDate, "MMM d, yyyy", "Invalid date")}
-              </span>
-            </button>
-            {currentStreak > 0 && (
-              <div className={cn(
-                "flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-                currentStreak >= 30
-                  ? "bg-stardust-gold/20 text-stardust-gold"
-                  : currentStreak >= 14
-                    ? "bg-celestial-blue/20 text-celestial-blue"
-                    : "bg-orange-500/10 text-orange-400"
-              )}>
-                <Flame className="h-3.5 w-3.5" />
-                {currentStreak}
-              </div>
-            )}
-          </div>
-
-          <div className={cn("flex items-center gap-2", isDesktopLayout && "gap-3")}>
-            {/* Compact progress ring */}
-            {totalCount > 0 && (
-              <div
-                className={cn(
-                  "flex items-center gap-1.5 rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1.5",
-                  isDesktopLayout && "px-3 py-2",
-                )}
+        {compactCalendar ? null : !isDesktopLayout ? (
+          <header
+            className="mb-2 rounded-[20px] border border-white/10 bg-slate-950/55 p-2 shadow-[0_12px_28px_rgba(0,0,0,0.18)] backdrop-blur-xl"
+            data-testid="agenda-mobile-header"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onOpenMonthView?.()}
+                className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-[16px] px-2 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                aria-label={`Open month calendar for ${safeFormat(selectedDate, "MMMM d, yyyy", "selected date")}`}
               >
-                <ProgressRing percent={progressPercent} size={24} strokeWidth={2.5} />
-                <span className="text-xs font-medium text-muted-foreground">
-                  {completedCount}/{totalCount}
+                <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[12px] bg-celestial-blue/15 text-celestial-blue">
+                  <CalendarDays className="h-4 w-4" />
                 </span>
-              </div>
-            )}
-            <div
-              className={cn(
-                "flex items-center gap-1 rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1.5 text-sm",
-                isDesktopLayout && "px-3 py-2",
-              )}
-            >
-              <Trophy className={cn(
-                "h-4 w-4",
-                allComplete ? "text-stardust-gold" : "text-stardust-gold/70"
-              )} />
-              <span className="font-semibold text-stardust-gold">{totalXP}</span>
+                <span className="min-w-0">
+                  <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-celestial-blue">
+                    {isSelectedToday ? "Today" : safeFormat(selectedDate, "EEEE", "Selected day")}
+                  </span>
+                  <span className="block truncate text-sm font-semibold text-foreground">
+                    {safeFormat(selectedDate, "MMMM d, yyyy", "Invalid date")}
+                  </span>
+                </span>
+              </button>
+              {quickCaptureControls}
             </div>
-            {quickCaptureControls}
+
+            <div className="mt-1 flex min-w-0 items-center gap-1.5 border-t border-white/[0.07] pt-2">
+              {!calendarOnly && totalCount > 0 ? (
+                <div
+                  className="flex h-8 items-center gap-1.5 rounded-[14px] bg-white/[0.045] px-2"
+                  aria-label={`${completedCount} of ${totalCount} agenda items complete`}
+                >
+                  <ProgressRing percent={progressPercent} size={21} strokeWidth={2.5} />
+                  <span className="text-xs font-semibold text-foreground">{completedCount}/{totalCount}</span>
+                </div>
+              ) : null}
+              {!calendarOnly ? <div
+                className="flex h-8 items-center gap-1 rounded-[14px] bg-white/[0.045] px-2 text-xs"
+                aria-label={`${totalXP} experience points available`}
+              >
+                <Trophy className={cn("h-3.5 w-3.5", allComplete ? "text-stardust-gold" : "text-stardust-gold/70")} />
+                <span className="font-semibold text-stardust-gold">{totalXP}</span>
+                <span className="text-muted-foreground">XP</span>
+              </div> : null}
+              {onManageCalendars ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 min-w-0 flex-1 justify-end rounded-[14px] px-2 text-xs text-celestial-blue hover:bg-celestial-blue/[0.1]"
+                  onClick={onManageCalendars}
+                >
+                  <CalendarDays className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span className="truncate">
+                    {connectedCalendarCount > 0 ? `${connectedCalendarCount} connected` : "Connect"}
+                  </span>
+                </Button>
+              ) : null}
+              {!isSelectedToday && onDateSelect ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 rounded-[14px] px-2 text-xs"
+                  onClick={() => onDateSelect(new Date())}
+                >
+                  Today
+                </Button>
+              ) : null}
+              {connectedCalendarCount > 0 && onRefreshExternalCalendars ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "h-8 w-8 flex-shrink-0 rounded-[14px]",
+                    externalCalendarSyncError && "text-destructive",
+                  )}
+                  onClick={onRefreshExternalCalendars}
+                  disabled={isExternalCalendarSyncing}
+                  aria-label={externalCalendarSyncError ? "Retry calendar sync" : "Refresh external calendars"}
+                  title={externalCalendarSyncError || "Refresh external calendars"}
+                >
+                  {externalCalendarSyncError ? (
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                  ) : (
+                    <RefreshCcw className={cn("h-3.5 w-3.5", isExternalCalendarSyncing && "animate-spin")} />
+                  )}
+                </Button>
+              ) : null}
+            </div>
+          </header>
+        ) : (
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => onOpenMonthView?.()}
+                className="flex items-center gap-2 rounded-2xl transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                aria-label={`Open month calendar for ${safeFormat(selectedDate, "MMMM d, yyyy", "selected date")}`}
+              >
+                <CalendarDays className="h-5 w-5 text-celestial-blue" />
+                <span className="text-[1.8rem] font-bold tracking-tight">
+                  {safeFormat(selectedDate, "MMM d, yyyy", "Invalid date")}
+                </span>
+              </button>
+              {!calendarOnly && currentStreak > 0 ? (
+                <div className="flex items-center gap-1 rounded-full bg-orange-500/10 px-2 py-1 text-xs font-medium text-orange-400">
+                  <Flame className="h-3.5 w-3.5" />
+                  {currentStreak}
+                </div>
+              ) : null}
+            </div>
+            {!calendarOnly ? <div className="flex items-center gap-3">
+              {totalCount > 0 ? (
+                <div className="flex items-center gap-2 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+                  <ProgressRing percent={progressPercent} size={24} strokeWidth={2.5} />
+                  <span className="text-xs font-medium text-muted-foreground">{completedCount}/{totalCount}</span>
+                </div>
+              ) : null}
+              <div className="flex items-center gap-1 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2 text-sm">
+                <Trophy className={cn("h-4 w-4", allComplete ? "text-stardust-gold" : "text-stardust-gold/70")} />
+                <span className="font-semibold text-stardust-gold">{totalXP}</span>
+              </div>
+            </div> : null}
           </div>
-        </div>
+        )}
 
         {isDesktopLayout ? (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -2997,6 +3200,18 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   Month
                 </Button>
               ) : null}
+              {onManageCalendars ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 rounded-[18px] border-white/10 bg-white/5 px-3 text-xs hover:bg-white/10"
+                  onClick={onManageCalendars}
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  Calendars
+                </Button>
+              ) : null}
               {showCompanionPlannerHeaderAction && onOpenCompanionPlanner ? (
                 <JourneysCompanionLauncher
                   variant="inline"
@@ -3013,7 +3228,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         ) : null}
 
         <AnimatePresence>
-          {comboCount > 1 && (
+          {!calendarOnly && comboCount > 1 && (
             <motion.div
               key="combo-banner"
               initial={useLiteAnimations ? { opacity: 1 } : { opacity: 0, y: 8, scale: 0.96 }}
@@ -3051,10 +3266,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         </AnimatePresence>
 
         {/* Timeline Content */}
-        <div className={cn(isDesktopLayout && "flex min-h-0 flex-1 flex-col")}>
-          <div className={cn("mb-2 flex flex-wrap items-center justify-between gap-2", isDesktopLayout && "mb-3")}>
+        <div className={cn((isDesktopLayout || compactCalendar) && "flex min-h-0 flex-1 flex-col")}>
+          <div className={cn("mb-2 flex flex-wrap items-center justify-between gap-2", isDesktopLayout && "mb-3", compactCalendar && (anytimeItems.length ? "mb-0 shrink-0 px-2 py-1" : "hidden"))}>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              {tasks.length > 0 && (
+              {!compactCalendar && tasks.length > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
@@ -3149,10 +3364,72 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   </DrawerContent>
                 </Drawer>
               ) : null}
+
+              {isDesktopLayout && connectedCalendarCount > 0 && onRefreshExternalCalendars ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "h-8 rounded-[16px] border-white/10 bg-white/[0.04] px-2.5 text-xs hover:bg-white/[0.08]",
+                    externalCalendarSyncError && "border-destructive/30 text-destructive",
+                  )}
+                  onClick={onRefreshExternalCalendars}
+                  disabled={isExternalCalendarSyncing}
+                  aria-label="Refresh external calendars"
+                  title={externalCalendarSyncError || "Refresh external calendars"}
+                  data-testid="external-calendar-refresh"
+                >
+                  {externalCalendarSyncError ? (
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                  ) : (
+                    <RefreshCcw className={cn(
+                      "h-3.5 w-3.5",
+                      isExternalCalendarSyncing && "animate-spin",
+                    )} />
+                  )}
+                  Calendars
+                  <Badge variant="secondary" className="h-5 rounded-full px-1.5 text-[10px]">
+                    {externalEvents.length}
+                  </Badge>
+                </Button>
+              ) : null}
             </div>
           </div>
 
-          {tasks.length === 0 ? (
+          {allDayExternalEvents.length > 0 ? (
+            <div
+              className="mb-3 space-y-2 rounded-[20px] border border-celestial-blue/20 bg-celestial-blue/[0.06] p-3"
+              data-testid="external-calendar-all-day-events"
+            >
+              <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-celestial-blue">
+                <CalendarDays className="h-3.5 w-3.5" />
+                All-day calendar events
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {allDayExternalEvents.map((event) => {
+                  const label = (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs text-foreground">
+                      <span className="font-medium">{event.title}</span>
+                      <span className="text-muted-foreground">· {event.calendarName}</span>
+                    </span>
+                  );
+
+                  return (
+                    <button type="button"
+                      key={externalCalendarEventKey(event)}
+                      onClick={() => setSelectedExternalEvent(event)}
+                      aria-label={`View ${event.title} details`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {!calendarOnly && tasks.length === 0 && externalEvents.length === 0 ? (
             <div
               className={cn(
                 "mb-3 rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] px-6 py-8 text-center",
@@ -3183,11 +3460,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             </div>
           ) : null}
 
-          <div className={cn(isDesktopLayout && "flex min-h-0 flex-1 flex-col")}>
+          <div className={cn((isDesktopLayout || compactCalendar) && "flex min-h-0 flex-1 flex-col")}>
             <div
               ref={setScheduledPaneNode}
               className={cn(
-                "overflow-y-auto overflow-x-hidden overscroll-contain pr-1",
+                "overflow-y-auto overflow-x-hidden overscroll-contain",
+                compactCalendar ? "min-h-0 flex-1" : "pr-1",
                 isDesktopLayout && "min-h-0",
               )}
               style={scheduledPaneStyle}
@@ -3198,9 +3476,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 style={scheduledTimelineContentStyle}
               >
                 <div
-                  className="relative overflow-hidden rounded-[24px] border border-white/10 bg-black/10"
+                  className={cn("relative overflow-hidden border border-white/15 bg-slate-950/25", !compactCalendar && "rounded-[20px] shadow-[0_14px_32px_rgba(0,0,0,0.2)]")}
                   data-testid="journeys-day-grid"
-                  style={{ height: `${OUTLOOK_TIMELINE_HEIGHT_PX}px` }}
+                  style={{ height: `${timelineHeightPx}px` }}
                 >
                   {fullDaySlotMinutes.map((slotMinute) => {
                     const isHour = slotMinute % 60 === 0;
@@ -3209,15 +3487,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       <div
                         key={slotMinute}
                         className={cn(
-                          "absolute left-0 right-0 flex border-b border-white/[0.07]",
-                          isHour ? "border-t border-white/[0.10]" : "border-t border-dashed border-white/[0.06]",
+                          "absolute left-0 right-0 flex border-b border-white/[0.06]",
+                          isHour ? "border-t border-white/[0.13]" : "border-t border-dashed border-white/[0.045]",
                           onTimeSlotLongPress && "touch-manipulation",
                         )}
                         data-testid={`journeys-day-grid-slot-${slotToken}`}
                         data-minute={slotMinute}
                         style={{
                           top: `${getTimelineTopPx(slotMinute)}px`,
-                          height: `${OUTLOOK_TIMELINE_SLOT_HEIGHT_PX}px`,
+                          height: `${timelineSlotHeightPx}px`,
                         }}
                         onTouchStart={(event) => handleTimeSlotTouchStart(slotMinute, event)}
                         onTouchMove={handleTimeSlotTouchMove}
@@ -3225,7 +3503,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         onTouchCancel={clearTimeSlotLongPress}
                       >
                         <div
-                          className="flex-shrink-0 px-1.5 pt-1.5 text-right text-[10px] font-medium text-muted-foreground/80"
+                          className="flex-shrink-0 px-2 pt-1.5 text-right text-[11px] font-semibold text-slate-300/90"
                           style={{ width: `${OUTLOOK_TIMELINE_GUTTER_WIDTH_PX}px` }}
                         >
                           {isHour ? formatGridTimeLabel(slotMinute) : null}
@@ -3244,7 +3522,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       style={{ top: `${getTimelineTopPx(nowMarkerMinute)}px` }}
                     >
                       <div
-                        className="pr-1 text-right text-[10px] font-semibold text-stardust-gold"
+                        className={cn("pr-2 text-right text-xs font-semibold", compactCalendar ? "text-primary" : "text-stardust-gold")}
                         style={{ width: `${OUTLOOK_TIMELINE_GUTTER_WIDTH_PX}px` }}
                       >
                         <span aria-hidden="true">{formatCurrentTimeLabel(nowMarkerMinute)}</span>
@@ -3252,8 +3530,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                           {minuteToTime(nowMarkerMinute)}
                         </span>
                       </div>
-                      <div className="h-2 w-2 rounded-full bg-stardust-gold shadow-[0_0_10px_hsl(var(--stardust-gold)/0.7)]" />
-                      <div className="h-px flex-1 bg-stardust-gold/80" />
+                      <div className={cn("h-1.5 w-1.5 rounded-full", compactCalendar ? "bg-primary" : "bg-stardust-gold shadow-[0_0_10px_hsl(var(--stardust-gold)/0.7)]")} />
+                      <div className={cn("h-px flex-1", compactCalendar ? "bg-primary/80" : "bg-stardust-gold/80")} />
                     </div>
                   ) : null}
 
@@ -3270,13 +3548,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       const isJustDropped = timelineJustDroppedId === task.id;
                       const usesOverlayPlaceholder = isThisDragging && shouldRenderDragOverlay;
                       const laneOffsetPx = entry.laneIndex > 0 ? OUTLOOK_TIMELINE_EVENT_GAP_PX : 0;
-                      const baseTimelineRowDragProps = isDesktopTimelineDragEnabled && task.scheduled_time && !task.completed
+                      const baseTimelineRowDragProps = isDesktopTimelineDragEnabled
+                        && task.scheduled_time
+                        && !task.completed
+                        && !task.is_external_calendar_event
                         ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
                         : undefined;
                       const timelineRowDragProps = baseTimelineRowDragProps
                         ? {
-                            // Keep touch hold-to-reschedule, but skip pointer row drag so
-                            // clicks/trackpad drags do not hijack normal quest interactions.
+                            onPointerDownCapture: baseTimelineRowDragProps.onPointerDownCapture,
+                            onPointerDown: baseTimelineRowDragProps.onPointerDown,
                             onTouchStartCapture: (
                               event: Parameters<NonNullable<typeof baseTimelineRowDragProps.onTouchStartCapture>>[0],
                             ) => {
@@ -3345,6 +3626,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                           data-top-px={entry.topPx}
                           data-duration-height-px={entry.heightPx}
                           onContextMenu={suppressNativeContextMenu}
+                          onClickCapture={(event) => {
+                            if (timelineDrag.shouldSuppressClick?.()) {
+                              event.preventDefault();
+                              event.stopPropagation();
+                            }
+                          }}
+                          onClick={(event) => {
+                            if (!isDesktopLayout && onViewQuest && !task.is_external_calendar_event && !(event.target as Element).closest('button, [role="button"], a, input')) {
+                              onViewQuest(task);
+                            }
+                          }}
                           {...(timelineRowDragProps ?? {})}
                           style={{
                             ...rowStyle,
@@ -3388,7 +3680,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     })}
                   </div>
                 </div>
-                {!isDesktopLayout ? renderCampaignSection() : null}
+                {!isDesktopLayout && !calendarOnly ? renderCampaignSection() : null}
               </div>
             </div>
           </div>
@@ -3397,7 +3689,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         {/* Inbox section removed - now has its own tab */}
       </div>
 
-      {desktopRail}
+      {!calendarOnly ? desktopRail : null}
 
       {!isDesktopLayout && mobileDetailTask ? (
         <Drawer
@@ -3491,6 +3783,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           )
         : null}
 
+      {selectedExternalEvent && <ExternalEventDetails event={selectedExternalEvent} events={externalEvents} quests={[...(weekTasks ?? []), ...tasks]} onClose={() => setSelectedExternalEvent(null)} />}
       {timelineZoomRail ? <DragTimeZoomRail rail={timelineZoomRail} /> : null}
     </div>
   );

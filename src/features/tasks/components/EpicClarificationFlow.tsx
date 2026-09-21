@@ -11,8 +11,7 @@ import {
   Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
-import { usePlannerPathfinderAppearance } from '@/hooks/usePlannerPathfinderAppearance';
+import { usePlannerSurface } from '@/components/companion/usePlannerSurface';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -43,7 +42,7 @@ export function EpicClarificationFlow({
   variant = 'default',
 }: EpicClarificationFlowProps) {
   const [answers, setAnswers] = useState<Record<string, string | number | string[]>>({});
-  const { themeModeClassName } = usePlannerPathfinderAppearance();
+  const { themeModeClassName, plannerPathfinderTheme } = usePlannerSurface();
   const isPlannerVariant = variant === 'planner';
 
   const handleChange = (questionId: string, value: string | number) => {

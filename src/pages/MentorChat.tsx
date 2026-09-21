@@ -227,6 +227,7 @@ export default function MentorChat() {
               variant="ghost" 
               size="icon" 
               onClick={() => navigate('/mentor')} 
+              aria-label="Back to mentor"
               className="bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-full shadow-soft"
             >
               <ArrowLeft className="w-5 h-5" />

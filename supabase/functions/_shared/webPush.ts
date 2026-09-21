@@ -39,7 +39,15 @@ export async function sendWebPush(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     // Import web-push dynamically
-    const webpush = await import('https://esm.sh/web-push@3.6.7');
+    // esm.sh wraps this CommonJS package in a default export, while its
+    // declaration file describes the CommonJS API directly. Describe that
+    // wrapper explicitly; do not depend on synthetic-default compiler flags.
+    const webpush = await import('https://esm.sh/web-push@3.6.7') as unknown as {
+      default: {
+        setVapidDetails(subject: string, publicKey: string, privateKey: string): void;
+        sendNotification(subscription: PushSubscription, payload: string, options: { TTL: number }): Promise<unknown>;
+      };
+    };
     
     webpush.default.setVapidDetails(
       vapidKeys.subject,

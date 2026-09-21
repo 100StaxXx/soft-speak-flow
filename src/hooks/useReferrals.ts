@@ -151,7 +151,7 @@ export const useReferrals = () => {
         ? "Genesis code applied! Your yearly plan is now eligible for the $49.99 Apple offer."
         : result.code_type === "affiliate"
           ? "Creator code applied! Your yearly plan is now eligible for the Apple discount flow."
-          : "Referral code applied! Your friend will earn rewards when you reach Stage 5 • Initiate.";
+          : "Referral code applied! Your friend will earn rewards when you reach Level 5 • Initiate.";
 
       toast.success(result.message || defaultMessage);
     },

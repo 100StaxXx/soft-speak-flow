@@ -1,5 +1,3 @@
-import type { PlannerMemoryProfile } from "@/types/companionPlanner";
-
 export const ONBOARDING_SCHEDULE_ARCHETYPE_QUESTION_ID = "schedule_archetype";
 
 export const ONBOARDING_SCHEDULE_ARCHETYPE_OPTIONS = [
@@ -47,8 +45,8 @@ export interface OnboardingScheduleArchetypeProfile {
   id: OnboardingScheduleArchetype;
   label: string;
   plannerHint: string;
-  defaultWorkloadTolerance: PlannerMemoryProfile["workloadTolerance"];
-  defaultPreferredTimeOfDay: PlannerMemoryProfile["preferredTimeOfDay"];
+  defaultWorkloadTolerance: "light" | "normal" | "heavy" | null;
+  defaultPreferredTimeOfDay: string | null;
   defaultPreferredTimeReason: string | null;
 }
 

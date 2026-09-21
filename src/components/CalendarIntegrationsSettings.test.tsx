@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => {
   const connectAppleNativeMutateAsync = vi.fn();
   const refreshCalendarIntegrationsMock = vi.fn();
   const browserOpenMock = vi.fn();
+  const browserCloseMock = vi.fn();
 
   const state = {
     integrationVisible: false,
@@ -42,6 +43,7 @@ const mocks = vi.hoisted(() => {
     connectAppleNativeMutateAsync,
     refreshCalendarIntegrationsMock,
     browserOpenMock,
+    browserCloseMock,
     state,
   };
 });
@@ -56,6 +58,7 @@ vi.mock("@capacitor/core", () => ({
 vi.mock("@capacitor/browser", () => ({
   Browser: {
     open: mocks.browserOpenMock,
+    close: mocks.browserCloseMock,
   },
 }));
 
@@ -131,6 +134,8 @@ describe("CalendarIntegrationsSettings", () => {
     mocks.state.connections = [];
     mocks.state.connectedByProvider = {};
     mocks.state.nativePlatform = false;
+    mocks.browserOpenMock.mockReset().mockResolvedValue(undefined);
+    mocks.browserCloseMock.mockReset().mockResolvedValue(undefined);
     mocks.upsertSettingsMutateAsync.mockResolvedValue(undefined);
     mocks.beginOAuthConnectionMutateAsync.mockResolvedValue("https://accounts.google.com/o/oauth2/v2/auth");
     mocks.listProviderCalendarsMutateAsync.mockResolvedValue([]);
@@ -143,7 +148,7 @@ describe("CalendarIntegrationsSettings", () => {
   it("shows calendar integrations by default when nothing is connected", () => {
     render(<CalendarIntegrationsSettings />);
 
-    expect(screen.getByText("Connect destinations for sending quests to external calendars.")).toBeInTheDocument();
+    expect(screen.getByText(/show selected calendars in agenda and send quests outward/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /connect outlook calendar/i })).toBeInTheDocument();
   });
 
@@ -287,6 +292,53 @@ describe("CalendarIntegrationsSettings", () => {
     });
   });
 
+  it("does not hand an invalid OAuth response to the native browser", async () => {
+    mocks.state.nativePlatform = true;
+    mocks.beginOAuthConnectionMutateAsync.mockResolvedValue(undefined);
+
+    render(<CalendarIntegrationsSettings />);
+
+    fireEvent.click(screen.getByRole("button", { name: /connect google calendar/i }));
+
+    await waitFor(() => {
+      expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
+        title: "Failed to start connection",
+        description: expect.stringMatching(/did not return a sign-in link/i),
+        variant: "destructive",
+      }));
+    });
+    expect(mocks.browserOpenMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['google', 'outlook'] as const)('recovers the native browser for %s with only one authorization request', async (provider) => {
+    mocks.state.nativePlatform = true;
+    const url = provider === 'google' ? 'https://accounts.google.com/o/oauth2/v2/auth' : 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize';
+    mocks.beginOAuthConnectionMutateAsync.mockResolvedValue(url);
+    mocks.browserOpenMock.mockRejectedValueOnce(new Error('Unable to display URL'));
+    render(<CalendarIntegrationsSettings />);
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`connect ${provider} calendar`, 'i') }));
+    await waitFor(() => expect(mocks.browserOpenMock).toHaveBeenCalledTimes(2));
+    expect(mocks.browserCloseMock).toHaveBeenCalledTimes(1);
+    expect(mocks.beginOAuthConnectionMutateAsync).toHaveBeenCalledTimes(1);
+    expect(mocks.browserOpenMock).toHaveBeenLastCalledWith({url});
+    expect(mocks.toastMock).not.toHaveBeenCalledWith(expect.objectContaining({title:'Failed to start connection'}));
+  });
+
+  it('blocks overlapping Google and Outlook attempts while a sign-in window is opening', async () => {
+    mocks.state.nativePlatform = true;
+    let finish!: () => void;
+    mocks.browserOpenMock.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    render(<CalendarIntegrationsSettings />);
+    fireEvent.click(screen.getByRole('button', {name:/connect google calendar/i}));
+    await waitFor(() => expect(mocks.browserOpenMock).toHaveBeenCalledTimes(1));
+    const outlook = screen.getByRole('button', {name:/connect outlook calendar/i});
+    expect(outlook).toBeDisabled();
+    fireEvent.click(outlook);
+    expect(mocks.beginOAuthConnectionMutateAsync).toHaveBeenCalledTimes(1);
+    finish();
+    await waitFor(() => expect(outlook).not.toBeDisabled());
+  });
+
   it("does not auto-load Outlook destinations for a connected account", async () => {
     mocks.state.integrationVisible = true;
     mocks.state.connections = [
@@ -351,3 +403,4 @@ describe("CalendarIntegrationsSettings", () => {
     expect(screen.queryByRole("button", { name: /use outlook for planning/i })).not.toBeInTheDocument();
   });
 });
+vi.mock('@/components/calendar/CalendarLinkStatus', () => ({ CalendarLinkStatus: () => null }));

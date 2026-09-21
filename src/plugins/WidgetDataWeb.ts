@@ -4,7 +4,7 @@ import type {
   WidgetSyncDiagnostics,
   WidgetSyncProbeResult,
   WidgetTask,
-} from './WidgetDataPlugin';
+} from './WidgetDataTypes';
 
 export class WidgetDataWeb extends WebPlugin implements WidgetDataPlugin {
   async updateWidgetData(_options: {

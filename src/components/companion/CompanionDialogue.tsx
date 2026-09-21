@@ -2,9 +2,7 @@ import { memo, useState, useEffect, useCallback, useMemo, type KeyboardEvent } f
 import { motion, AnimatePresence } from "framer-motion";
 import { useCompanionDialogue, DialogueMood } from "@/hooks/useCompanionDialogue";
 import { useCompanion, type Companion } from "@/hooks/useCompanion";
-import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionExpressionState } from "@/hooks/useCompanionExpressionState";
-import { useCompanionVisualState } from "@/hooks/useCompanionVisualState";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CompanionImage, CompanionPortraitShell } from "@/components/CompanionImage";
 import {
@@ -143,15 +141,7 @@ export const CompanionDialogue = memo(({
     progressToNext: rawProgressToNext,
     canEvolve: rawCanEvolve,
   } = useCompanion();
-  const { health } = useCompanionHealth();
   const expressionState = useCompanionExpressionState();
-  const { isDormant } = useCompanionVisualState(
-    health.moodState,
-    health.hunger,
-    health.happiness,
-    health.isAlive,
-    health.recoveryProgress,
-  );
   const companion = companionOverride ?? rawCompanion;
   const progressToNext = progressToNextOverride ?? rawProgressToNext;
   const canEvolve = canEvolveOverride ?? rawCanEvolve;
@@ -161,33 +151,13 @@ export const CompanionDialogue = memo(({
   const normalCompanionImageUrl = useMemo(() => {
     if (!companion) return null;
 
-    if (isDormant) {
-      return resolveCompanionVisualAssetUrl(companion, "dormant");
-    }
-    if (
-      health.isNeglected
-      && health.neglectedImageUrl
-      && (typeof companion.current_stage !== "number" || companion.current_stage > 0)
-    ) {
-      return health.neglectedImageUrl;
-    }
-    if (health.isNeglected) {
-      return resolveCompanionVisualAssetUrl(companion, "neglected");
-    }
     return resolveCompanionVisualAssetUrl(companion, "normal")
       ?? companion.current_image_url
       ?? null;
-  }, [
-    companion,
-    health.isNeglected,
-    health.neglectedImageUrl,
-    isDormant,
-  ]);
+  }, [companion]);
 
   const expressiveCompanionImageUrl = useMemo(() => {
-    if (!companion || isDormant || health.isNeglected) {
-      return null;
-    }
+    if (!companion) return null;
 
     return resolveCompanionExpressiveAssetUrl(companion, {
       mood: expressionState.mood,
@@ -197,24 +167,14 @@ export const CompanionDialogue = memo(({
     companion,
     expressionState.mood,
     expressionState.variant,
-    health.isNeglected,
-    isDormant,
   ]);
 
   const companionImageUrl = fallbackToDefaultPortrait || !expressiveCompanionImageUrl
     ? normalCompanionImageUrl
     : expressiveCompanionImageUrl;
   const bundledCompanionImageFocal = getBundledCompanionImageFocalPoint(companionImageUrl);
-  const companionImageFocalX = isDormant
-    ? companion?.dormant_image_focal_x ?? companion?.current_image_focal_x ?? null
-    : health.isNeglected
-      ? health.neglectedImageFocalX ?? companion?.neglected_image_focal_x ?? companion?.current_image_focal_x ?? null
-      : bundledCompanionImageFocal?.x ?? companion?.current_image_focal_x ?? null;
-  const companionImageFocalY = isDormant
-    ? companion?.dormant_image_focal_y ?? companion?.current_image_focal_y ?? null
-    : health.isNeglected
-      ? health.neglectedImageFocalY ?? companion?.neglected_image_focal_y ?? companion?.current_image_focal_y ?? null
-      : bundledCompanionImageFocal?.y ?? companion?.current_image_focal_y ?? null;
+  const companionImageFocalX = bundledCompanionImageFocal?.x ?? companion?.current_image_focal_x ?? null;
+  const companionImageFocalY = bundledCompanionImageFocal?.y ?? companion?.current_image_focal_y ?? null;
   const usesGeneratedSceneAvatar = shouldContainCompanionSceneImage(companionImageUrl);
   const usesPortraitAvatar =
     isCompanionSceneImageSource(companionImageUrl) && !usesGeneratedSceneAvatar;
@@ -247,7 +207,7 @@ export const CompanionDialogue = memo(({
 
   useEffect(() => {
     setFallbackToDefaultPortrait(false);
-  }, [expressiveCompanionImageUrl, isDormant, health.isNeglected]);
+  }, [expressiveCompanionImageUrl]);
 
   const handleCompanionImageLoadingStatusChange = useCallback((status: AvatarImageLoadingStatus) => {
     if (status === "error" && expressiveCompanionImageUrl) {

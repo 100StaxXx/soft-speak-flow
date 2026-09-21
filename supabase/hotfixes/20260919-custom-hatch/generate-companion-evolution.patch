@@ -1,0 +1,30 @@
+--- a/supabase/functions/generate-companion-evolution/index.ts
++++ b/supabase/functions/generate-companion-evolution/index.ts
+@@ -73,7 +73,8 @@
+ import { registerUserStorageAsset } from "../_shared/storageAssetLedger.ts";
+ import {
+   getCompanionCinemaRolloutConfig,
+-  isCompanionCinemaUserEligible,
++  isCompanionCinemaBoundaryEligible,
++  isCompanionHatchEnabled,
+ } from "../_shared/companionCinemaRollout.ts";
+ 
+ export { maybeEnqueueCompanionAnimationJob } from "../_shared/companionAnimationJobs.ts";
+@@ -849,7 +850,7 @@
+     // Graceward continues on its independent premade path below.
+     if (companion.product_mode === "cosmiq") {
+       const cinemaRollout = getCompanionCinemaRolloutConfig();
+-      if (!cinemaRollout.enabled) {
++      if (!cinemaRollout.enabled && !(nextStage === 1 && isCompanionHatchEnabled())) {
+         return new Response(
+           JSON.stringify({
+             evolved: false,
+@@ -865,7 +866,7 @@
+           },
+         );
+       }
+-      if (!isCompanionCinemaUserEligible(resolvedUserId)) {
++      if (!isCompanionCinemaBoundaryEligible(resolvedUserId, nextStage)) {
+         return new Response(
+           JSON.stringify({
+             evolved: false,

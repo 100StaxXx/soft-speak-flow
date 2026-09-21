@@ -2,6 +2,10 @@ import type { ReactNode } from "react";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: { auth: {}, functions: { invoke: vi.fn() } },
+}));
+
 const { passthroughProvider, isMainTabPathMock, authMock, profileMock, storageMock, hideSplashScreenMock } = vi.hoisted(() => ({
   passthroughProvider: ({ children }: { children?: ReactNode }) => <>{children}</>,
   isMainTabPathMock: vi.fn((pathname: string) => pathname === "/mentor"),
@@ -17,7 +21,7 @@ const { passthroughProvider, isMainTabPathMock, authMock, profileMock, storageMo
     loading: false,
   },
   storageMock: {
-    getItem: vi.fn(() => null as string | null),
+    getItem: vi.fn((_key: string) => null as string | null),
     setItem: vi.fn(),
     removeItem: vi.fn(),
     clear: vi.fn(),
@@ -132,6 +136,9 @@ vi.mock("@/components/ErrorBoundary", () => ({
 vi.mock("@/components/GlobalEvolutionListener", () => ({
   GlobalEvolutionListener: () => null,
 }));
+vi.mock("@/components/companion/CompanionVideoPreparation", () => ({
+  CompanionVideoPreparation: () => null,
+}));
 
 vi.mock("@/components/RealtimeSyncProvider", () => ({
   RealtimeSyncProvider: passthroughProvider,
@@ -228,7 +235,7 @@ vi.mock("@/utils/profileOnboarding", () => ({
 
 vi.mock("@/utils/storage", () => ({
   safeLocalStorage: {
-    getItem: (...args: unknown[]) => storageMock.getItem(...args),
+    getItem: (key: string) => storageMock.getItem(key),
     setItem: (...args: unknown[]) => storageMock.setItem(...args),
     removeItem: (...args: unknown[]) => storageMock.removeItem(...args),
     clear: (...args: unknown[]) => storageMock.clear(...args),
@@ -255,6 +262,9 @@ vi.mock("./pages/PremiumSuccess", () => ({
 
 import App from "./App";
 
+vi.mock("./pages/Welcome", () => ({ default: () => <div>Welcome Page</div> }));
+vi.mock("./pages/Home", () => ({ default: () => <div>Home Page</div> }));
+
 describe("App preview route", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -274,6 +284,22 @@ describe("App preview route", () => {
     storageMock.clear.mockReset();
     hideSplashScreenMock.mockReset();
     isMainTabPathMock.mockImplementation((pathname: string) => pathname === "/mentor");
+  });
+
+  it.each(["loading", "recovering"])("keeps a %s root session behind the recovery guard", async (status) => {
+    authMock.status = status;
+    authMock.loading = true;
+    window.history.pushState({}, "", "/");
+    render(<App />);
+    expect(await screen.findByTestId("protected-route")).toBeInTheDocument();
+    expect(screen.queryByText("Welcome Page")).not.toBeInTheDocument();
+  });
+
+  it("shows welcome only when the root session is confirmed signed out", async () => {
+    window.history.pushState({}, "", "/");
+    render(<App />);
+    expect(await screen.findByText("Welcome Page")).toBeInTheDocument();
+    expect(screen.queryByTestId("protected-route")).not.toBeInTheDocument();
   });
 
   it("falls through to not found when /preview is requested", async () => {
@@ -371,3 +397,4 @@ describe("App preview route", () => {
     vi.useRealTimers();
   });
 });
+vi.mock('@/components/calendar/CalendarQuestSyncBridge', () => ({ CalendarQuestSyncBridge: () => null }));

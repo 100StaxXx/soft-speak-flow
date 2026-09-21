@@ -1,6 +1,5 @@
 import { useState, type CSSProperties } from 'react';
 import { format, parseISO, differenceInDays } from 'date-fns';
-import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
 import { 
   ChevronRight, 
   Flag, 
@@ -11,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { usePlannerPathfinderAppearance } from '@/hooks/usePlannerPathfinderAppearance';
+import { usePlannerSurface } from '@/components/companion/usePlannerSurface';
 import { cn } from '@/lib/utils';
 import type { JourneyPhase, JourneyMilestone } from '@/hooks/useJourneySchedule';
 
@@ -40,7 +39,7 @@ export function PhaseCard({
 }: PhaseCardProps) {
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   const [expandedMilestones, setExpandedMilestones] = useState<Set<string>>(new Set());
-  const { themeModeClassName } = usePlannerPathfinderAppearance();
+  const { themeModeClassName, plannerPathfinderTheme } = usePlannerSurface();
   const startDate = parseISO(phase.startDate);
 
   const toggleExpanded = (milestoneId: string) => {

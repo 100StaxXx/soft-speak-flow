@@ -1,0 +1,39 @@
+--- a/supabase/functions/prewarm-companion-animation/index.ts
++++ b/supabase/functions/prewarm-companion-animation/index.ts
+@@ -512,7 +512,7 @@
+     const { data: companion, error: companionError } = await supabase
+       .from("user_companion")
+       .select(
+-        "id, user_id, preset_id, core_element, current_stage, current_xp, image_lineage_metadata",
++        "id, user_id, product_mode, cinema_lineage_revision, preset_id, core_element, current_stage, current_xp, image_lineage_metadata",
+       )
+       .eq("id", companionId)
+       .eq("user_id", auth.userId)
+@@ -526,6 +526,27 @@
+       return errorResponse(404, "Companion not found", corsHeaders);
+     }
+ 
++    if (companion.product_mode === "cosmiq" && companion.current_stage === 0 && stage === 1) {
++      // Preparation never creates a claimed evolution or spends XP. Reuse the
++      // durable custom-cinema job even when an older client calls this endpoint.
++      const { data: existing, error: lookupError } = await supabase.from("companion_cinema_events")
++        .select("id, status").eq("companion_id", companionId).eq("event_type", "evolution")
++        .eq("event_key", "level_1").eq("lineage_revision", companion.cinema_lineage_revision ?? 1).maybeSingle();
++      if (lookupError) throw lookupError;
++      let eventId = existing?.id;
++      if (!existing) {
++        const { data, error } = await supabase.rpc("enqueue_cosmiq_cinema_event_internal", {
++          p_user_id: auth.userId, p_companion_id: companionId,
++        });
++        if (error) throw error;
++        eventId = data;
++      }
++      return new Response(JSON.stringify({
++        status: existing?.status === "ready" ? "succeeded" : "queued",
++        cinemaEventId: eventId, cinemaStatus: existing?.status ?? "queued", stage: 1,
++      }), { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } });
++    }
++
+     const companionRecord = companion as CompanionRecord;
+     const currentStage = typeof companionRecord.current_stage === "number"
+       ? Math.max(0, Math.floor(companionRecord.current_stage))

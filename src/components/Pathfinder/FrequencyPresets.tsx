@@ -1,4 +1,4 @@
-import { plannerPathfinderTheme } from "@/components/companion/plannerPathfinderTheme";
+import { usePlannerSurface } from '@/components/companion/usePlannerSurface';
 import { cn } from "@/lib/utils";
 import {
   formatScheduleSelectionShort,
@@ -53,6 +53,7 @@ export function FrequencyPresets({
   });
   const showWeekPicker = frequency === 'weekly' || (frequency === 'custom' && resolvedCustomPeriod === 'week');
   const showMonthPicker = frequency === 'monthly' || (frequency === 'custom' && resolvedCustomPeriod === 'month');
+  const { plannerPathfinderTheme } = usePlannerSurface();
   const isPlannerVariant = variant === "planner";
 
   const emitChange = (next: Partial<FrequencySelection>) => {

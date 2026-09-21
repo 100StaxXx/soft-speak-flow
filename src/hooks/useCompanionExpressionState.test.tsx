@@ -105,7 +105,7 @@ describe("useCompanionExpressionState", () => {
     expect(state.isEventDriven).toBe(true);
   });
 
-  it("maps low care and warning states to concerned", () => {
+  it("does not punish time away or low care with a distressed expression", () => {
     const state = deriveCompanionExpressionState({
       companionId: "companion-1",
       currentStage: 8,
@@ -115,8 +115,8 @@ describe("useCompanionExpressionState", () => {
       now: new Date("2026-04-18T14:00:00"),
     });
 
-    expect(state.mood).toBe("concerned");
-    expect(state.reason).toBe("inactive-days");
+    expect(state.mood).toBe("calm");
+    expect(state.reason).toBe("default-calm");
   });
 
   it("maps late-night idle periods to sleepy", () => {

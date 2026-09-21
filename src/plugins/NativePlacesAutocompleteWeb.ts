@@ -2,7 +2,7 @@ import { WebPlugin } from '@capacitor/core';
 import type {
   NativePlacesAutocompletePlugin,
   NativePlacesAutocompleteSuggestion,
-} from './NativePlacesAutocompletePlugin';
+} from './NativePlacesAutocompleteTypes';
 
 export class NativePlacesAutocompleteWeb extends WebPlugin implements NativePlacesAutocompletePlugin {
   async isAvailable(): Promise<{ available: boolean }> {

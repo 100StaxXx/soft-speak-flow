@@ -249,8 +249,8 @@ vi.mock("@/components/XPBreakdown", () => ({
   XPBreakdown: () => <div data-testid="xp-breakdown" />,
 }));
 
-vi.mock("@/components/DailyMissions", () => ({
-  DailyMissions: () => <div data-testid="daily-missions" />,
+vi.mock("@/components/DailyChapterOverviewCard", () => ({
+  DailyChapterOverviewCard: () => <div data-testid="daily-chapter-overview" />,
 }));
 
 vi.mock("@/components/companion/MemoryWhisper", () => ({

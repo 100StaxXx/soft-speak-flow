@@ -27,6 +27,13 @@ vi.mock("@/hooks/useMotionProfile", () => ({
 import { CompanionMotionSurface } from "./CompanionMotionSurface";
 
 describe("CompanionMotionSurface", () => {
+  it("omits unnecessary visual effects in clean portrait mode", () => {
+    render(<CompanionMotionSurface showEffects={false} variant="companion" stage={1} element="storm"><div>Animal</div></CompanionMotionSurface>);
+    const surface = screen.getByTestId("companion-motion-surface");
+    expect(surface.children).toHaveLength(1);
+    expect(screen.getByText("Animal")).toBeInTheDocument();
+    expect(surface.querySelector('[data-motion-plane]')).toBeNull();
+  });
   beforeEach(() => {
     mocks.profile = "balanced";
     mocks.maxParticles = 8;

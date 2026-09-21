@@ -68,6 +68,7 @@ import {
 import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
 
 export interface AddQuestData {
+  category?: "mind" | "body" | "soul";
   text: string;
   taskDate: string | null;
   difficulty: "easy" | "medium" | "hard";
@@ -144,6 +145,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [sheetView, setSheetView] = useState<"editor" | "templates">("editor");
   const [templateBrowserInitialTab, setTemplateBrowserInitialTab] = useState<QuestTemplateBrowserTab>("common");
   const [taskText, setTaskText] = useState("");
+  const [category, setCategory] = useState<"mind" | "body" | "soul" | undefined>();
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [scheduledTime, setScheduledTime] = useState<string | null>(prefilledTime ?? null);
@@ -223,6 +225,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       reminderOffsetsMinutes: snapshot.reminderOffsetsMinutes,
     });
     setTaskText(snapshot.text);
+    setCategory(snapshot.category);
     setDifficulty(snapshot.difficulty);
     setScheduledTime(snapshot.scheduledTime);
     setEstimatedDuration(snapshot.estimatedDuration);
@@ -307,6 +310,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       setSheetView("editor");
       setTemplateBrowserInitialTab("common");
       setTaskText("");
+      setCategory(undefined);
       setDifficulty("medium");
       setShowAdvanced(false);
       setScheduledTime(null);
@@ -349,6 +353,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
     lastPrefillKeyRef.current = prefillKey;
     setTaskText(prefillDraft.text ?? "");
+    setCategory(prefillDraft.category);
     setDifficulty(prefillDraft.difficulty ?? "medium");
     setScheduledTime(prefillDraft.scheduledTime ?? null);
     setEstimatedDuration(prefillDraft.estimatedDuration ?? 30);
@@ -367,7 +372,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     setMoreInformation(prefillDraft.moreInformation ?? null);
     setLocation(prefillDraft.location ?? null);
     setSubtasks(prefillDraft.subtasks ?? []);
-    setTaskDate(prefillDraft.taskDate ?? format(selectedDate, "yyyy-MM-dd"));
+    setTaskDate(prefillDraft.creationSource === "inbox" ? null : prefillDraft.taskDate ?? format(selectedDate, "yyyy-MM-dd"));
     setCreationSource(prefillDraft.creationSource ?? "manual");
     setCalendarSendTarget(null);
     setSelectedTemplate(null);
@@ -444,6 +449,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const hasRecurrence = hasRecurrencePattern(recurrencePattern);
   const canCreateTask = !!trimmedTaskText && hasDateAndTime;
   const canAddToInbox = !!trimmedTaskText && !hasRecurrence;
+  const isInboxDraft = creationSource === "inbox" && !taskDate;
+  const canSavePrimary = isInboxDraft ? canAddToInbox : canCreateTask;
   const reviewDateLabel = taskDate ? format(dateObj, "EEE, MMM d") : "Inbox";
   const reviewTimeLabel = scheduledTime ? formatTime12(scheduledTime) : "Select a time";
   const reviewTitle = trimmedTaskText || "Name your quest";
@@ -456,6 +463,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   }), [taskText, difficulty, estimatedDuration, moreInformation, subtasks]);
   const currentQuestDraftSnapshot = useMemo<QuestDraftSnapshot>(() => ({
     text: taskText,
+    category,
     taskDate,
     difficulty,
     scheduledTime,
@@ -497,6 +505,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     subtasks,
     taskDate,
     taskText,
+    category,
   ]);
   const hasTemplateCustomizations = useMemo(
     () => selectedTemplate
@@ -586,6 +595,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
   const applyTemplatePrefill = useCallback((template: QuestTemplatePrefill) => {
     setTaskText(template.title);
+    setCategory(undefined);
     setDifficulty(template.difficulty);
     setEstimatedDuration(template.estimatedDuration);
     setMoreInformation(template.notes);
@@ -648,6 +658,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
     await onAdd({
       text: taskText,
+      category,
       taskDate: intent === "inbox" ? null : taskDate,
       difficulty,
       scheduledTime: intent === "inbox" ? null : scheduledTime,
@@ -673,7 +684,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     });
     clearQuestDraftSnapshot(user?.id);
     onOpenChange(false);
-  }, [taskText, recurrencePattern, creationSource, scheduledTime, onAdd, taskDate, difficulty, estimatedDuration, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, reminderOffsetsMinutes, moreInformation, location, sendToCalendar, canShowCalendarSendOption, selectedCalendarSendTarget, subtasks, attachments, onOpenChange, user?.id]);
+  }, [taskText, category, recurrencePattern, creationSource, scheduledTime, onAdd, taskDate, difficulty, estimatedDuration, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, reminderOffsetsMinutes, moreInformation, location, sendToCalendar, canShowCalendarSendOption, selectedCalendarSendTarget, subtasks, attachments, onOpenChange, user?.id]);
 
   const submitWithTemplateHandling = useCallback(async (intent: SubmitIntent) => {
     if (selectedTemplate && hasTemplateCustomizations) {
@@ -686,8 +697,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   }, [executeSubmit, hasTemplateCustomizations, selectedTemplate]);
 
   const handleSubmit = useCallback(async () => {
-    await submitWithTemplateHandling("scheduled");
-  }, [submitWithTemplateHandling]);
+    await submitWithTemplateHandling(creationSource === "inbox" && !taskDate ? "inbox" : "scheduled");
+  }, [submitWithTemplateHandling, creationSource, taskDate]);
 
   const handleAddToInbox = useCallback(async () => {
     await submitWithTemplateHandling("inbox");
@@ -834,8 +845,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
         data-tour="add-quest-sheet"
         className={cn(
           isDesktopPanel
-            ? "!top-4 !bottom-4 !left-auto !right-4 !h-[calc(100dvh-2rem)] !w-[calc(100vw-2rem)] !max-w-[640px] !rounded-[32px] flex flex-col !p-0 !gap-0 overflow-hidden sm:!w-[620px]"
-            : "h-[92vh] rounded-t-[34px] flex flex-col p-0 gap-0 overflow-hidden",
+            ? "!top-4 !bottom-4 !left-auto !right-4 !h-[calc(100dvh-2rem)] !w-[calc(100vw-2rem)] !max-w-[640px] !rounded-[24px] flex flex-col !p-0 !gap-0 overflow-hidden sm:!w-[620px]"
+            : "h-[92vh] rounded-t-[24px] flex flex-col p-0 gap-0 overflow-hidden",
           isDesktopPanel ? QUEST_FORM_STYLES.desktopPanelShell : QUEST_FORM_STYLES.sheet,
         )}
         style={resolvedCompanionFrostedThemeStyle}
@@ -887,7 +898,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                         <span className={getQuestDifficultyIconClasses(value, difficulty === value)}>
                           <Icon className="h-3.5 w-3.5" />
                         </span>
-                        <span className="font-fredoka text-[12px] leading-none">{label}</span>
+                        <span className="font-body text-[12px] leading-none">{label}</span>
                       </button>
                     ))}
                   </div>
@@ -954,7 +965,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                       <span className={getQuestDifficultyIconClasses(value, difficulty === value)}>
                         <Icon className="h-3.5 w-3.5" />
                       </span>
-                      <span className="font-fredoka text-[12px] leading-none">{label}</span>
+                      <span className="font-body text-[12px] leading-none">{label}</span>
                     </button>
                   ))}
                 </div>
@@ -988,7 +999,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               <div className={QUEST_FORM_STYLES.heroIcon}>
                 <History className="h-5 w-5" />
               </div>
-              <p className="mt-3 font-fredoka text-[1.15rem]">Quest shortcuts</p>
+              <p className="mt-3 font-body text-[1.15rem]">Quest shortcuts</p>
               <p className="mt-1 max-w-[16rem] text-sm text-muted-foreground">
                 Pick a common quest or one you already use a lot.
               </p>
@@ -1004,7 +1015,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 <div className={cn(QUEST_FORM_STYLES.sectionCard, "px-4 py-4")}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="font-fredoka text-[1.05rem] text-foreground">Your templates</p>
+                      <p className="font-body text-[1.05rem] text-foreground">Your templates</p>
                       <p className="text-xs text-muted-foreground">Saved templates and repeat quests you can reuse fast</p>
                     </div>
                     <button
@@ -1380,28 +1391,28 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             <Button
               onClick={handleSubmit}
               data-tour="add-quest-create-button"
-              disabled={isAdding || !canCreateTask}
+              disabled={isAdding || !canSavePrimary}
               className={cn(
                 isDesktopPanel ? "h-14" : "h-12",
-                "w-full rounded-[28px] font-fredoka text-[1.05rem] tracking-[0.01em] disabled:opacity-100",
-                canCreateTask ? colors.primaryButton : colors.primaryButtonDisabled,
+                "w-full rounded-xl font-body text-[1.05rem] tracking-[0.01em] disabled:opacity-100",
+                canSavePrimary ? colors.primaryButton : colors.primaryButtonDisabled,
               )}
             >
-              {isAdding ? "Adding..." : "Add Quest"}
+              {isAdding ? "Adding..." : isInboxDraft ? "Save to Inbox" : "Add Quest"}
             </Button>
-            <Button
+            {!isInboxDraft && <Button
               variant="outline"
               onClick={handleAddToInbox}
               disabled={isAdding || !canAddToInbox}
               className={cn(
                 isDesktopPanel ? "h-12" : "h-10",
-                "w-full rounded-[26px] border font-semibold disabled:opacity-45",
+                "w-full rounded-xl border font-semibold disabled:opacity-45",
                 QUEST_FORM_STYLES.secondaryButton,
               )}
             >
               <Inbox className="mr-2 h-4 w-4" />
               Add to Inbox instead
-            </Button>
+            </Button>}
             {isDesktopPanel && hasRecurrence && (
               <p className={cn("text-center", QUEST_FORM_STYLES.helperText)}>
                 Recurring quests must stay scheduled with a time.

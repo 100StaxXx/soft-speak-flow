@@ -35,6 +35,8 @@ import {
   type DispatchDeviceTokenRow,
 } from "./deviceTokens.ts";
 import { resolveBadgeCountAfterSend } from "./badgeCount.ts";
+import { createNotificationProductResolver } from "../_shared/notificationProduct.ts";
+import type { NotificationProductMode } from "../_shared/notificationComposer.ts";
 
 interface QueueRow {
   id: string;
@@ -311,6 +313,7 @@ serve(async (req) => {
       )],
     );
     const budgetCache = new Map<string, DeliveryBudgetState>();
+    const productForUser = createNotificationProductResolver(supabase);
 
     let processed = 0;
     let sent = 0;
@@ -478,9 +481,27 @@ serve(async (req) => {
         ((deviceTokens as DispatchDeviceTokenRow[] | null) ?? []).slice(),
       );
       const tokensToAttempt = orderedTokens;
+      let productMode: NotificationProductMode;
+      try {
+        productMode = await productForUser(row.user_id);
+      } catch {
+        const terminal = attemptCount >= maxAttempts;
+        if (terminal) failedTerminal += 1;
+        else retried += 1;
+        await updateQueueStatus(supabase, row.id, {
+          status: terminal ? "failed_terminal" : "retry",
+          delivered: terminal,
+          delivered_at: terminal ? nowIso : null,
+          attempt_count: attemptCount,
+          next_retry_at: terminal ? null : addMinutes(now, getRetryDelayMinutes(attemptCount)).toISOString(),
+          last_error: "account_product_lookup_failed",
+        });
+        continue;
+      }
       const deliveryCopy = resolveDeliveryCopy(
         row,
         companionContextMap.get(row.user_id) ?? null,
+        productMode,
       );
       const badgeCount = await resolveBadgeCountAfterSend(supabase, row);
 
@@ -492,10 +513,11 @@ serve(async (req) => {
             ...(badgeCount !== null ? { badge: badgeCount } : {}),
             data: {
               ...(row.payload ?? {}),
+              product_mode: productMode,
               queue_id: row.id,
               type: row.notification_type,
             },
-          });
+          }, productMode);
 
           if (sendResult.success) {
             successCount += 1;
@@ -538,6 +560,9 @@ serve(async (req) => {
         sent += 1;
         await updateQueueStatus(supabase, row.id, {
           status: "sent",
+          title: deliveryCopy.title,
+          body: deliveryCopy.body,
+          payload: { ...(row.payload ?? {}), product_mode: productMode },
           delivered: true,
           delivered_at: nowIso,
           attempt_count: attemptCount,

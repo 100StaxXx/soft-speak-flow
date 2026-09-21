@@ -1,0 +1,54 @@
+export interface WidgetTask {
+  id: string;
+  text: string;
+  completed: boolean;
+  xpReward: number;
+  isMainQuest: boolean;
+  category: string | null;
+  section: string;
+  scheduledTime: string | null;
+  kind?: 'quest' | 'ritual' | 'campaign_ritual';
+  isRitual?: boolean;
+  isCampaignRitual?: boolean;
+  campaignTitle?: string | null;
+  epicId?: string | null;
+  habitSourceId?: string | null;
+}
+
+export interface WidgetSyncDiagnostics {
+  appGroupAccessible: boolean;
+  hasPayload: boolean;
+  payloadDate: string | null;
+  payloadUpdatedAt: string | null;
+  payloadByteCount: number;
+  appGroupId: string;
+  dataKey: string;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+}
+
+export interface WidgetSyncProbeResult {
+  appGroupAccessible: boolean;
+  writeSucceeded: boolean;
+  readBackSucceeded: boolean;
+  payloadByteCount: number;
+  errorCode: string | null;
+  errorMessage: string | null;
+  timestamp: string;
+}
+
+export interface WidgetDataPlugin {
+  updateWidgetData(options: {
+    tasks: WidgetTask[];
+    completedCount: number;
+    totalCount: number;
+    ritualCount: number;
+    ritualCompleted: number;
+    date: string;
+    profileWallpaperImageUrl?: string;
+    profileWallpaperDateKey?: string;
+  }): Promise<void>;
+  reloadWidget(): Promise<void>;
+  getWidgetSyncDiagnostics(): Promise<WidgetSyncDiagnostics>;
+  runWidgetSyncProbe(): Promise<WidgetSyncProbeResult>;
+}

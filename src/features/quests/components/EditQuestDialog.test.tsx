@@ -200,7 +200,7 @@ describe("EditQuestDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
     const dialog = screen.getByTestId("edit-quest-delete-dialog");
-    expect(dialog).toHaveClass("companion-frosted-quest-light");
+    expect(dialog).toHaveClass("agenda-quest-theme");
     expect(dialog.style.getPropertyValue("--companion-frosted-primary")).toBe(
       companionFrostedThemeStyle["--companion-frosted-primary"],
     );
@@ -257,7 +257,7 @@ describe("EditQuestDialog", () => {
     expect(screen.getByTestId("edit-quest-desktop-panel")).toBeInTheDocument();
     expectElementToIncludeClasses(
       screen.getByTestId("edit-quest-desktop-panel"),
-      "border-[hsl(var(--celestial-blue)_/_0.62)] text-foreground",
+      "agenda-quest-theme",
     );
     expect(screen.queryByTestId("edit-quest-mobile-sheet")).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Legacy quest")).toBeInTheDocument();

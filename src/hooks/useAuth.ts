@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { clearAuthScopedClientState } from "@/services/authScopedClientState";
 import { getUserTimezone } from "@/utils/timezone";
 import { isNetworkLikeError } from "@/utils/networkErrors";
+import { checkSessionWithDeadline, getAuthRecoveryIssue, type AuthRecoveryIssue } from "@/utils/authRecovery";
 
 const SESSION_RETRY_DELAYS_MS = [0, 250, 750, 1500] as const;
 const RESUME_REFRESH_COOLDOWN_MS = 4000;
@@ -28,6 +29,7 @@ interface AuthContextValue {
   session: Session | null;
   status: AuthStatus;
   loading: boolean;
+  recoveryIssue: AuthRecoveryIssue | null;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
 }
@@ -44,12 +46,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
+  const [recoveryIssue, setRecoveryIssue] = useState<AuthRecoveryIssue | null>(null);
   const sessionRef = useRef<Session | null>(null);
   const statusRef = useRef<AuthStatus>("loading");
   const refreshInFlightRef = useRef<Promise<void> | null>(null);
   const signOutInFlightRef = useRef<Promise<void> | null>(null);
   const lastResumeRefreshRef = useRef(0);
   const activeUserIdRef = useRef<string | null>(null);
+  const authRevisionRef = useRef(0);
 
   useEffect(() => {
     sessionRef.current = session;
@@ -64,9 +68,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [session?.user?.id]);
 
   const applySessionState = useCallback((nextSession: Session | null, nextStatus?: AuthStatus) => {
+    sessionRef.current = nextSession;
+    activeUserIdRef.current = nextSession?.user?.id ?? null;
+    statusRef.current = nextStatus ?? (nextSession?.user ? "authenticated" : "unauthenticated");
     setSession(nextSession);
     setUser(nextSession?.user ?? null);
     setStatus(nextStatus ?? (nextSession?.user ? "authenticated" : "unauthenticated"));
+    if (nextStatus !== "recovering") setRecoveryIssue(null);
   }, []);
 
   const saveUserTimezone = useCallback(async (userId: string) => {
@@ -107,6 +115,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const currentSession = sessionRef.current;
+    const refreshRevision = authRevisionRef.current;
     setStatus((previousStatus) => {
       if (previousStatus === "loading") return "loading";
       return "recovering";
@@ -123,13 +132,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           await sleep(delay);
         }
 
-        const {
-          data: { session: fetchedSession },
-          error,
-        } = await supabase.auth.getSession();
+        if (refreshRevision !== authRevisionRef.current) return;
+        const { data: { session: fetchedSession }, error } = await checkSessionWithDeadline(() => supabase.auth.getSession())
+          .catch((error: unknown) => ({ data: { session: null }, error }));
+        // A newer sign-in, token refresh or explicit sign-out wins over this read.
+        if (refreshRevision !== authRevisionRef.current) return;
 
         if (error) {
           lastError = error;
+          // Don't enqueue four more reads behind a non-settling SDK operation.
+          if (typeof error === "object" && error !== null && "code" in error && error.code === "AUTH_SESSION_CHECK_TIMEOUT") break;
           continue;
         }
 
@@ -157,6 +169,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       console.error("Failed to refresh session:", lastError);
+      setRecoveryIssue(getAuthRecoveryIssue(lastError));
       if (currentSession?.user) {
         if (isNetworkLikeError(lastError)) {
           applySessionState(currentSession, "recovering");
@@ -167,7 +180,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      applySessionState(null, "unauthenticated");
+      // Failed checks do not prove the saved session is absent.
+      applySessionState(null, "recovering");
     })().finally(() => {
       refreshInFlightRef.current = null;
     });
@@ -182,6 +196,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const signOutPromise = (async () => {
+      authRevisionRef.current += 1;
       let signOutError: unknown = null;
 
       try {
@@ -213,6 +228,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      // The SDK can emit INITIAL_SESSION(null) after a storage/read failure.
+      // Let our checked bootstrap distinguish that from confirmed absence.
+      if (event === "INITIAL_SESSION" && !nextSession) return;
+      authRevisionRef.current += 1;
       const previousUserId = activeUserIdRef.current;
       const nextUserId = nextSession?.user?.id ?? null;
       const userChanged = Boolean(previousUserId && nextUserId && previousUserId !== nextUserId);
@@ -224,7 +243,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         nextSession?.user &&
         (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION")
       ) {
-        void saveUserTimezone(nextSession.user.id);
+        // Run outside the auth notification lock. Database requests may need a
+        // fresh token and must not block the auth callback that is producing it.
+        setTimeout(() => {
+          if (activeUserIdRef.current === nextSession.user.id) {
+            void saveUserTimezone(nextSession.user.id);
+          }
+        }, 0);
       }
 
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
@@ -266,7 +291,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const setupListener = async () => {
       const handle = await App.addListener("appStateChange", ({ isActive }) => {
-        if (!isActive) return;
+        if (!isActive) {
+          supabase.auth.stopAutoRefresh();
+          return;
+        }
+        supabase.auth.startAutoRefresh();
         refreshOnResume();
       });
 
@@ -278,10 +307,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       listenerHandle = handle;
     };
 
-    void setupListener();
+    supabase.auth.startAutoRefresh();
+    void setupListener().catch((error) => console.error("Auth resume listener failed:", error));
 
     return () => {
       isDisposed = true;
+      supabase.auth.stopAutoRefresh();
       if (listenerHandle) {
         void listenerHandle.remove();
       }
@@ -321,10 +352,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       session,
       status,
       loading,
+      recoveryIssue,
       signOut,
       refreshSession,
     }),
-    [loading, refreshSession, session, signOut, status, user],
+    [loading, recoveryIssue, refreshSession, session, signOut, status, user],
   );
 
   return createElement(AuthContext.Provider, { value }, children);

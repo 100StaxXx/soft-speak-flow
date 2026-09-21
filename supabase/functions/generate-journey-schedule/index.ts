@@ -91,6 +91,39 @@ interface ScheduleResponse {
   planningStyleReason?: string;
 }
 
+function createFallbackScheduleResponse(
+  executionModel: ExecutionModel,
+  planningStyleReason: string,
+  now: Date,
+  deadline: string,
+  daysAvailable: number,
+): ScheduleResponse {
+  const fallback = createFallbackScheduleParts(
+    executionModel,
+    now,
+    deadline,
+    daysAvailable,
+  );
+
+  return {
+    feasibilityAssessment: {
+      daysAvailable,
+      typicalDays: daysAvailable,
+      feasibility: 'achievable',
+      message: `You have ${daysAvailable} days to achieve your goal. Let's create a solid plan!`,
+    },
+    phases: fallback.phases,
+    milestones: fallback.milestones,
+    rituals: fallback.rituals,
+    weeklyHoursEstimate: 5,
+    suggestedChapterCount: fallback.suggestedChapterCount,
+    suggestedStoryType: 'heroes_journey',
+    suggestedThemeColor: 'heroic',
+    executionModel,
+    planningStyleReason,
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -356,7 +389,25 @@ ${timelineContext ? '14. Adjust the schedule based on the user\'s context (exist
     if (!response.ok) {
       const errorText = await response.text();
       console.error('AI gateway error:', response.status, errorText);
-      throw new Error('Failed to generate schedule');
+      const fallbackSchedule = createFallbackScheduleResponse(
+        planningShape.executionModel,
+        planningShape.planningStyleReason,
+        now,
+        deadline,
+        daysAvailable,
+      );
+
+      console.warn('[Journey Schedule] Using deterministic fallback after AI gateway failure');
+      return new Response(
+        JSON.stringify(fallbackSchedule),
+        {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'X-Cosmiq-Plan-Source': 'fallback',
+          },
+        },
+      );
     }
 
     const data = await response.json();
@@ -366,7 +417,25 @@ ${timelineContext ? '14. Adjust the schedule based on the user\'s context (exist
     console.log('[Journey Schedule] Raw AI response length:', content?.length, 'chars');
 
     if (!content) {
-      throw new Error('No content in AI response');
+      console.warn('[Journey Schedule] Using deterministic fallback after empty AI response');
+      const fallbackSchedule = createFallbackScheduleResponse(
+        planningShape.executionModel,
+        planningShape.planningStyleReason,
+        now,
+        deadline,
+        daysAvailable,
+      );
+
+      return new Response(
+        JSON.stringify(fallbackSchedule),
+        {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'X-Cosmiq-Plan-Source': 'fallback',
+          },
+        },
+      );
     }
 
     // Parse the JSON from the response
@@ -449,25 +518,13 @@ ${timelineContext ? '14. Adjust the schedule based on the user\'s context (exist
       
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError, content);
-      const fallback = createFallbackScheduleParts(planningShape.executionModel, now, deadline, daysAvailable);
-
-      schedule = {
-        feasibilityAssessment: {
-          daysAvailable,
-          typicalDays: daysAvailable,
-          feasibility: 'achievable',
-          message: `You have ${daysAvailable} days to achieve your goal. Let's create a solid plan!`,
-        },
-        phases: fallback.phases,
-        milestones: fallback.milestones,
-        rituals: fallback.rituals,
-        weeklyHoursEstimate: 5,
-        suggestedChapterCount: fallback.suggestedChapterCount,
-        suggestedStoryType: 'heroes_journey',
-        suggestedThemeColor: 'heroic',
-        executionModel: planningShape.executionModel,
-        planningStyleReason: 'fallback_default',
-      };
+      schedule = createFallbackScheduleResponse(
+        planningShape.executionModel,
+        'fallback_default',
+        now,
+        deadline,
+        daysAvailable,
+      );
     }
 
     console.log(`Generated schedule with ${schedule.phases.length} phases, ${schedule.milestones.length} milestones (${schedule.suggestedChapterCount} chapters), ${schedule.rituals.length} rituals`);

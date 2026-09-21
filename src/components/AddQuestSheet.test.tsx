@@ -40,6 +40,10 @@ vi.mock("@/hooks/useAuth", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useSmartScheduling", () => ({
+  useSmartScheduling: () => ({ suggestedSlots: [], isLoading: false, error: null, getSuggestedSlots: vi.fn(), clearSuggestions: vi.fn() }),
+}));
+
 vi.mock("@/hooks/useCompanion", () => ({
   useCompanion: () => ({
     companion: { favorite_color: mocks.companionFavoriteColor },
@@ -192,6 +196,14 @@ describe("AddQuestSheet", () => {
     }));
   });
 
+  it("keeps the Mind Body Soul category when an optional idea is saved to the inbox", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+    render(<AddQuestSheet open onOpenChange={vi.fn()} selectedDate={selectedDate} onAdd={onAdd}
+      prefillKey="wellbeing-soul" prefillDraft={{ text: "Notice something you appreciate", estimatedDuration: 2, category: "soul" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add to Inbox instead" }));
+    await waitFor(() => expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ category: "soul", text: "Notice something you appreciate", taskDate: null, estimatedDuration: 2 })));
+  });
+
   it("renders simplified add quest controls without step instructions", () => {
     render(
       <AddQuestSheet
@@ -215,7 +227,7 @@ describe("AddQuestSheet", () => {
     expect(screen.queryByText(/Name your quest.*Select a time/i)).not.toBeInTheDocument();
     expectElementToIncludeClasses(
       screen.getByTestId("add-quest-mobile-sheet"),
-      "border-[hsl(var(--celestial-blue)_/_0.62)] text-foreground",
+      "agenda-quest-theme",
     );
     expect(screen.getByTestId("add-quest-editor-header").firstElementChild).toContainElement(
       screen.getByPlaceholderText("Quest Title"),
@@ -238,7 +250,7 @@ describe("AddQuestSheet", () => {
     expect(screen.getByTestId("add-quest-desktop-panel")).toBeInTheDocument();
     expectElementToIncludeClasses(
       screen.getByTestId("add-quest-desktop-panel"),
-      "border-[hsl(var(--celestial-blue)_/_0.62)] text-foreground",
+      "agenda-quest-theme",
     );
     expect(screen.queryByTestId("add-quest-mobile-sheet")).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("Quest Title")).toBeInTheDocument();
@@ -887,7 +899,7 @@ describe("AddQuestSheet", () => {
     expect(await screen.findByText("Save these changes to My Templates?")).toBeInTheDocument();
     const prompt = screen.getByTestId("add-quest-template-prompt-dialog");
     const companionFrostedThemeStyle = getCompanionFrostedThemeStyle(mocks.companionFavoriteColor);
-    expect(prompt).toHaveClass("companion-frosted-quest-light");
+    expect(prompt).toHaveClass("agenda-quest-theme");
     expect(prompt.style.getPropertyValue("--companion-frosted-primary")).toBe(
       companionFrostedThemeStyle["--companion-frosted-primary"],
     );
@@ -1766,7 +1778,7 @@ describe("AddQuestSheet", () => {
     expect(await screen.findByText("Restore saved quest draft?")).toBeInTheDocument();
     const prompt = screen.getByTestId("add-quest-draft-restore-dialog");
     const companionFrostedThemeStyle = getCompanionFrostedThemeStyle(mocks.companionFavoriteColor);
-    expect(prompt).toHaveClass("companion-frosted-quest-light");
+    expect(prompt).toHaveClass("agenda-quest-theme");
     expect(prompt.style.getPropertyValue("--companion-frosted-primary")).toBe(
       companionFrostedThemeStyle["--companion-frosted-primary"],
     );
@@ -1930,5 +1942,15 @@ describe("AddQuestSheet", () => {
 
     expect(screen.queryByText("Restore saved quest draft?")).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("Quest Title")).toHaveValue("Voice wins");
+  });
+
+  it("saves an assistant inbox draft without silently scheduling it on the selected date", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+    render(<AddQuestSheet open onOpenChange={vi.fn()} selectedDate={selectedDate} onAdd={onAdd}
+      prefillKey="assistant-inbox-1" prefillDraft={{ text: "Explore a new trail", taskDate: null, creationSource: "inbox" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Save to Inbox" }));
+    await waitFor(() => expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({
+      text: "Explore a new trail", taskDate: null, sendToInbox: true,
+    })));
   });
 });

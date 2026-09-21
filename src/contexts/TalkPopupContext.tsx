@@ -8,30 +8,16 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { CompanionTalkPopup } from "@/components/companion/CompanionTalkPopup";
 import { resolveCompanionName } from "@/lib/companionName";
 import type { CompletionCompanionTone } from "@/types/completionFeedback";
+import type {
+  CompanionTalkPopupAction,
+  CompanionTalkPopupShowOptions,
+} from "@/types/companionTalkPopup";
 
-export interface CompanionTalkPopupAction {
-  label: string;
-  ariaLabel?: string;
-  onSelect: () => void | Promise<void>;
-}
- 
-interface ShowOptions {
-  message: string;
-  tone?: CompletionCompanionTone;
-  mentor?: {
-    personality: string;
-    message: string;
-  };
-  action?: CompanionTalkPopupAction | null;
-  companionName?: string | null;
-  companionImageUrl?: string;
-  companionImageFocalX?: number | null;
-  companionImageFocalY?: number | null;
-}
+export type { CompanionTalkPopupAction } from "@/types/companionTalkPopup";
  
  interface TalkPopupContextType {
-   show: (options: ShowOptions) => Promise<void>;
-   replaceCurrent: (options: ShowOptions, expectedCurrentMessage?: string) => Promise<boolean>;
+   show: (options: CompanionTalkPopupShowOptions) => Promise<void>;
+   replaceCurrent: (options: CompanionTalkPopupShowOptions, expectedCurrentMessage?: string) => Promise<boolean>;
    dismiss: () => void;
    isVisible: boolean;
  }
@@ -47,7 +33,7 @@ export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => 
   const [isVisible, setIsVisible] = useState(false);
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState<CompletionCompanionTone | null>(null);
-  const [mentor, setMentor] = useState<ShowOptions["mentor"] | null>(null);
+  const [mentor, setMentor] = useState<CompanionTalkPopupShowOptions["mentor"] | null>(null);
   const [action, setAction] = useState<CompanionTalkPopupAction | null>(null);
   const [companionName, setCompanionName] = useState("");
   const [companionImageUrl, setCompanionImageUrl] = useState<string | null>(null);
@@ -55,11 +41,11 @@ export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => 
   const [companionImageFocalY, setCompanionImageFocalY] = useState<number | null>(null);
    
    // Queue for pending messages
-   const queueRef = useRef<ShowOptions[]>([]);
+   const queueRef = useRef<CompanionTalkPopupShowOptions[]>([]);
    const isShowingRef = useRef(false);
    const currentMessageRef = useRef("");
  
-  const applyPopupOptions = useCallback(async (options: ShowOptions) => {
+  const applyPopupOptions = useCallback(async (options: CompanionTalkPopupShowOptions) => {
     const name = await resolveCompanionName({
       companion,
       overrideName: options.companionName,
@@ -81,7 +67,7 @@ export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => 
   }, [companion]);
 
   // Show the popup with a message
-  const show = useCallback(async (options: ShowOptions) => {
+  const show = useCallback(async (options: CompanionTalkPopupShowOptions) => {
      // If already showing, add to queue
      if (isShowingRef.current) {
        queueRef.current.push(options);
@@ -94,7 +80,7 @@ export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => 
   }, [applyPopupOptions]);
 
   const replaceCurrent = useCallback(async (
-    options: ShowOptions,
+    options: CompanionTalkPopupShowOptions,
     expectedCurrentMessage?: string,
   ): Promise<boolean> => {
     if (!isShowingRef.current) return false;

@@ -1,9 +1,8 @@
 # Functions that are invoked dynamically and cannot be discovered by static grep.
+calendar-linked-event
 ai-orchestrator
 generate-weekly-plan
 generate-cosmiq-title-card
-generate-dormant-companion-image
-generate-neglected-companion-image
 google-calendar-auth
 google-calendar-events
 optimize-weekly-plan
@@ -19,3 +18,4 @@ check-task-reminders
 check-habit-reminders
 check-contact-reminders
 dispatch-mentor-nudge-pushes
+calendar-sync-worker

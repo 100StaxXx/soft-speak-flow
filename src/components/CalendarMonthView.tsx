@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Clock, AlertCircle, Star, Repeat } from "luc
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "./ui/badge";
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 import { playSound } from "@/utils/soundEffects";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import {
@@ -25,6 +25,7 @@ const MONTHS = [
 ];
 
 interface CalendarMonthViewProps {
+  compact?: boolean;
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
   onMonthChange?: (date: Date) => void;
@@ -35,8 +36,10 @@ interface CalendarMonthViewProps {
   onDateLongPress?: (date: Date) => void;
 }
 
-export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, tasks, milestones = [], onTaskClick, onMilestoneClick, onDateLongPress }: CalendarMonthViewProps) => {
-  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+export const CalendarMonthView = ({ compact = false, selectedDate, onDateSelect, onMonthChange, tasks, milestones = [], onTaskClick, onMilestoneClick, onDateLongPress }: CalendarMonthViewProps) => {
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressTouchClick = useRef(false);
+  useEffect(() => () => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }, []);
 
   const monthStart = startOfMonth(selectedDate);
   const monthEnd = endOfMonth(selectedDate);
@@ -52,7 +55,7 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
   const selectedYear = selectedDate.getFullYear();
   
   const handleMonthSelect = (monthIndex: string) => {
-    const newDate = new Date(selectedDate);
+    const newDate = startOfMonth(selectedDate);
     newDate.setMonth(parseInt(monthIndex));
     (onMonthChange || onDateSelect)(newDate);
   };
@@ -64,17 +67,19 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
   };
 
   const handleLongPressStart = (date: Date) => {
-    const timer = setTimeout(() => {
+    suppressTouchClick.current = false;
+    if (!onDateLongPress) return;
+    longPressTimer.current = setTimeout(() => {
+      suppressTouchClick.current = true;
       playSound('pop');
       onDateLongPress?.(date);
     }, 500);
-    setLongPressTimer(timer);
   };
 
   const handleLongPressEnd = () => {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer);
-      setLongPressTimer(null);
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
     }
   };
   
@@ -113,7 +118,7 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      {!compact && <div className="flex items-center justify-between">
         <div className="flex items-center gap-1">
           {/* Month Dropdown */}
           <Select value={selectedMonth.toString()} onValueChange={handleMonthSelect}>
@@ -160,7 +165,7 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-      </div>
+      </div>}
 
       <div className="border border-border">
         {/* Day headers */}
@@ -169,7 +174,8 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
             <div 
               key={day} 
               className={cn(
-                "text-center text-sm font-medium text-muted-foreground p-2",
+                "text-center text-sm font-medium text-muted-foreground",
+                compact ? "px-0 py-2 text-xs" : "p-2",
                 i < 6 && "border-r border-border"
               )}
             >
@@ -195,15 +201,26 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
               <div
                 key={day.toString()}
                 className={cn(
-                  "min-h-[120px] p-2 cursor-pointer transition-colors bg-background",
+                  "min-w-0 cursor-pointer transition-colors",
+                  compact ? "min-h-[96px] p-1 bg-slate-950/20" : "min-h-[120px] p-2 bg-background",
                   !isLastInRow && "border-r border-border",
                   !isInLastRow && "border-b border-border",
                   isSelected && "bg-primary/10",
                   isToday && "bg-primary/5",
                   !isSameMonth(day, selectedDate) && "bg-muted/20 text-muted-foreground"
                 )}
-                onClick={() => onDateSelect(day)}
+                role="button"
+                tabIndex={0}
+                aria-label={format(day, "EEEE, MMMM d, yyyy")}
+                onKeyDown={(event) => {
+                  if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onDateSelect(day); }
+                }}
+                onClick={() => {
+                  if (suppressTouchClick.current) { suppressTouchClick.current = false; return; }
+                  onDateSelect(day);
+                }}
                 onTouchStart={() => handleLongPressStart(day)}
+                onTouchMove={() => { handleLongPressEnd(); suppressTouchClick.current = true; }}
                 onTouchEnd={handleLongPressEnd}
                 onTouchCancel={handleLongPressEnd}
               >
@@ -250,14 +267,17 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
                     const campaignTitle = task.epic_title?.trim() || "Campaign";
 
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={task.id}
+                        aria-label={`Open ${task.task_text}`}
+                        onTouchStart={event => event.stopPropagation()}
                         onClick={(e) => {
                           e.stopPropagation();
                           onTaskClick(task);
                         }}
                         className={cn(
-                          "text-xs p-1 border-l-2 transition-all hover:bg-muted/50",
+                          "block w-full text-left text-xs p-1 border-l-2 transition-all hover:bg-muted/50",
                           task.completed && "opacity-50 line-through",
                           isCampaignRitual && CAMPAIGN_RITUAL_CARD_CLASSES,
                           !isCampaignRitual && task.is_main_quest && "border-l-amber-500 bg-amber-500/5",
@@ -279,7 +299,7 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
                             Campaign Ritual - {campaignTitle}
                           </div>
                         )}
-                      </div>
+                      </button>
                     );
                   })}
                   {totalItems > maxVisibleItems && (

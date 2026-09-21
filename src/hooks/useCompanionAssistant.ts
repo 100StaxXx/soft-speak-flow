@@ -29,6 +29,7 @@ import {
   stopCompanionSpeech,
 } from "@/services/companionSpeech";
 import { getCompanionPlannerOpener } from "@/shared/companionPlannerCopy";
+import { pendingActionToQuestDraft } from "@/shared/agendaCompanionChat";
 import { getRandomCompanionChatOpeningLine } from "@/shared/companionChatOpeners";
 import {
   analyzeSchedulingIntent,
@@ -178,12 +179,6 @@ type PendingLegacyFallbackReplay = {
   shouldConsumePendingStarterIntent: boolean;
 };
 
-const hasPlanDaySnapshotBriefing = (
-  launchIntent: CompanionPlannerLaunchIntent | null | undefined,
-) =>
-  launchIntent?.starterIntent === "plan_day" &&
-  Boolean(launchIntent.briefingContext?.dataSnapshot);
-
 const readFollowUpSelectedDate = (
   followUp: CompanionAgentFollowUp | null | undefined,
 ) => {
@@ -205,7 +200,7 @@ const shouldApplyDefaultSelectedDateToStarterIntent = (
 
 const shouldForceChatAfterLauncherStarterIntent = (
   starterIntent: CompanionPlannerLaunchIntent["starterIntent"] | null | undefined,
-) => starterIntent === "plan_day" || starterIntent === "upcoming_start";
+) => starterIntent === "upcoming_start";
 
 const hasChatOnlyLauncherStructuredResponse = (
   response: CompanionAgentResponse["structuredResponse"] | null | undefined,
@@ -782,7 +777,7 @@ export function useCompanionAssistant({
     surface,
     conversationEnabled,
     onOpenCampaignBuilder,
-    plannerFallbackMode: "read_only",
+    plannerFallbackMode: useLegacyFallback ? "interactive" : "read_only",
   });
 
   const [activeSessionId, setActiveSessionId] = useState(() =>
@@ -1454,15 +1449,18 @@ export function useCompanionAssistant({
       setDraftInput("");
       setInterimText("");
 
-      const shouldUseDirectChat = shouldUseDirectCompanionChat({
-        surface,
-        message,
-        starterIntent,
-        turnOrigin: options?.turnOrigin,
-        selectedDate,
-        activeFollowUp: requestActiveFollowUp,
-        pendingAction,
-      }) || forceLauncherContinuationChat;
+      const hasOpenPlannerThread = surface === "journeys" &&
+        Boolean(lastReplayablePlannerMessageRef.current);
+      const shouldUseDirectChat = forceLauncherContinuationChat ||
+        (!hasOpenPlannerThread && shouldUseDirectCompanionChat({
+          surface,
+          message,
+          starterIntent,
+          turnOrigin: options?.turnOrigin,
+          selectedDate,
+          activeFollowUp: requestActiveFollowUp,
+          pendingAction,
+        }));
       const directChatHistory = shouldUseDirectChat
         ? buildDirectChatHistory(messages)
         : [];
@@ -1760,7 +1758,7 @@ export function useCompanionAssistant({
   );
 
   const resolvePendingAction = useCallback(
-    async (mode: "confirm" | "cancel") => {
+    async (mode: "confirm" | "cancel" | "edit") => {
       if (useLegacyFallback) {
         if (mode === "confirm") {
           await legacyAssistant.confirmPendingAction();
@@ -1770,8 +1768,8 @@ export function useCompanionAssistant({
         return;
       }
 
-      if (!pendingAction || isResolvingAction || isSubmitting) return;
-      if (!(await ensureFunctionSession())) return;
+      if (!pendingAction || isResolvingAction || isSubmitting) return false;
+      if (!(await ensureFunctionSession())) return false;
 
       setIsResolvingAction(true);
       try {
@@ -1781,7 +1779,7 @@ export function useCompanionAssistant({
             body: {
               sessionId: activeSessionIdRef.current,
               actionId: pendingAction.id,
-              action: mode,
+              action: mode === "edit" ? "cancel" : mode,
             },
           },
         );
@@ -1789,6 +1787,9 @@ export function useCompanionAssistant({
         if (error) throw error;
 
         const response = data as CompanionAgentResponse;
+        if (mode === "edit" && (response.receipt?.status !== "cancelled" || response.receipt.actionId !== pendingAction.id)) {
+          throw new Error("Quest draft could not be transferred to the editor");
+        }
         const nextStructuredResponse =
           response.structuredResponse === undefined
             ? (structuredResponse ?? null)
@@ -1797,10 +1798,10 @@ export function useCompanionAssistant({
         setPendingAction(null);
         setMessages((previous) => [
           ...previous,
-          createMessage("user", mode === "confirm" ? "Confirm" : "Cancel", {
+          createMessage("user", mode === "edit" ? "Review quest draft" : mode === "confirm" ? "Confirm" : "Cancel", {
             source: "agent",
           }),
-          createMessage("assistant", stripMarkdown(response.reply), {
+          createMessage("assistant", mode === "edit" ? "Your draft is ready to review. You can adjust the details before saving." : stripMarkdown(response.reply), {
             source: "agent",
             understandingState: response.understandingState,
             followUp: response.followUp ?? null,
@@ -1833,19 +1834,32 @@ export function useCompanionAssistant({
         });
         if (mode === "confirm" && response.receipt?.status === "executed") {
           emitPlanDayActionSavedEvent();
+          for (const queryKey of [
+            "daily-tasks",
+            "tasks",
+            "calendar-tasks",
+            "inbox-tasks",
+            "habit-surfacing",
+            "epics",
+            "epic-progress",
+          ]) {
+            void queryClient.invalidateQueries({ queryKey: [queryKey] });
+          }
         }
-        void speakAssistantReply(
+        if (mode !== "edit") void speakAssistantReply(
           response.reply,
           response.threadState.sessionId,
         );
         void invalidateThreads();
+        return true;
       } catch (error) {
         console.error(`Failed to ${mode} pending action:`, error);
         toast.error(
-          mode === "confirm"
+          mode === "edit" ? "I couldn't open the quest editor yet. Please try again." : mode === "confirm"
             ? "I couldn't confirm that action right now."
             : "I couldn't cancel that action right now.",
         );
+        return false;
       } finally {
         setIsResolvingAction(false);
       }
@@ -1857,6 +1871,7 @@ export function useCompanionAssistant({
       isSubmitting,
       legacyAssistant,
       pendingAction,
+      queryClient,
       speakAssistantReply,
       structuredResponse,
       surface,
@@ -2013,8 +2028,6 @@ export function useCompanionAssistant({
     const isCompanionAuthoredConversationStarter =
       launchIntent.target === "conversation" &&
       launchIntent.starterIntent === "free_talk_start";
-    const isSnapshotOnlyPlanDayStarter =
-      hasPlanDaySnapshotBriefing(launchIntent);
     const isLocalUpcomingStarter =
       localScheduleReadEnabled &&
       launchIntent.starterIntent === "upcoming_start";
@@ -2035,29 +2048,6 @@ export function useCompanionAssistant({
               greetingText,
               visibleAssistantOpening: true,
             });
-          }
-          return;
-        }
-
-        if (isSnapshotOnlyPlanDayStarter) {
-          let nextSessionId: string | undefined;
-          if (useLegacyFallback) {
-            nextSessionId = legacyAssistant.startTemplateThread?.();
-          } else {
-            nextSessionId = startTemplateThread({ greetingText: null });
-          }
-          if (nextSessionId) {
-            chatOnlyLauncherSessionRef.current = nextSessionId;
-          } else {
-            chatOnlyLauncherSessionRef.current = activeSessionIdRef.current;
-          }
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(
-              new CustomEvent("companion-plan-my-day-started"),
-            );
-            window.dispatchEvent(
-              new CustomEvent("companion-plan-my-day-snapshot-shown"),
-            );
           }
           return;
         }
@@ -2206,6 +2196,10 @@ export function useCompanionAssistant({
       pendingAction: legacyAssistant.pendingAction,
       pendingActionCount: legacyAssistant.pendingActionCount,
       readyPendingActionCount: legacyAssistant.readyPendingActionCount,
+      editableQuestProposal: legacyAssistant.editableQuestProposal,
+      prepareQuestEditor: async (_proposalId: string) => true,
+      completeEditableQuestProposal: legacyAssistant.completeEditableQuestProposal,
+      rejectEditableQuestProposal: legacyAssistant.rejectEditableQuestProposal,
       draftInput,
       setDraftInput,
       interimText,
@@ -2267,6 +2261,15 @@ export function useCompanionAssistant({
     pendingAction,
     pendingActionCount: pendingAction ? 1 : 0,
     readyPendingActionCount: pendingAction ? 1 : 0,
+    editableQuestProposal: surface === "journeys" ? pendingActionToQuestDraft(pendingAction) : null,
+    prepareQuestEditor: async (proposalId: string) => {
+      if (pendingAction?.id !== proposalId || pendingAction.actionType !== "task_create") return false;
+      return resolvePendingAction("edit");
+    },
+    completeEditableQuestProposal: async (_proposalId: string, result?: { savedTitle?: string | null }) => {
+      setMessages((previous) => [...previous, createMessage("assistant", `${result?.savedTitle || "Your quest"} is saved. What else is on your mind?`, { source: "agent" })]);
+    },
+    rejectEditableQuestProposal: async () => { await resolvePendingAction("cancel"); },
     draftInput,
     setDraftInput,
     interimText,

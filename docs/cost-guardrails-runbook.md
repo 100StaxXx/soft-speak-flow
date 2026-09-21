@@ -45,8 +45,6 @@ High:
 - `generate-campaign-welcome-image`
 - `generate-journey-path`
 - `generate-adversary-image`
-- `generate-neglected-companion-image`
-- `generate-dormant-companion-image`
 
 Medium:
 
@@ -60,7 +58,6 @@ Medium:
 - `generate-epic-narrative-seed`
 - `generate-reflection-reply`
 - `generate-check-in-response`
-- `generate-memorial-image`
 - `generate-quote-image`
 - `generate-zodiac-images`
 
@@ -112,7 +109,7 @@ Narrower shutdowns:
   - `COSMIQ_TITLE_CARD_IMAGE_MODEL=gpt-image-1-mini`
   - `COSMIQ_TITLE_CARD_IMAGE_FALLBACK_MODELS=gpt-image-1`
   - `COSMIQ_TITLE_CARD_IMAGE_QUALITY=medium`
-- Leave `COMPANION_DECAY_IMAGE_AUTOGENERATION=false` unless you intentionally want the daily decay job to generate dormant/neglected custom art for inactive users.
+- Return invitations reuse the companion's current approved art; no absence-based image variants are generated.
 - Standard image generation defaults to no quality retry and one evolution render. Raise `COMPANION_IMAGE_STAGE0_MAX_RETRIES`, `COMPANION_IMAGE_NON_STAGE0_MAX_RETRIES`, or `COMPANION_EVOLUTION_RENDER_ATTEMPTS` only for premium experiments or short QA windows.
 - Keep lineage and visible companion art at `medium` quality by default. Use `COMPANION_IMAGE_FINAL_QUALITY=high` only for short premium QA windows.
 

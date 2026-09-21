@@ -42,7 +42,7 @@ export default function TermsOfService() {
                 1. Acceptance of Terms
               </h2>
               <p className="text-muted-foreground leading-relaxed">
-                By accessing and using Soft Speak Flow ("the App"), you accept and agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our service.
+                By accessing and using Cosmiq ("the App"), you accept and agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our service.
               </p>
             </section>
 
@@ -51,7 +51,7 @@ export default function TermsOfService() {
                 2. Description of Service
               </h2>
               <p className="text-muted-foreground leading-relaxed">
-                Soft Speak Flow is a personal development platform that provides habit tracking, personalized guidance, motivational content, companion evolution features, and tools to help users achieve their goals.
+                Cosmiq is a personal development platform that provides habit tracking, personalized guidance, motivational content, companion evolution features, and tools to help users achieve their goals.
               </p>
             </section>
 
@@ -78,7 +78,7 @@ export default function TermsOfService() {
                 5. Premium Subscriptions
               </h2>
               <p className="text-muted-foreground leading-relaxed">
-                Premium features are available through subscription. Subscriptions automatically renew unless cancelled. Refunds are handled on a case-by-case basis. We reserve the right to modify pricing with advance notice to subscribers.
+                Premium features are currently offered through Apple App Store subscriptions on supported iOS devices. The localized price, trial eligibility, subscription period, and renewal terms shown by Apple at confirmation control your purchase. Subscriptions renew automatically unless canceled in your Apple account settings, and refund requests are handled by Apple under its policies.
               </p>
             </section>
 
@@ -87,7 +87,7 @@ export default function TermsOfService() {
                 6. Intellectual Property
               </h2>
               <p className="text-muted-foreground leading-relaxed">
-                All content, features, and functionality of Soft Speak Flow, including but not limited to text, graphics, logos, and software, are owned by Cosmiq LLC or our licensors and are protected by copyright, trademark, and other intellectual property laws.
+                All content, features, and functionality of Cosmiq, including but not limited to text, graphics, logos, and software, are owned by Cosmiq LLC or our licensors and are protected by copyright, trademark, and other intellectual property laws.
               </p>
             </section>
 
@@ -106,7 +106,7 @@ export default function TermsOfService() {
               </h2>
               <div className="space-y-3">
                 <p className="text-muted-foreground leading-relaxed font-medium">
-                  ⚠️ Important: Soft Speak Flow is NOT a substitute for professional medical, psychological, or therapeutic services.
+                  ⚠️ Important: Cosmiq is NOT a substitute for professional medical, psychological, or therapeutic services.
                 </p>
                 <p className="text-muted-foreground leading-relaxed">
                   Our content and guide guidance are for motivational and educational purposes only. If you are experiencing mental health issues, please consult with qualified healthcare professionals.

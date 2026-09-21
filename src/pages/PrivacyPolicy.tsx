@@ -42,7 +42,7 @@ export default function PrivacyPolicy() {
                 1. Introduction
               </h2>
               <p className="text-muted-foreground leading-relaxed">
-                This Privacy Policy explains how Soft Speak Flow ("we," "us," or "our") collects, uses, and protects your personal information when you use our application and services.
+                This Privacy Policy explains how Cosmiq ("we," "us," or "our") collects, uses, and protects your personal information when you use our application and services.
               </p>
             </section>
 
@@ -109,7 +109,7 @@ export default function PrivacyPolicy() {
                 </p>
                 <p className="flex items-start gap-2">
                   <span className="text-primary shrink-0">•</span>
-                  <span>Process payments for premium features</span>
+                  <span>Verify subscription purchases and premium access</span>
                 </p>
               </div>
             </section>
@@ -140,7 +140,7 @@ export default function PrivacyPolicy() {
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-primary shrink-0">→</span>
-                      <span>Stripe (payment processing)</span>
+                      <span>Apple App Store and RevenueCat (subscription processing and entitlement status)</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-primary shrink-0">→</span>

@@ -14,15 +14,15 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
-    poolOptions: {
-      threads: {
-        execArgv: vitestWorkerExecArgv,
-      },
-      forks: {
-        execArgv: vitestWorkerExecArgv,
-      },
+    env: {
+      // Unit tests must never depend on a developer's private .env.local file.
+      // Individual suites mock network behavior; these values only allow the
+      // generated Supabase client module to initialize deterministically.
+      VITE_SUPABASE_URL: "http://127.0.0.1:54321",
+      VITE_SUPABASE_PUBLISHABLE_KEY: "test-anon-key",
     },
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    execArgv: vitestWorkerExecArgv,
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },

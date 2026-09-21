@@ -47,7 +47,7 @@ describe("EvolveButton", () => {
     expect(screen.getByText("EVOLVING...")).toBeInTheDocument();
     expect(screen.getByText("This can take a few minutes")).toBeInTheDocument();
     expect(
-      screen.getByText("You can leave this screen and come back when it is ready."),
+      screen.getByRole("status"),
     ).toBeInTheDocument();
 
     act(() => {
@@ -55,7 +55,7 @@ describe("EvolveButton", () => {
     });
 
     expect(
-      screen.getByText("Still working. Reveal videos can take several minutes."),
+      screen.getByText("Still preparing your video. You can leave and come back."),
     ).toBeInTheDocument();
   });
 
@@ -71,7 +71,7 @@ describe("EvolveButton", () => {
     expect(onEvolve).not.toHaveBeenCalled();
     expect(screen.getByText("This can take a few minutes")).toBeInTheDocument();
     expect(
-      screen.getByText("You can leave this screen and come back when it is ready."),
+      screen.getByRole("status"),
     ).toBeInTheDocument();
   });
 });

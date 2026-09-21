@@ -13,6 +13,8 @@ const SCOPES = ["offline_access", "User.Read", "Calendars.ReadWrite", "Tasks.Rea
 type SyncMode = "send_only";
 
 type Action =
+  | "listEvents"
+  | "listRangeEvents"
   | "createLinkedEvent"
   | "updateLinkedEvent"
   | "deleteLinkedEvent";
@@ -35,6 +37,7 @@ interface CalendarConnection {
   token_expires_at: string | null;
   calendar_id: string | null;
   primary_calendar_id: string | null;
+  primary_calendar_name: string | null;
   sync_mode: SyncMode;
 }
 
@@ -69,6 +72,10 @@ const jsonResponse = (body: unknown, status = 200) =>
 function normalizeAction(raw: string | undefined): Action | null {
   if (!raw) return null;
   const map: Record<string, Action> = {
+    listEvents: "listEvents",
+    list_events: "listEvents",
+    listRangeEvents: "listRangeEvents",
+    list_range_events: "listRangeEvents",
     createLinkedEvent: "createLinkedEvent",
     create_linked_event: "createLinkedEvent",
     updateLinkedEvent: "updateLinkedEvent",
@@ -77,6 +84,70 @@ function normalizeAction(raw: string | undefined): Action | null {
     delete_linked_event: "deleteLinkedEvent",
   };
   return map[raw] ?? null;
+}
+
+function parseEventRange(body: Record<string, unknown>): { startDate: string; endDate: string } {
+  const startDate = typeof body.startDate === "string" ? body.startDate : "";
+  const endDate = typeof body.endDate === "string" ? body.endDate : "";
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  if (
+    !startDate
+    || !endDate
+    || Number.isNaN(start.getTime())
+    || Number.isNaN(end.getTime())
+    || end <= start
+  ) {
+    throw new Error("A valid startDate and endDate range is required");
+  }
+
+  if (end.getTime() - start.getTime() > 62 * 24 * 60 * 60 * 1000) {
+    throw new Error("Calendar event range cannot exceed 62 days");
+  }
+
+  return { startDate: start.toISOString(), endDate: end.toISOString() };
+}
+
+const readRangeDateTime = (value: unknown): string | null => {
+  if (typeof value !== "string" || value.trim().length === 0) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+};
+
+const normalizeOutlookUtcDateTime = (value: unknown): string | null => {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const trimmed = value.trim();
+  return /(?:Z|[+-]\d{2}:\d{2})$/i.test(trimmed) ? trimmed : `${trimmed}Z`;
+};
+
+export function mapOutlookRangeEvent(
+  event: Record<string, any>,
+  connectionId: string,
+) {
+  const startTime = normalizeOutlookUtcDateTime(event.start?.dateTime);
+  const endTime = normalizeOutlookUtcDateTime(event.end?.dateTime);
+  if (!event.id || !startTime || !endTime) return null;
+
+  const location = typeof event.location?.displayName === "string"
+    ? event.location.displayName.slice(0, 300)
+    : null;
+  return {
+    id: `outlook:${connectionId}:${event.id}`,
+    external_event_id: String(event.id),
+    title: typeof event.subject === "string" && event.subject.trim()
+      ? event.subject.trim().slice(0, 200)
+      : "Busy",
+    description: typeof event.bodyPreview === "string"
+      ? event.bodyPreview.slice(0, 1000)
+      : null,
+    start_time: startTime,
+    end_time: endTime,
+    is_all_day: event.isAllDay === true,
+    location,
+    source: "outlook",
+    read_only: true,
+  };
 }
 
 function normalizeSyncMode(mode: unknown): SyncMode {
@@ -518,6 +589,41 @@ export function mapOutlookEventToTaskUpdate(
   };
 }
 
+function normalizeGraphDateTime(value: unknown, timezone: unknown): string {
+  if (typeof value !== "string" || !value.trim()) return "";
+  const trimmed = value.trim();
+  const hasOffset = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(trimmed);
+  if (hasOffset) return trimmed;
+  return String(timezone).toUpperCase() === "UTC" ? `${trimmed}Z` : trimmed;
+}
+
+export function toOutlookExternalCalendarEvent(
+  event: Record<string, any>,
+  calendarId: string,
+  calendarName: string,
+) {
+  const id = typeof event.id === "string" ? event.id : "";
+  const isAllDay = event.isAllDay === true;
+  const startValue = normalizeGraphDateTime(event.start?.dateTime, event.start?.timeZone);
+  const endValue = normalizeGraphDateTime(event.end?.dateTime, event.end?.timeZone);
+  const startDate = isAllDay ? startValue.slice(0, 10) : startValue;
+  const endDate = isAllDay ? endValue.slice(0, 10) : endValue;
+
+  if (!id || !startDate || !endDate || event.isCancelled === true) return null;
+
+  return {
+    id,
+    title: typeof event.subject === "string" && event.subject.trim() ? event.subject : "Busy",
+    startDate,
+    endDate,
+    isAllDay,
+    location: typeof event.location?.displayName === "string" ? event.location.displayName : null,
+    calendarId,
+    calendarName,
+    htmlLink: typeof event.webLink === "string" ? event.webLink : null,
+  };
+}
+
 async function outlookApi(
   accessToken: string,
   path: string,
@@ -533,6 +639,7 @@ async function outlookApi(
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
+      Prefer: 'outlook.timezone="UTC"',
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -622,6 +729,105 @@ async function handleOutlookCalendarEvents(req: Request) {
 
     const connection = await getOutlookConnection(supabase, userId);
     const accessToken = await refreshAccessTokenIfNeeded(supabase, connection, clientId, clientSecret);
+
+    if (action === "listEvents") {
+      const range = parseEventRange(body as Record<string, unknown>);
+      const externalCalendarId =
+        (body?.calendarId || body?.calendar_id) as string | undefined
+        || connection.primary_calendar_id
+        || connection.calendar_id;
+
+      if (!externalCalendarId) {
+        return jsonResponse({ error: "No primary Outlook calendar selected" }, 400);
+      }
+
+      const calendarName = connection.primary_calendar_name || "Outlook Calendar";
+      const query = new URLSearchParams({
+        startDateTime: range.startDate,
+        endDateTime: range.endDate,
+        "$select": "id,subject,start,end,isAllDay,isCancelled,location,webLink",
+        "$orderby": "start/dateTime",
+        "$top": "1000",
+      });
+      const events = [];
+      let nextPage: string | null =
+        `/me/calendars/${encodeURIComponent(externalCalendarId)}/calendarView?${query.toString()}`;
+      let pageCount = 0;
+
+      while (nextPage && pageCount < 10) {
+        const response = await outlookApi(accessToken, nextPage);
+        events.push(
+          ...(Array.isArray(response?.value) ? response.value : [])
+            .map((event: Record<string, unknown>) =>
+              toOutlookExternalCalendarEvent(event, externalCalendarId, calendarName))
+            .filter(Boolean),
+        );
+        nextPage = typeof response?.["@odata.nextLink"] === "string"
+          ? response["@odata.nextLink"]
+          : null;
+        pageCount += 1;
+      }
+      const syncedAt = new Date().toISOString();
+
+      await supabase
+        .from("user_calendar_connections")
+        .update({ last_synced_at: syncedAt, updated_at: syncedAt })
+        .eq("id", connection.id);
+
+      return jsonResponse({ events, syncedAt });
+    }
+
+    if (action === "listRangeEvents") {
+      const startDateTime = readRangeDateTime(
+        body?.startDateTime ?? body?.start_date_time,
+      );
+      const endDateTime = readRangeDateTime(
+        body?.endDateTime ?? body?.end_date_time,
+      );
+      if (!startDateTime || !endDateTime) {
+        return jsonResponse(
+          { error: "startDateTime and endDateTime are required" },
+          400,
+        );
+      }
+      const rangeMs = new Date(endDateTime).getTime() -
+        new Date(startDateTime).getTime();
+      if (rangeMs <= 0 || rangeMs > 32 * 24 * 60 * 60 * 1000) {
+        return jsonResponse({ error: "Calendar range must be 1 to 32 days" }, 400);
+      }
+
+      const externalCalendarId =
+        (body?.calendarId || body?.calendar_id) as string | undefined ||
+        connection.primary_calendar_id ||
+        connection.calendar_id;
+      if (!externalCalendarId) {
+        return jsonResponse({ error: "No primary Outlook calendar selected" }, 400);
+      }
+      const query = new URLSearchParams({
+        startDateTime,
+        endDateTime,
+        "$select": "id,subject,bodyPreview,start,end,isAllDay,location,isCancelled",
+        "$orderby": "start/dateTime",
+        "$top": "100",
+      });
+      const response = await outlookApi(
+        accessToken,
+        `/me/calendars/${encodeURIComponent(externalCalendarId)}/calendarView?${query.toString()}`,
+      );
+      const events = (Array.isArray(response?.value) ? response.value : [])
+        .filter((event: Record<string, unknown>) => event.isCancelled !== true)
+        .map((event: Record<string, any>) =>
+          mapOutlookRangeEvent(event, connection.id)
+        )
+        .filter(Boolean);
+
+      return jsonResponse({
+        success: true,
+        provider: "outlook",
+        calendarId: externalCalendarId,
+        events,
+      });
+    }
 
     if (action === "createLinkedEvent") {
       const taskId = (body?.taskId || body?.task_id) as string | undefined;
@@ -789,9 +995,11 @@ async function handleOutlookCalendarEvents(req: Request) {
     const message = error instanceof Error ? error.message : "Internal server error";
     const status = message.toLowerCase().includes("unauthorized")
       ? 401
-      : message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")
+      : message.toLowerCase().includes("range")
         ? 400
-        : 500;
+        : message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")
+          ? 400
+          : 500;
     return jsonResponse({ error: message }, status);
   }
 }

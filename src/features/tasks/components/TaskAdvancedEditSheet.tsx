@@ -74,7 +74,7 @@ const durationOptions = [
 
 const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTH_DAYS = Array.from({ length: 31 }, (_, index) => index + 1);
-const REMINDER_PRESET_VALUES = new Set(QUEST_REMINDER_PRESET_OPTIONS.map((option) => option.value));
+const REMINDER_PRESET_VALUES = new Set<number>(QUEST_REMINDER_PRESET_OPTIONS.map((option) => option.value));
 const CUSTOM_REMINDER_PAST_START_MESSAGE = 'Choose a future quest time before adding a custom reminder.';
 const CUSTOM_REMINDER_PAST_TIME_MESSAGE = 'Choose a reminder time in the future.';
 

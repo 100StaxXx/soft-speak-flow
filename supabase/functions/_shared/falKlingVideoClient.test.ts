@@ -109,6 +109,24 @@ Deno.test("getFalKlingQueueStatus and result parse fal queue responses", async (
   assertEquals(result.videoUrl, "https://example.com/result.mp4");
 });
 
+Deno.test("loop submissions send the same complete scene as start and end for four or five seconds", async () => {
+  for (const durationSeconds of [4, 5]) {
+    let payload: any;
+    await submitFalKlingVideo({
+      fetchFn: (async (_url, init) => {
+        payload = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({ request_id: "loop-test" }));
+      }) as typeof fetch,
+      apiKey: "test-only", model: "fal-ai/kling-video/v3/standard/image-to-video",
+      imageUrl: "https://example.com/scene.jpg", endImageUrl: "https://example.com/scene.jpg",
+      prompt: "Return to the original pose", durationSeconds,
+    });
+    assertEquals(payload.start_image_url, payload.end_image_url);
+    assertEquals(payload.duration, String(durationSeconds));
+    assertEquals(payload.generate_audio, false);
+  }
+});
+
 Deno.test("downloadFalVideo rejects empty video payloads", async () => {
   await assertRejects(
     () =>

@@ -221,11 +221,17 @@ export const resolveCompanionImagePresentation = ({
   }
 
   if (fit === "contain" || fit === "portrait") {
+    // Eggs are authored on uniform square canvases and are always shown in
+    // full. Applying a focal translation to contained egg art creates a
+    // visible wobble between elements without improving the crop.
+    const shouldCenterContainedAsset = isCompanionEggImageSource(src);
     return {
       focalPoint,
       focalSource,
       assetKey,
-      style: manifestEntry ? resolveContainStyle(focalPoint) : CENTERED_CONTAIN_STYLE,
+      style: manifestEntry && !shouldCenterContainedAsset
+        ? resolveContainStyle(focalPoint)
+        : CENTERED_CONTAIN_STYLE,
     };
   }
 

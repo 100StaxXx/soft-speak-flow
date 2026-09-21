@@ -1,7 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { motion } from "framer-motion";
-import { X, MapPin, Calendar, Share2, Sparkles, BookOpen, Search, Quote, Users, Crown, Trophy, Star } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { X, MapPin, Calendar, Share2, Sparkles, BookOpen, Search, Quote, Users, Crown, Trophy, Star, RotateCcw, ScanSearch } from "lucide-react";
 import { CompanionPostcard } from "@/hooks/useCompanionPostcards";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,12 @@ import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
 import { useNarrativeEpic } from "@/hooks/useCosmicLibrary";
 import { useAchievements } from "@/hooks/useAchievements";
+import { useCompanion } from "@/hooks/useCompanion";
+import {
+  buildPostcardDiscoveries,
+  buildPostcardLivingNarrativePrompt,
+} from "@/shared/livingNarrative";
+import { LivingNarrativeChoiceCard } from "./LivingNarrativeChoiceCard";
 
 interface PostcardFullscreenProps {
   postcard: CompanionPostcard;
@@ -23,6 +29,22 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
   const hasNarrativeContent = !!(postcard.chapter_title || postcard.story_content || postcard.clue_text || postcard.prophecy_line);
   const isFinale = postcard.is_finale;
   const { checkFullStorylineAchievement, checkStoryChapterAchievement } = useAchievements();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const shouldReduceMotion = useReducedMotion();
+  const [showBack, setShowBack] = useState(false);
+  const [activeDiscoveryKey, setActiveDiscoveryKey] = useState<string | null>(null);
+  const { companion } = useCompanion();
+  const companionName = companion?.companion_name ||
+    companion?.cached_creature_name ||
+    companion?.spirit_animal ||
+    "Your companion";
+  const discoveries = useMemo(() => buildPostcardDiscoveries(postcard), [postcard]);
+  const activeDiscovery = discoveries.find((discovery) => discovery.key === activeDiscoveryKey) ?? null;
+  const livingNarrativePrompt = useMemo(
+    () => buildPostcardLivingNarrativePrompt({ postcard, companionName }),
+    [companionName, postcard],
+  );
   
   // Fetch epic data for finale info
   const { epic } = useNarrativeEpic(isFinale ? postcard.epic_id || undefined : undefined);
@@ -43,6 +65,43 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
     isFinale,
     postcard.id,
   ]);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    closeButtonRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      ).filter((element) => element.getAttribute("aria-hidden") !== "true");
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [onClose]);
 
   const handleShare = async () => {
     const shareText = postcard.chapter_title 
@@ -80,19 +139,30 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
+      ref={dialogRef}
+      initial={shouldReduceMotion ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex flex-col"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={postcard.chapter_title
+        ? `Chapter ${postcard.chapter_number ?? ""}: ${postcard.chapter_title}`
+        : `Postcard from ${postcard.location_name}`}
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4 safe-area-top">
         <Button
+          ref={closeButtonRef}
           variant="ghost"
           size="icon"
-          onClick={onClose}
+          onClick={(event) => {
+            event.stopPropagation();
+            onClose();
+          }}
           className="text-white hover:bg-white/10"
+          aria-label="Close postcard"
         >
           <X className="w-6 h-6" />
         </Button>
@@ -104,6 +174,7 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
             handleShare();
           }}
           className="text-white hover:bg-white/10"
+          aria-label="Share postcard"
         >
           <Share2 className="w-5 h-5" />
         </Button>
@@ -114,7 +185,7 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
           {/* Chapter Header */}
           {postcard.chapter_title && (
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
+              initial={shouldReduceMotion ? false : { opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               className="text-center mb-4"
             >
@@ -137,41 +208,147 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
 
           {/* Image Container */}
           <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
+            initial={shouldReduceMotion ? false : { scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1 }}
+            transition={shouldReduceMotion ? { duration: 0 } : { delay: 0.1 }}
             className="relative w-full max-w-md"
           >
-            {/* Postcard Frame */}
+            {/* Interactive Postcard Frame */}
             <div className={`relative rounded-2xl overflow-hidden shadow-2xl border-4 ${isFinale ? 'border-yellow-400/40' : 'border-white/20'}`}>
-              <img
-                src={postcard.image_url}
-                alt={postcard.location_name}
-                className="w-full aspect-[4/3] object-cover"
-              />
-              
-              {/* Milestone Badge */}
-              <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-yellow-400" />
-                <span className="text-sm font-bold text-white">
-                  {postcard.milestone_percent}%
-                </span>
-              </div>
+              <AnimatePresence mode="wait" initial={false}>
+                {!showBack ? (
+                  <motion.div
+                    key="front"
+                    initial={shouldReduceMotion ? false : { opacity: 0, rotateY: -8 }}
+                    animate={{ opacity: 1, rotateY: 0 }}
+                    exit={shouldReduceMotion ? undefined : { opacity: 0, rotateY: 8 }}
+                    className="relative aspect-[4/3] bg-black"
+                  >
+                    <motion.img
+                      src={postcard.image_url}
+                      alt={postcard.location_name}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      animate={shouldReduceMotion ? undefined : { scale: [1, 1.025, 1] }}
+                      transition={shouldReduceMotion ? undefined : {
+                        duration: 12,
+                        ease: "easeInOut",
+                        repeat: Infinity,
+                      }}
+                    />
 
-              {/* Finale Badge */}
-              {isFinale && (
-                <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-yellow-500/80 backdrop-blur-sm flex items-center gap-1">
-                  <Crown className="w-4 h-4 text-yellow-900" />
-                  <span className="text-sm font-bold text-yellow-900">FINALE</span>
-                </div>
-              )}
+                    {discoveries.map((discovery, index) => (
+                      <motion.button
+                        key={discovery.key}
+                        type="button"
+                        aria-label={discovery.label}
+                        aria-pressed={activeDiscoveryKey === discovery.key}
+                        onClick={() => setActiveDiscoveryKey(
+                          activeDiscoveryKey === discovery.key ? null : discovery.key,
+                        )}
+                        className={`absolute ${discovery.positionClassName} -translate-x-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full border border-cyan-100/70 bg-cyan-300/20 backdrop-blur-sm flex items-center justify-center shadow-lg shadow-cyan-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white`}
+                        animate={shouldReduceMotion ? undefined : {
+                          scale: activeDiscoveryKey === discovery.key ? 1.15 : [1, 1.12, 1],
+                          opacity: [0.72, 1, 0.72],
+                        }}
+                        transition={shouldReduceMotion ? undefined : {
+                          duration: 2.4,
+                          delay: index * 0.35,
+                          repeat: Infinity,
+                        }}
+                      >
+                        <ScanSearch className="w-4 h-4 text-white" />
+                      </motion.button>
+                    ))}
+
+                    <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-yellow-400" />
+                      <span className="text-sm font-bold text-white">
+                        {postcard.milestone_percent}%
+                      </span>
+                    </div>
+
+                    {isFinale && (
+                      <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-yellow-500/80 backdrop-blur-sm flex items-center gap-1">
+                        <Crown className="w-4 h-4 text-yellow-900" />
+                        <span className="text-sm font-bold text-yellow-900">FINALE</span>
+                      </div>
+                    )}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="back"
+                    initial={shouldReduceMotion ? false : { opacity: 0, rotateY: 8 }}
+                    animate={{ opacity: 1, rotateY: 0 }}
+                    exit={shouldReduceMotion ? undefined : { opacity: 0, rotateY: -8 }}
+                    className="aspect-[4/3] bg-[#eee5d2] text-slate-900 p-6 flex flex-col"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-serif text-lg font-semibold">A note from {companionName}</p>
+                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500 mt-1">
+                          {postcard.location_name}
+                        </p>
+                      </div>
+                      <div className="w-14 h-16 border-2 border-dashed border-slate-400 flex items-center justify-center rotate-2">
+                        <Sparkles className="w-6 h-6 text-violet-600" />
+                      </div>
+                    </div>
+                    <p className="font-serif italic leading-relaxed mt-5 flex-1 line-clamp-5">
+                      “{postcard.caption || postcard.story_content || `I’ll remember how the light looked at ${postcard.location_name}.`}”
+                    </p>
+                    <div className="border-t border-slate-400/60 pt-3 flex justify-between text-xs text-slate-500">
+                      <span>Chapter {postcard.chapter_number ?? "—"}</span>
+                      <span>{format(new Date(postcard.generated_at), "MMM d, yyyy")}</span>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
+
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <p className="text-xs text-white/45">
+                {showBack
+                  ? "The back keeps your companion’s note."
+                  : `${discoveries.length} discover${discoveries.length === 1 ? "y" : "ies"} hidden in this memory.`}
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setShowBack((current) => !current);
+                  setActiveDiscoveryKey(null);
+                }}
+                className="text-white/75 hover:text-white hover:bg-white/10 shrink-0"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                {showBack ? "Show front" : "Flip postcard"}
+              </Button>
+            </div>
+
+            <AnimatePresence>
+              {activeDiscovery && !showBack && (
+                <motion.div
+                  key={activeDiscovery.key}
+                  initial={shouldReduceMotion ? false : { opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={shouldReduceMotion ? undefined : { opacity: 0, y: -6 }}
+                  className="mt-3 rounded-xl border border-cyan-300/25 bg-cyan-400/10 p-4"
+                  role="status"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wide text-cyan-300">
+                    {activeDiscovery.title}
+                  </p>
+                  <p className="text-sm text-white/85 mt-1">{activeDiscovery.text}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Location Info */}
             <motion.div
-              initial={{ y: 20, opacity: 0 }}
+              initial={shouldReduceMotion ? false : { y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.2 }}
+              transition={shouldReduceMotion ? { duration: 0 } : { delay: 0.2 }}
               className="mt-4 p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10"
             >
               <div className="flex items-start gap-3">
@@ -192,9 +369,9 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
             {/* Story Content */}
             {postcard.story_content && (
               <motion.div
-                initial={{ y: 20, opacity: 0 }}
+                initial={shouldReduceMotion ? false : { y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.3 }}
+                transition={shouldReduceMotion ? { duration: 0 } : { delay: 0.3 }}
               >
                 <Card className="mt-4 p-4 bg-white/5 border-white/10">
                   <div className="flex items-center gap-2 mb-3">
@@ -211,9 +388,9 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
             {/* Mystery Clue */}
             {postcard.clue_text && (
               <motion.div
-                initial={{ y: 20, opacity: 0 }}
+                initial={shouldReduceMotion ? false : { y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.4 }}
+                transition={shouldReduceMotion ? { duration: 0 } : { delay: 0.4 }}
               >
                 <Card className="mt-4 p-4 bg-purple-500/10 border-purple-500/30">
                   <div className="flex items-center gap-2 mb-2">
@@ -230,9 +407,9 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
             {/* Prophecy Fragment */}
             {postcard.prophecy_line && (
               <motion.div
-                initial={{ y: 20, opacity: 0 }}
+                initial={shouldReduceMotion ? false : { y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.5 }}
+                transition={shouldReduceMotion ? { duration: 0 } : { delay: 0.5 }}
               >
                 <Card className="mt-4 p-4 bg-amber-500/10 border-amber-500/30">
                   <div className="flex items-center gap-2 mb-2">
@@ -249,9 +426,9 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
             {/* Featured Characters */}
             {postcard.characters_featured && postcard.characters_featured.length > 0 && (
               <motion.div
-                initial={{ y: 20, opacity: 0 }}
+                initial={shouldReduceMotion ? false : { y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.6 }}
+                transition={shouldReduceMotion ? { duration: 0 } : { delay: 0.6 }}
                 className="mt-4"
               >
                 <div className="flex items-center gap-2 mb-2">
@@ -278,9 +455,9 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
                 {/* Boss Victory Section */}
                 {storySeed?.finale_architecture?.boss_name && (
                   <motion.div
-                    initial={{ y: 20, opacity: 0 }}
+                    initial={shouldReduceMotion ? false : { y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.7 }}
+                    transition={shouldReduceMotion ? { duration: 0 } : { delay: 0.7 }}
                   >
                     <Card className="mt-4 p-5 bg-gradient-to-br from-red-500/20 to-orange-500/20 border-red-500/40">
                       <div className="flex items-center gap-2 mb-3">
@@ -302,9 +479,9 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
                 {/* Final Wisdom Section */}
                 {storySeed?.finale_architecture?.the_resolution && (
                   <motion.div
-                    initial={{ y: 20, opacity: 0 }}
+                    initial={shouldReduceMotion ? false : { y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.8 }}
+                    transition={shouldReduceMotion ? { duration: 0 } : { delay: 0.8 }}
                   >
                     <Card className="mt-4 p-5 bg-gradient-to-br from-purple-500/20 to-indigo-500/20 border-purple-500/40">
                       <div className="flex items-center gap-2 mb-3">
@@ -326,9 +503,9 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
                 {/* New Beginning Teaser */}
                 {storySeed?.finale_architecture?.the_new_beginning && (
                   <motion.div
-                    initial={{ y: 20, opacity: 0 }}
+                    initial={shouldReduceMotion ? false : { y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.9 }}
+                    transition={shouldReduceMotion ? { duration: 0 } : { delay: 0.9 }}
                   >
                     <Card className="mt-4 p-4 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border-emerald-500/40">
                       <div className="flex items-center gap-2 mb-2">
@@ -344,9 +521,9 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
 
                 {/* Journey Complete Banner */}
                 <motion.div
-                  initial={{ y: 20, opacity: 0 }}
+                  initial={shouldReduceMotion ? false : { y: 20, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 1.0 }}
+                  transition={shouldReduceMotion ? { duration: 0 } : { delay: 1.0 }}
                   className="mt-6 text-center"
                 >
                   <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/20 border border-yellow-500/40">
@@ -364,6 +541,19 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
                 "{postcard.caption}"
               </p>
             )}
+
+            <div className="mt-5">
+              <LivingNarrativeChoiceCard
+                sourceType="postcard"
+                sourceId={postcard.id}
+                companionId={postcard.companion_id}
+                companionName={companionName}
+                prompt={livingNarrativePrompt}
+                epicId={postcard.epic_id}
+                chapterNumber={postcard.chapter_number}
+                tone="dark"
+              />
+            </div>
 
             {/* Date */}
             <div className="mt-4 flex items-center justify-center gap-2 text-white/50 text-xs">

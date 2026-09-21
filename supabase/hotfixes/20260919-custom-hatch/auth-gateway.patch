@@ -1,0 +1,15 @@
+--- a/supabase/functions/auth-gateway/index.ts
++++ b/supabase/functions/auth-gateway/index.ts
+@@ -66,8 +66,10 @@
+ 
+ type AuthProductMode = "graceward" | "cosmiq";
+ 
+-function normalizeAuthProductMode(value: unknown): AuthProductMode {
+-  return value === "cosmiq" ? "cosmiq" : "graceward";
++export function normalizeAuthProductMode(value: unknown): AuthProductMode {
++  // Pre-split shipped Cosmiq clients omit this field. Graceward clients send
++  // their product explicitly; do not silently bind legacy Cosmiq to Graceward.
++  return value === "graceward" ? "graceward" : "cosmiq";
+ }
+ 
+ function readUserProductMode(user: any): AuthProductMode | null {

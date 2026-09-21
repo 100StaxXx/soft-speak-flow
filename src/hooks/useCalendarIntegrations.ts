@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { NativeCalendar } from '@/plugins/NativeCalendarPlugin';
 import { parseFunctionInvokeError, toUserFacingFunctionError } from '@/utils/supabaseFunctionErrors';
 import { toUserFacingCalendarOAuthError } from '@/utils/calendarOAuthErrors';
+import { parseCalendarOAuthUrl } from '@/utils/calendarOAuthUrl';
 
 export type CalendarProvider = 'google' | 'outlook' | 'apple';
 export type CalendarSyncMode = 'send_only';
@@ -26,6 +27,7 @@ export interface ConnectedCalendar {
 }
 
 interface CalendarUserSettings {
+  visible_calendars?: Partial<Record<CalendarProvider, string[]>>;
   user_id: string;
   integration_visible: boolean;
   nudge_dismissed_at: string | null;
@@ -33,6 +35,7 @@ interface CalendarUserSettings {
 }
 
 interface ProviderCalendarOption {
+  readOnly?: boolean;
   id: string;
   name: string;
   isPrimary?: boolean;
@@ -90,12 +93,12 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
 
       const { data, error } = await supabase
         .from('calendar_user_settings')
-        .select('user_id, integration_visible, nudge_dismissed_at, default_provider')
+        .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
 
       if (error) throw error;
-      return data as CalendarUserSettings | null;
+      return data as unknown as CalendarUserSettings | null;
     },
   });
 
@@ -142,6 +145,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
       queryClient.invalidateQueries({ queryKey: ['calendar-connections'] }),
       queryClient.invalidateQueries({ queryKey: ['quest-calendar-links'] }),
       queryClient.invalidateQueries({ queryKey: ['quest-outlook-task-links'] }),
+      queryClient.invalidateQueries({ queryKey: ['external-calendar-events'] }),
     ]);
   }, [queryClient]);
 
@@ -178,7 +182,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
     }) => {
       const fn = providerToFunction(provider);
       const { data, error } = await supabase.functions.invoke(fn, {
-        body: { action: 'getAuthUrl', redirectUri, syncMode: SEND_ONLY_SYNC_MODE, source },
+        body: { action: 'getAuthUrl', redirectUri, syncMode: SEND_ONLY_SYNC_MODE, source, productMode: 'cosmiq' },
       });
 
       if (error) {
@@ -189,7 +193,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
         });
       }
 
-      return (data?.url || data?.auth_url) as string;
+      return parseCalendarOAuthUrl(data);
     },
   });
 
@@ -208,7 +212,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
     }) => {
       const fn = providerToFunction(provider);
       const { data, error } = await supabase.functions.invoke(fn, {
-        body: { action: 'exchangeCode', code, redirectUri, syncMode: SEND_ONLY_SYNC_MODE, state },
+        body: { action: 'exchangeCode', code, redirectUri, syncMode: SEND_ONLY_SYNC_MODE, state, productMode: 'cosmiq' },
       });
 
       if (error) {
@@ -270,6 +274,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
           id: calendar.id,
           name: calendar.title,
           isPrimary: calendar.isPrimary,
+          readOnly: calendar.readOnly,
         }));
       }
 
@@ -291,6 +296,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
         id: String(calendar.id),
         name: String(calendar.summary || calendar.name || calendar.id),
         isPrimary: Boolean(calendar.primary || calendar.isDefaultCalendar),
+        readOnly: calendar.canEdit === false || calendar.accessRole === 'reader' || calendar.accessRole === 'freeBusyReader',
       }));
     },
   });
@@ -411,7 +417,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
       }
 
       const { calendars } = await NativeCalendar.listCalendars();
-      const primary = calendars.find((c) => c.isPrimary) || calendars[0];
+      const primary = calendars.find((c) => c.isPrimary && !c.readOnly) || calendars.find((c) => !c.readOnly);
       if (!primary) {
         throw new Error('No writable Apple calendars found on this device');
       }

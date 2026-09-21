@@ -230,6 +230,7 @@ export default function CalendarOAuthCallback() {
       const { error: exchangeError } = await supabase.functions.invoke(`${provider}-calendar-auth`, {
         body: {
           action: 'exchangeCode',
+          productMode: 'cosmiq',
           code,
           redirectUri,
           state: state ?? undefined,

@@ -121,14 +121,9 @@ export function useCompanionDialogue() {
   const dialogueMood = useMemo((): DialogueMood => {
     if (!care) return "content";
 
-    if (care.dormancy?.isDormant && care.dormancy.recoveryDays > 0) return "recovering";
-    if (care.dormancy?.isDormant) return "desperate";
-
     const overallCare = care.overallCare;
     if (overallCare >= 0.8) return "thriving";
-    if (overallCare >= 0.5) return "content";
-    if (overallCare >= 0.25) return "concerned";
-    return "desperate";
+    return "content";
   }, [care]);
 
   const spiritAnimal = companion?.spirit_animal || "companion";
@@ -157,7 +152,7 @@ export function useCompanionDialogue() {
       dialogueMood,
       overallCare: care?.overallCare ?? 0.5,
       hasDormancyWarning: care?.hasDormancyWarning ?? false,
-      inactiveDays: care?.dormancy?.inactiveDays ?? companion?.inactive_days ?? 0,
+      inactiveDays: 0,
       progressToNext: typeof progressToNext === "number" ? progressToNext : 0,
       xpToNext:
         companion && typeof nextEvolutionXP === "number"
@@ -169,8 +164,7 @@ export function useCompanionDialogue() {
         && !care?.hasDormancyWarning
         && (dialogueMood === "content" || dialogueMood === "thriving")
         && (care?.overallCare ?? 0) >= 0.55
-        && (typeof progressToNext === "number" ? progressToNext : 0) < 65
-        && (care?.dormancy?.inactiveDays ?? 0) <= 1,
+        && (typeof progressToNext === "number" ? progressToNext : 0) < 65,
       forceBaseFallback: !hasRequiredContext,
     }),
     [
@@ -178,7 +172,6 @@ export function useCompanionDialogue() {
       dialogueMood,
       care?.overallCare,
       care?.hasDormancyWarning,
-      care?.dormancy?.inactiveDays,
       companion,
       progressToNext,
       nextEvolutionXP,

@@ -1,0 +1,97 @@
+# Cosmiq stabilization release — 4.8 (355)
+
+## Release identity
+
+- Based on the user's latest push, `fe2040b1ce395f72d5332e3af43bc62537daeb3b`, on `codex/cosmiq-product-repair`. Build 354 was independently confirmed as Testing in TestFlight before starting this release.
+- Signed archive: `/Users/macbookair/Library/Developer/Xcode/Archives/2026-09-20/Cosmiq 4.8 (355) 2026-09-20.xcarchive`.
+- Xcode archive and App Store Connect upload succeeded September 20, 2026 Pacific. Upload finished at 00:20:42. TestFlight processing/distribution is a separate check below.
+- Verification logs: `/private/tmp/cosmiq-repair.88uHXk` (temporary, not durable source control).
+
+## Repairs
+
+1. Reconciled the already-live hatch/evolution and stats implementations into an isolated production baseline and made the root entry points use them. Preserves cinema preparation, bounded custom-video waiting, portrait promotion, and the Cosmiq stats product boundary. The shared backend's product-specific catalog is not copied into the Cosmiq frontend.
+2. Fixed Mind/Body/Soul video preparation for custom `evolution-cards` portraits and approved bundled presets. Source matching, account ownership, product separation, and restricted URLs remain enforced. New paid generations and retries require active trial/subscription/promo access; existing cached clips remain readable. Added regression tests for real portrait shapes, entitlement expiry, trial access, and worker checks.
+3. Added a 15-second playback startup/stall timeout, retained a close control, and preserved tap-to-play when autoplay is blocked. Generation still takes longer than the three-second finished clip and does not silently resubmit paid work.
+4. Fixed calendar deferred date-reset ordering when closing creation/planning sheets. Updated integration tests to exercise the actual calendar toolbar and current navigation behavior.
+5. Corrected paid-plan progression copy to the implemented 100 levels and seven companion forms, derived from progression configuration.
+6. Repaired application/node type checking, lint, obsolete test mocks/expectations, and unused code after Daily Adventure removal. The production Supabase project pin remains strict; test setup uses a mocked client with network blocked.
+7. Updated dependencies, moved test/build-only tools to development dependencies, and migrated the Vitest configuration/tests. Dependency audit reports zero vulnerabilities at verification time.
+8. Fixed CI Node compatibility and pinned CI's public product identity. CI asset builds use inert test keys and are never signed or distributed. Replaced automatic broad shared-backend deployment with an explicit, version-checked function scope after validation; no automatic auth-config or database push.
+
+## Live backend
+
+- Deployed only `companion-wellbeing-video`, from v1 to v2; ACTIVE. All 12 downloaded deployed TypeScript sources match the tested local sources byte-for-byte.
+- Unauthenticated POST returns 401. Gateway JWT configuration remains unchanged; the handler authenticates user/internal requests.
+- Existing wellbeing table and claim function are present. Existing cron job 21 is active every minute and invokes the internal-authenticated function. Thirty scheduler runs succeeded during the preceding 30 minutes. This confirms scheduled invocation, not a successful newly generated clip.
+- No database migration, auth configuration, calendar worker activation, Graceward function deployment, test purchase, customer calendar mutation, or paid AI generation was performed in this repair release.
+- Existing shared $25 monthly feature/endpoint video budget is unchanged. It is not a per-user budget.
+
+## Apple trial
+
+- App Store Connect monthly product `6756406102` and yearly product `6756406164` both show **Free for the first 2 weeks**, starting September 19, no end date, across 175 regions.
+- Yearly review notes were corrected from three days to 14 days for eligible new subscribers and saved. Monthly notes already agreed.
+- Apple's offer eligibility still applies. This verification does not substitute for a sandbox purchase, restore, and entitlement-expiration test on an iPhone.
+
+## Verification
+
+| Check | Result |
+| --- | --- |
+| Frontend | 385 files, 2,918 tests passed |
+| Backend | 43 isolated groups, 833 assertions passed |
+| Static SQL migration tests | 28 passed; not a production DB regression suite |
+| Scoped release validator | 4 passed |
+| Application and Node types | Passed |
+| Backend types | Passed |
+| Lint | Passed, zero warnings |
+| Unused code / import cycles | Passed |
+| Dependency audit | Zero reported vulnerabilities |
+| Secret scan | Passed locally and remotely; also required on each commit |
+| Product boundary / function manifest | Passed |
+| Production web build / bundle budgets / Maps asset checks | Passed |
+| Native asset synchronization / signing preflight | Passed |
+| Xcode signed archive / upload | Both succeeded |
+
+## Still requires a real device
+
+Do not interpret this release as proof that every possible bug is fixed. Complete the acceptance pass against build 355:
+
+- Email and Apple login, account switching, background/foreground, force-close, offline recovery, and expired sessions.
+- Eligible Apple trial purchase, restore, cancellation/expiration, and no surprise paywall while entitled or while access is temporarily unknown.
+- First custom hatch and later evolution, preparation while away, one-time reveal, and replay.
+- Mind/Body/Soul for new/existing portraits, real generated output, cached replay, slow network, backgrounding, reduced motion, and budget exhaustion. Soul prompts remain secular.
+- Google/Outlook/Apple create/import/export/edit/complete/conflict/reconnect, recurring/all-day items, time zones, and permissions on real provider accounts.
+- Day/Agenda/3-Day/Month layout, scrolling, keyboard, and accessibility on the phone.
+- Separate Cosmiq and Graceward notification delivery and navigation.
+
+Unattended calendar synchronization remains disabled pending safe provider round-trip testing. Multiple accounts per provider, complete recurring-series editing, and provider webhooks are not delivered by this stabilization release.
+
+## Disk cleanup
+
+Deleted the three explicitly approved regenerable caches for device smoke testing and builds 342/343 (about 1.2 GB), then removed this release's temporary DerivedData after successful archive/upload (about 976 MB). Both are regenerable; signed archives and source were preserved. Remaining disk space is still low, around 1 GB.
+
+## TestFlight availability
+
+Upload succeeded; Apple processed build 355 and automatically attached the existing internal Test Group 1 (two testers). The group's Builds page confirms **Testing** for 4.8 (355). Focused testing notes were saved. No external beta review or App Store review submission was made.
+
+## Clean-install follow-up
+
+The first remote CI run exposed an orphaned patch for the removed `@capgo/native-purchases` package. Local incremental installs had not surfaced this missing-package failure. Removed that obsolete patch; active purchases use RevenueCat and its existing native integration. This changes installation tooling only, not the uploaded app bundle. Remote CI is being rerun; local passing checks above are not a claim that remote checks have finished.
+
+Further clean-run findings: removed an orphaned `generate-daily-quotes` local configuration entry and added an entry-point existence check. Three planner fixtures incorrectly used Pacific-relative timestamps for local wall-clock expectations; all 43 planner tests and the full 2,918-test app suite now pass under both UTC and Pacific after correcting the fixtures (no frontend runtime change).
+
+The test database also exposed missing already-applied cinema/product schema prerequisites. Recovered five migrations verbatim from production's recorded statements: `20260812090000`, `20260812100000`, `20260819090000`, `20260819101500`, and `20260819143000`. They cover the companion selection matrix, explicit product identity, cinema engine, compatible hatch RPC, and final premade product binding. These files reconstruct relevant test dependencies; they are not a claim that every historical shared-backend migration has been reconciled. No production SQL was executed. Static migration tests and secret scanning pass. The function manifest now has 100 entries, including the two existing cinema jobs recorded in the recovered history; this does not expand the four-function deployment allow-list.
+
+Recovered two additional recorded prerequisites, `20260811210000` (animation first/last endpoints) and `20260813143000` (calendar sync constraints), bringing this release's recovered migration count to seven. Corrected the already-applied calendar-link migration's fragile predicate text substitution for fresh databases: it now wraps the original check expression with the additive calendar-link exception, preserving other sources and rules. The isolated database now rebuilds successfully and the migration regression suite passes. Production was not changed or replayed.
+
+Updated the database-security evolution fixture to enforce actual visual forms rather than treating intermediate level 2 as a new form. It now separately exercises a below-threshold level-5 claim and an intermediate-level row whose XP threshold is met.
+
+Clean-run compiler differences were addressed with an explicit type for the existing web-push CommonJS wrapper and an equivalent, explicit planner slot fallback. All 117 planner backend tests pass. These backend compiler-compatibility edits were not deployed over other live functions; the only production deployment remains the wellbeing endpoint v2.
+
+## Final remote verification
+
+- [Frontend Release Gate 35498026305](https://github.com/100StaxXx/soft-speak-flow/actions/runs/35498026305) passed both jobs: the complete app/backend test and build gate, and the separate macOS iOS asset synchronization/widget-signing check. This run tested `291dd0336`.
+- [Security Regression 35498259548](https://github.com/100StaxXx/soft-speak-flow/actions/runs/35498259548) passed on `d49a71b2f`: dependency audit, fresh database reconstruction, 28 static migration tests, six live isolated migration assertions, 61 database-security assertions, and 11 edge-function security steps.
+- The only code difference between those two checkpoints is the corrected SQL test fixture; app/runtime/backend sources are identical. The redundant full frontend rerun for `d49a71b2f` was still running at this report's finalization.
+- The actual signed build-355 archive/upload and internal **Testing** status are independently confirmed above. Post-upload commits corrected installation/CI tooling, test fixtures, historical migration reconstruction, and backend compiler portability; they did not change the native app bundle or perform another production deployment.
+
+The obsolete purchase patch was removed from source control and remains recoverable in Git. The pre-existing `supabase/.temp/cli-latest` change was left outside all release commits.

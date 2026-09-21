@@ -1,4 +1,4 @@
-import { memo, useState, useMemo, useRef, type CSSProperties } from "react";
+import { memo, useState, useMemo, useRef, useEffect, type CSSProperties } from "react";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -132,6 +132,13 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({
   const [togglingHabitId, setTogglingHabitId] = useState<string | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const lastTouchToggleAtRef = useRef(0);
+  const toggleResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (toggleResetTimerRef.current !== null) {
+      clearTimeout(toggleResetTimerRef.current);
+    }
+  }, []);
   
   // Get habit surfacing data and mutations for syncing with Quests tab
   const taskDate = format(new Date(), 'yyyy-MM-dd');
@@ -210,7 +217,13 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({
         });
       }
     } finally {
-      setTimeout(() => setTogglingHabitId(null), 300);
+      if (toggleResetTimerRef.current !== null) {
+        clearTimeout(toggleResetTimerRef.current);
+      }
+      toggleResetTimerRef.current = setTimeout(() => {
+        toggleResetTimerRef.current = null;
+        setTogglingHabitId(null);
+      }, 300);
     }
   };
   

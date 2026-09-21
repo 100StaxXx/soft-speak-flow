@@ -7,6 +7,5 @@ export { MentorChatSkeleton } from './MentorChatSkeleton';
 // Re-export existing skeletons from SkeletonLoader
 export { 
   HabitCardSkeleton, 
-  MissionCardSkeleton, 
   CompanionSkeleton 
 } from '@/components/SkeletonLoader';

@@ -1,447 +1,61 @@
-name: Supabase Deploy
+name: Supabase Scoped Deploy
 
+# Shared by Cosmiq and Graceward: never blanket-deploy on a source push.
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "supabase/**"
-      - "src/config/**"
-      - "src/lib/**"
-      - "src/shared/**"
-      - "src/types/**"
-      - "src/utils/**"
-      - "scripts/check-function-manifest.sh"
-      - "scripts/generate-function-manifest.sh"
-      - "supabase/function-manifest.json"
   workflow_dispatch:
     inputs:
-      repair_wallpapers:
-        description: Run the wallpaper-only production repair flow instead of the full deploy
-        required: false
-        type: boolean
-        default: false
-      wallpaper_start_date:
-        description: Active wallpaper date for the repair flow (YYYY-MM-DD)
-        required: false
-        default: "2026-04-09"
-      allow_new_functions:
-        description: Allow deploy to create Edge Functions missing from the Supabase project
-        required: false
-        type: boolean
-        default: false
-
+      function_versions:
+        description: 'Reviewed scope and live versions, e.g. {"companion-wellbeing-video":1}'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: shared-supabase-production
+  cancel-in-progress: false
 jobs:
-  repair-wallpapers:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.repair_wallpapers }}
+  validate:
     runs-on: ubuntu-latest
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+      - uses: actions/setup-node@v4
         with:
-          version: latest
-
-      - name: Link Supabase project
-        run: supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
-
-      - name: Apply wallpaper catalog migrations
-        run: |
-          set -euo pipefail
-
-          for file in \
-            supabase/migrations/20260408200000_add_guide_to_wallpaper_catalog.sql \
-            supabase/migrations/20260408210000_create_live_wallpaper_manifest_view.sql \
-            supabase/migrations/20260408211000_rework_daily_wallpaper_rotation_schedule.sql \
-            supabase/migrations/20260409171000_extend_wallpaper_rotation_internal_timeout.sql
-          do
-            echo "Applying ${file}"
-            supabase db query --linked -f "$file"
-          done
-
-      - name: Repair migration history for wallpaper fixes
-        run: |
-          set -euo pipefail
-
-          for version in \
-            20260408200000 \
-            20260408210000 \
-            20260408211000 \
-            20260409171000
-          do
-            echo "Marking ${version} as applied"
-            supabase migration repair --linked --password "$SUPABASE_DB_PASSWORD" --status applied "$version" --yes
-          done
-
-      - name: Verify catalog schema and scheduler
-        run: |
-          set -euo pipefail
-
-          supabase db query --linked "
-            select conrelid::regclass::text as table_name,
-                   conname,
-                   pg_get_constraintdef(oid) as definition
-            from pg_constraint
-            where conname in (
-              'wallpaper_assets_page_key_check',
-              'daily_wallpaper_assignments_page_key_check'
-            )
-            order by table_name;
-          "
-
-          supabase db query --linked "
-            select to_regclass('public.live_wallpaper_manifest_v') as live_wallpaper_manifest_v;
-          "
-
-          supabase db query --linked "
-            select jobname, schedule, command
-            from cron.job
-            where jobname = 'rotate-daily-wallpapers';
-          "
-
-      - name: Queue guide wallpaper generation for active day
-        run: |
-          set -euo pipefail
-
-          supabase db query --linked "
-            select public.invoke_rotate_daily_wallpapers_with_internal_secret(
-              jsonb_build_object(
-                'startDate', '${{ inputs.wallpaper_start_date }}',
-                'daysAhead', 1,
-                'candidateCount', 3,
-                'force', true,
-                'pageKeys', jsonb_build_array('guide')
-              )
-            );
-          "
-
-      - name: Wait for guide wallpaper generation
-        run: |
-          set -euo pipefail
-
-          for attempt in $(seq 1 30); do
-            ready_count="$(supabase db query --linked -o csv "
-              select count(*)
-              from public.wallpaper_assets
-              where page_key = 'guide'
-                and publish_state = 'ready';
-            " | tail -n 1 | tr -d '\r')"
-
-            assignment_count="$(supabase db query --linked -o csv "
-              select count(*)
-              from public.daily_wallpaper_assignments
-              where for_date = date '${{ inputs.wallpaper_start_date }}'
-                and page_key = 'guide';
-            " | tail -n 1 | tr -d '\r')"
-
-            if [ "${ready_count}" -ge 1 ] && [ "${assignment_count}" -ge 1 ]; then
-              echo "Guide wallpaper generation completed on attempt ${attempt}"
-              exit 0
-            fi
-
-            echo "Guide wallpaper not ready yet (attempt ${attempt}/30)"
-            sleep 10
-          done
-
-          echo "Guide wallpaper generation did not finish within 5 minutes" >&2
-          exit 1
-
-      - name: Queue 4-day horizon refill for all cinematic pages
-        run: |
-          set -euo pipefail
-
-          supabase db query --linked "
-            select public.invoke_rotate_daily_wallpapers_with_internal_secret(
-              jsonb_build_object(
-                'startDate', '${{ inputs.wallpaper_start_date }}',
-                'daysAhead', 4,
-                'candidateCount', 3,
-                'force', false,
-                'pageKeys', jsonb_build_array('guide', 'quests', 'campaigns', 'companion', 'profile')
-              )
-            );
-          "
-
-      - name: Wait for 4-day horizon refill
-        run: |
-          set -euo pipefail
-
-          for attempt in $(seq 1 18); do
-            horizon_count="$(supabase db query --linked -o csv "
-              select count(*)
-              from public.daily_wallpaper_assignments
-              where for_date between date '${{ inputs.wallpaper_start_date }}' and date '${{ inputs.wallpaper_start_date }}' + 3
-                and page_key in ('guide', 'quests', 'campaigns', 'companion', 'profile');
-            " | tail -n 1 | tr -d '\r')"
-
-            if [ "${horizon_count}" -ge 20 ]; then
-              echo "Wallpaper horizon filled on attempt ${attempt}"
-              exit 0
-            fi
-
-            echo "Wallpaper horizon still incomplete (attempt ${attempt}/18, count=${horizon_count})"
-            sleep 10
-          done
-
-          echo "Wallpaper horizon refill did not finish within 3 minutes" >&2
-          exit 1
-
-      - name: Verify guide assets and 4-day assignment coverage
-        run: |
-          set -euo pipefail
-
-          cat > /tmp/verify_wallpaper_repair.sql <<SQL
-          DO \$\$
-          DECLARE
-            start_date date := DATE '${{ inputs.wallpaper_start_date }}';
-            missing_count integer;
-          BEGIN
-            IF NOT EXISTS (
-              SELECT 1
-              FROM public.wallpaper_assets
-              WHERE page_key = 'guide'
-                AND publish_state = 'ready'
-            ) THEN
-              RAISE EXCEPTION 'Guide still has no ready wallpaper assets';
-            END IF;
-
-            SELECT count(*)
-              INTO missing_count
-            FROM (
-              SELECT expected.for_date, expected.page_key
-              FROM (
-                SELECT gs::date AS for_date, pages.page_key
-                FROM generate_series(start_date, start_date + 3, interval '1 day') AS gs
-                CROSS JOIN (
-                  VALUES
-                    ('guide'),
-                    ('quests'),
-                    ('campaigns'),
-                    ('companion'),
-                    ('profile')
-                ) AS pages(page_key)
-              ) AS expected
-              LEFT JOIN public.daily_wallpaper_assignments AS actual
-                ON actual.for_date = expected.for_date
-               AND actual.page_key = expected.page_key
-              WHERE actual.id IS NULL
-            ) AS missing;
-
-            IF missing_count > 0 THEN
-              RAISE EXCEPTION 'Missing % wallpaper assignments in the active horizon', missing_count;
-            END IF;
-          END
-          \$\$;
-          SQL
-
-          supabase db query --linked -f /tmp/verify_wallpaper_repair.sql
-
-          supabase db query --linked "
-            select for_date, page_key, assignment_source, wallpaper_asset_id
-            from public.daily_wallpaper_assignments
-            where for_date between date '${{ inputs.wallpaper_start_date }}' and date '${{ inputs.wallpaper_start_date }}' + 3
-            order by for_date, page_key;
-          "
-
-          supabase db query --linked "
-            select page_key, count(*) as ready_assets
-            from public.wallpaper_assets
-            where publish_state = 'ready'
-            group by page_key
-            order by page_key;
-          "
-
-  deploy:
-    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.repair_wallpapers }}
-    runs-on: ubuntu-latest
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Deno
-        uses: denoland/setup-deno@v1
+          node-version: 24
+          cache: npm
+      - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-
-      - name: Verify function manifest
-        run: ./scripts/check-function-manifest.sh
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+      - run: npm ci
+      - run: npm run typecheck && npm run lint && npm run deadcode:check
+      - run: npm audit --audit-level=moderate
+      - run: npm run test:run
+      - run: node --test scripts/validate-scoped-release.test.mjs
+      - run: npm run functions:typecheck && npm run functions:test
+      - run: npm run test:migrations:static && npm run manifest:check
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          version: latest
-
-      - name: Validate required Supabase secrets
-        run: |
-          set -euo pipefail
-          supabase secrets list --project-ref "$PROJECT_REF" > /tmp/supabase-secrets.txt
-          required=(
-            SUPABASE_URL
-            SUPABASE_ANON_KEY
-            SUPABASE_SERVICE_ROLE_KEY
-            INTERNAL_FUNCTION_SECRET
-            APNS_KEY_ID
-            APNS_TEAM_ID
-            APNS_BUNDLE_ID
-            APNS_AUTH_KEY
-            APNS_ENVIRONMENT
-            OPENAI_API_KEY
-            ELEVENLABS_API_KEY
-            GOOGLE_CALENDAR_CLIENT_ID
-            GOOGLE_CALENDAR_CLIENT_SECRET
-            OUTLOOK_CLIENT_ID
-            OUTLOOK_CLIENT_SECRET
-          )
-
-          missing=0
-          for key in "${required[@]}"; do
-            if ! grep -q "${key}" /tmp/supabase-secrets.txt; then
-              echo "Missing secret in Supabase project: ${key}" >&2
-              missing=1
-            fi
-          done
-
-          if [ "$missing" -ne 0 ]; then
-            exit 1
-          fi
-
-      - name: Link Supabase project
-        run: supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
-
-      - name: Push Supabase config
-        run: supabase config push --project-ref "$PROJECT_REF" --yes
-
-      - name: Repair stale migration versions
-        run: |
-          set -euo pipefail
-          for version in 20251123 20251125 20251126 20251127; do
-            supabase migration repair --linked --password "$SUPABASE_DB_PASSWORD" --status reverted "$version" --yes || true
-          done
-
-      - name: Push database migrations
-        run: supabase db push --linked --password "$SUPABASE_DB_PASSWORD" --yes --include-all
-
-      - name: Deno check Outlook functions
+          node-version: 24
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.98.2
+      - name: Verify live versions and deploy only reviewed functions
         env:
-          DENO_NO_PACKAGE_JSON: "1"
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          FUNCTION_VERSIONS: ${{ inputs.function_versions }}
         run: |
           set -euo pipefail
-          deno check supabase/functions/outlook-calendar-auth/index.ts
-          deno check supabase/functions/outlook-calendar-events/index.ts
-          deno check supabase/functions/outlook-todo-tasks/index.ts
-
-      - name: Deno test Outlook sync helpers
-        env:
-          DENO_NO_PACKAGE_JSON: "1"
-        run: |
-          set -euo pipefail
-          deno test supabase/functions/outlook-calendar-events/index.test.ts
-          deno test supabase/functions/outlook-todo-tasks/index.test.ts
-
-      - name: Deno check companion stats analysis function
-        env:
-          DENO_NO_PACKAGE_JSON: "1"
-        run: |
-          set -euo pipefail
-          deno check --sloppy-imports supabase/functions/generate-companion-stat-analysis/index.ts
-
-      - name: Deno test companion stats analysis function
-        env:
-          DENO_NO_PACKAGE_JSON: "1"
-        run: |
-          set -euo pipefail
-          deno test --allow-env --sloppy-imports supabase/functions/generate-companion-stat-analysis/index.test.ts
-
-      - name: Deploy allow-listed Edge Functions
-        env:
-          ALLOW_NEW_FUNCTIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_new_functions == true }}
-        run: |
-          set -euo pipefail
-
-          supabase functions list --project-ref "$PROJECT_REF" -o json > /tmp/supabase-functions.json
-
-          jq -r '
-            if type == "array" then .[]
-            elif type == "object" and has("functions") and (.functions | type == "array") then .functions[]
-            elif type == "object" and has("data") and (.data | type == "array") then .data[]
-            else empty end
-            | .name // .slug // .id // empty
-          ' /tmp/supabase-functions.json | sort -u > /tmp/existing-functions.txt
-
-          existing_count="$(wc -l < /tmp/existing-functions.txt | tr -d ' ')"
-          echo "Found ${existing_count} deployed Edge Functions in Supabase"
-
-          if [ "$existing_count" -eq 0 ] && [ "${ALLOW_NEW_FUNCTIONS}" != "true" ]; then
-            echo "Supabase returned no deployed functions; refusing to skip the entire allow-list." >&2
-            exit 1
-          fi
-
-          deploy_function() {
-            local fn="$1"
-            local attempt
-            local delay
-
-            for attempt in 1 2 3; do
-              if supabase functions deploy "$fn" --project-ref "$PROJECT_REF"; then
-                return 0
-              fi
-
-              if [ "$attempt" -eq 3 ]; then
-                echo "Deploy failed after ${attempt} attempts: ${fn}" >&2
-                return 1
-              fi
-
-              delay=$((attempt * 15))
-              echo "::warning title=Retrying Edge Function deploy::Deploy of ${fn} failed on attempt ${attempt}; retrying in ${delay}s."
-              sleep "$delay"
-            done
-          }
-
-          jq -r '.allowList[]' supabase/function-manifest.json > /tmp/allow-listed-functions.txt
-          sort -u /tmp/allow-listed-functions.txt > /tmp/allow-listed-functions.sorted.txt
-          comm -23 /tmp/existing-functions.txt /tmp/allow-listed-functions.sorted.txt > /tmp/deployed-outside-allow-list.txt
-          : > /tmp/skipped-new-functions.txt
-
+          test "$PROJECT_REF" = "opbfpbbqvuksuvmtmssd"
+          supabase functions list --project-ref "$PROJECT_REF" -o json > /tmp/live-functions.json
+          node scripts/validate-scoped-release.mjs /tmp/live-functions.json > /tmp/reviewed-functions.txt
           while IFS= read -r fn; do
-            if [ -z "$fn" ]; then
-              continue
-            fi
-
-            if grep -Fxq "$fn" /tmp/existing-functions.txt; then
-              echo "Deploying function: $fn"
-              deploy_function "$fn"
-              continue
-            fi
-
-            if [ "${ALLOW_NEW_FUNCTIONS}" = "true" ]; then
-              echo "Deploying new function with explicit override: $fn"
-              deploy_function "$fn"
-              continue
-            fi
-
-            echo "Skipping undeployed function under function quota guard: $fn"
-            echo "$fn" >> /tmp/skipped-new-functions.txt
-          done < /tmp/allow-listed-functions.txt
-
-          if [ -s /tmp/skipped-new-functions.txt ]; then
-            skipped_count="$(wc -l < /tmp/skipped-new-functions.txt | tr -d ' ')"
-            echo "::error title=Missing allow-listed Edge Functions::Refusing to leave ${skipped_count} allow-listed functions undeployed. Deploy with allow_new_functions=true only after confirming project quota/pruning."
-            sed 's/^/Missing allow-listed function: /' /tmp/skipped-new-functions.txt
-            exit 1
-          fi
-
-          if [ -s /tmp/deployed-outside-allow-list.txt ]; then
-            outside_count="$(wc -l < /tmp/deployed-outside-allow-list.txt | tr -d ' ')"
-            echo "::warning title=Deployed functions outside manifest::Supabase has ${outside_count} deployed functions that are not in supabase/function-manifest.json. Audit these before pruning production functions."
-            sed 's/^/Deployed outside manifest: /' /tmp/deployed-outside-allow-list.txt
-          fi
+            supabase functions deploy "$fn" --project-ref "$PROJECT_REF"
+          done < /tmp/reviewed-functions.txt
+          supabase functions list --project-ref "$PROJECT_REF" -o json
+      # Database and auth settings need a separate reviewed rollout. Never run
+      # config push, migration repair, or db push --include-all here.

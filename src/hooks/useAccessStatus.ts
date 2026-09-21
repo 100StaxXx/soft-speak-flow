@@ -49,19 +49,23 @@ interface AccessStatus {
   trialEndsAt: Date | null;
   /** Loading state */
   loading: boolean;
+  error?: boolean;
+  retry?: () => Promise<void>;
 }
 
 export function useAccessStatus(): AccessStatus {
-  const { profile, loading: profileLoading } = useProfile();
-  const { accessState, isLoading: accessLoading } = useAccessState();
+  const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile();
+  const { accessState, isLoading: accessLoading, error: accessError, refetch: refetchAccess } = useAccessState();
   const isSubscribed = accessState.subscribed;
 
   const loading = profileLoading || accessLoading;
 
-  // If still loading, return safe defaults (grant access during load to avoid flash)
+  // Entitlement checks fail closed while they are unresolved. ProtectedRoute can
+  // keep a previously resolved decision for the same user during background
+  // refreshes, but a new session must never inherit optimistic access.
   if (loading) {
     return {
-      hasAccess: true, // Optimistic - don't block during load
+      hasAccess: false,
       isSubscribed: false,
       isInTrial: false,
       trialExpired: false,
@@ -73,10 +77,11 @@ export function useAccessStatus(): AccessStatus {
     };
   }
 
-  // Profile should exist for authenticated users, but fail open if it does not.
-  if (!profile) {
+  // Profile data is part of the access decision. A missing profile must not
+  // become an implicit entitlement.
+  if ((!profile || accessError) && !accessState.has_access) {
     return {
-      hasAccess: true,
+      hasAccess: false,
       isSubscribed,
       isInTrial: false,
       trialExpired: false,
@@ -85,12 +90,14 @@ export function useAccessStatus(): AccessStatus {
       gateReason: 'none' as AccessGateReason,
       trialEndsAt: null,
       loading: false,
+      error: true,
+      retry: async () => { await Promise.all([refetchProfile(), refetchAccess()]); },
     };
   }
 
   const tutorialCompleted =
-    hasGuidedTutorialCompleted(profile.onboarding_data) ||
-    hasLocalGuidedTutorialCompleted(profile.id);
+    hasGuidedTutorialCompleted(profile?.onboarding_data) ||
+    hasLocalGuidedTutorialCompleted(profile?.id);
 
   const trialEndsAt = accessState.trial_ends_at ? new Date(accessState.trial_ends_at) : null;
 
@@ -104,9 +111,10 @@ export function useAccessStatus(): AccessStatus {
     trialDaysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
   }
 
-  // Product rule: once guided tutorial concludes, unsubscribed users should land on the trial CTA gate.
-  // This intentionally takes precedence over legacy trial timestamp fields.
-  const needsPreTrialSignup = !isSubscribed && tutorialCompleted;
+  // Completing the tutorial should only expose the trial CTA when there is no
+  // verified entitlement. An active App Store trial is access, even though it
+  // is not yet a paid subscription.
+  const needsPreTrialSignup = !isSubscribed && !accessState.has_access && tutorialCompleted;
 
   let hasAccess = true;
   let accessSource: AccessSource = 'none';
@@ -115,15 +123,15 @@ export function useAccessStatus(): AccessStatus {
   if (isSubscribed) {
     accessSource = accessState.access_source === 'promo_code' ? 'promo_code' : 'subscription';
     hasAccess = true;
+  } else if (trialExpired || (!accessState.has_access && accessState.access_source === 'subscription')) {
+    hasAccess = false;
+    gateReason = 'trial_expired';
   } else if (needsPreTrialSignup) {
     hasAccess = false;
     gateReason = 'pre_trial_signup';
   } else if (accessState.has_access) {
     accessSource = accessState.access_source === 'trial' ? 'trial' : 'subscription';
     hasAccess = true;
-  } else if (trialExpired) {
-    hasAccess = false;
-    gateReason = 'trial_expired';
   }
 
   return {

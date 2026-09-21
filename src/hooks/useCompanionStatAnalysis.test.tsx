@@ -222,6 +222,19 @@ describe("useCompanionStatAnalysis", () => {
     vi.useRealTimers();
   });
 
+  it.each([
+    [403, "Your companion's account setup needs attention. Please contact support if retrying doesn't help."],
+    [401, "Your session has expired. Please sign in again and try to analyze your companion's stats."],
+    [503, "Our servers are temporarily unavailable. Please try again in a moment."],
+  ])("explains analysis HTTP %s without exposing the transport error", async (status, message) => {
+    const error = Object.assign(new Error("Edge Function returned a non-2xx status code"), {
+      context: new Response(JSON.stringify({ error: "" }), { status }),
+    });
+    mocks.invokeMock.mockResolvedValue({ data: null, error });
+    const { result } = renderHook(() => useCompanionStatAnalysis(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.error).toBe(message));
+  });
+
   it("loads today's cached analysis without forcing regeneration", async () => {
     mocks.invokeMock.mockResolvedValue({
       data: { analysis: baseAnalysis, cached: true },

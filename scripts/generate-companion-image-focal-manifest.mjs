@@ -121,7 +121,7 @@ function renderManifestFile(manifest) {
     );
   }
 
-  lines.push("};", "");
+  lines.push("};");
   return `${lines.join("\n")}\n`;
 }
 

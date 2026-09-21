@@ -442,6 +442,7 @@ export const StoryQuestionnaire = ({
                       type="button"
                       variant="outline"
                       disabled={controlsLocked}
+                      aria-label={`${String.fromCharCode(65 + index)} ${option.text}`}
                       aria-pressed={isSelected}
                       data-selected={isSelected ? "true" : "false"}
                       className={cn(

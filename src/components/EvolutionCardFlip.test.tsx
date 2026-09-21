@@ -95,9 +95,9 @@ describe("EvolutionCardFlip", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /open cyndathia companion card/i }));
 
-    const cardImages = screen.getAllByRole("img", { name: "Cyndathia" });
-    expect(cardImages[1]).toHaveAttribute("data-companion-image-fit", "contain");
-    expect(cardImages[1]).toHaveClass("object-contain");
+    const fullscreenImage = screen.getByRole("img", { name: "Cyndathia" });
+    expect(fullscreenImage).toHaveAttribute("data-companion-image-fit", "contain");
+    expect(fullscreenImage).toHaveClass("object-contain");
   });
 
   it("resets flip state when dialog closes and reopens", () => {

@@ -11,6 +11,7 @@ import {
   confirmPendingAction,
 } from "../companion-agent/executor.ts";
 import { CompanionAgentActionRequestSchema } from "../companion-agent/types.ts";
+import { createCallerSupabaseClient } from "../_shared/callerSupabase.ts";
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -49,6 +50,7 @@ serve(async (req) => {
     const result = parsed.data.action === "confirm"
       ? await confirmPendingAction({
         supabase: protectedRequest.supabase,
+        actorSupabase: createCallerSupabaseClient(req),
         userId: protectedRequest.auth.userId,
         sessionId: parsed.data.sessionId,
         actionId: parsed.data.actionId,

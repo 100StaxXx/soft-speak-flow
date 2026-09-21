@@ -277,7 +277,7 @@ describe("QuestLocationAutocompleteInput", () => {
         place_id: "place-1",
       })),
     };
-    const Autocomplete = vi.fn(() => autocomplete);
+    const Autocomplete = vi.fn(function () { return autocomplete; });
     mocks.loadGoogleMapsPlacesLibrary.mockResolvedValue({ Autocomplete });
     const onChange = vi.fn();
 
@@ -308,7 +308,7 @@ describe("QuestLocationAutocompleteInput", () => {
       addListener: vi.fn(() => ({ remove: vi.fn() })),
       getPlace: vi.fn(),
     };
-    const Autocomplete = vi.fn(() => autocomplete);
+    const Autocomplete = vi.fn(function () { return autocomplete; });
     mocks.loadGoogleMapsPlacesLibrary
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ Autocomplete });
@@ -337,7 +337,7 @@ describe("QuestLocationAutocompleteInput", () => {
       addListener: vi.fn(() => ({ remove: vi.fn() })),
       getPlace: vi.fn(),
     };
-    const Autocomplete = vi.fn(() => autocomplete);
+    const Autocomplete = vi.fn(function () { return autocomplete; });
     mocks.loadGoogleMapsPlacesLibrary.mockResolvedValue({ Autocomplete });
 
     render(<QuestLocationAutocompleteInput value="1157 canyon" onChange={vi.fn()} />);

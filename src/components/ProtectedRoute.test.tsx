@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,16 +6,37 @@ const authState = vi.hoisted(() => ({
   user: null as { id: string } | null,
   loading: false,
   status: "unauthenticated" as "loading" | "recovering" | "authenticated" | "unauthenticated",
+  recoveryIssue: null as "secure_storage" | "connection" | null,
 }));
+
+const recovery = vi.hoisted(() => ({ restart: vi.fn(), signIn: vi.fn() }));
+vi.mock("@/utils/authRecovery", () => ({ restartAuthRecovery: recovery.restart }));
+vi.mock("@/utils/authSignInRecovery", () => ({ returnToSignIn: recovery.signIn }));
 
 const accessState = vi.hoisted(() => ({
   hasAccess: true,
   gateReason: "none" as "none" | "pre_trial_signup" | "trial_expired",
   loading: false,
+  error: false,
+  retry: vi.fn(),
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => authState,
+}));
+
+const profileState = vi.hoisted(() => ({
+  profile: null as {
+    onboarding_completed?: boolean | null;
+    selected_mentor_id?: string | null;
+    onboarding_step?: string | null;
+    onboarding_data?: Record<string, unknown> | null;
+  } | null,
+  loading: false,
+}));
+
+vi.mock("@/hooks/useProfile", () => ({
+  useProfile: () => profileState,
 }));
 
 vi.mock("@/hooks/useAccessStatus", () => ({
@@ -42,6 +63,7 @@ const ProtectedRouteTree = (props?: Partial<React.ComponentProps<typeof Protecte
         }
       />
       <Route path="/welcome" element={<div>Welcome Page</div>} />
+      <Route path="/onboarding" element={<div>Onboarding Page</div>} />
     </Routes>
   </MemoryRouter>
 );
@@ -51,12 +73,18 @@ const renderProtectedRoute = (props?: Partial<React.ComponentProps<typeof Protec
 
 describe("ProtectedRoute", () => {
   beforeEach(() => {
+    recovery.restart.mockClear();
+    recovery.signIn.mockClear();
     authState.user = null;
     authState.loading = false;
     authState.status = "unauthenticated";
+    authState.recoveryIssue = null;
     accessState.hasAccess = true;
     accessState.gateReason = "none";
     accessState.loading = false;
+    accessState.error = false;
+    profileState.profile = null;
+    profileState.loading = false;
   });
 
   it("renders protected content while auth is recovering with a cached user", () => {
@@ -71,6 +99,27 @@ describe("ProtectedRoute", () => {
     expect(screen.queryByText("Welcome Page")).not.toBeInTheDocument();
   });
 
+  it("shows a retry screen rather than a paywall when the initial access check fails", () => {
+    authState.user = { id: "user-1" };
+    authState.status = "authenticated";
+    accessState.hasAccess = false;
+    accessState.error = true;
+    renderProtectedRoute();
+    expect(screen.getByText("We couldn’t check your access")).toBeInTheDocument();
+    expect(screen.queryByText(/Paywall:/)).not.toBeInTheDocument();
+  });
+
+  it("does not interrupt an already verified user on a failed background check", () => {
+    authState.user = { id: "user-1" };
+    authState.status = "authenticated";
+    const view = renderProtectedRoute();
+    accessState.hasAccess = false;
+    accessState.error = true;
+    view.rerender(ProtectedRouteTree());
+    expect(screen.getByText("Protected Content")).toBeInTheDocument();
+    expect(screen.queryByText(/Paywall:/)).not.toBeInTheDocument();
+  });
+
   it("does not redirect while auth is recovering without a cached user", () => {
     authState.status = "recovering";
     authState.loading = true;
@@ -78,7 +127,9 @@ describe("ProtectedRoute", () => {
 
     renderProtectedRoute();
 
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    expect(screen.getByText("We couldn’t restore your sign-in")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back to sign in" })).toBeInTheDocument();
+    expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
     expect(screen.queryByText("Welcome Page")).not.toBeInTheDocument();
   });
 
@@ -104,6 +155,27 @@ describe("ProtectedRoute", () => {
     expect(screen.getByText("Protected Content")).toBeInTheDocument();
   });
 
+  it("sends a newly created incomplete account back to onboarding before access checks", async () => {
+    authState.status = "authenticated";
+    authState.loading = false;
+    authState.user = { id: "new-apple-user" };
+    profileState.profile = {
+      onboarding_completed: null,
+      selected_mentor_id: null,
+      onboarding_step: null,
+      onboarding_data: null,
+    };
+    accessState.loading = true;
+
+    renderProtectedRoute();
+
+    await waitFor(() => {
+      expect(screen.getByText("Onboarding Page")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Checking access...")).not.toBeInTheDocument();
+    expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
+  });
+
   it("keeps rendered content visible while access refreshes", () => {
     authState.status = "authenticated";
     authState.loading = false;
@@ -120,7 +192,7 @@ describe("ProtectedRoute", () => {
     expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
   });
 
-  it("does not reuse a previous user's access decision during account switches", () => {
+  it("blocks content instead of reusing a previous user's access decision during account switches", () => {
     authState.status = "authenticated";
     authState.loading = false;
     authState.user = { id: "user-a" };
@@ -133,11 +205,11 @@ describe("ProtectedRoute", () => {
     accessState.loading = true;
     view.rerender(ProtectedRouteTree());
 
-    expect(screen.getByText("Protected Content")).toBeInTheDocument();
-    expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
+    expect(screen.getByText("Checking access...")).toBeInTheDocument();
+    expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
   });
 
-  it("renders protected content while the initial access check is still loading", () => {
+  it("does not render protected content while the initial access check is still loading", () => {
     authState.status = "authenticated";
     authState.loading = false;
     authState.user = { id: "user-stalled" };
@@ -147,11 +219,11 @@ describe("ProtectedRoute", () => {
 
     renderProtectedRoute();
 
-    expect(screen.getByText("Protected Content")).toBeInTheDocument();
-    expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
+    expect(screen.getByText("Checking access...")).toBeInTheDocument();
+    expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
   });
 
-  it("shows the paywall if access resolves denied after the optimistic initial render", () => {
+  it("shows the paywall if the initial access check resolves denied", () => {
     authState.status = "authenticated";
     authState.loading = false;
     authState.user = { id: "user-denied-after-stall" };
@@ -161,7 +233,8 @@ describe("ProtectedRoute", () => {
 
     const view = renderProtectedRoute();
 
-    expect(screen.getByText("Protected Content")).toBeInTheDocument();
+    expect(screen.getByText("Checking access...")).toBeInTheDocument();
+    expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
 
     accessState.loading = false;
     accessState.hasAccess = false;
@@ -172,7 +245,7 @@ describe("ProtectedRoute", () => {
     expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
   });
 
-  it("leaves auth loading and redirects to welcome if auth never resolves", async () => {
+  it("offers recovery without logging out when auth takes too long", async () => {
     vi.useFakeTimers();
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     authState.status = "loading";
@@ -183,17 +256,56 @@ describe("ProtectedRoute", () => {
       renderProtectedRoute();
 
       expect(screen.getByText("Loading...")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Back to sign in" }));
+      expect(recovery.signIn).toHaveBeenCalledTimes(1);
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(PROTECTED_ROUTE_AUTH_STALL_MS);
         await Promise.resolve();
       });
 
-      expect(screen.getByText("Welcome Page")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Retry sign-in check" })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Retry sign-in check" }));
+      expect(recovery.restart).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole("button", { name: "Back to sign in" }));
+      expect(recovery.signIn).toHaveBeenCalledTimes(2);
+      expect(screen.queryByText("Welcome Page")).not.toBeInTheDocument();
+      expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
     } finally {
       warnSpy.mockRestore();
       vi.useRealTimers();
     }
+  });
+
+  it("lets a slow saved-session renewal finish without a premature failure screen", async () => {
+    vi.useFakeTimers();
+    try {
+      authState.status = "loading";
+      authState.loading = true;
+      const view = renderProtectedRoute();
+      await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+      expect(screen.queryByRole("button", { name: "Retry sign-in check" })).not.toBeInTheDocument();
+      authState.user = { id: "restored-user" };
+      authState.loading = false;
+      authState.status = "authenticated";
+      view.rerender(ProtectedRouteTree());
+      expect(screen.getByText("Protected Content")).toBeInTheDocument();
+      expect(screen.queryByText("Welcome Page")).not.toBeInTheDocument();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("distinguishes secure storage failure from a connection problem", async () => {
+    vi.useFakeTimers();
+    try {
+      authState.status = "recovering";
+      authState.loading = true;
+      authState.recoveryIssue = "secure_storage";
+      renderProtectedRoute();
+      await act(async () => { await vi.advanceTimersByTimeAsync(PROTECTED_ROUTE_AUTH_STALL_MS); });
+      expect(screen.getByText("Your saved sign-in couldn’t be opened")).toBeInTheDocument();
+      expect(screen.queryByText(/Check your connection/)).not.toBeInTheDocument();
+      expect(screen.queryByText("Welcome Page")).not.toBeInTheDocument();
+    } finally { vi.useRealTimers(); }
   });
 
   it("keeps the paywall visible while denied access refreshes", () => {

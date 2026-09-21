@@ -1519,7 +1519,12 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         }
       };
 
-      void generateStageOneArtifacts();
+      // The backwards-compatible hatch RPC may return the still-unhatched
+      // egg while its custom cinema job runs. Artifacts belong to the actual
+      // claimed evolution, not to preparation.
+      if (hatchResult.current_stage >= 1 && hatchResult.evolution_id) {
+        void generateStageOneArtifacts();
+      }
 
       await requestCompanionAnimationPrewarm({
         companionId: companionToUse.id,
@@ -1791,7 +1796,7 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
           kickQueuedEvolutionJob(queuedJob.job_id);
 
           return {
-            queued: true,
+            queued: true as const,
             jobId: queuedJob.job_id,
             newStage: queuedJob.requested_stage,
             status: queuedJob.status,
@@ -1946,16 +1951,6 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
       if (latestEarnedLevel > latestCompanion.current_stage) {
         toast.success(`Level ${latestEarnedLevel} reached!`);
       }
-      return;
-    }
-
-    if (isPresetEggCompanion(latestCompanion)) {
-      setIsEvolvingLoading(true);
-      window.dispatchEvent(new CustomEvent("evolution-loading-start"));
-      hatchCompanion.mutate({
-        presetId: latestCompanion.preset_id,
-        companionSnapshot: latestCompanion,
-      });
       return;
     }
 

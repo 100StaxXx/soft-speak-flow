@@ -14,7 +14,7 @@ import {
   shouldContainCompanionSceneImage,
 } from "@/lib/companionImageFocal";
 import type { CompletionCompanionTone } from "@/types/completionFeedback";
-import type { CompanionTalkPopupAction } from "@/contexts/TalkPopupContext";
+import type { CompanionTalkPopupAction } from "@/types/companionTalkPopup";
  
  interface CompanionTalkPopupProps {
    isVisible: boolean;

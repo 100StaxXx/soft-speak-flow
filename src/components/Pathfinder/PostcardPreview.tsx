@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, MapPin, Book, Star } from 'lucide-react';
-import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
+import { usePlannerSurface } from '@/components/companion/usePlannerSurface';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { JourneyMilestone } from '@/hooks/useJourneySchedule';
@@ -13,6 +13,7 @@ interface PostcardPreviewProps {
 }
 
 export const PostcardPreview = memo(function PostcardPreview({ milestones, storyType: _storyType, className }: PostcardPreviewProps) {
+  const { plannerPathfinderTheme } = usePlannerSurface();
   const postcardMilestones = useMemo(() => 
     milestones.filter(m => m.isPostcardMilestone),
     [milestones]

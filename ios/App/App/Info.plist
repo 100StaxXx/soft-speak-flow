@@ -58,7 +58,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>We use the camera only if you choose to take photos for your profile, progress tracking, or to attach images to your quests.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>We use the microphone for voice input to create tasks and chat with your mentor using your voice.</string>
+	<string>We use the microphone for voice input to create tasks and chat with your companion using your voice.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>We use speech recognition to convert your voice into text for creating tasks and sending messages.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
@@ -66,7 +66,13 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>We save photos to your library only if you choose to download images from the app.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>We use calendar access to let you optionally send quests to your Apple Calendar and keep linked events in sync.</string>
+	<string>Cosmiq uses your calendars to show your schedule and sync quests you choose to link.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Cosmiq reads and updates only the reminders you choose to link to quests.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Cosmiq reads your reminder lists and updates only the reminders you choose to link to quests.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Show your calendar events in Cosmiq and add or update the quests you choose to send to your calendar.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -115,5 +121,7 @@
 	<true/>
 	<key>GooglePlacesAPIKey</key>
 	<string>$(GOOGLE_PLACES_IOS_API_KEY)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

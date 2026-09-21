@@ -71,7 +71,7 @@ const normalizeDeletedPlannerEntity = (
   if (!entityType) return null;
 
   const entityId = normalizeEntityId(
-    ("entityId" in entity ? entity.entityId : entity.entity_id) as
+    ("entityId" in entity ? entity.entityId : "entity_id" in entity ? entity.entity_id : null) as
       | string
       | null
       | undefined,
@@ -80,7 +80,7 @@ const normalizeDeletedPlannerEntity = (
   if (!entityId && !title) return null;
 
   const deletedAt = normalizeTitle(
-    ("deletedAt" in entity ? entity.deletedAt : entity.deleted_at) as
+    ("deletedAt" in entity ? entity.deletedAt : "deleted_at" in entity ? entity.deleted_at : null) as
       | string
       | null
       | undefined,

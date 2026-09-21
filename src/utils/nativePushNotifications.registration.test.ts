@@ -14,7 +14,7 @@ const supabaseMocks = vi.hoisted(() => ({
 }));
 
 const sonnerMocks = vi.hoisted(() => ({
-  toast: vi.fn(() => "toast-id"),
+  toast: vi.fn((_message: string, _options?: Record<string, unknown>) => "toast-id"),
 }));
 
 vi.mock("@capacitor/core", () => ({

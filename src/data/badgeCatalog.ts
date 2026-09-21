@@ -2,7 +2,6 @@
  * Badge Catalog - Defines all possible badges in the app
  * Used to show both earned and locked badges in the collection
  */
-import { BADGE_PREVIEW_URLS } from "@/data/badgePreviewUrls";
 
 export type BadgeCategory = 'streaks' | 'companion' | 'starpaths' | 'challenges' | 'firsts' | 'special' | 'astral';
 export type BadgeTier = 'bronze' | 'silver' | 'gold' | 'platinum';
@@ -67,41 +66,41 @@ const BADGE_CATALOG_BASE: Omit<BadgeDefinition, "image_url">[] = [
     id: 'companion_level_5',
     achievementType: 'companion_level_5',
     title: 'Growing Together',
-    description: 'Reached Stage 5 • Initiate',
+    description: 'Reached Level 5 • Initiate',
     icon: '✨',
     tier: 'bronze',
     category: 'companion',
-    unlockHint: 'Reach Stage 5 • Initiate',
+    unlockHint: 'Reach Level 5 • Initiate',
   },
   {
     id: 'companion_level_21',
     achievementType: 'companion_level_21',
     title: 'Deep Bond',
-    description: 'Reached Stage 21 • Guardian',
+    description: 'Reached Level 21 • Guardian',
     icon: '🌟',
     tier: 'silver',
     category: 'companion',
-    unlockHint: 'Reach Stage 21 • Guardian',
+    unlockHint: 'Reach Level 21 • Guardian',
   },
   {
     id: 'companion_level_56',
     achievementType: 'companion_level_56',
     title: 'Champion Bond',
-    description: 'Reached Stage 56 • Mythic',
+    description: 'Reached Level 56 • Mythic',
     icon: '🏅',
     tier: 'gold',
     category: 'companion',
-    unlockHint: 'Reach Stage 56 • Mythic',
+    unlockHint: 'Reach Level 56 • Mythic',
   },
   {
     id: 'companion_level_100',
     achievementType: 'companion_level_100',
     title: 'Ultimate Bond',
-    description: 'Reached Stage 100 • Ascended',
+    description: 'Reached Level 100 • Ascended',
     icon: '💎',
     tier: 'platinum',
     category: 'companion',
-    unlockHint: 'Reach Stage 100 • Ascended',
+    unlockHint: 'Reach Level 100 • Ascended',
   },
 
   // === FIRST TIME BADGES ===
@@ -911,9 +910,14 @@ const BADGE_CATALOG_BASE: Omit<BadgeDefinition, "image_url">[] = [
   },
 ];
 
+export const BADGE_CATEGORY_ARTWORK: Record<BadgeCategory, string> = {
+  streaks: "/badges-v2/streaks.webp", companion: "/badges-v2/companion.webp",
+  starpaths: "/badges-v2/starpaths.webp", challenges: "/badges-v2/challenges.webp",
+  firsts: "/badges-v2/firsts.webp", special: "/badges-v2/special.webp", astral: "/badges-v2/astral.webp",
+};
 export const BADGE_CATALOG: BadgeDefinition[] = BADGE_CATALOG_BASE.map((badge) => ({
   ...badge,
-  image_url: BADGE_PREVIEW_URLS[badge.id] ?? null,
+  image_url: badge.id === "first_epic" ? BADGE_CATEGORY_ARTWORK.starpaths : BADGE_CATEGORY_ARTWORK[badge.category],
 }));
 
 export const CATEGORY_LABELS: Record<BadgeCategory, string> = {

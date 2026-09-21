@@ -182,6 +182,9 @@ describe("Campaigns populated layout", () => {
     );
     const existingSection = screen.getByTestId("campaigns-existing-section");
     const createButton = within(existingSection).getByTestId("campaigns-create-button");
+    expect(createButton).toHaveAttribute("aria-label", "Create campaign");
+    expect(createButton).toHaveClass("h-11", "w-11");
+    expect(createButton.textContent).toBe("");
     const firstCampaignCard = within(existingSection).getAllByTestId("campaign-card")[0];
 
     expect(within(existingSection).getByText("Existing campaigns")).toBeInTheDocument();
@@ -249,3 +252,4 @@ describe("Campaigns populated layout", () => {
     expect(mocks.lastPathfinderProps?.resumeDraftKey).toBe("resume-2026-05-01T12:00:00.000Z");
   });
 });
+vi.mock("@/components/GoalsActivity", () => ({ GoalsActivity: () => <div data-testid="goals-activity" /> }));

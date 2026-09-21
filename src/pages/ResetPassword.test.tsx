@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => {
   const safeNavigateMock = vi.fn();
   const getSessionMock = vi.fn();
   const updateUserMock = vi.fn();
+  const setSessionMock = vi.fn();
+  const exchangeCodeForSessionMock = vi.fn();
   const unsubscribeMock = vi.fn();
   let authStateHandler: ((event: string, session: { user: { id: string } } | null) => void) | null = null;
 
@@ -15,6 +17,8 @@ const mocks = vi.hoisted(() => {
     safeNavigateMock,
     getSessionMock,
     updateUserMock,
+    setSessionMock,
+    exchangeCodeForSessionMock,
     unsubscribeMock,
     setAuthStateHandler: (
       handler: ((event: string, session: { user: { id: string } } | null) => void) | null,
@@ -50,6 +54,8 @@ vi.mock("@/integrations/supabase/client", () => ({
         };
       },
       updateUser: mocks.updateUserMock,
+      setSession: mocks.setSessionMock,
+      exchangeCodeForSession: mocks.exchangeCodeForSessionMock,
     },
   },
 }));
@@ -71,6 +77,8 @@ describe("ResetPassword", () => {
     window.history.replaceState({}, "", "/auth/reset-password");
     mocks.getSessionMock.mockResolvedValue({ data: { session: null } });
     mocks.updateUserMock.mockResolvedValue({ error: null });
+    mocks.setSessionMock.mockResolvedValue({ data: { session: { access_token: 'token', user: { id: 'user-1' } } }, error: null });
+    mocks.exchangeCodeForSessionMock.mockResolvedValue({ data: { session: { user: { id: 'user-1' } } }, error: null });
     mocks.setAuthStateHandler(null);
   });
 
@@ -127,6 +135,38 @@ describe("ResetPassword", () => {
 
     expect(await screen.findByLabelText(/new password/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /reset password/i })).toBeInTheDocument();
+  });
+
+  it("establishes a recovery session when a link opens in the running app", async () => {
+    window.history.replaceState({}, "", "/auth/reset-password#access_token=token&refresh_token=refresh&type=recovery");
+    renderResetPassword();
+    expect(await screen.findByLabelText(/new password/i)).toBeInTheDocument();
+    expect(mocks.setSessionMock).toHaveBeenCalledWith({ access_token: "token", refresh_token: "refresh" });
+    expect(window.location.hash).toBe("");
+  });
+
+  it("accepts a session after Supabase has already consumed the recovery URL", async () => {
+    mocks.getSessionMock.mockResolvedValue({ data: { session: { user: { id: "user-1" } } } });
+    renderResetPassword();
+    expect(await screen.findByLabelText(/new password/i)).toBeInTheDocument();
+    expect(mocks.safeNavigateMock).not.toHaveBeenCalled();
+  });
+
+  it("exchanges recovery codes", async () => {
+    window.history.replaceState({}, "", "/auth/reset-password?code=recovery-code");
+    renderResetPassword();
+    expect(await screen.findByLabelText(/new password/i)).toBeInTheDocument();
+    expect(mocks.exchangeCodeForSessionMock).toHaveBeenCalledWith("recovery-code");
+    expect(window.location.search).toBe("");
+  });
+
+  it("rejects invalid recovery tokens even when another account is signed in", async () => {
+    window.history.replaceState({}, "", "/auth/reset-password#access_token=bad&refresh_token=bad&type=recovery");
+    mocks.getSessionMock.mockResolvedValue({ data: { session: { user: { id: "other-user" } } } });
+    mocks.setSessionMock.mockResolvedValue({ data: { session: null }, error: new Error("Invalid token") });
+    renderResetPassword();
+    await waitFor(() => expect(mocks.safeNavigateMock).toHaveBeenCalledWith(expect.any(Function), "/auth"));
+    expect(screen.queryByLabelText(/new password/i)).not.toBeInTheDocument();
   });
 
   it("renders the reset form after a PASSWORD_RECOVERY auth event", async () => {

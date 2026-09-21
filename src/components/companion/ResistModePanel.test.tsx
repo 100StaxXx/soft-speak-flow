@@ -101,7 +101,7 @@ describe("ResistModePanel", () => {
       screen.getByText("Astral Encounters are only available on iPhone and iPad."),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Open Soft Speak Flow on your iPhone or iPad to play Astral Encounters."),
+      screen.getByText("Open Cosmiq on your iPhone or iPad to play Astral Encounters."),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "iPhone/iPad only" })).toBeDisabled();
   });

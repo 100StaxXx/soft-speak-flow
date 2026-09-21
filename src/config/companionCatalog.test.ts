@@ -74,21 +74,21 @@ describe("companion preset asset coverage", () => {
     ).toBe(false);
   });
 
-  it("preserves full remote coverage for existing remote presets", () => {
+  it("does not advertise legacy remote variants that have not shipped", () => {
     expect(
       hasRemoteCompanionPresetAssetCoverage({
         presetId: "dragon",
         tier: "t4_guardian",
         state: "dormant",
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       hasRemoteCompanionPresetStageAssetCoverage({
         presetId: "raven",
         stage: 0,
         state: "normal",
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("keeps canonical internal labels while exposing renamed product-facing labels", () => {

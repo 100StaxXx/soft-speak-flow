@@ -76,6 +76,7 @@ type StoreKitContextValue = {
   isLoading: boolean;
   products: StoreKitProduct[];
   productsLoading: boolean;
+  productsError: string | null;
   currentEntitlement: StoreKitTransaction | null;
   customerInfo: CustomerInfo | null;
   offerings: PurchasesOfferings | null;
@@ -137,6 +138,16 @@ function revenueCatProductToStoreKitProduct(product: PurchasesStoreProduct): Sto
     type: product.productType,
     pricePerMonthString: product.pricePerMonthString,
     pricePerYearString: product.pricePerYearString,
+    introductoryPrice: product.introPrice
+      ? {
+          price: product.introPrice.price,
+          displayPrice: product.introPrice.priceString,
+          cycles: product.introPrice.cycles,
+          period: product.introPrice.period,
+          periodUnit: product.introPrice.periodUnit,
+          periodNumberOfUnits: product.introPrice.periodNumberOfUnits,
+        }
+      : null,
     ...parseSubscriptionPeriod(product.subscriptionPeriod),
   };
 }
@@ -325,6 +336,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   const isAvailable = Capacitor.isNativePlatform() && isNativeIOS();
   const [products, setProducts] = useState<StoreKitProduct[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const [productsError, setProductsError] = useState<string | null>(null);
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [currentEntitlement, setCurrentEntitlement] = useState<StoreKitTransaction | null>(null);
   const [offerings, setOfferings] = useState<PurchasesOfferings | null>(null);
@@ -333,7 +345,10 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   const [isConfigured, setIsConfigured] = useState(false);
   const configuredAppUserIdRef = useRef<string | null>(null);
   const configurationPromiseRef = useRef<Promise<void> | null>(null);
+  const entitlementBootstrapUserIdRef = useRef<string | null>(null);
+  const entitlementSyncAttemptUserIdRef = useRef<string | null>(null);
   const purchaseRecoveryPromiseRef = useRef<Promise<StoreKitTransaction | null> | null>(null);
+  const activeEntitlementRefreshesRef = useRef(0);
   const packagesRef = useRef<PurchasesPackage[]>([]);
   const storeProductsRef = useRef<Map<string, PurchasesStoreProduct>>(new Map());
 
@@ -429,6 +444,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     if (!isAvailable) return [];
 
     setProductsLoading(true);
+    setProductsError(null);
     try {
       const configured = await ensureConfigured();
       if (!configured) return [];
@@ -475,6 +491,20 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
       storeProductsRef.current = new Map(allProducts.map((product) => [product.identifier, product]));
 
       const mappedProducts = mergeProducts(allProducts);
+      try {
+        const eligibility = await withTimeout(
+          () => Purchases.checkTrialOrIntroductoryPriceEligibility({
+            productIdentifiers: mappedProducts.map((product) => product.identifier),
+          }),
+          { timeoutMs: CUSTOMER_INFO_TIMEOUT_MS, operation: "Introductory offer eligibility", timeoutCode: "REVENUECAT_TIMEOUT" },
+        );
+        for (const product of mappedProducts) {
+          product.introductoryOfferEligible = eligibility[product.identifier]?.status === 2;
+        }
+      } catch {
+        // Unknown eligibility must use standard pricing; Apple owns the final offer.
+        for (const product of mappedProducts) product.introductoryOfferEligible = false;
+      }
       setProducts(mappedProducts);
 
       if (!mappedProducts.length) {
@@ -482,6 +512,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
           productIds: REVENUECAT_PRODUCT_IDS,
           platform: Capacitor.getPlatform(),
         });
+        setProductsError("No App Store products are available. Check your connection and try again.");
       }
 
       return mappedProducts;
@@ -491,6 +522,8 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
         platform: Capacitor.getPlatform(),
         error,
       });
+      setProducts([]);
+      setProductsError("Cosmiq couldn't load App Store products. Check your connection and try again.");
       return [];
     } finally {
       setProductsLoading(false);
@@ -500,28 +533,67 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
   const refreshEntitlement = useCallback(async () => {
     if (!isAvailable) return;
 
+    activeEntitlementRefreshesRef.current += 1;
     setEntitlementLoading(true);
     try {
       const configured = await ensureConfigured();
       if (!configured) return;
-      await fetchCustomerInfo();
+      const nextCustomerInfo = await fetchCustomerInfo();
+
+      // A TestFlight/App Store transaction can predate the current RevenueCat
+      // app-user mapping. Reconcile StoreKit once per signed-in session when a
+      // normal customer-info refresh is empty. syncPurchases is silent (unlike
+      // restorePurchases) and lets existing subscribers avoid a false paywall.
+      if (
+        user?.id
+        && !customerInfoToTransaction(nextCustomerInfo)
+        && entitlementSyncAttemptUserIdRef.current !== user.id
+      ) {
+        entitlementSyncAttemptUserIdRef.current = user.id;
+        try {
+          const { Purchases } = await loadRevenueCat();
+          await withTimeout(
+            () => Purchases.syncPurchases(),
+            {
+              timeoutMs: REVENUECAT_PURCHASE_RECOVERY_TIMEOUT_MS,
+              operation: "RevenueCat purchase sync",
+              timeoutCode: "REVENUECAT_TIMEOUT",
+            },
+          );
+          await fetchCustomerInfo();
+        } catch (syncError) {
+          console.warn("[RevenueCat] Silent existing-purchase sync failed", syncError);
+          setEntitlementError(true);
+          return;
+        }
+      }
       setEntitlementError(false);
     } catch (error) {
       setEntitlementError(true);
       console.error("[RevenueCat] Failed to get customer info:", error);
     } finally {
-      setEntitlementLoading(false);
+      activeEntitlementRefreshesRef.current -= 1;
+      setEntitlementLoading(activeEntitlementRefreshesRef.current > 0);
     }
-  }, [ensureConfigured, fetchCustomerInfo, isAvailable]);
+  }, [ensureConfigured, fetchCustomerInfo, isAvailable, user?.id]);
 
   useEffect(() => {
     if (!isAvailable) {
+      entitlementBootstrapUserIdRef.current = null;
+      entitlementSyncAttemptUserIdRef.current = null;
       setIsConfigured(false);
       setEntitlementLoading(false);
+      setProductsError(null);
       return;
     }
 
+    // A token refresh can temporarily report recovering for the same signed-in
+    // user. Keep their known entitlement instead of clearing it mid-session.
+    if (status === "recovering" && user?.id === configuredAppUserIdRef.current) return;
+
     if (status !== "authenticated" || !user?.id) {
+      entitlementBootstrapUserIdRef.current = null;
+      entitlementSyncAttemptUserIdRef.current = null;
       applyCustomerInfo(null);
       setIsConfigured(false);
       setEntitlementLoading(false);
@@ -529,11 +601,24 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (configuredAppUserIdRef.current !== user.id) {
+      entitlementBootstrapUserIdRef.current = null;
+      entitlementSyncAttemptUserIdRef.current = null;
       applyCustomerInfo(null);
       setIsConfigured(false);
       setEntitlementLoading(false);
     }
   }, [applyCustomerInfo, isAvailable, status, user?.id]);
+
+  useEffect(() => {
+    if (!isAvailable || status !== "authenticated" || !user?.id) return;
+    if (entitlementBootstrapUserIdRef.current === user.id) return;
+
+    // Hydrate existing App Store/TestFlight entitlements as part of session
+    // startup. Product loading alone does not fetch customer information, so
+    // without this an already-subscribed user can be shown the trial paywall.
+    entitlementBootstrapUserIdRef.current = user.id;
+    void refreshEntitlement();
+  }, [isAvailable, refreshEntitlement, status, user?.id]);
 
   useEffect(() => {
     if (!isAvailable || !isConfigured) return;
@@ -771,6 +856,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     isLoading: entitlementLoading,
     products,
     productsLoading,
+    productsError,
     currentEntitlement,
     customerInfo,
     offerings,
@@ -801,6 +887,7 @@ export const StoreKitProvider = ({ children }: { children: ReactNode }) => {
     offerings,
     presentRevenueCatPaywall,
     products,
+    productsError,
     productsLoading,
     purchase,
     redeemOfferCode,

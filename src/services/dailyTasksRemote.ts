@@ -18,6 +18,7 @@ export interface DailyTask {
   task_date: string | null;
   completed: boolean | null;
   completed_at: string | null;
+  excluded_from_planner_at?: string | null;
   is_main_quest: boolean | null;
   scheduled_time: string | null;
   estimated_duration: number | null;

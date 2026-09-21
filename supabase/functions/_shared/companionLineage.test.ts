@@ -1,6 +1,7 @@
 import {
   buildAiEvolutionPrompt,
   buildBoundaryEvolutionGenerationPrompt,
+  buildCompanionArtDirection,
   buildCompanionGenerationMetadata,
   buildEggFromStage1Prompt,
   buildInitialImageLineageMetadata,
@@ -138,7 +139,30 @@ Deno.test("future companion image prompts ask for transparent cutout output", ()
       prompt.includes("no scenic") || prompt.includes("No scenic"),
       "Expected companion prompt to reject scenic backdrops",
     );
+    assert(
+      prompt.includes("cosmiq_collectible_v1") &&
+        prompt.includes("square 1:1") &&
+        prompt.includes("68-78%") &&
+        prompt.includes("upper-left"),
+      "Expected every companion prompt to carry the canonical art, scale, camera, and lighting contract",
+    );
   }
+});
+
+Deno.test("canonical companion art direction prevents cross-page style drift", () => {
+  const contract = buildCompanionArtDirection().join("\n");
+
+  assert(
+    contract.includes("same rendering medium") &&
+      contract.includes("every egg, companion, state, and evolution tier"),
+    "Expected the art contract to apply across every companion surface",
+  );
+  assert(
+    contract.includes("photorealism") &&
+      contract.includes("flat vector") &&
+      contract.includes("extreme chibi"),
+    "Expected explicit style-drift exclusions",
+  );
 });
 
 Deno.test("visual anchors persist in lineage metadata by level", () => {

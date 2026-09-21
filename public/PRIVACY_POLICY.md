@@ -33,12 +33,12 @@ Welcome to Cosmiq ("we," "our," or "us"). We respect your privacy and are commit
 - Feedback and support requests
 - User-generated content and responses
 
-**Payment Information:**
-- Billing name and address
-- Payment method details (processed securely through Stripe)
-- Transaction history
-- Subscription status
-- In-app purchase records
+**Subscription Information:**
+- App Store transaction identifiers and purchase history needed to verify access
+- Subscription and entitlement status
+- Product, renewal, expiration, and offer eligibility metadata provided by Apple and RevenueCat
+
+Apple processes your payment method and billing details. Cosmiq does not receive or store your full card or App Store payment credentials.
 
 ### 2.2 Automatically Collected Information
 
@@ -127,10 +127,11 @@ We share information with third-party service providers who perform services on 
 - Provides secure authentication services
 - Privacy Policy: [https://supabase.com/privacy](https://supabase.com/privacy)
 
-**Stripe** (Payment Processing)
-- Processes subscription payments and in-app purchases securely
-- Stores payment method information
-- Privacy Policy: [https://stripe.com/privacy](https://stripe.com/privacy)
+**Apple App Store and RevenueCat** (Subscription Processing)
+- Apple presents and processes supported iOS subscription purchases
+- RevenueCat verifies purchase receipts and reports subscription entitlement status to Cosmiq
+- Apple Privacy Policy: [https://www.apple.com/legal/privacy/](https://www.apple.com/legal/privacy/)
+- RevenueCat Privacy Policy: [https://www.revenuecat.com/privacy/](https://www.revenuecat.com/privacy/)
 
 **Artificial Intelligence Service Providers**
 - Process mentor chat messages and generate personalized responses
@@ -138,8 +139,8 @@ We share information with third-party service providers who perform services on 
 - We use AI services that do not retain or train on your personal data
 - All data sent to AI providers is anonymized where possible
 
-**Mobile App Platforms** (Apple App Store, Google Play Store)
-- Process in-app purchases and subscription management
+**Mobile App Platform** (Apple App Store)
+- Processes supported iOS in-app purchases and subscription management
 - Provide app distribution and update services
 - Subject to their respective privacy policies
 
@@ -264,7 +265,7 @@ You have the right to request deletion of your personal data and account. We pro
 
 **Important Notes:**
 - Deletion is permanent and cannot be undone
-- Active subscriptions must be cancelled separately through your app store (Apple/Google)
+- Active subscriptions must be canceled separately through your Apple account settings
 - We cannot delete data from your device backups (iCloud, Google Drive)
 - Some data may remain in backup systems for up to 90 days before final deletion
 

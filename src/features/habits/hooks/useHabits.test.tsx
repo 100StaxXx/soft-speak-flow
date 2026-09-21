@@ -125,8 +125,7 @@ vi.mock("@/utils/plannerSync", () => ({
   loadLocalEpics: (...args: unknown[]) => mocks.loadLocalEpics(...args),
   syncLocalHabitsFromRemote: (...args: unknown[]) =>
     mocks.syncLocalHabitsFromRemote(...args),
-  withPlannerRemoteSyncLock: (...args: unknown[]) =>
-    mocks.withPlannerRemoteSyncLock(...args),
+  withPlannerRemoteSyncLock: mocks.withPlannerRemoteSyncLock,
 }));
 
 import { useHabits } from "./useHabits";

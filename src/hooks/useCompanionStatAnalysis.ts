@@ -17,6 +17,7 @@ import {
   buildCompanionCosmiqTitleCardProfileKey,
 } from "@/shared/companionStatCosmiqTitles";
 import type { CompanionStatAttribute } from "@/shared/companionStatSignals";
+import { parseFunctionInvokeError, toUserFacingFunctionError } from "@/utils/supabaseFunctionErrors";
 
 export type {
   CompanionStatAnalysis,
@@ -160,7 +161,15 @@ export const useCompanionStatAnalysis = ({ enabled = true }: UseCompanionStatAna
       body: { forceRefresh },
     });
 
-    if (error) throw error;
+    if (error) {
+      const parsed = await parseFunctionInvokeError(error);
+      // A product/setup rejection isn't an expired session; signing in again
+      // cannot fix it. Keep transport internals out of the analysis sheet.
+      const message = parsed.status === 403
+        ? "Your companion's account setup needs attention. Please contact support if retrying doesn't help."
+        : toUserFacingFunctionError(parsed, { action: "analyze your companion's stats" });
+      throw new Error(message);
+    }
     if (data?.error) throw new Error(data.error);
 
     return data;

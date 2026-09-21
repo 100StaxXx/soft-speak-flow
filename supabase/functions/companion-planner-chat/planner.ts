@@ -1703,16 +1703,14 @@ const findSuggestedSlot = (
   input: PlannerBuildInput,
   targetDate: string,
   targetTime?: string | null,
-): PlannerOpenSlot | null =>
-  (targetTime
-    ? input.plannerContext.scheduleInsights?.suggestedSlots.find((slot) =>
-      slot.date === targetDate && slot.time === targetTime
-    ) ?? null
-    : null) ??
-    input.plannerContext.scheduleInsights?.suggestedSlots.find((slot) =>
-      slot.date === targetDate
-    ) ??
-    null;
+): PlannerOpenSlot | null => {
+  const slots = input.plannerContext.scheduleInsights?.suggestedSlots;
+  if (targetTime) {
+    const exact = slots?.find((slot) => slot.date === targetDate && slot.time === targetTime);
+    if (exact) return exact;
+  }
+  return slots?.find((slot) => slot.date === targetDate) ?? null;
+};
 
 const formatMinutes = (minutes: number): string => {
   const safeMinutes = Math.max(0, Math.min(minutes, (23 * 60) + 59));

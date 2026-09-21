@@ -1,5 +1,0 @@
-
-module CapacitorCamera.Swift {
-  header "CapacitorCamera-Swift.h"
-  requires objc
-}

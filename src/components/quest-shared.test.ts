@@ -9,7 +9,6 @@ import {
   getQuestDifficultyIconClasses,
   getQuestOptionPillClasses,
 } from "./quest-shared";
-import { COMPANION_FROSTED_QUEST_LIGHT_CLASS } from "@/lib/companionFrostedTheme";
 
 const toMinutes = (time: string) => {
   const [hours, minutes] = time.split(":").map(Number);
@@ -40,52 +39,20 @@ describe("quest-shared time slots", () => {
   });
 });
 
-describe("quest-shared tokenized editor classes", () => {
-  it("lets active option pill tones own their text color", () => {
-    const classes = getQuestOptionPillClasses(true, DIFFICULTY_COLORS.medium.pill);
-
-    expect(classes).toContain("text-foreground");
-    expect(classes).not.toContain("text-white");
+describe("quest editor agenda styling", () => {
+  it("uses a shared dark theme for sheets, sections and portaled pickers", () => {
+    for (const key of ["sheet", "sectionCard", "popover", "desktopPanelShell"] as const) {
+      expect(QUEST_FORM_STYLES[key]).toContain("agenda-quest-theme");
+      expect(QUEST_FORM_STYLES[key]).not.toContain("companion-frosted-quest-light");
+    }
   });
-
-  it("uses tokenized inactive icon contrast for difficulty bubbles", () => {
-    const classes = getQuestDifficultyIconClasses("medium", false);
-
-    expect(classes).toContain("border-[hsl(var(--border)_/_0.72)]");
-    expect(classes).toContain("bg-card/[0.72]");
-    expect(classes).toContain("text-muted-foreground");
-    expect(classes).not.toContain("text-white");
-  });
-
-  it("resolves the frosted quest variables from the companion theme alias", () => {
-    expect(QUEST_FORM_STYLES.sheet).toContain(COMPANION_FROSTED_QUEST_LIGHT_CLASS);
-    expect(QUEST_FORM_STYLES.popover).toContain(COMPANION_FROSTED_QUEST_LIGHT_CLASS);
-    expect(QUEST_FORM_STYLES.sheet).not.toContain("[--primary:202_68%_68%]");
-    expect(QUEST_FORM_STYLES.sheet).not.toContain("[--celestial-blue:202_92%_76%]");
-  });
-
-  it("uses companion primary rgb for frosted quest shadows", () => {
-    const frostedChrome = [
-      QUEST_FORM_STYLES.sheet,
-      QUEST_FORM_STYLES.sectionCard,
-      QUEST_FORM_STYLES.popover,
-      QUEST_FORM_STYLES.desktopPanelShell,
-      QUEST_TEMPLATE_BROWSER_STYLES.header,
-      QUEST_TEMPLATE_BROWSER_STYLES.rowDefault,
-      getQuestOptionPillClasses(true, DIFFICULTY_COLORS.medium.pill),
-    ].join(" ");
-
-    expect(frostedChrome).toContain("rgba(var(--primary-rgb),0.58)");
-    expect(frostedChrome).toContain("rgba(var(--primary-rgb),0.34)");
-    expect(frostedChrome).not.toMatch(/rgba\((?:92,157,198|58,121,158),/);
-  });
-
-  it("uses companion-token color mixes instead of fixed blue CTA gradient stops", () => {
-    const primaryButton = DIFFICULTY_COLORS.medium.primaryButton;
-
-    expect(primaryButton).toContain("color-mix(in_srgb,hsl(var(--celestial-blue))");
-    expect(primaryButton).not.toContain("#f3fbff");
-    expect(primaryButton).not.toContain("#eaf8ff");
-    expect(primaryButton).not.toContain("#f4fbff");
+  it("keeps controls restrained without gradients or raised glowing outlines", () => {
+    const classes = [...Object.values(QUEST_FORM_STYLES), ...Object.values(QUEST_TEMPLATE_BROWSER_STYLES),
+      ...Object.values(DIFFICULTY_COLORS.medium)].join(" ");
+    expect(classes).not.toContain("border-[2px]");
+    expect(classes).not.toContain("radial-gradient");
+    expect(DIFFICULTY_COLORS.medium.primaryButton).toContain("bg-primary");
+    expect(getQuestOptionPillClasses(true, DIFFICULTY_COLORS.medium.pill)).toContain("bg-primary/15");
+    expect(getQuestDifficultyIconClasses("medium", false)).toContain("text-muted-foreground");
   });
 });

@@ -35,6 +35,15 @@ const transaction = (overrides: Partial<StoreKitTransaction> = {}): StoreKitTran
 });
 
 describe("localSubscriptionAccess", () => {
+  it("honors the entire 14-day Apple trial instead of ending access after three days", () => {
+    const trial = transaction({ purchaseDate: "2026-05-18T12:00:00.000Z", expirationDate: "2026-06-01T12:00:00.000Z" });
+    vi.setSystemTime(new Date("2026-05-22T12:00:00.000Z"));
+    expect(buildLocalSubscriptionAccessState(trial, userId)?.has_access).toBe(true);
+    vi.setSystemTime(new Date("2026-06-01T11:59:59.000Z"));
+    expect(buildLocalSubscriptionAccessState(trial, userId)?.has_access).toBe(true);
+    vi.setSystemTime(new Date("2026-06-01T12:00:00.000Z"));
+    expect(buildLocalSubscriptionAccessState(trial, userId)).toBeNull();
+  });
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-18T12:00:00.000Z"));

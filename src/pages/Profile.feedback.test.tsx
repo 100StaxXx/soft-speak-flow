@@ -149,6 +149,9 @@ vi.mock("@/components/CompanionNameSetting", () => ({
 vi.mock("@/components/CalendarIntegrationsSettings", () => ({
   CalendarIntegrationsSettings: () => null,
 }));
+vi.mock("@/components/calendar/ConnectedTasks", () => ({
+  ConnectedTasks: () => <div>Connected tasks and reminders</div>,
+}));
 
 vi.mock("@/pages/profileMentorChange", () => ({
   applyMentorChange: vi.fn(),
@@ -177,6 +180,13 @@ describe("Profile feedback entry", () => {
     renderProfile();
 
     expect(screen.getByTestId("cinematic-background")).toHaveAttribute("data-preset", "profile");
+  });
+
+  it("keeps connected tasks in Preferences, out of the main account view", () => {
+    renderProfile();
+    expect(screen.queryByText("Connected tasks and reminders")).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Prefs" }), { key: "Enter" });
+    expect(screen.getByText("Connected tasks and reminders")).toBeInTheDocument();
   });
 
   it("renders a feedback card that opens the support form in feedback mode", () => {

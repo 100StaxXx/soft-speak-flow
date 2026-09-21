@@ -2,12 +2,42 @@ import { describe, expect, it } from "vitest";
 import { parseDeepLink } from "./deepLinkHandler";
 
 describe("parseDeepLink", () => {
+  it.each([
+    "https://app.cosmiq.quest/auth?code=apple-code",
+    "cosmiq://auth?code=apple-code",
+    "com.darrylgraham.revolution://auth?code=apple-code",
+  ])("recognizes Apple callback links: %s", (url) => {
+    expect(parseDeepLink(url)).toEqual({ type: "auth_callback", path: "/auth?code=apple-code", rawUrl: url });
+  });
+
+  it.each([
+    "https://app.cosmiq.quest/auth/reset-password?code=recovery-code",
+    "cosmiq://auth/reset-password?code=recovery-code",
+  ])("recognizes recovery code links: %s", (url) => {
+    expect(parseDeepLink(url)).toEqual({ type: "auth_recovery", path: "/auth/reset-password?code=recovery-code", rawUrl: url });
+  });
+
+  it("does not accept auth links from an unrelated host", () => {
+    expect(parseDeepLink("https://example.com/auth?code=untrusted").type).toBe("unknown");
+  });
   it("parses task deep links", () => {
     const parsed = parseDeepLink("cosmiq://task/task-123?from=widget");
     expect(parsed).toEqual({
       type: "task",
       taskId: "task-123",
       rawUrl: "cosmiq://task/task-123?from=widget",
+    });
+  });
+
+  it.each([
+    "com.darrylgraham.revolution://tasks/task-legacy",
+    "https://app.cosmiq.quest/task/task-legacy",
+    "https://cosmiq.quest/tasks/task-legacy",
+  ])("normalizes legacy and universal task URLs from %s", (url) => {
+    expect(parseDeepLink(url)).toEqual({
+      type: "task",
+      taskId: "task-legacy",
+      rawUrl: url,
     });
   });
 
@@ -43,6 +73,18 @@ describe("parseDeepLink", () => {
     });
   });
 
+  it.each([
+    "com.darrylgraham.revolution://epics/join/EPIC-OLD-1234",
+    "https://app.cosmiq.quest/join/EPIC-OLD-1234",
+    "https://cosmiq.quest/campaigns/join/EPIC-OLD-1234",
+  ])("normalizes legacy and universal epic invite URLs from %s", (url) => {
+    expect(parseDeepLink(url)).toEqual({
+      type: "join_epic",
+      path: "/join/EPIC-OLD-1234",
+      rawUrl: url,
+    });
+  });
+
   it.each(["cosmiq://journeys", "cosmiq://journeys/plan"])(
     "parses widget journeys deep links from %s",
     (url) => {
@@ -54,6 +96,18 @@ describe("parseDeepLink", () => {
       });
     },
   );
+
+  it.each([
+    "com.darrylgraham.revolution://journeys",
+    "https://app.cosmiq.quest/journeys",
+    "https://cosmiq.quest/tasks",
+  ])("normalizes legacy and universal journeys URLs from %s", (url) => {
+    expect(parseDeepLink(url)).toEqual({
+      type: "journeys",
+      path: "/journeys",
+      rawUrl: url,
+    });
+  });
 
   it("parses hosted auth recovery links", () => {
     const parsed = parseDeepLink(

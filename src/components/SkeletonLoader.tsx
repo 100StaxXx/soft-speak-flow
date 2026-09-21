@@ -17,32 +17,6 @@ export const HabitCardSkeleton = () => (
   </Card>
 );
 
-export const MissionCardSkeleton = () => (
-  <Card className="p-5 md:p-6 space-y-4 animate-pulse">
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <Skeleton className="h-10 w-10 rounded-full" />
-        <div className="space-y-2">
-          <Skeleton className="h-5 w-32" />
-          <Skeleton className="h-3 w-20" />
-        </div>
-      </div>
-    </div>
-    <Skeleton className="h-2 w-full" />
-    <div className="space-y-2">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="flex items-center justify-between p-3 rounded-lg border">
-          <div className="flex items-center gap-3 flex-1">
-            <Skeleton className="h-5 w-5 rounded-full" />
-            <Skeleton className="h-4 w-full max-w-xs" />
-          </div>
-          <Skeleton className="h-9 w-24" />
-        </div>
-      ))}
-    </div>
-  </Card>
-);
-
 export const CompanionSkeleton = () => (
   <Card className="p-6 md:p-8 space-y-6 animate-pulse">
     <div className="flex items-center justify-between">

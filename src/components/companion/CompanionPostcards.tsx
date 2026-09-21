@@ -1,12 +1,13 @@
 import { useState, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useCompanionPostcards, CompanionPostcard } from "@/hooks/useCompanionPostcards";
 import { PostcardCard } from "./PostcardCard";
 import { PostcardFullscreen } from "./PostcardFullscreen";
 import { PostcardsTutorialModal } from "@/components/PostcardsTutorialModal";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
-import { MapPin, Sparkles, BookOpen, ChevronRight, HelpCircle } from "lucide-react";
+import { MapPin, Sparkles, BookOpen, ChevronRight, HelpCircle, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,7 +36,8 @@ interface CompanionPostcardsProps {
 }
 
 export const CompanionPostcards = ({ layoutMode = "mobile" }: CompanionPostcardsProps) => {
-  const { postcards, isLoading } = useCompanionPostcards();
+  const shouldReduceMotion = useReducedMotion();
+  const { postcards, isLoading, error, refetch } = useCompanionPostcards();
   const [selectedPostcard, setSelectedPostcard] = useState<CompanionPostcard | null>(null);
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
   const {
@@ -122,6 +124,22 @@ export const CompanionPostcards = ({ layoutMode = "mobile" }: CompanionPostcards
     );
   }
 
+  if (error) {
+    return (
+      <div className="text-center py-12 px-6" role="alert">
+        <BookOpen className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+        <h4 className="text-lg font-medium text-foreground mb-2">Postcards unavailable</h4>
+        <p className="text-sm text-muted-foreground mb-5">
+          We couldn&apos;t load your collection. Your postcards are still safe.
+        </p>
+        <Button variant="outline" onClick={() => void refetch()}>
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Try again
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("space-y-6", isDesktop && "pt-1")}>
       {/* Tutorial Modal */}
@@ -175,7 +193,7 @@ export const CompanionPostcards = ({ layoutMode = "mobile" }: CompanionPostcards
       {/* Empty State */}
       {totalPostcards === 0 && (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center py-12 px-6"
         >
@@ -218,7 +236,7 @@ export const CompanionPostcards = ({ layoutMode = "mobile" }: CompanionPostcards
           {Object.entries(filteredGroups).map(([epicId, group]) => (
             <motion.div
               key={epicId}
-              initial={{ opacity: 0 }}
+              initial={shouldReduceMotion ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
               className="space-y-3"
             >
@@ -251,9 +269,9 @@ export const CompanionPostcards = ({ layoutMode = "mobile" }: CompanionPostcards
                 {group.postcards.map((postcard, index) => (
                   <motion.div
                     key={postcard.id}
-                    initial={{ opacity: 0, scale: 0.9 }}
+                    initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: index * 0.05 }}
+                    transition={shouldReduceMotion ? { duration: 0 } : { delay: index * 0.05 }}
                   >
                     <PostcardCard
                       postcard={postcard}
@@ -264,6 +282,11 @@ export const CompanionPostcards = ({ layoutMode = "mobile" }: CompanionPostcards
               </div>
             </motion.div>
           ))}
+          {Object.keys(filteredGroups).length === 0 && (
+            <div className="text-center py-10 text-sm text-muted-foreground">
+              No {filter} postcard stories yet.
+            </div>
+          )}
         </div>
       )}
 

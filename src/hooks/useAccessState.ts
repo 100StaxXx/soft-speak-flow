@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { queryKeys } from "@/lib/queryKeys";
@@ -14,18 +14,9 @@ import {
   storeKitTransactionMatchesUser,
 } from "@/utils/localSubscriptionAccess";
 import { parseFunctionInvokeError, type ParsedFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
+import type { AccessState } from "@/types/access";
 
-export type AccessSource = "subscription" | "promo_code" | "trial" | "manual" | "none";
-
-export interface AccessState {
-  has_access: boolean;
-  access_source: AccessSource;
-  trial_ends_at: string | null;
-  subscribed: boolean;
-  status?: string;
-  plan?: string;
-  subscription_end?: string;
-}
+export type { AccessSource, AccessState } from "@/types/access";
 
 const DEFAULT_ACCESS_STATE: AccessState = {
   has_access: false,
@@ -69,6 +60,7 @@ export function useAccessState() {
     currentEntitlement,
     entitlementError,
     isLoading: storeKitLoading,
+    refreshEntitlement,
   } = useStoreKit();
 
   const currentStoreKitAccessState = useMemo<AccessState | null>(() => {
@@ -116,6 +108,9 @@ export function useAccessState() {
         const { data, error } = await supabase.functions.invoke("check-apple-subscription");
         if (error) throw error;
 
+        if (!data || typeof data.has_access !== "boolean" || typeof data.subscribed !== "boolean") {
+          throw new Error("Subscription status could not be confirmed.");
+        }
         const response = {
           ...DEFAULT_ACCESS_STATE,
           ...((data ?? {}) as Partial<AccessState>),
@@ -153,6 +148,7 @@ export function useAccessState() {
   const accessState =
     graceAccessState ??
     query.data ??
+    currentStoreKitAccessState ??
     (canUseFreshLocalActivationAccessForRender ? freshLocalActivationAccessState : null) ??
     (canUseRememberedLocalAccessForRender ? rememberedLocalAccessState : null) ??
     DEFAULT_ACCESS_STATE;
@@ -212,6 +208,9 @@ export function useAccessState() {
             recoveryTimersRef.current.forEach((pendingTimer) => clearTimeout(pendingTimer));
             recoveryTimersRef.current = [];
             await queryClient.invalidateQueries({ queryKey: queryKeys.access.detail(user.id) });
+            // A video request may have arrived before the verified Apple access
+            // reached the server. Recheck those durable jobs after reconciliation.
+            await queryClient.invalidateQueries({ queryKey: ["companion-video-preparation", user.id] });
             return;
           }
 
@@ -252,6 +251,10 @@ export function useAccessState() {
     user?.id,
   ]);
 
+  const refetch = useCallback(async () => {
+    await Promise.all([query.refetch(), refreshEntitlement?.()]);
+  }, [query.refetch, refreshEntitlement]);
+
   return {
     accessState,
     isLoading: authLoading ||
@@ -259,7 +262,10 @@ export function useAccessState() {
         query.isLoading ||
         waitingForStoreKitFallback
       )),
-    error: query.error,
-    refetch: query.refetch,
+    // A failed check is unknown, not proof that the customer needs to buy again.
+    error: accessState.has_access ? null : query.error ?? (
+      entitlementError ? new Error("App Store access could not be confirmed.") : null
+    ),
+    refetch,
   };
 }

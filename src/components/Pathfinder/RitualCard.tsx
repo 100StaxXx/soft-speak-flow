@@ -1,14 +1,12 @@
 import { memo, useState, type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  GripVertical, 
   Trash2, 
   Clock, 
   Edit2,
   Check,
   X,
 } from 'lucide-react';
-import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DurationPickerField, TimePickerField, getNextTimeForStep } from '@/components/scheduling';
-import { usePlannerPathfinderAppearance } from '@/hooks/usePlannerPathfinderAppearance';
+import { usePlannerSurface } from '@/components/companion/usePlannerSurface';
 import { cn } from '@/lib/utils';
 import type { JourneyRitual } from '@/hooks/useJourneySchedule';
 import { FrequencyPresets, formatDaysShort, getDefaultDaysForFrequency, getDefaultMonthDays } from './FrequencyPresets';
@@ -50,10 +48,11 @@ export const RitualCard = memo(function RitualCard({
 }: RitualCardProps) {
   const [isEditing, setIsEditing] = useState(initialEditing);
   const [editedRitual, setEditedRitual] = useState(ritual);
-  const { themeModeClassName } = usePlannerPathfinderAppearance();
+  const { themeModeClassName, plannerPathfinderTheme } = usePlannerSurface();
 
   const handleSave = () => {
-    onUpdate(editedRitual);
+    if (!editedRitual.title.trim()) return;
+    onUpdate({ ...editedRitual, title: editedRitual.title.trim() });
     setIsEditing(false);
   };
 
@@ -167,7 +166,7 @@ export const RitualCard = memo(function RitualCard({
                 setEditedRitual({ ...editedRitual, difficulty: value })
               }
             >
-              <SelectTrigger className={cn(plannerPathfinderTheme.textField, "h-10 text-xs")}>
+              <SelectTrigger aria-label="Difficulty" className={cn(plannerPathfinderTheme.textField, "h-11 text-sm")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent
@@ -192,7 +191,7 @@ export const RitualCard = memo(function RitualCard({
             <X className="w-3 h-3 mr-1" />
             Cancel
           </Button>
-          <Button size="sm" className={cn(plannerPathfinderTheme.primaryButton, "flex-1")} onClick={handleSave}>
+          <Button size="sm" disabled={!editedRitual.title.trim()} className={cn(plannerPathfinderTheme.primaryButton, "flex-1")} onClick={handleSave}>
             <Check className="w-3 h-3 mr-1" />
             Save
           </Button>
@@ -214,11 +213,10 @@ export const RitualCard = memo(function RitualCard({
       layout
       className={`${plannerPathfinderTheme.mutedPanel} group flex items-center gap-2 p-3 transition-colors hover:bg-card/85`}
     >
-      <GripVertical className="w-4 h-4 cursor-grab text-celestial-blue/45" />
       
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="font-medium text-sm truncate">{ritual.title}</span>
+          <span className="font-medium text-sm break-words">{ritual.title}</span>
           <Badge 
             variant="outline" 
             className={cn(plannerPathfinderTheme.chip, 'text-[10px] px-1.5 py-0', difficultyColors[ritual.difficulty])}
@@ -226,7 +224,7 @@ export const RitualCard = memo(function RitualCard({
             {ritual.difficulty}
           </Badge>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           <span>{formatScheduleLabel({
             frequency: ritual.frequency,
             custom_days: ritual.customDays,
@@ -254,11 +252,12 @@ export const RitualCard = memo(function RitualCard({
         </div>
       </div>
 
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex shrink-0 items-center gap-1">
         <Button
           size="icon"
           variant="ghost"
-          className={cn(plannerPathfinderTheme.outlineButton, "h-8 w-8 p-0")}
+          className="h-11 w-11 rounded-lg p-0 text-muted-foreground hover:bg-white/5 hover:text-foreground"
+          aria-label={`Edit ${ritual.title}`}
           onClick={() => setIsEditing(true)}
         >
           <Edit2 className="w-3.5 h-3.5" />
@@ -266,7 +265,8 @@ export const RitualCard = memo(function RitualCard({
         <Button
           size="icon"
           variant="ghost"
-          className="h-8 w-8 rounded-full border-[3px] border-category-body/45 bg-category-body/10 p-0 text-category-body shadow-[0_6px_0_hsl(var(--category-body)_/_0.16)] hover:bg-category-body/15 hover:text-category-body"
+          className="h-11 w-11 rounded-lg p-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          aria-label={`Remove ${ritual.title}`}
           onClick={() => onDelete(ritual.id)}
         >
           <Trash2 className="w-3.5 h-3.5" />

@@ -219,6 +219,7 @@ class AppBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(WidgetDataPlugin())
         bridge?.registerPluginInstance(AppBadgePlugin())
         bridge?.registerPluginInstance(NativeCalendarPlugin())
+        bridge?.registerPluginInstance(AuthSessionStoragePlugin())
         bridge?.registerPluginInstance(NativePlacesAutocompletePlugin())
         bridge?.registerPluginInstance(EvolutionShareVideoPlugin())
         bridge?.registerPluginInstance(AppleOfferCodeRedemptionPlugin())

@@ -12,9 +12,31 @@ const mocks = vi.hoisted(() => ({
     handleRestore: vi.fn(),
     loading: false,
     isAvailable: true,
-    products: [],
+    products: [
+      {
+        identifier: "cosmiq_premium_monthly",
+        displayName: "Monthly",
+        description: "Monthly plan",
+        price: 9.99,
+        displayPrice: "$9.99",
+        type: "autoRenewable",
+        introductoryOfferEligible: true,
+          introductoryPrice: { price: 0, displayPrice: "$0.00", cycles: 1, period: "P2W", periodUnit: "WEEK", periodNumberOfUnits: 2 },
+      },
+      {
+        identifier: "cosmiq_premium_yearly",
+        displayName: "Yearly",
+        description: "Yearly plan",
+        price: 99.99,
+        displayPrice: "$99.99",
+        type: "autoRenewable",
+        pricePerMonthString: "$8.33",
+        introductoryOfferEligible: true,
+          introductoryPrice: { price: 0, displayPrice: "$0.00", cycles: 1, period: "P2W", periodUnit: "WEEK", periodNumberOfUnits: 2 },
+      },
+    ],
     productsLoading: false,
-    productError: null,
+    productError: null as string | null,
     reloadProducts: vi.fn(),
     hasOfferCode: false,
     activeYearlyOffer: null as null | { tier: string; price: string; priceCents: number; unitPrice: string },
@@ -140,7 +162,29 @@ describe("Paywall creator offer-code eligibility", () => {
       handleRestore: vi.fn(),
       loading: false,
       isAvailable: true,
-      products: [],
+      products: [
+        {
+          identifier: "cosmiq_premium_monthly",
+          displayName: "Monthly",
+          description: "Monthly plan",
+          price: 9.99,
+          displayPrice: "$9.99",
+          type: "autoRenewable",
+          introductoryOfferEligible: true,
+          introductoryPrice: { price: 0, displayPrice: "$0.00", cycles: 1, period: "P2W", periodUnit: "WEEK", periodNumberOfUnits: 2 },
+        },
+        {
+          identifier: "cosmiq_premium_yearly",
+          displayName: "Yearly",
+          description: "Yearly plan",
+          price: 99.99,
+          displayPrice: "$99.99",
+          type: "autoRenewable",
+          pricePerMonthString: "$8.33",
+          introductoryOfferEligible: true,
+          introductoryPrice: { price: 0, displayPrice: "$0.00", cycles: 1, period: "P2W", periodUnit: "WEEK", periodNumberOfUnits: 2 },
+        },
+      ],
       productsLoading: false,
       productError: null,
       reloadProducts: vi.fn(),
@@ -262,18 +306,18 @@ describe("Paywall creator offer-code eligibility", () => {
     expect(
       screen.queryByText("Big goals become campaigns, rituals, milestones, and a planned day."),
     ).not.toBeInTheDocument();
-    expect(screen.getAllByText("3-day free trial").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("14-day free trial").length).toBeGreaterThan(0);
     expect(screen.getByTestId("paywall-trial-callout")).toBeInTheDocument();
-    expect(screen.getByTestId("paywall-trial-callout")).toHaveTextContent("3-day free trial");
+    expect(screen.getByTestId("paywall-trial-callout")).toHaveTextContent("14-day free trial");
     expect(screen.getByTestId("paywall-trial-callout")).toHaveTextContent("No charge today.");
     expect(screen.getByText("Have a creator or Apple offer code?")).toBeInTheDocument();
     expect(
       screen.getByText("Entering a valid creator or Apple offer code unlocks discounted annual pricing."),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /start 3-day free trial/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /start 14-day free trial/i })).toBeInTheDocument();
     expect(screen.getByText("Unlimited companion chat")).toBeInTheDocument();
     expect(screen.getByText("Unlimited quests and campaigns")).toBeInTheDocument();
-    expect(screen.getByText("100+ levels and 12+ evolutions")).toBeInTheDocument();
+    expect(screen.getByText("100 levels and 7 companion forms")).toBeInTheDocument();
     expect(
       screen.getByText("Both monthly and yearly plans include the same Cosmiq features and renew automatically until canceled."),
     ).toBeInTheDocument();
@@ -293,16 +337,53 @@ describe("Paywall creator offer-code eligibility", () => {
     expect(screen.queryByText("All premium features")).not.toBeInTheDocument();
   });
 
-  it("starts the default 3-day trial from the hero button", () => {
+  it("starts the default 14-day trial from the hero button", async () => {
     render(
       <MemoryRouter>
         <Paywall />
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /^3-day free trial$/i }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /^14-day free trial$/i })); });
 
     expect(mocks.appleSubscription.handlePurchase).toHaveBeenCalledWith("cosmiq_premium_yearly", "paywall");
+  });
+
+  it("does not promise another trial when Apple says the customer is ineligible", () => {
+    mocks.appleSubscription.products.forEach((product) => { product.introductoryOfferEligible = false; });
+    render(<MemoryRouter><Paywall /></MemoryRouter>);
+    expect(screen.queryByRole("button", { name: /free trial/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Subscribe Yearly$/i })).toBeInTheDocument();
+    expect(screen.queryByText("Start the trial. Keep the story moving.")).not.toBeInTheDocument();
+  });
+
+  it("does not launch duplicate purchases from the hero and checkout buttons", async () => {
+    let finish!: (value: boolean) => void;
+    mocks.appleSubscription.handlePurchase.mockImplementation(() => new Promise<boolean>((resolve) => { finish = resolve; }));
+    render(<MemoryRouter><Paywall /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: /^14-day free trial$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Start 14-day free trial/i }));
+    expect(mocks.appleSubscription.handlePurchase).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: /^Start 14-day free trial/i })).toBeDisabled();
+    await act(async () => { finish(false); });
+    expect(screen.getByRole("button", { name: /^Start 14-day free trial/i })).toBeEnabled();
+  });
+
+  it("does not advertise or enable a purchase when StoreKit returns no products", () => {
+    mocks.appleSubscription.products = [];
+    mocks.appleSubscription.productError = "No App Store products are available. Check your connection and try again.";
+
+    render(
+      <MemoryRouter>
+        <Paywall />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText("14-day free trial")).not.toBeInTheDocument();
+    screen.getAllByRole("button", { name: /subscribe yearly/i }).forEach((button) => {
+      expect(button).toBeDisabled();
+    });
+    expect(screen.getByText(/no app store products are available/i)).toBeInTheDocument();
   });
 
   it("applies a valid creator code through the existing referral path", async () => {
@@ -694,8 +775,8 @@ describe("Paywall creator offer-code eligibility", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("button", { name: /^3-day free trial$/i })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /start 3-day free trial/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^14-day free trial$/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /start 14-day free trial/i })).toBeDisabled();
   });
 
   it("does not render when refreshed access is already active", () => {
@@ -726,9 +807,9 @@ describe("Paywall creator offer-code eligibility", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /subscribe yearly/i })).toBeInTheDocument();
     expect(screen.getByText("Continue with Cosmiq")).toBeInTheDocument();
-    expect(screen.queryByText("3-day free trial")).not.toBeInTheDocument();
+    expect(screen.queryByText("14-day free trial")).not.toBeInTheDocument();
     expect(screen.queryByTestId("paywall-trial-callout")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /start 3-day free trial/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /start 14-day free trial/i })).not.toBeInTheDocument();
     expect(screen.queryByText("Start the trial. Keep the story moving.")).not.toBeInTheDocument();
   });
 });

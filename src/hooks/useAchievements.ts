@@ -284,7 +284,7 @@ export const useAchievements = () => {
       await awardAchievement({
         type: "companion_level_5",
         title: "Growing Together",
-        description: "Your companion reached Stage 5 • Initiate",
+        description: "Your companion reached Level 5 • Initiate",
         icon: "sparkles",
         tier: "bronze",
         metadata: {
@@ -300,7 +300,7 @@ export const useAchievements = () => {
       await awardAchievement({
         type: "companion_level_21",
         title: "Deep Bond",
-        description: "Your companion reached Stage 21 • Guardian",
+        description: "Your companion reached Level 21 • Guardian",
         icon: "sparkles",
         tier: "silver",
         metadata: {
@@ -316,7 +316,7 @@ export const useAchievements = () => {
       await awardAchievement({
         type: "companion_level_56",
         title: "Champion Bond",
-        description: "Your companion reached Stage 56 • Mythic",
+        description: "Your companion reached Level 56 • Mythic",
         icon: "star",
         tier: "gold",
         metadata: {
@@ -332,13 +332,13 @@ export const useAchievements = () => {
       await awardAchievement({
         type: "companion_level_100",
         title: "Ultimate Bond",
-        description: "Your companion reached Stage 100 • Ascended",
+        description: "Your companion reached Level 100 • Ascended",
         icon: "crown",
         tier: "platinum",
         metadata: {
           stage,
           pepTalkDuration: "7-10 min",
-          pepTalkMessage: "Stage 100. This bond has become legend.",
+          pepTalkMessage: "Level 100. This bond has become legend.",
           pepTalkCategory: "breakthrough",
         },
       });
@@ -427,8 +427,8 @@ export const useAchievements = () => {
       { count: habitCount },
       { count: habitCompletionCount },
       { count: checkInCount },
-      { count: missionCount },
-      { count: completedMissionCount },
+      { count: chapterCount },
+      { count: completedChapterCount },
     ] = await Promise.all([
       supabase
         .from("habits")
@@ -446,29 +446,29 @@ export const useAchievements = () => {
         .eq("user_id", user.id)
         .eq("check_in_date", effectiveDate),
       supabase
-        .from("daily_missions")
+        .from("daily_mission_threads")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id)
         .eq("mission_date", effectiveDate),
       supabase
-        .from("daily_missions")
+        .from("daily_mission_threads")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id)
         .eq("mission_date", effectiveDate)
-        .eq("completed", true),
+        .in("status", ["completed", "reflected"]),
     ]);
 
     const activeHabits = habitCount ?? 0;
     const completedHabits = habitCompletionCount ?? 0;
     const completedCheckIns = checkInCount ?? 0;
-    const missionsForDay = missionCount ?? 0;
-    const completedMissions = completedMissionCount ?? 0;
+    const chaptersForDay = chapterCount ?? 0;
+    const completedChapters = completedChapterCount ?? 0;
 
     if (activeHabits === 0 || completedHabits < activeHabits || completedCheckIns === 0) {
       return;
     }
 
-    if (missionsForDay > 0 && completedMissions < missionsForDay) {
+    if (chaptersForDay > 0 && completedChapters < chaptersForDay) {
       return;
     }
 

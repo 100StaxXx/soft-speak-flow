@@ -34,6 +34,12 @@ vi.mock("@tanstack/react-query", () => ({
   },
 }));
 
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    from: vi.fn(),
+  },
+}));
+
 vi.mock("@/utils/plannerSync", () => ({
   warmDailyTasksQueryFromRemote: (...args: unknown[]) => mocks.warmDailyTasksQueryFromRemote(...args),
   warmEpicsQueryFromRemote: (...args: unknown[]) => mocks.warmEpicsQueryFromRemote(...args),
@@ -162,13 +168,14 @@ describe("BottomNav", () => {
     expect(mocks.hapticsLight).toHaveBeenCalledTimes(1);
   });
 
-  it("warms the local-first journeys cache on tab prefetch interactions", () => {
+  it("warms the local-first journeys and campaigns caches on tab prefetch interactions", () => {
     renderBottomNav("/mentor");
 
-    fireEvent.pointerDown(screen.getByText("Quests"));
+    fireEvent.pointerDown(screen.getByText("Agenda"));
+    fireEvent.pointerDown(screen.getByText("Goals"));
 
     expect(mocks.warmDailyTasksQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1", expect.any(String));
-    expect(mocks.warmEpicsQueryFromRemote).not.toHaveBeenCalled();
+    expect(mocks.warmEpicsQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1");
   });
 
   it("signals journeys to reset to today when the quests tab is tapped", () => {
@@ -181,7 +188,7 @@ describe("BottomNav", () => {
     try {
       renderBottomNav("/journeys");
 
-      fireEvent.click(screen.getByText("Quests"));
+      fireEvent.click(screen.getByText("Agenda"));
 
       expect(mocks.hapticsLight).toHaveBeenCalledTimes(1);
       expect(resetEvents).toHaveLength(1);
@@ -191,20 +198,26 @@ describe("BottomNav", () => {
     }
   });
 
-  it("renders quests before companion in the bottom nav", () => {
+  it("renders the primary app areas in the bottom nav", () => {
     renderBottomNav("/mentor");
 
     expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
       "Guide",
-      "Quests",
+      "Agenda",
+      "Goals",
       "Companion",
     ]);
   });
 
-  it("does not render a campaigns tab", () => {
+  it("navigates to campaigns through the goals tab", async () => {
     renderBottomNav("/mentor");
 
-    expect(screen.queryByText("Campaigns")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Goals"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("pathname")).toHaveTextContent("/campaigns");
+    });
+    expect(mocks.hapticsLight).toHaveBeenCalledTimes(1);
   });
 
   it("does not show companion ready badge when companion is not evolvable", () => {

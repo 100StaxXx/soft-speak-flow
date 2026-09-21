@@ -1,0 +1,101 @@
+diff --git a/node_modules/@supabase/auth-js/dist/main/GoTrueClient.js b/node_modules/@supabase/auth-js/dist/main/GoTrueClient.js
+index 1d5fbdb..adc3cd6 100644
+--- a/node_modules/@supabase/auth-js/dist/main/GoTrueClient.js
++++ b/node_modules/@supabase/auth-js/dist/main/GoTrueClient.js
+@@ -1578,7 +1578,9 @@ class GoTrueClient {
+         (async () => {
+             await this.initializePromise;
+             await this._acquireLock(-1, async () => {
+-                this._emitInitialSession(id);
++                this._emitInitialSession(id).catch((error) => {
++                    console.error('Initial auth session could not be read', error);
++                });
+             });
+         })();
+         return { data: { subscription } };
+diff --git a/node_modules/@supabase/auth-js/dist/main/lib/locks.js b/node_modules/@supabase/auth-js/dist/main/lib/locks.js
+index 7ad8787..319783e 100644
+--- a/node_modules/@supabase/auth-js/dist/main/lib/locks.js
++++ b/node_modules/@supabase/auth-js/dist/main/lib/locks.js
+@@ -175,10 +175,11 @@ async function processLock(name, acquireTimeout, fn) {
+         if (e && e.isAcquireTimeout) {
+             // if the current operation timed out, it doesn't mean that the previous
+             // operation finished, so we need contnue waiting for it to finish
+-            await previousOperation;
++            await previousOperation.catch(() => null);
+             return null;
+         }
+-        throw e;
++        // Report failure through currentOperation, not an unobserved queue tail.
++        return null;
+     });
+     // finally wait for the current operation to finish successfully, with an
+     // error or with an acquire timeout error
+diff --git a/node_modules/@supabase/auth-js/dist/module/GoTrueClient.js b/node_modules/@supabase/auth-js/dist/module/GoTrueClient.js
+index 4ccd88b..672a6d8 100644
+--- a/node_modules/@supabase/auth-js/dist/module/GoTrueClient.js
++++ b/node_modules/@supabase/auth-js/dist/module/GoTrueClient.js
+@@ -1575,7 +1575,9 @@ class GoTrueClient {
+         (async () => {
+             await this.initializePromise;
+             await this._acquireLock(-1, async () => {
+-                this._emitInitialSession(id);
++                this._emitInitialSession(id).catch((error) => {
++                    console.error('Initial auth session could not be read', error);
++                });
+             });
+         })();
+         return { data: { subscription } };
+diff --git a/node_modules/@supabase/auth-js/dist/module/lib/locks.js b/node_modules/@supabase/auth-js/dist/module/lib/locks.js
+index 8bf9410..72a9ad1 100644
+--- a/node_modules/@supabase/auth-js/dist/module/lib/locks.js
++++ b/node_modules/@supabase/auth-js/dist/module/lib/locks.js
+@@ -167,10 +167,11 @@ export async function processLock(name, acquireTimeout, fn) {
+         if (e && e.isAcquireTimeout) {
+             // if the current operation timed out, it doesn't mean that the previous
+             // operation finished, so we need contnue waiting for it to finish
+-            await previousOperation;
++            await previousOperation.catch(() => null);
+             return null;
+         }
+-        throw e;
++        // Report failure through currentOperation, not an unobserved queue tail.
++        return null;
+     });
+     // finally wait for the current operation to finish successfully, with an
+     // error or with an acquire timeout error
+diff --git a/node_modules/@supabase/auth-js/src/GoTrueClient.ts b/node_modules/@supabase/auth-js/src/GoTrueClient.ts
+index f23bc95..edf86cd 100644
+--- a/node_modules/@supabase/auth-js/src/GoTrueClient.ts
++++ b/node_modules/@supabase/auth-js/src/GoTrueClient.ts
+@@ -2185,7 +2185,9 @@ export default class GoTrueClient {
+       await this.initializePromise
+ 
+       await this._acquireLock(-1, async () => {
+-        this._emitInitialSession(id)
++        this._emitInitialSession(id).catch((error) => {
++          console.error('Initial auth session could not be read', error)
++        })
+       })
+     })()
+ 
+diff --git a/node_modules/@supabase/auth-js/src/lib/locks.ts b/node_modules/@supabase/auth-js/src/lib/locks.ts
+index 6ed715a..39cec2c 100644
+--- a/node_modules/@supabase/auth-js/src/lib/locks.ts
++++ b/node_modules/@supabase/auth-js/src/lib/locks.ts
+@@ -211,12 +211,13 @@ export async function processLock<R>(
+     if (e && e.isAcquireTimeout) {
+       // if the current operation timed out, it doesn't mean that the previous
+       // operation finished, so we need contnue waiting for it to finish
+-      await previousOperation
++      await previousOperation.catch(() => null)
+ 
+       return null
+     }
+ 
+-    throw e
++    // Report failure through currentOperation, not an unobserved queue tail.
++    return null
+   })
+ 
+   // finally wait for the current operation to finish successfully, with an

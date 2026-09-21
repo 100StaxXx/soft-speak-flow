@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { motion } from "framer-motion";
+import { useTimelineDrag } from "@/hooks/useTimelineDrag";
+import { SHARED_TIMELINE_DRAG_INTERACTION_PROFILE } from "@/components/calendar/dragSnap";
 import { addDays, addWeeks, format, isSameDay, isToday, startOfWeek, subWeeks } from "date-fns";
 import {
   CalendarDays,
@@ -63,6 +66,7 @@ interface ActiveEpic {
 }
 
 interface DesktopWeekPlannerProps {
+  calendarOnly?: boolean;
   selectedDate: Date;
   tasks: DailyTask[];
   readableQuestCardsEnabled?: boolean;
@@ -85,6 +89,7 @@ interface DesktopWeekPlannerProps {
   isVoiceAddSupported?: boolean;
   showCompanionPlannerHeaderAction?: boolean;
   onOpenMonthView?: () => void;
+  onTaskReschedule?: (id: string, time: string) => void;
   onUndoToggle?: (taskId: string, xpReward: number) => void;
   onEditQuest?: (task: DailyTask) => void;
   onDeleteQuest?: (task: DailyTask) => void;
@@ -328,6 +333,7 @@ function WeekPlannerTaskCard({
               : "border-white/25 text-transparent hover:border-primary/70",
           )}
           aria-label={isComplete ? "Mark task as incomplete" : "Mark task as complete"}
+          data-interactive="true"
         >
           <Check className="h-3 w-3" />
         </button>
@@ -381,6 +387,7 @@ function WeekPlannerTaskCard({
 }
 
 export function DesktopWeekPlanner({
+  calendarOnly = false,
   selectedDate,
   tasks,
   readableQuestCardsEnabled = false,
@@ -403,6 +410,7 @@ export function DesktopWeekPlanner({
   isVoiceAddSupported = true,
   showCompanionPlannerHeaderAction = false,
   onOpenMonthView,
+  onTaskReschedule,
   onUndoToggle,
   onEditQuest,
   onDeleteQuest,
@@ -412,6 +420,15 @@ export function DesktopWeekPlanner({
   onOpenCampaigns,
   companionFrostedThemeStyle,
 }: DesktopWeekPlannerProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const drag = useTimelineDrag({
+    containerRef: scrollRef,
+    enabled: !!onTaskReschedule,
+    ...SHARED_TIMELINE_DRAG_INTERACTION_PROFILE,
+    pixelsPerMinute: HOUR_HEIGHT_PX / 60,
+    postActivationDeadzonePx: 0,
+    onDrop: (id, time) => onTaskReschedule?.(id, time),
+  });
   const dayHeaderRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const lastCenterDateRequestKeyRef = useRef(centerDateRequestKey);
   const hasCompanionPlannerShortcut = Boolean(onOpenCompanionPlanner);
@@ -692,7 +709,7 @@ export function DesktopWeekPlanner({
 
   return (
     <div
-      className={cn(COMPANION_FROSTED_PLANNER_DARK_CLASS, "grid grid-cols-[minmax(0,1fr)_320px] items-start gap-5")}
+      className={cn(COMPANION_FROSTED_PLANNER_DARK_CLASS, "grid items-start gap-5", !calendarOnly && "grid-cols-[minmax(0,1fr)_320px]")}
       data-testid="desktop-week-planner"
       style={companionFrostedThemeStyle}
     >
@@ -802,7 +819,7 @@ export function DesktopWeekPlanner({
         </div>
 
         <div className="overflow-hidden rounded-[28px] border border-white/8 bg-black/10">
-          <div className="overflow-auto" style={{ maxHeight: "min(72vh, 820px)" }}>
+          <div ref={scrollRef} className="overflow-auto" style={{ maxHeight: "min(72vh, 820px)" }}>
             <div
               className="min-w-0"
               data-testid="desktop-week-planner-grid"
@@ -998,10 +1015,19 @@ export function DesktopWeekPlanner({
                         const leftPercent = column * widthPercent;
 
                         return (
-                          <div
+                          <motion.div
                             key={task.id}
+                            {...(!task.completed && task.scheduled_time && onTaskReschedule ? drag.getRowDragProps(task.id, task.scheduled_time) : {})}
+                            onClickCapture={event => {
+                              if (drag.shouldSuppressClick()) { event.preventDefault(); event.stopPropagation(); }
+                            }}
+                            onContextMenu={event => event.preventDefault()}
                             className="absolute z-10 px-1"
                             style={{
+                              y: drag.draggingTaskId === task.id ? drag.dragOffsetY : 0,
+                              zIndex: drag.draggingTaskId === task.id ? 30 : 10,
+                              touchAction: drag.draggingTaskId === task.id || drag.longPressTaskId === task.id ? "none" : "pan-y",
+                              userSelect: "none",
                               top: `${topPx}px`,
                               height: `${heightPx}px`,
                               left: `calc(${leftPercent}% + ${TASK_PAD_PX}px)`,
@@ -1009,7 +1035,8 @@ export function DesktopWeekPlanner({
                             }}
                           >
                             {renderTaskCard(task, heightPx < 50)}
-                          </div>
+                            {drag.draggingTaskId === task.id && <span className="pointer-events-none absolute bottom-full rounded bg-slate-900 px-2 py-1 text-xs text-white">{drag.previewTime}</span>}
+                          </motion.div>
                         );
                       })}
                     </div>
@@ -1021,7 +1048,7 @@ export function DesktopWeekPlanner({
         </div>
       </div>
 
-      <aside className="flex flex-col gap-4">
+      {!calendarOnly ? <aside className="flex flex-col gap-4">
         <section className={desktopRailCardClass}>
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -1147,7 +1174,7 @@ export function DesktopWeekPlanner({
             </p>
           </div>
         </section>
-      </aside>
+      </aside> : null}
     </div>
   );
 }

@@ -22,7 +22,7 @@ Deno.env.set("INTERNAL_FUNCTION_SECRET", "internal-secret");
 Deno.env.set("OPENAI_API_KEY", "openai-key");
 
 const module = await import("./index.ts");
-const costGuardrailsModule = await import("../_shared/costGuardrails.ts");
+const costGuardrailsModule = await import("../../production-baseline/20260920-companion/supabase/functions/_shared/costGuardrails.ts");
 type GenerateCompanionEvolutionDeps = NonNullable<
   Parameters<typeof module.handleGenerateCompanionEvolution>[1]
 >;
@@ -112,6 +112,8 @@ const createPassingScores = (difference = 7) => ({
   difference,
   anatomy: 8,
   centering: 8,
+  styleConsistency: 8,
+  compositionConsistency: 8,
   backgroundCutout: 8,
   overall: 8,
   subjectCenterX: 0.44,
@@ -126,6 +128,8 @@ const createFailingScores = () => ({
   difference: 1,
   anatomy: 4,
   centering: 4,
+  styleConsistency: 4,
+  compositionConsistency: 4,
   backgroundCutout: 4,
   overall: 4,
   subjectCenterX: 0.2,
@@ -334,6 +338,7 @@ Deno.test("reveal path uses hidden stage-1 anchor without invoking image generat
           focalY: 0.66,
           sourceType: "bootstrap_generation",
           visibility: "hidden_until_reached",
+          approvedForReveal: true,
         },
       },
     },
@@ -1150,6 +1155,7 @@ Deno.test("maybeEnqueueCompanionAnimationJob skips without touching storage when
     evolutionId: "evo-1",
     stage: 5,
     imageUrl: "https://example.com/stage-5.png",
+    previousImageUrl: "https://example.com/stage-1.png",
     env: { get: () => undefined },
   });
 
@@ -1178,6 +1184,7 @@ Deno.test("maybeEnqueueCompanionAnimationJob records a skipped status when FAL_K
     evolutionId: "evo-1",
     stage: 5,
     imageUrl: "https://example.com/stage-5.png",
+    previousImageUrl: "https://example.com/stage-1.png",
     env: {
       get: (name: string) =>
         name === "COMPANION_ANIMATION_ENABLED" ? "true" : undefined,
@@ -1327,6 +1334,7 @@ Deno.test("maybeEnqueueCompanionAnimationJob enqueues only when enabled, credent
     evolutionId: "evo-1",
     stage: 5,
     imageUrl: "https://example.com/stage-5.png",
+    previousImageUrl: "https://example.com/stage-1.png",
     element: "water",
     env: {
       get: (name: string) => {
@@ -1394,6 +1402,7 @@ Deno.test("maybeEnqueueCompanionAnimationJob records skipped when video cost gua
     evolutionId: "evo-1",
     stage: 5,
     imageUrl: "https://example.com/stage-5.png",
+    previousImageUrl: "https://example.com/stage-1.png",
     env: {
       get: (name: string) => {
         if (name === "COMPANION_ANIMATION_ENABLED") return "true";

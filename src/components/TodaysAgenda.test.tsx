@@ -391,6 +391,29 @@ beforeEach(() => {
 });
 
 describe("TodaysAgenda subtasks", () => {
+  it("gives the compact calendar a scrolling full-day grid without the date or empty-state cards", () => {
+    render(<TodaysAgenda calendarOnly compactCalendar layoutMode="mobile" tasks={[]} selectedDate={new Date("2026-09-19T12:00:00")}
+      completedCount={0} totalCount={0} onToggle={vi.fn()} onAddQuest={vi.fn()} />, { wrapper: createWrapper(new QueryClient()) });
+    expect(screen.queryByTestId("agenda-mobile-header")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("empty-state-pane")).not.toBeInTheDocument();
+    expect(screen.getByTestId("scheduled-timeline-pane")).toHaveClass("overflow-y-auto", "min-h-0", "flex-1");
+    expect(screen.getByTestId("scheduled-timeline-pane").style.maxHeight).toBe("");
+    expect(screen.getByTestId("scheduled-timeline-content").style.paddingBottom).toBe("");
+    expect(screen.getByTestId("journeys-day-grid")).toBeInTheDocument();
+    // Only individual cards/controls may frost the scenic wallpaper.
+    expect(screen.getByTestId("journeys-day-grid").className).not.toMatch(/backdrop-blur/);
+    expect(screen.getByTestId("journeys-day-grid")).toHaveClass("bg-slate-950/25");
+  });
+  it("shows calendar controls without campaign or progress decoration in calendar-only mode", () => {
+    const queryClient = new QueryClient();
+    render(<TodaysAgenda calendarOnly tasks={[]} selectedDate={new Date("2026-09-19T12:00:00")}
+      completedCount={2} totalCount={3} currentStreak={7} onToggle={vi.fn()} onAddQuest={vi.fn()}
+      onManageCalendars={vi.fn()} />, { wrapper: createWrapper(queryClient) });
+    expect(screen.getByTestId("todays-agenda")).toBeInTheDocument();
+    expect(screen.queryByLabelText("2 of 3 agenda items complete")).not.toBeInTheDocument();
+    expect(screen.queryByText("XP")).not.toBeInTheDocument();
+    expect(screen.queryByText("Campaigns")).not.toBeInTheDocument();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.timelineDragState.draggingTaskId = null;
@@ -2284,6 +2307,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(mocks.useTimelineDragMock).toHaveBeenCalledWith(
       expect.objectContaining({
         ...SHARED_TIMELINE_DRAG_INTERACTION_PROFILE,
+        postActivationDeadzonePx: 0,
       }),
     );
   });
@@ -2321,7 +2345,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(mocks.getRowDragPropsMock).not.toHaveBeenCalled();
   });
 
-  it("does not forward row pointer down to row drag handler", () => {
+  it("forwards row pointer down to row drag handler", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -2352,8 +2376,8 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const row = screen.getByTestId("timeline-row-task-scheduled-1");
     fireEvent.pointerDown(row, { pointerType: "mouse", button: 0, clientY: 100 });
 
-    expect(mocks.rowPointerDownCaptureSpy).not.toHaveBeenCalled();
-    expect(mocks.rowPointerDownSpy).not.toHaveBeenCalled();
+    expect(mocks.rowPointerDownCaptureSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.rowPointerDownSpy).toHaveBeenCalledTimes(1);
     expect(mocks.handlePointerDownCaptureSpy).not.toHaveBeenCalled();
     expect(mocks.handlePointerDownSpy).not.toHaveBeenCalled();
   });
@@ -2395,7 +2419,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(mocks.handleTouchStartSpy).not.toHaveBeenCalled();
   });
 
-  it("keeps pointer starts off row drag wiring and touch starts off handle-only drag wiring", () => {
+  it("routes pointer and touch starts through row drag rather than a separate handle", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -2427,8 +2451,8 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     fireEvent.pointerDown(row, { pointerType: "mouse", button: 0, clientY: 100 });
     fireEvent.touchStart(row, { touches: [{ clientX: 0, clientY: 100 }] });
 
-    expect(mocks.rowPointerDownCaptureSpy).not.toHaveBeenCalled();
-    expect(mocks.rowPointerDownSpy).not.toHaveBeenCalled();
+    expect(mocks.rowPointerDownCaptureSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.rowPointerDownSpy).toHaveBeenCalledTimes(1);
     expect(mocks.rowTouchStartCaptureSpy).toHaveBeenCalledTimes(1);
     expect(mocks.rowTouchStartSpy).toHaveBeenCalledTimes(1);
     expect(mocks.handlePointerDownCaptureSpy).not.toHaveBeenCalled();
@@ -3686,7 +3710,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     });
     expect(screen.getByText("Time")).toBeInTheDocument();
     expect(screen.getByText("Priority")).toBeInTheDocument();
-    expect(screen.getByText("XP")).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "XP" })).toBeInTheDocument();
   });
 
   it("shows the row action trigger when move-to-tomorrow is available", () => {
@@ -3872,7 +3896,20 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(readableShell).not.toHaveClass("bg-primary/[0.08]");
   });
 
-  it("does not wire desktop scheduled rows for drag", () => {
+  it("opens a quest summary from the title without toggling completion", () => {
+    const task = { id: "summary", task_text: "Read", completed: false, xp_reward: 10, scheduled_time: "09:00" };
+    const onViewQuest = vi.fn(); const onToggle = vi.fn();
+    render(<TodaysAgenda tasks={[task]} selectedDate={new Date("2026-09-24T12:00:00")} onToggle={onToggle} onAddQuest={vi.fn()} completedCount={0} totalCount={1} onViewQuest={onViewQuest} />,
+      { wrapper: createWrapper(new QueryClient({ defaultOptions: { queries: { retry: false } } })) });
+    fireEvent.click(screen.getByRole("button", { name: "View Read summary" }));
+    expect(onViewQuest).toHaveBeenCalledWith(task);
+    expect(onToggle).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(onToggle).toHaveBeenCalledOnce();
+    expect(onViewQuest).toHaveBeenCalledOnce();
+  });
+
+  it("wires desktop scheduled rows for drag", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -3901,7 +3938,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(mocks.getRowDragPropsMock).not.toHaveBeenCalled();
+    expect(mocks.getRowDragPropsMock).toHaveBeenCalledWith("task-scheduled-1", "08:00");
   });
 
   it("renders a full 24-hour half-hour grid", () => {
@@ -3928,7 +3965,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(slotMinutes).toHaveLength(48);
     expect(slotMinutes[0]).toBe(0);
     expect(slotMinutes.at(-1)).toBe(23 * 60 + 30);
-    expect(screen.getByTestId("journeys-day-grid")).toHaveStyle({ height: "2496px" });
+    expect(screen.getByTestId("journeys-day-grid")).toHaveStyle({ height: "1728px" });
     expect(screen.getByText("No tasks for this day")).toBeInTheDocument();
   });
 
@@ -3963,9 +4000,9 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
 
     const wrapper = getTimelineRowWrapper("task-scheduled-1");
     expect(Number(wrapper.getAttribute("data-start-minute"))).toBe(minuteFromTime("01:30"));
-    expect(Number(wrapper.getAttribute("data-top-px"))).toBeCloseTo(156);
-    expect(Number(wrapper.getAttribute("data-duration-height-px"))).toBeCloseTo(104);
-    expect(wrapper).toHaveStyle({ top: "156px", height: "104px" });
+    expect(Number(wrapper.getAttribute("data-top-px"))).toBeCloseTo(108);
+    expect(Number(wrapper.getAttribute("data-duration-height-px"))).toBeCloseTo(72);
+    expect(wrapper).toHaveStyle({ top: "108px", height: "72px" });
   });
 
   it("clips 30-minute scheduled quest cards while opening details in a drawer", async () => {
@@ -4101,8 +4138,8 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const row = screen.getByTestId("timeline-row-task-scheduled-60");
     const shell = getQuestCardShell(row);
 
-    expect(Number(wrapper.getAttribute("data-duration-height-px"))).toBeCloseTo(104);
-    expect(wrapper).toHaveStyle({ height: "104px" });
+    expect(Number(wrapper.getAttribute("data-duration-height-px"))).toBeCloseTo(72);
+    expect(wrapper).toHaveStyle({ height: "72px" });
     expect(row.style.overflow).toBe("");
     expect(row).not.toHaveAttribute("data-timeline-compact");
     expect(shell).not.toHaveAttribute("data-compact-timeline-card");
@@ -4400,5 +4437,79 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
 
     expect(elementScrollToSpy).not.toHaveBeenCalled();
     expect(windowScrollToSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("TodaysAgenda external calendar overlay", () => {
+  it("renders connected calendar events as read-only agenda items and refreshes them", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const onRefresh = vi.fn();
+    const onManageCalendars = vi.fn();
+    const onDateSelect = vi.fn();
+
+    render(
+      <TodaysAgenda
+        tasks={[]}
+        externalEvents={[
+          {
+            id: "meeting-1",
+            provider: "google",
+            title: "Project review",
+            taskDate: "2026-02-13",
+            scheduledTime: "10:00",
+            estimatedDuration: 45,
+            isAllDay: false,
+            startDate: "2026-02-13T18:00:00.000Z",
+            endDate: "2026-02-13T18:45:00.000Z",
+            location: null,
+            calendarId: "primary",
+            calendarName: "Work",
+            htmlLink: "https://calendar.google.com/event?eid=1",
+          },
+          {
+            id: "holiday-1",
+            provider: "outlook",
+            title: "Holiday",
+            taskDate: "2026-02-13",
+            scheduledTime: null,
+            estimatedDuration: 1440,
+            isAllDay: true,
+            startDate: "2026-02-13",
+            endDate: "2026-02-14",
+            location: null,
+            calendarId: "work",
+            calendarName: "Company",
+            htmlLink: null,
+          },
+        ]}
+        connectedCalendarCount={2}
+        onRefreshExternalCalendars={onRefresh}
+        onManageCalendars={onManageCalendars}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onDateSelect={onDateSelect}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={0}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByTestId("external-calendar-event-external:google::primary:meeting-1")).toHaveTextContent(
+      "Project review",
+    );
+    expect(screen.getByTestId("external-calendar-all-day-events")).toHaveTextContent("Holiday");
+    expect(screen.queryByTestId("empty-state-pane")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh external calendars" }));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "2 connected" }));
+    expect(onManageCalendars).toHaveBeenCalledTimes(1);
   });
 });

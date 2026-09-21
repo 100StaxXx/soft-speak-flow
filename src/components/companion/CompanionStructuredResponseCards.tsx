@@ -33,15 +33,15 @@ interface CompanionStructuredResponseCardsProps {
 const variantStyles = {
   journeys: {
     card:
-      "rounded-[1.7rem] border-[3px] border-[#4d2811] bg-[linear-gradient(180deg,rgba(255,247,229,0.96),rgba(255,215,137,0.92))] text-[#5b2e13] shadow-[0_10px_0_rgba(77,40,17,0.82),0_24px_40px_-28px_rgba(36,12,4,0.45)]",
+      "rounded-2xl border border-white/10 bg-slate-900/85 text-slate-100 shadow-sm",
     title:
-      "text-[0.72rem] font-black uppercase tracking-[0.22em] text-[#8c5a25]",
-    body: "text-sm leading-6 text-[#5b2e13]",
-    subtext: "text-sm text-[#7a4a21]",
+      "text-xs font-medium tracking-wide text-violet-200",
+    body: "text-sm leading-6 text-slate-100",
+    subtext: "text-sm text-slate-400",
     item:
-      "rounded-[1.25rem] border-[3px] border-[#6d3518] bg-[linear-gradient(180deg,#fff9ef_0%,#ffe5af_100%)] px-4 py-3 shadow-[0_6px_0_rgba(109,53,24,0.82)]",
+      "rounded-xl border border-white/10 bg-white/5 px-4 py-3",
     accent:
-      "rounded-full border-[2px] border-[#6d3518] bg-white/60 px-2 py-1 text-[0.62rem] font-black uppercase tracking-[0.18em] text-[#8b4d1d]",
+      "rounded-full border border-violet-300/15 bg-violet-400/10 px-2 py-1 text-[11px] font-medium text-violet-200",
   },
   companion: {
     card: plannerPathfinderTheme.raisedPanel,

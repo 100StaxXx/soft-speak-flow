@@ -127,11 +127,11 @@ describe("useDraggableFAB", () => {
   it("uses a freeform bottom-right default position within the safe viewport bounds", () => {
     const { result } = renderHook(() => useDraggableFAB());
 
-    expect(result.current.position).toEqual({ x: 240, y: 536 });
+    expect(result.current.position).toEqual({ x: 288, y: 584 });
     expect(result.current.popupAlignment).toEqual({ horizontal: "right", vertical: "bottom" });
     expect(result.current.positionStyles).toMatchObject({
-      left: 240,
-      top: 536,
+      left: 288,
+      top: 584,
     });
   });
 
@@ -150,12 +150,12 @@ describe("useDraggableFAB", () => {
 
     const { result } = renderHook(() => useDraggableFAB());
 
-    expect(result.current.position).toEqual({ x: 240, y: 536 });
+    expect(result.current.position).toEqual({ x: 288, y: 584 });
 
     await waitFor(() => {
       expect(storage.safeLocalStorage.setItem).toHaveBeenCalledWith(
         DRAGGABLE_FAB_STORAGE_KEY_V3,
-        JSON.stringify({ x: 240, y: 536 }),
+        JSON.stringify({ x: 288, y: 584 }),
       );
     });
   });
@@ -257,7 +257,7 @@ describe("useDraggableFAB", () => {
       }));
     });
 
-    expect(result.current.position).toEqual({ x: 120, y: 160 });
+    expect(result.current.position).toEqual({ x: 168, y: 208 });
     expect(result.current.isDragging).toBe(true);
   });
 
@@ -288,13 +288,13 @@ describe("useDraggableFAB", () => {
       }));
     });
 
-    expect(result.current.position).toEqual({ x: 150, y: 210 });
+    expect(result.current.position).toEqual({ x: 198, y: 258 });
     expect(result.current.isDragging).toBe(false);
     expect(result.current.isLongPressing).toBe(false);
 
     expect(storage.safeLocalStorage.setItem).toHaveBeenLastCalledWith(
       DRAGGABLE_FAB_STORAGE_KEY_V3,
-      JSON.stringify({ x: 150, y: 210 }),
+      JSON.stringify({ x: 198, y: 258 }),
     );
   });
 
@@ -303,7 +303,7 @@ describe("useDraggableFAB", () => {
 
     const { result } = renderHook(() => useDraggableFAB());
 
-    expect(result.current.position).toEqual({ x: 240, y: 536 });
+    expect(result.current.position).toEqual({ x: 260, y: 584 });
 
     setViewport({ width: 320, height: 640 });
     document.documentElement.style.setProperty("--bottom-nav-runtime-offset", "120px");
@@ -314,7 +314,7 @@ describe("useDraggableFAB", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.position).toEqual({ x: 160, y: 352 });
+      expect(result.current.position).toEqual({ x: 208, y: 400 });
     });
   });
 });

@@ -54,6 +54,10 @@ describe("companionMotion config", () => {
   it("exposes stable event codes and stage power for runtime bindings", () => {
     expect(getCompanionMotionEventCode("idle")).toBe(0);
     expect(getCompanionMotionEventCode("evolution_reveal")).toBe(6);
+    expect(getCompanionMotionEventCode("touch")).toBe(7);
+    expect(getCompanionMotionEventCode("pet")).toBe(8);
+    expect(getCompanionMotionEventCode("comfort")).toBe(9);
+    expect(getCompanionMotionEventCode("play")).toBe(10);
     expect(getCompanionMotionStagePower(0)).toBe(0.22);
     expect(getCompanionMotionStagePower(21)).toBe(0.7);
     expect(getCompanionMotionStagePower(81)).toBe(1);

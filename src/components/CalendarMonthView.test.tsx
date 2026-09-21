@@ -120,6 +120,29 @@ describe("CalendarMonthView", () => {
     expect(onDateLongPress).not.toHaveBeenCalled();
   });
 
+  it("cancels long-press creation when scrolling the month", () => {
+    const onDateLongPress = vi.fn();
+    render(<CalendarMonthView compact selectedDate={selectedDate} onDateSelect={vi.fn()} tasks={[]} onTaskClick={vi.fn()} onDateLongPress={onDateLongPress} />);
+    const cell = getDayCell("15");
+    fireEvent.touchStart(cell);
+    fireEvent.touchMove(cell);
+    act(() => vi.advanceTimersByTime(600));
+    expect(onDateLongPress).not.toHaveBeenCalled();
+  });
+
+  it("does not navigate away after a successful long press opens creation", () => {
+    const onDateSelect = vi.fn();
+    const onDateLongPress = vi.fn();
+    render(<CalendarMonthView compact selectedDate={selectedDate} onDateSelect={onDateSelect} tasks={[]} onTaskClick={vi.fn()} onDateLongPress={onDateLongPress} />);
+    const cell = getDayCell("15");
+    fireEvent.touchStart(cell);
+    act(() => vi.advanceTimersByTime(600));
+    fireEvent.touchEnd(cell);
+    fireEvent.click(cell);
+    expect(onDateLongPress).toHaveBeenCalledOnce();
+    expect(onDateSelect).not.toHaveBeenCalled();
+  });
+
   it("renders campaign rituals as distinct scheduled calendar items", () => {
     render(
       <CalendarMonthView

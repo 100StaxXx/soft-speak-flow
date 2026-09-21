@@ -336,6 +336,30 @@ describe("useCompanionAssistant", () => {
     expect(result.current.pendingAction?.id).toBe("action-1");
   });
 
+  it.each([true, false])("transfers a quest draft only after its server proposal is retired (success=%s)", async (success) => {
+    mocks.loadPendingAction.mockResolvedValue({
+      id: "draft-1", status: "pending", intent: "schedule_task", actionType: "task_create",
+      summary: "Take a trail walk", confirmationMessage: null,
+      normalizedPayload: { title: "Trail walk", task_date: "2026-09-22", scheduled_time: "15:30", estimated_duration: 45 },
+      affectedEntities: null, expiresAt: "2026-09-23T20:00:00Z", createdAt: "2026-09-20T08:00:00Z",
+    });
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useCompanionAssistant({ surface: "journeys" }), { wrapper });
+    await waitFor(() => expect(result.current.editableQuestProposal?.id).toBe("draft-1"));
+    mocks.supabaseInvoke.mockResolvedValueOnce(success ? {
+      data: { reply: "Cancelled", receipt: { actionId: "draft-1", status: "cancelled" },
+        threadState: { sessionId: "persisted-session" } }, error: null,
+    } : { data: null, error: new Error("Offline") });
+    let transferred: unknown;
+    await act(async () => { transferred = await result.current.prepareQuestEditor("draft-1"); });
+    expect(transferred).toBe(success);
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith("companion-agent-action", expect.objectContaining({
+      body: { sessionId: "persisted-session", actionId: "draft-1", action: "cancel" },
+    }));
+    if (success) expect(result.current.pendingAction).toBeNull();
+    else expect(result.current.pendingAction?.id).toBe("draft-1");
+  });
+
   it("restores persisted planner cards after a full reload", async () => {
     mocks.loadThreadMessages.mockResolvedValue([
       {
@@ -1964,15 +1988,8 @@ describe("useCompanionAssistant", () => {
     });
   });
 
-  it("opens plan-day snapshot launchers without submitting synthetic chat", async () => {
+  it("sends plan-day snapshot context to the conversational agent", async () => {
     const consumed = vi.fn();
-    const started = vi.fn();
-    const snapshotShown = vi.fn();
-    window.addEventListener("companion-plan-my-day-started", started);
-    window.addEventListener(
-      "companion-plan-my-day-snapshot-shown",
-      snapshotShown,
-    );
     const { wrapper } = createWrapper();
     const { result } = renderHook(
       () =>
@@ -2004,53 +2021,34 @@ describe("useCompanionAssistant", () => {
       expect(consumed).toHaveBeenCalledWith("launch-snapshot-plan-1");
     });
 
-    expect(mocks.supabaseInvoke).not.toHaveBeenCalled();
+    expect(mocks.supabaseInvoke).toHaveBeenCalledWith(
+      "companion-agent",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          message: "Plan my day",
+          starterIntent: "plan_day",
+          turnOrigin: "launcher",
+          selectedDate: "2026-02-13",
+          briefingContext: expect.objectContaining({
+            dataSnapshot: expect.objectContaining({ openQuestCount: 2 }),
+          }),
+        }),
+      }),
+    );
     expect(result.current.activeThread?.sessionId).toBe("fresh-session");
-    expect(result.current.messages).toEqual([]);
-    expect(started).toHaveBeenCalledTimes(1);
-    expect(snapshotShown).toHaveBeenCalledTimes(1);
+    expect(result.current.messages.some((message) => message.content === "Plan my day")).toBe(true);
 
     mocks.supabaseInvoke.mockClear();
     await act(async () => {
-      await result.current.submitMessage("Anything I should add?", "text");
-    });
-    await act(async () => {
-      await result.current.submitMessage("schedule gym at 5", "text");
-    });
-    await act(async () => {
-      await result.current.submitMessage("turn this into a quest", "text");
+      await result.current.submitMessage("Make it lighter", "text");
     });
 
     const invokedFunctionNames = mocks.supabaseInvoke.mock.calls.map(
       ([functionName]) => functionName,
     );
-    expect(invokedFunctionNames).toEqual([
-      "companion-chat",
-      "companion-chat",
-      "companion-chat",
-    ]);
-    const chatBodies = mocks.supabaseInvoke.mock.calls.map(
-      ([, options]) => options.body,
-    );
-    expect(chatBodies[0]).toEqual(
-      expect.objectContaining({
-        message: "Anything I should add?",
-        currentDate: "2026-04-18",
-        journeysContext: expect.objectContaining({
-          tasks: [],
-          inboxTasks: [],
-          activeEpics: [],
-          calendarEvents: [],
-        }),
-      }),
-    );
+    expect(invokedFunctionNames).toEqual(["companion-agent"]);
     expect(mocks.legacySubmitMessage).not.toHaveBeenCalled();
     expect(result.current.pendingAction).toBeNull();
-    window.removeEventListener("companion-plan-my-day-started", started);
-    window.removeEventListener(
-      "companion-plan-my-day-snapshot-shown",
-      snapshotShown,
-    );
   });
 
   it("opens free-talk launcher templates as companion-authored visible openers", async () => {

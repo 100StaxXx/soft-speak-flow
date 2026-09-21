@@ -19,7 +19,7 @@ collect_frontend() {
 }
 
 collect_internal() {
-  find supabase/functions -type f \( -name '*.ts' -o -name '*.js' \) -print0 \
+  find supabase/functions supabase/production-baseline -type f \( -name '*.ts' -o -name '*.js' \) -print0 \
     | xargs -0 perl -0777 -ne 'while(/functions\/v1\/([a-z0-9-]+)/g){print "$1\n"} while(/invokeInternalFunction\(\s*["\x27]([a-z0-9-]+)["\x27]/sg){print "$1\n"}' \
     | sort -u
 }
@@ -54,6 +54,15 @@ comm -23 "$tmp_discovered" "$tmp_declared" > "$tmp_missing"
 comm -13 "$tmp_discovered" "$tmp_declared" > "$tmp_stale"
 
 status=0
+
+# Supabase validates configured entry points even when CI excludes edge-runtime.
+# Catch orphaned function configuration before starting or deploying the stack.
+while IFS= read -r function_name; do
+  if [ ! -f "supabase/functions/$function_name/index.ts" ]; then
+    echo "Configured function has no entry point: $function_name" >&2
+    status=1
+  fi
+done < <(sed -n 's/^\[functions\.\([^]]*\)\]$/\1/p' supabase/config.toml)
 
 if [ -s "$tmp_missing" ]; then
   echo "Manifest missing function entries:" >&2

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -77,5 +77,15 @@ describe("BadgesCollectionPanel", () => {
 
     expect(await screen.findByText("Your Badges")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: /evolutions/i })).not.toBeInTheDocument();
+  });
+  it("uses the new bundled art in the tile and enlarged accessible detail", async () => {
+    mocks.achievements = [{ achievement_type: "first_epic", earned_at: "2026-09-20" }];
+    renderPanel();
+    const tile = await screen.findByRole("button", { name: "Epic Starter, bronze" });
+    expect(within(tile).getByRole("img")).toHaveAttribute("src", "/badges-v2/starpaths.webp");
+    fireEvent.click(tile);
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("img")).toHaveClass("h-40", "w-40");
+    expect(within(dialog).getByRole("img")).toHaveAttribute("src", "/badges-v2/starpaths.webp");
   });
 });

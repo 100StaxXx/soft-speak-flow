@@ -199,7 +199,7 @@ describe("EvolutionMomentsPanel", () => {
     renderPanel();
 
     expect(
-      await screen.findByRole("button", { name: /stage 5 evolution/i }),
+      await screen.findByRole("button", { name: /form 2 .* initiate evolution/i }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Watch")).not.toBeInTheDocument();
     expect(
@@ -212,7 +212,7 @@ describe("EvolutionMomentsPanel", () => {
     renderPanel();
 
     const momentCard = await screen.findByRole("button", {
-      name: /stage 5 evolution/i,
+      name: /form 2 .* initiate evolution/i,
     });
     const thumbnail = momentCard.querySelector("img");
 
@@ -224,11 +224,11 @@ describe("EvolutionMomentsPanel", () => {
     renderPanel();
 
     fireEvent.click(
-      await screen.findByRole("button", { name: /stage 5 evolution/i }),
+      await screen.findByRole("button", { name: /form 2 .* initiate evolution/i }),
     );
 
     expect(
-      await screen.findByRole("dialog", { name: /stage 5 evolution/i }),
+      await screen.findByRole("dialog", { name: /form 2 .* initiate evolution/i }),
     ).toBeInTheDocument();
     const video = await screen.findByTestId("evolution-moment-video");
     expect(video).toHaveAttribute("src", "https://example.com/stage-5.mp4");
@@ -241,7 +241,7 @@ describe("EvolutionMomentsPanel", () => {
     renderPanel();
 
     const momentCard = await screen.findByRole("button", {
-      name: /stage 5 evolution/i,
+      name: /form 2 .* initiate evolution/i,
     });
     fireEvent.click(momentCard);
 
@@ -252,7 +252,7 @@ describe("EvolutionMomentsPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /close/i }));
     await waitFor(() => {
       expect(
-        screen.queryByRole("dialog", { name: /stage 5 evolution/i }),
+        screen.queryByRole("dialog", { name: /form 2 .* initiate evolution/i }),
       ).not.toBeInTheDocument();
     });
 
@@ -272,7 +272,7 @@ describe("EvolutionMomentsPanel", () => {
     renderPanel();
 
     const generatingCard = await screen.findByRole("button", {
-      name: /stage 13 evolution generating/i,
+      name: /form 3 .* awakened evolution generating/i,
     });
     expect(generatingCard).toBeDisabled();
     expect(screen.queryByText("Generating")).not.toBeInTheDocument();
@@ -290,12 +290,12 @@ describe("EvolutionMomentsPanel", () => {
 
     expect(
       await screen.findByRole("button", {
-        name: /share evolution for stage 5/i,
+        name: /share evolution for form 2 .* initiate/i,
       }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", {
-        name: /share evolution for stage 13/i,
+        name: /share evolution for form 3 .* awakened/i,
       }),
     ).not.toBeInTheDocument();
   });
@@ -305,7 +305,7 @@ describe("EvolutionMomentsPanel", () => {
 
     fireEvent.click(
       await screen.findByRole("button", {
-        name: /share evolution for stage 5/i,
+        name: /share evolution for form 2 .* initiate/i,
       }),
     );
 
@@ -324,7 +324,7 @@ describe("EvolutionMomentsPanel", () => {
         width: 1080,
         height: 1920,
       }),
-      title: "Stage 5 Evolution",
+      title: "Form 2 • Initiate Evolution",
       text: "My companion just evolved. #Cosmiq",
       dialogTitle: "Share evolution video",
     });
@@ -342,7 +342,7 @@ describe("EvolutionMomentsPanel", () => {
     renderPanel();
 
     expect(
-      await screen.findByRole("button", { name: /stage 1 evolution/i }),
+      await screen.findByRole("button", { name: /form 1 .* hatchling evolution/i }),
     ).toBeInTheDocument();
   });
 
@@ -353,7 +353,7 @@ describe("EvolutionMomentsPanel", () => {
     renderPanel();
 
     fireEvent.click(
-      await screen.findByRole("button", { name: /stage 1 evolution/i }),
+      await screen.findByRole("button", { name: /form 1 .* hatchling evolution/i }),
     );
     expect(await screen.findByTestId("evolution-moment-video")).toHaveAttribute(
       "src",
@@ -398,17 +398,17 @@ describe("EvolutionMomentsPanel", () => {
 
     expect(await screen.findByText("No Evolutions Yet")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /stage 10 evolution/i }),
+      screen.queryByRole("button", { name: /level 10 evolution/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /stage 11 evolution/i }),
+      screen.queryByRole("button", { name: /level 11 evolution/i }),
     ).not.toBeInTheDocument();
   });
 
   it("filters visual-boundary stages in the queries before limiting", async () => {
     renderPanel();
 
-    await screen.findByRole("button", { name: /stage 5 evolution/i });
+    await screen.findByRole("button", { name: /form 2 .* initiate evolution/i });
 
     const evolutionStageFilter = mocks.queryFilters.find(
       (filter) =>
@@ -431,7 +431,7 @@ describe("EvolutionMomentsPanel", () => {
     renderPanel();
 
     fireEvent.click(
-      await screen.findByRole("button", { name: /stage 5 evolution/i }),
+      await screen.findByRole("button", { name: /form 2 .* initiate evolution/i }),
     );
     fireEvent.error(await screen.findByTestId("evolution-moment-video"));
 

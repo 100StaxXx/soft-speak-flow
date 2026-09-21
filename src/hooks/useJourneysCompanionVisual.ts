@@ -13,7 +13,6 @@ import { resolveCompanionDisplayLabel } from "@/lib/companionDisplayLabel";
 import { isAiGeneratedCompanion } from "@/lib/companionPredicates";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { useCompanion } from "./useCompanion";
-import { useCompanionCareSignals } from "./useCompanionCareSignals";
 import { useCompanionHealth } from "./useCompanionHealth";
 
 const COMPANION_PLACEHOLDER = "/placeholder-companion.svg";
@@ -33,7 +32,6 @@ export const useJourneysCompanionVisual = () => {
     canEvolve,
   } = useCompanion();
   const { health } = useCompanionHealth();
-  const { care } = useCompanionCareSignals();
   const { pendingEvolutionReveal } = useEvolution();
 
   const matchingPendingEvolutionReveal = useMemo(
@@ -58,25 +56,9 @@ export const useJourneysCompanionVisual = () => {
     [canEvolve, companion, matchingPendingEvolutionReveal, nextEvolutionXP, progressToNext],
   );
 
-  const isDormant = care?.dormancy?.isDormant ?? false;
-
   const imageUrl = useMemo(() => {
     if (!displayCompanion) {
       return health.imageUrl ?? companion?.current_image_url ?? COMPANION_PLACEHOLDER;
-    }
-
-    if (isDormant) {
-      return resolveCompanionVisualAssetUrl(displayCompanion, "dormant") ?? COMPANION_PLACEHOLDER;
-    }
-    if (
-      health.isNeglected
-      && health.neglectedImageUrl
-      && (typeof displayCompanion.current_stage !== "number" || displayCompanion.current_stage > 0)
-    ) {
-      return health.neglectedImageUrl;
-    }
-    if (health.isNeglected) {
-      return resolveCompanionVisualAssetUrl(displayCompanion, "neglected") ?? COMPANION_PLACEHOLDER;
     }
 
     return resolveCompanionVisualAssetUrl(displayCompanion, "normal") ?? COMPANION_PLACEHOLDER;
@@ -84,9 +66,6 @@ export const useJourneysCompanionVisual = () => {
     companion?.current_image_url,
     displayCompanion,
     health.imageUrl,
-    health.isNeglected,
-    health.neglectedImageUrl,
-    isDormant,
   ]);
 
   const focalPoint = useMemo(() => {
@@ -94,28 +73,6 @@ export const useJourneysCompanionVisual = () => {
       return {
         x: health.imageFocalX ?? companion?.current_image_focal_x ?? null,
         y: health.imageFocalY ?? companion?.current_image_focal_y ?? null,
-      };
-    }
-
-    if (isDormant) {
-      return {
-        x: displayCompanion.dormant_image_focal_x ?? displayCompanion.current_image_focal_x ?? null,
-        y: displayCompanion.dormant_image_focal_y ?? displayCompanion.current_image_focal_y ?? null,
-      };
-    }
-
-    if (health.isNeglected) {
-      return {
-        x:
-          health.neglectedImageFocalX
-          ?? displayCompanion.neglected_image_focal_x
-          ?? displayCompanion.current_image_focal_x
-          ?? null,
-        y:
-          health.neglectedImageFocalY
-          ?? displayCompanion.neglected_image_focal_y
-          ?? displayCompanion.current_image_focal_y
-          ?? null,
       };
     }
 
@@ -129,10 +86,6 @@ export const useJourneysCompanionVisual = () => {
     displayCompanion,
     health.imageFocalX,
     health.imageFocalY,
-    health.isNeglected,
-    health.neglectedImageFocalX,
-    health.neglectedImageFocalY,
-    isDormant,
   ]);
 
   const companionLabel = useMemo(() => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Mail, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import confetti from "canvas-confetti";
@@ -20,6 +20,7 @@ export const PostcardUnlockCelebration = ({
   onDismiss,
 }: PostcardUnlockCelebrationProps) => {
   const [stage, setStage] = useState<"entering" | "main" | "exiting">("entering");
+  const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
     if (show) {
@@ -28,6 +29,11 @@ export const PostcardUnlockCelebration = ({
       // Play sound and haptics
       playMissionComplete();
       Haptics.impact({ style: ImpactStyle.Heavy }).catch(() => {});
+
+      if (shouldReduceMotion) {
+        setStage("main");
+        return;
+      }
 
       // Trigger confetti with amber/gold colors
       const colors = ["#F59E0B", "#F97316", "#FBBF24", "#FCD34D", "#D97706"];
@@ -60,9 +66,13 @@ export const PostcardUnlockCelebration = ({
       // Transition to main stage
       setTimeout(() => setStage("main"), 300);
     }
-  }, [show]);
+  }, [shouldReduceMotion, show]);
 
   const handleDismiss = () => {
+    if (shouldReduceMotion) {
+      onDismiss();
+      return;
+    }
     setStage("exiting");
     setTimeout(() => {
       onDismiss();
@@ -74,20 +84,20 @@ export const PostcardUnlockCelebration = ({
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0 }}
+        initial={shouldReduceMotion ? false : { opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
         onClick={handleDismiss}
       >
         <motion.div
-          initial={{ scale: 0.8, rotateY: 180, opacity: 0 }}
+          initial={shouldReduceMotion ? false : { scale: 0.8, rotateY: 180, opacity: 0 }}
           animate={
             stage === "exiting"
               ? { scale: 0.8, opacity: 0, y: 20 }
               : { scale: 1, rotateY: 0, opacity: 1 }
           }
-          transition={{
+          transition={shouldReduceMotion ? { duration: 0 } : {
             type: "spring",
             damping: 20,
             stiffness: 300,
@@ -104,9 +114,9 @@ export const PostcardUnlockCelebration = ({
           <div className="relative z-10 flex flex-col items-center text-center space-y-4">
             {/* Postcard Icon with animation */}
             <motion.div
-              initial={{ scale: 0 }}
+              initial={shouldReduceMotion ? false : { scale: 0 }}
               animate={{ scale: 1 }}
-              transition={{ delay: 0.3, type: "spring", stiffness: 500 }}
+              transition={shouldReduceMotion ? { duration: 0 } : { delay: 0.3, type: "spring", stiffness: 500 }}
               className="relative"
             >
               <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
@@ -114,15 +124,15 @@ export const PostcardUnlockCelebration = ({
               </div>
               {/* Sparkle decorations */}
               <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                animate={shouldReduceMotion ? undefined : { rotate: 360 }}
+                transition={shouldReduceMotion ? undefined : { duration: 3, repeat: Infinity, ease: "linear" }}
                 className="absolute -top-2 -right-2"
               >
                 <Sparkles className="w-6 h-6 text-amber-400" />
               </motion.div>
               <motion.div
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
+                animate={shouldReduceMotion ? undefined : { scale: [1, 1.2, 1] }}
+                transition={shouldReduceMotion ? undefined : { duration: 2, repeat: Infinity }}
                 className="absolute -bottom-1 -left-2"
               >
                 <Sparkles className="w-5 h-5 text-yellow-400" />
@@ -131,9 +141,9 @@ export const PostcardUnlockCelebration = ({
 
             {/* Title */}
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
+              initial={shouldReduceMotion ? false : { opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
+              transition={shouldReduceMotion ? { duration: 0 } : { delay: 0.4 }}
             >
               <h2 className="text-xl font-bold bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-500 bg-clip-text text-transparent">
                 Postcard Unlocked!
@@ -148,9 +158,9 @@ export const PostcardUnlockCelebration = ({
             {/* Milestone info */}
             {milestoneTitle && (
               <motion.p
-                initial={{ opacity: 0 }}
+                initial={shouldReduceMotion ? false : { opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
+                transition={shouldReduceMotion ? { duration: 0 } : { delay: 0.5 }}
                 className="text-sm text-foreground/80 font-medium"
               >
                 {milestoneTitle}
@@ -159,9 +169,9 @@ export const PostcardUnlockCelebration = ({
 
             {/* Companion message */}
             <motion.p
-              initial={{ opacity: 0 }}
+              initial={shouldReduceMotion ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.6 }}
+              transition={shouldReduceMotion ? { duration: 0 } : { delay: 0.6 }}
               className="text-xs text-muted-foreground italic"
             >
               Your companion is sending you a cosmic memory...
@@ -169,9 +179,9 @@ export const PostcardUnlockCelebration = ({
 
             {/* Continue button */}
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
+              initial={shouldReduceMotion ? false : { opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7 }}
+              transition={shouldReduceMotion ? { duration: 0 } : { delay: 0.7 }}
               className="pt-2"
             >
               <Button
@@ -186,7 +196,8 @@ export const PostcardUnlockCelebration = ({
           {/* Close button */}
           <button
             onClick={handleDismiss}
-            className="absolute top-3 right-3 p-1 rounded-full hover:bg-white/10 transition-colors"
+            className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+            aria-label="Close postcard celebration"
           >
             <X className="w-4 h-4 text-muted-foreground" />
           </button>

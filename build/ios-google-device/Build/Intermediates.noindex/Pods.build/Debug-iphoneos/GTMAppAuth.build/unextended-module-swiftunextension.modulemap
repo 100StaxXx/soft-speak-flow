@@ -1,4 +1,0 @@
-
-module GTMAppAuth.__Swift {
-  exclude header "GTMAppAuth-Swift.h"
-}

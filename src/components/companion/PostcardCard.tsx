@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { MapPin, Calendar, BookOpen, Sparkles, Crown } from "lucide-react";
 import { CompanionPostcard } from "@/hooks/useCompanionPostcards";
 import { format } from "date-fns";
@@ -37,10 +37,10 @@ const milestoneColors: Record<number, string> = {
 };
 
 export const PostcardCard = ({ postcard, onClick }: PostcardCardProps) => {
+  const shouldReduceMotion = useReducedMotion();
   const storyType = 'story_type_slug' in postcard 
     ? (postcard.story_type_slug as StoryTypeSlug | undefined) 
     : undefined;
-  const hasNarrativeContent = !!(postcard.chapter_title || postcard.story_content);
   const isFinale = postcard.is_finale;
   
   // Use special finale styling, story type colors, or fallback to milestone colors
@@ -55,8 +55,8 @@ export const PostcardCard = ({ postcard, onClick }: PostcardCardProps) => {
   return (
     <motion.button
       onClick={onClick}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
+      whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+      whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
       className={cn(
         "relative w-full aspect-[4/3] rounded-xl overflow-hidden",
         "bg-gradient-to-br border",
@@ -109,11 +109,6 @@ export const PostcardCard = ({ postcard, onClick }: PostcardCardProps) => {
           </span>
         </div>
       </div>
-
-      {/* Content indicator */}
-      {hasNarrativeContent && !isFinale && (
-        <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-primary animate-pulse" />
-      )}
 
       {/* Content */}
       <div className="absolute bottom-0 left-0 right-0 p-3">

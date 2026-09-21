@@ -104,7 +104,10 @@ const JoinEpic = () => {
             <p className="text-muted-foreground mb-6">
               Sign in to join this shared epic and embark on the journey with the community!
             </p>
-            <Button onClick={() => navigate("/auth")} className="w-full">
+            <Button
+              onClick={() => navigate(`/auth?returnTo=${encodeURIComponent(`/join/${code ?? ""}`)}`)}
+              className="w-full"
+            >
               Sign In to Join
             </Button>
           </Card>

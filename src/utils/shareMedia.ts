@@ -227,11 +227,10 @@ const normalizeShareableMedia = (media: ShareableRenderedMedia) => {
     };
   }
 
-  return {
-    uri: media.uri,
-    filename: media.filename,
-    mimeType: media.mimeType,
-  };
+  if ("uri" in media) {
+    return { uri: media.uri, filename: media.filename, mimeType: media.mimeType };
+  }
+  throw new Error("This file cannot be shared in the current environment.");
 };
 
 const canWebShareFiles = (files: File[]): boolean =>

@@ -298,7 +298,7 @@ export const CompanionPersonalization = ({
                                   {getCompanionEggLabel(element.id)}
                                 </div>
                                 <div className="text-xs uppercase tracking-[0.2em] text-white/55">
-                                  Stage 0 • Egg
+                                  Form 0 • Egg
                                 </div>
                               </div>
                             </div>
@@ -361,8 +361,8 @@ export const CompanionPersonalization = ({
                     <p className="text-sm text-foreground/85">{selectedElementMeta.summary}</p>
                     <p className="text-xs text-muted-foreground">
                       {isResetMode
-                        ? "Stage 0 art stays shared across the roster. Your reset locks both the element and species now, then reveals that species when the shell cracks."
-                        : "Stage 0 is shared across the roster. The egg locks your element now, and you&apos;ll choose the creature form when it hatches."}
+                        ? "Form 0 art stays shared across the roster. Your reset locks both the element and species now, then reveals that species when the shell cracks."
+                        : "Form 0 is shared across the roster. The egg locks your element now, and you&apos;ll choose the creature form when it hatches."}
                     </p>
                     {isResetMode ? (
                       <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-left">

@@ -1,13 +1,7 @@
-import { CompanionDisplay } from "@/components/CompanionDisplay";
 import { CompanionErrorBoundary } from "@/components/CompanionErrorBoundary";
-import { NextEvolutionPreview } from "@/components/NextEvolutionPreview";
-import { XPBreakdown } from "@/components/XPBreakdown";
-import { DailyMissions } from "@/components/DailyMissions";
 import { PageTransition } from "@/components/PageTransition";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, BookOpen, Package, Sparkles, Timer, Settings } from "lucide-react";
-import { CollectionTab } from "@/components/companion/CollectionTab";
-import { FocusTab } from "@/components/companion/FocusTab";
 import { MemoryWhisper } from "@/components/companion/MemoryWhisper";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useAuth } from "@/hooks/useAuth";
@@ -47,6 +41,32 @@ import {
 } from "@/hooks/useCompanionLayoutMode";
 import { deriveCompanionDisplayState } from "@/lib/companionDisplayState";
 import { cn } from "@/lib/utils";
+
+const LazyCompanionDisplay = lazy(() =>
+  import("@/components/CompanionDisplay").then((module) => ({
+    default: module.CompanionDisplay,
+  })),
+);
+const LazyNextEvolutionPreview = lazy(() =>
+  import("@/components/NextEvolutionPreview").then((module) => ({
+    default: module.NextEvolutionPreview,
+  })),
+);
+const LazyXPBreakdown = lazy(() =>
+  import("@/components/XPBreakdown").then((module) => ({
+    default: module.XPBreakdown,
+  })),
+);
+const LazyFocusTab = lazy(() =>
+  import("@/components/companion/FocusTab").then((module) => ({
+    default: module.FocusTab,
+  })),
+);
+const LazyCollectionTab = lazy(() =>
+  import("@/components/companion/CollectionTab").then((module) => ({
+    default: module.CollectionTab,
+  })),
+);
 
 type CompanionTab = "overview" | "focus" | "stories" | "collection";
 
@@ -101,17 +121,16 @@ const OverviewTab = memo(({
 
         <div className="grid gap-6 xl:grid-cols-2">
           <div data-tour="companion-progress-area">
-            <NextEvolutionPreview
+            <LazyNextEvolutionPreview
               currentXP={companion?.current_xp || 0}
               nextEvolutionXP={nextEvolutionXP || 0}
               currentStage={companion?.current_stage || 0}
               progressPercent={progressToNext}
             />
           </div>
-          <XPBreakdown />
+          <LazyXPBreakdown />
         </div>
 
-        <DailyMissions />
       </div>
     );
   }
@@ -121,11 +140,11 @@ const OverviewTab = memo(({
       <MemoryWhisper chance={0.2} className="px-2" />
 
       <ParallaxCard offset={30}>
-        <CompanionDisplay isVisible={isActive} />
+        <LazyCompanionDisplay isVisible={isActive} />
       </ParallaxCard>
       <ParallaxCard offset={22}>
         <div data-tour="companion-progress-area">
-          <NextEvolutionPreview
+          <LazyNextEvolutionPreview
             currentXP={companion?.current_xp || 0}
             nextEvolutionXP={nextEvolutionXP || 0}
             currentStage={companion?.current_stage || 0}
@@ -133,11 +152,8 @@ const OverviewTab = memo(({
           />
         </div>
       </ParallaxCard>
-      <ParallaxCard offset={16}>
-        <DailyMissions />
-      </ParallaxCard>
       <ParallaxCard offset={12}>
-        <XPBreakdown />
+        <LazyXPBreakdown />
       </ParallaxCard>
     </div>
   );
@@ -435,13 +451,15 @@ const Companion = () => {
             className={cn("data-[state=inactive]:hidden", contentClassName)}
           >
             {mountedTabs.overview && (
-              <OverviewTab
-                companion={displayCompanion}
-                nextEvolutionXP={displayNextEvolutionXP}
-                progressToNext={displayProgressToNext}
-                layoutMode={layoutMode}
-                isActive={activeTab === "overview"}
-              />
+              <Suspense fallback={<OverviewSkeleton />}>
+                <OverviewTab
+                  companion={displayCompanion}
+                  nextEvolutionXP={displayNextEvolutionXP}
+                  progressToNext={displayProgressToNext}
+                  layoutMode={layoutMode}
+                  isActive={activeTab === "overview"}
+                />
+              </Suspense>
             )}
           </TabsContent>
 
@@ -450,7 +468,11 @@ const Companion = () => {
             forceMount
             className={cn("data-[state=inactive]:hidden", contentClassName)}
           >
-            {mountedTabs.focus && <FocusTab layoutMode={layoutMode} />}
+            {mountedTabs.focus && (
+              <Suspense fallback={<TabLoadingFallback />}>
+                <LazyFocusTab layoutMode={layoutMode} />
+              </Suspense>
+            )}
           </TabsContent>
 
           <TabsContent
@@ -470,7 +492,11 @@ const Companion = () => {
             forceMount
             className={cn("data-[state=inactive]:hidden", contentClassName)}
           >
-            {mountedTabs.collection && <CollectionTab layoutMode={layoutMode} />}
+            {mountedTabs.collection && (
+              <Suspense fallback={<TabLoadingFallback />}>
+                <LazyCollectionTab layoutMode={layoutMode} />
+              </Suspense>
+            )}
           </TabsContent>
         </motion.div>
       )}
@@ -547,7 +573,9 @@ const Companion = () => {
                     Keep the creature visible while you track growth, stories, and rewards.
                   </p>
                 </div>
-                <CompanionDisplay layoutMode={layoutMode} />
+                <Suspense fallback={<OverviewSkeleton />}>
+                  <LazyCompanionDisplay layoutMode={layoutMode} />
+                </Suspense>
               </div>
             </aside>
 

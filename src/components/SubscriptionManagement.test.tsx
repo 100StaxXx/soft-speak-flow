@@ -32,7 +32,25 @@ vi.mock("@/hooks/useAppleSubscription", () => ({
     loading: false,
     manageLoading: false,
     isAvailable: true,
-    products: [],
+    products: [
+      {
+        identifier: "cosmiq_premium_monthly",
+        displayName: "Monthly",
+        description: "Monthly plan",
+        price: 9.99,
+        displayPrice: "$9.99",
+        type: "autoRenewable",
+      },
+      {
+        identifier: "cosmiq_premium_yearly",
+        displayName: "Yearly",
+        description: "Yearly plan",
+        price: 99.99,
+        displayPrice: "$99.99",
+        pricePerMonthString: "$8.33",
+        type: "autoRenewable",
+      },
+    ],
     productsLoading: false,
     productError: null,
     reloadProducts: appleSubscriptionMocks.reloadProducts,
@@ -54,7 +72,7 @@ describe("SubscriptionManagement", () => {
 
     expect(screen.getByText("Unlock unlimited companion chat, quests, and offline access")).toBeInTheDocument();
     expect(screen.getByText("Unlimited companion chat")).toBeInTheDocument();
-    expect(screen.getByText("100+ levels and 12+ evolutions")).toBeInTheDocument();
+    expect(screen.getByText("100 levels and 7 companion forms")).toBeInTheDocument();
     expect(screen.getByText("Unlimited Quests & Epics")).toBeInTheDocument();
     expect(screen.getByText("Offline access to downloaded content")).toBeInTheDocument();
     expect(

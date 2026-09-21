@@ -16,7 +16,9 @@ describe("CompanionImage", () => {
     const image = screen.getByRole("img", { name: "Storm Egg" });
     expect(image).toHaveAttribute("data-companion-image-focal-source", "manifest");
     expect(image).toHaveAttribute("data-companion-image-fit", "cover");
-    expect(image).toHaveStyle({ objectPosition: "50% 33.62588070175439%" });
+    // A square source in a square container has no crop range, so the manifest
+    // focal point correctly resolves to the visual center.
+    expect(image).toHaveStyle({ objectPosition: "50% 50%" });
   });
 
   it("renders preset portraits in portrait mode with contain framing", () => {

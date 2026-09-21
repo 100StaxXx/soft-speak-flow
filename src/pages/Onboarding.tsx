@@ -24,6 +24,7 @@ import {
 import { getCompanionEggLabel, getCompanionPreset } from "@/config/companionCatalog";
 import { getStoredCompanionCustomName } from "@/lib/companionName";
 import { trackOnboardingTutorialEvent } from "@/utils/onboardingTutorialTelemetry";
+import { consumeAuthReturnPath } from "@/utils/authReturnPath";
 
 const ONBOARDING_GATE_STALL_MS = 12_000;
 
@@ -249,7 +250,7 @@ export default function Onboarding() {
     if (!onboardingGate.isEstablished) return;
     if (isShowingJourneyCinematic) return;
 
-    navigate("/journeys", { replace: true });
+    navigate(consumeAuthReturnPath() ?? "/journeys", { replace: true });
   }, [user, onboardingGateReady, onboardingGate.isEstablished, isShowingJourneyCinematic, navigate]);
 
   if (status === "loading" || status === "recovering") {

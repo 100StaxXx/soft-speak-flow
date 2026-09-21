@@ -4,6 +4,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { requestJourneyPathGeneration } from "@/utils/journeyPathCache";
 import { toast } from "@/components/ui/sonner";
 import { useCallback, useState } from "react";
+import {
+  parseFunctionInvokeError,
+  toUserFacingFunctionError,
+} from "@/utils/supabaseFunctionErrors";
 
 export interface CompanionPostcard {
   id: string;
@@ -60,7 +64,7 @@ export const useCompanionPostcards = () => {
     setPostcardJustUnlocked(null);
   }, []);
 
-  const { data: postcards, isLoading, error } = useQuery({
+  const { data: postcards, isLoading, error, refetch } = useQuery({
     queryKey: getCompanionPostcardsQueryKey(user?.id),
     queryFn: async () => {
       if (!user?.id) return [];
@@ -76,6 +80,7 @@ export const useCompanionPostcards = () => {
       milestonePercent,
       companionData,
       milestoneTitle,
+      chapterNumber,
     }: {
       companionId: string;
       epicId: string;
@@ -88,6 +93,7 @@ export const useCompanionPostcards = () => {
         fur_color?: string;
       };
       milestoneTitle?: string;
+      chapterNumber?: number;
     }) => {
       if (!user?.id) throw new Error("Not authenticated");
 
@@ -97,6 +103,7 @@ export const useCompanionPostcards = () => {
           epicId,
           milestonePercent,
           companionData,
+          chapterNumber,
         },
       });
 
@@ -106,8 +113,8 @@ export const useCompanionPostcards = () => {
       return { ...data, milestoneTitle };
     },
     onSuccess: async (data) => {
-      if (!data?.existing) {
-        queryClient.invalidateQueries({ queryKey: getCompanionPostcardsQueryKey(user?.id) });
+      await queryClient.invalidateQueries({ queryKey: getCompanionPostcardsQueryKey(user?.id) });
+      if (!data?.cached) {
         
         // Set unlock info for celebration animation
         setPostcardJustUnlocked({
@@ -134,9 +141,18 @@ export const useCompanionPostcards = () => {
         }
       }
     },
-    onError: (error) => {
+    onError: async (error, variables) => {
       console.error("Failed to generate postcard:", error);
-      // Silent fail - don't interrupt user flow
+      const parsed = await parseFunctionInvokeError(error);
+      toast.error("Postcard generation paused", {
+        description: toUserFacingFunctionError(parsed, {
+          action: "create this postcard",
+        }),
+        action: {
+          label: "Try again",
+          onClick: () => generatePostcard.mutate(variables),
+        },
+      });
     },
   });
 
@@ -200,7 +216,7 @@ export const useCompanionPostcards = () => {
       // Fetch the milestone to check if it's a postcard milestone
       const { data: milestone, error } = await supabase
         .from("epic_milestones")
-        .select("id, title, milestone_percent, is_postcard_milestone")
+        .select("id, title, milestone_percent, is_postcard_milestone, chapter_number")
         .eq("id", milestoneId)
         .maybeSingle();
 
@@ -237,6 +253,7 @@ export const useCompanionPostcards = () => {
         milestonePercent: milestone.milestone_percent,
         companionData,
         milestoneTitle: milestone.title,
+        chapterNumber: milestone.chapter_number ?? undefined,
       });
     },
     [user?.id, postcards, generatePostcard]
@@ -246,6 +263,7 @@ export const useCompanionPostcards = () => {
     postcards: postcards || [],
     isLoading,
     error,
+    refetch,
     generatePostcard,
     checkAndGeneratePostcard,
     checkMilestoneForPostcard,
