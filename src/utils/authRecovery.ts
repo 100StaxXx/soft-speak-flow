@@ -1,4 +1,8 @@
-export const AUTH_REQUEST_TIMEOUT_MS = 15_000;
+// Auth responses can take longer during a cold start or transient Supabase
+// congestion. Apple has already completed its credential flow by this point,
+// so aborting at 15 seconds strands a valid sign-in. Keep this bound to avoid
+// an indefinite wait, but allow enough time for the auth exchange to finish.
+export const AUTH_REQUEST_TIMEOUT_MS = 60_000;
 export const AUTH_SESSION_CHECK_TIMEOUT_MS = 35_000;
 
 /** A waiting SDK queue must not keep the app's bootstrap promise alive forever. */
