@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Browser } from '@capacitor/browser';
 import { CalendarDays, Link2, Unlink2, RefreshCcw, EyeOff, Eye } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,7 @@ import {
 } from '@/hooks/useCalendarIntegrations';
 import { getCalendarOAuthRedirectUri, getCalendarOAuthSource } from '@/utils/calendarOAuthRedirect';
 import { parseCalendarOAuthUrl } from '@/utils/calendarOAuthUrl';
+import { openCalendarOAuthBrowser } from '@/utils/openCalendarOAuthBrowser';
 import { CalendarLinkStatus } from '@/components/calendar/CalendarLinkStatus';
 
 const PROVIDERS: Array<{ key: CalendarProvider; label: string; web: boolean; ios: boolean }> = [
@@ -59,6 +59,7 @@ export function CalendarIntegrationsSettings() {
     Partial<Record<CalendarProvider, Array<{ id: string; name: string }>>>
   >({});
   const [connectingProvider, setConnectingProvider] = useState<CalendarProvider | null>(null);
+  const connectionAttemptInFlight = useRef(false);
 
   const canUseApple = isNativeIOS();
   const hasConnectedProviders = connections.length > 0;
@@ -217,6 +218,8 @@ export function CalendarIntegrationsSettings() {
   }, [clearOauthParams, completeOAuthConnection, toast]);
 
   const handleConnect = async (provider: CalendarProvider) => {
+    if (connectionAttemptInFlight.current) return;
+    connectionAttemptInFlight.current = true;
     try {
       setConnectingProvider(provider);
 
@@ -236,7 +239,7 @@ export function CalendarIntegrationsSettings() {
       });
       const url = parseCalendarOAuthUrl(responseUrl);
       if (source === 'native') {
-        await Browser.open({ url });
+        await openCalendarOAuthBrowser(url);
         return;
       }
       window.location.href = url;
@@ -247,6 +250,7 @@ export function CalendarIntegrationsSettings() {
         variant: 'destructive',
       });
     } finally {
+      connectionAttemptInFlight.current = false;
       setConnectingProvider(null);
     }
   };
@@ -419,7 +423,7 @@ export function CalendarIntegrationsSettings() {
                   size="sm"
                   variant="outline"
                   disabled={
-                    connectingProvider === provider.key
+                    connectingProvider !== null
                     || (provider.key === 'apple' && (!canUseApple || !canConnectAppleNative))
                   }
                   onClick={() => handleConnect(provider.key)}

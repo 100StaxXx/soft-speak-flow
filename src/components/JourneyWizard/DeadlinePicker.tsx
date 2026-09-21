@@ -1,11 +1,10 @@
 import { useState, type CSSProperties } from 'react';
-import { format, addDays, addWeeks, addMonths, addYears, differenceInDays } from 'date-fns';
+import { format, addDays, addWeeks, addMonths, addYears, differenceInCalendarDays, startOfDay } from 'date-fns';
 import { Calendar as CalendarIcon, Clock, Zap } from 'lucide-react';
-import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { usePlannerPathfinderAppearance } from '@/hooks/usePlannerPathfinderAppearance';
+import { usePlannerSurface } from '@/components/companion/usePlannerSurface';
 import { cn } from '@/lib/utils';
 
 interface DeadlinePickerProps {
@@ -25,12 +24,12 @@ const quickOptions = [
 
 export function DeadlinePicker({ value, onChange, minDate, companionFrostedThemeStyle }: DeadlinePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const { themeModeClassName } = usePlannerPathfinderAppearance();
+  const { themeModeClassName, plannerPathfinderTheme } = usePlannerSurface();
   
-  const effectiveMinDate = minDate || addDays(new Date(), 1);
+  const effectiveMinDate = startOfDay(minDate || addDays(new Date(), 1));
   
   const daysUntilDeadline = value 
-    ? differenceInDays(value, new Date())
+    ? differenceInCalendarDays(value, new Date())
     : null;
 
   return (
@@ -48,7 +47,8 @@ export function DeadlinePicker({ value, onChange, minDate, companionFrostedTheme
               type="button"
               variant={isSelected ? 'default' : 'outline'}
               size="sm"
-              onClick={() => onChange(optionDate)}
+              onClick={() => onChange(startOfDay(optionDate))}
+              disabled={startOfDay(optionDate) < effectiveMinDate}
               className={cn(
                 "min-w-[80px] flex-1",
                 isSelected ? plannerPathfinderTheme.primaryButton : plannerPathfinderTheme.outlineButton,
@@ -73,11 +73,11 @@ export function DeadlinePicker({ value, onChange, minDate, companionFrostedTheme
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {value ? (
-              <span className="flex items-center gap-2">
-                {format(value, 'EEEE, MMMM d, yyyy')}
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                {format(value, 'MMM d, yyyy')}
                 {daysUntilDeadline && (
                   <span className="text-xs text-muted-foreground">
-                    ({daysUntilDeadline} days)
+                    ({daysUntilDeadline} {daysUntilDeadline === 1 ? 'day' : 'days'})
                   </span>
                 )}
               </span>
@@ -118,7 +118,7 @@ export function DeadlinePicker({ value, onChange, minDate, companionFrostedTheme
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Clock className="w-4 h-4 text-celestial-blue" />
           <span>
-            {daysUntilDeadline} days until deadline
+            {daysUntilDeadline} {daysUntilDeadline === 1 ? 'day' : 'days'} until deadline
             {daysUntilDeadline <= 14 && (
               <span className="ml-2 text-amber-500 font-medium">
                 <Zap className="w-3 h-3 inline mr-1" />

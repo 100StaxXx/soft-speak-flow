@@ -1,7 +1,7 @@
 import { useState, useMemo, type CSSProperties } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Clock, RotateCcw, Sparkles } from 'lucide-react';
-import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
+import { usePlannerSurface } from '@/components/companion/usePlannerSurface';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +25,7 @@ export function RitualEditor({
   className,
   companionFrostedThemeStyle,
 }: RitualEditorProps) {
+  const { plannerPathfinderTheme } = usePlannerSurface();
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newRitualTitle, setNewRitualTitle] = useState('');
 

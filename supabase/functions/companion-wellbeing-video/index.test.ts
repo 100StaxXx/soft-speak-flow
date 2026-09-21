@@ -2,7 +2,7 @@ import { assertEquals, assert } from "https://deno.land/std@0.168.0/testing/asse
 import { deps, handleWellbeingVideo, trustedSourceImage, resolveWellbeingSourceImage, hasWellbeingVideoAccess, retryMode } from "./index.ts";
 const BASE = "https://testproject.supabase.co";
 const IMAGE = `${BASE}/storage/v1/object/public/companion-images/user-1/one.png`;
-const body = { action: "prepare", companionId: "companion-1", category: "mind", stage: 5, sourceImageUrl: IMAGE, promptVersion: 3 };
+const body = { action: "prepare", companionId: "companion-1", category: "mind", stage: 5, sourceImageUrl: IMAGE, promptVersion: WELLBEING_PROMPT_VERSION };
 import { COMPANION_VIDEO_CATEGORIES, IDLE_VIDEO_CATEGORIES, WELLBEING_PROMPT_VERSION } from "../../../src/shared/companionWellbeing.ts";
 
 Deno.test("runtime smoke check is service-only and never touches jobs or paid generation", async () => {
@@ -156,7 +156,7 @@ Deno.test("status checks never enqueue, repeated prepare calls reuse one saved j
   await f.request(); await f.request();
   assertEquals(f.jobs.length, 1);
   assertEquals(f.calls.submit.length, 0);
-  assert(f.jobs[0].prompt.includes("moving reflection"));
+  assert(f.jobs[0].prompt.includes("Walk a short curious arc toward a reflection"));
   f.jobs[0].status = "succeeded"; f.jobs[0].video_url = "saved.mp4";
   assertEquals((await (await f.request()).json()).clip.video_url, "saved.mp4");
   assertEquals(f.jobs.length, 1);
@@ -278,8 +278,21 @@ Deno.test("new scene version replaces the lookup for backgroundless clips withou
   const response = await (await f.request()).json();
   assertEquals(f.jobs.length, 2);
   assertEquals(f.jobs[0].video_url, "old-backgroundless.mp4");
-  assertEquals(f.jobs[1].prompt_version, 3);
+  assertEquals(f.jobs[1].prompt_version, WELLBEING_PROMPT_VERSION);
   assertEquals(response.clip.status, "queued");
+});
+Deno.test("build 360 keeps its saved v3 clips while updated clients queue expressive v4 clips once", async () => {
+  const f = fixture(); await f.request();
+  f.jobs[0].prompt_version = 3;
+  f.jobs[0].status = "succeeded"; f.jobs[0].video_url = "minimal-v3.mp4";
+  const legacy = await f.request({ ...body, promptVersion: 3 });
+  assertEquals(legacy.status, 200);
+  assertEquals((await legacy.json()).clip.video_url, "minimal-v3.mp4");
+  await f.request(); await f.request();
+  assertEquals(f.jobs.length, 2);
+  assertEquals(f.jobs[0].video_url, "minimal-v3.mp4");
+  assertEquals(f.jobs[1].prompt_version, 4);
+  assert(f.jobs[1].prompt.includes("clearly visible full-body excursion"));
 });
 Deno.test("pending provider work is polled without a new generation and times out cleanly", async () => {
   const f = fixture(); await f.request(); f.calls.internal = true; await f.request({});

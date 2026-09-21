@@ -190,7 +190,7 @@ export async function handleWellbeingVideo(req: Request, d: Dependencies = deps)
     if (!body || typeof body.companionId !== "string" || !isCompanionVideoCategory(body.category)) return reply(400, { error: "Choose a valid companion moment." });
     // Older installed apps stop playback at 3s. Never hand them the new 5s clips.
     const promptVersion = body.promptVersion ?? 2;
-    if (promptVersion !== 2 && promptVersion !== WELLBEING_PROMPT_VERSION) return reply(400, { code: "upgrade_required", error: "Update Cosmiq for new companion moments." });
+    if (![2, 3, WELLBEING_PROMPT_VERSION].includes(promptVersion)) return reply(400, { code: "upgrade_required", error: "Update Cosmiq for new companion moments." });
     const { data: companion, error } = await db.from("user_companion")
       .select("id,current_stage,current_image_url,core_element,product_mode").eq("id", body.companionId).eq("user_id", auth.userId).maybeSingle();
     if (error) throw error;

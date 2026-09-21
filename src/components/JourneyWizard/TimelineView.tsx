@@ -1,7 +1,6 @@
 import { useMemo, type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
-import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
 import { 
   Flag, 
   Calendar, 
@@ -13,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 
 import { cn, formatDisplayLabel } from '@/lib/utils';
 import type { JourneyPhase, JourneyMilestone, JourneyRitual, FeasibilityAssessment, JourneyExecutionModel } from '@/hooks/useJourneySchedule';
-import { usePlannerPathfinderAppearance } from '@/hooks/usePlannerPathfinderAppearance';
+import { usePlannerSurface } from '@/components/companion/usePlannerSurface';
 import { PhaseCard } from './PhaseCard';
 
 interface TimelineViewProps {
@@ -45,7 +44,7 @@ export function TimelineView({
   executionModel = 'sequential',
   companionFrostedThemeStyle,
 }: TimelineViewProps) {
-  const { themeModeClassName } = usePlannerPathfinderAppearance();
+  const { themeModeClassName, plannerPathfinderTheme } = usePlannerSurface();
   const sortedPhases = useMemo(() => 
     [...phases].sort((a, b) => a.phaseOrder - b.phaseOrder),
     [phases]

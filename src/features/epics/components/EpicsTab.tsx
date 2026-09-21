@@ -52,6 +52,7 @@ export const EpicsTab = memo(function EpicsTab() {
     } catch (error) {
       // Error is already handled by the mutation's onError
       console.error('Failed to create campaign:', error);
+      throw error;
     }
   }, [createEpic]);
 

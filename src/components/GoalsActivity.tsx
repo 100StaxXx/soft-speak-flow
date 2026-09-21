@@ -8,7 +8,6 @@ import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { useProfile } from "@/hooks/useProfile";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { getEffectiveMissionDate } from "@/utils/timezone";
-import { ConnectedTasks } from "@/components/calendar/ConnectedTasks";
 
 /** Goal progress belongs here; Calendar remains focused on scheduling. */
 export function GoalsActivity() {
@@ -37,7 +36,6 @@ export function GoalsActivity() {
         onEditQuest={(task) => navigate(`/journeys?taskId=${encodeURIComponent(task.id)}`)}
         onDeleteQuest={(taskId) => { deleteInboxTask(taskId); }}
       />
-      <ConnectedTasks />
     </div>
   );
 }

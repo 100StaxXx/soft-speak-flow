@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { buildWellbeingVideoPrompt, WELLBEING_CATEGORIES, WELLBEING_OPTIONS, WELLBEING_VIDEO_SECONDS, IDLE_VIDEO_CATEGORIES, companionVideoSeconds } from "./companionWellbeing";
+import { buildWellbeingVideoPrompt, WELLBEING_CATEGORIES, WELLBEING_OPTIONS, WELLBEING_VIDEO_SECONDS, IDLE_VIDEO_CATEGORIES, companionVideoSeconds, WELLBEING_PROMPT_VERSION, COMPANION_VIDEO_CATEGORIES } from "./companionWellbeing";
 describe("Wellbeing prompts", () => {
+  it("versions expressive motion and requires a visible action between matching endpoints", () => {
+    expect(WELLBEING_PROMPT_VERSION).toBe(4);
+    for (const stage of [1,5,13,21,36,56,81]) for (const category of COMPANION_VIDEO_CATEGORIES) {
+      const prompt = buildWellbeingVideoPrompt(stage, category, "nature");
+      expect(prompt).toContain("clearly visible full-body excursion");
+      expect(prompt).toContain("Only the endpoints match");
+      expect(prompt).toContain("never simulate movement by stretching the still image");
+      expect(prompt).toContain("exact last frame");
+      expect(prompt).toContain("landscape, ground, horizon and scenery visible throughout");
+      expect(prompt).not.toMatch(/tiny|very subtle|without changing the stance|Small, gentle/);
+    }
+  });
   it("has a distinct action for every form and category", () => {
     const prompts = [1,5,13,21,36,56,81].flatMap((stage) => WELLBEING_CATEGORIES.map((category) => buildWellbeingVideoPrompt(stage, category, "storm")));
     expect(new Set(prompts).size).toBe(21);

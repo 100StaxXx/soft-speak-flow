@@ -29,6 +29,7 @@ describe("Goals activity", () => {
     expect(screen.getByText("Draft plan")).toBeInTheDocument();
     expect(mocks.chapter).not.toHaveBeenCalled();
     expect(screen.queryByText("Add chapter quest")).not.toBeInTheDocument();
+    expect(screen.queryByText("Connected tasks and reminders")).not.toBeInTheDocument();
   });
   it("keeps inbox completion working", () => {
     render(<GoalsActivity />); fireEvent.click(screen.getByRole("button", { name: "Mark quest complete" }));
@@ -43,4 +44,4 @@ describe("Goals activity", () => {
     expect(screen.queryByText("Draft plan")).not.toBeInTheDocument();
   });
 });
-vi.mock('@/components/calendar/ConnectedTasks', () => ({ ConnectedTasks: () => null }));
+vi.mock('@/components/calendar/ConnectedTasks', () => ({ ConnectedTasks: () => <div>Connected tasks and reminders</div> }));

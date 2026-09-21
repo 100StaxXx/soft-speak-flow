@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MessageSquare, Loader2, Sparkles } from 'lucide-react';
-import { plannerPathfinderTheme } from '@/components/companion/plannerPathfinderTheme';
+import { usePlannerSurface } from '@/components/companion/usePlannerSurface';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -17,6 +17,7 @@ const quickAdjustments = [
 ];
 
 export function AdjustmentInput({ onSubmit, isLoading }: AdjustmentInputProps) {
+  const { plannerPathfinderTheme } = usePlannerSurface();
   const [customInput, setCustomInput] = useState('');
   const [showCustom, setShowCustom] = useState(false);
 

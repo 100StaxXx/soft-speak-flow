@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CompanionWellbeing } from "./CompanionWellbeing";
+import { WELLBEING_PROMPT_VERSION } from "@/shared/companionWellbeing";
 const mocks = vi.hoisted(() => ({ invoke: vi.fn(), navigate: vi.fn(), user: { id: "user-1" } }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { functions: { invoke: mocks.invoke } } }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: mocks.user }) }));
@@ -16,7 +17,7 @@ describe("Optional Mind Body Soul", () => {
     expect(screen.queryByLabelText("Soul ideas")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Soul" }));
     await waitFor(() => expect(props.onPlay).toHaveBeenCalledTimes(1));
-    expect(mocks.invoke).toHaveBeenCalledWith("companion-wellbeing-video", { timeout: 20000, body: { action: "prepare", companionId: "one", category: "soul", stage: 5, sourceImageUrl: props.sourceImageUrl, promptVersion: 3 } });
+    expect(mocks.invoke).toHaveBeenCalledWith("companion-wellbeing-video", { timeout: 20000, body: { action: "prepare", companionId: "one", category: "soul", stage: 5, sourceImageUrl: props.sourceImageUrl, promptVersion: WELLBEING_PROMPT_VERSION } });
     fireEvent.click(screen.getByRole("button", { name: "Soul" }));
     expect(mocks.invoke).toHaveBeenCalledTimes(1);
     expect(props.onPlay).toHaveBeenCalledTimes(2);

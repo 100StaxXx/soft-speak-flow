@@ -1,6 +1,7 @@
 import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { differenceInCalendarDays } from 'date-fns';
 
 import { ACTIVE_CAMPAIGN_LIMIT_WARNING } from "@/features/epics/constants";
 import { getCompanionFrostedThemeStyle } from "@/lib/companionFrostedTheme";
@@ -139,7 +140,7 @@ vi.mock("@/utils/creationPopupPersistence", () => ({
 
 vi.mock("@/components/JourneyWizard/DeadlinePicker", () => ({
   DeadlinePicker: ({ onChange }: { onChange: (date: Date) => void }) => (
-    <button type="button" onClick={() => onChange(new Date("2026-10-01T00:00:00.000Z"))}>
+    <button type="button" onClick={() => onChange(new Date(2026, 9, 1))}>
       Pick Deadline
     </button>
   ),
@@ -291,12 +292,13 @@ describe("Pathfinder", () => {
     expect(screen.getByTestId("pathfinder-shell")).toBeInTheDocument();
     expectElementToIncludeClasses(
       screen.getByTestId("pathfinder-shell"),
-      "border-[hsl(var(--celestial-blue)_/_0.58)] text-foreground",
+      "agenda-quest-theme border-white/10 text-foreground font-body",
     );
     expect(screen.getByTestId("pathfinder-header")).toBeInTheDocument();
     expect(screen.getByTestId("pathfinder-progress")).toBeInTheDocument();
-    expect(screen.getByTestId("pathfinder-progress").innerHTML).toContain("rgba(var(--primary-rgb),0.58)");
-    expect(screen.getByTestId("pathfinder-progress").innerHTML).not.toContain("rgba(28,117,177");
+    expect(screen.getByRole('list', { name: 'Plan progress' })).toBeInTheDocument();
+    expect(screen.getByRole('listitem', { name: '1. Goal' })).toHaveAttribute('aria-current', 'step');
+    expect(screen.getByTestId("pathfinder-progress").innerHTML).not.toContain("linear-gradient");
     expect(screen.getByTestId("pathfinder-footer")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Build My Plan/i })).toBeInTheDocument();
   });
@@ -624,6 +626,45 @@ describe("Pathfinder", () => {
     expect(mocks.clearCampaignBuilderDraftSnapshot).toHaveBeenCalledWith("user-1");
   });
 
+  it("keeps the campaign name editable without requiring a why and preserves calendar days", async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 8, 20, 16, 30));
+    try {
+      render(<Pathfinder open userId="user-1" onOpenChange={vi.fn()} onCreateEpic={mocks.onCreateEpic} isCreating={false} />);
+      fireEvent.change(screen.getByLabelText("What's your goal?"), { target: { value: 'Learn Spanish' } });
+      fireEvent.click(screen.getByText('Pick Deadline'));
+      fireEvent.click(screen.getByRole('button', { name: 'Build My Plan' }));
+      await clickPathfinderButton(/Continue with this plan/i);
+      await clickPathfinderButton(/Continue to Review/i);
+      expect(await screen.findByLabelText('Campaign Name')).toHaveValue('Learn Spanish');
+      expect(screen.getByLabelText('Your Why')).toHaveValue('');
+      fireEvent.click(screen.getByRole('button', { name: 'Create Campaign' }));
+      await waitFor(() => expect(mocks.onCreateEpic).toHaveBeenCalledOnce());
+      expect(mocks.onCreateEpic.mock.calls[0][0].target_days).toBe(differenceInCalendarDays(new Date(2026, 9, 1), new Date()));
+      expect(mocks.onCreateEpic.mock.calls[0][0].target_days).toBe(11);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("retains the plan and offers a retry after campaign creation fails", async () => {
+    mocks.onCreateEpic.mockRejectedValueOnce(new Error('Network unavailable'));
+    render(<Pathfinder open userId="user-1" onOpenChange={vi.fn()} onCreateEpic={mocks.onCreateEpic} isCreating={false} />);
+    fireEvent.change(screen.getByLabelText("What's your goal?"), { target: { value: 'Learn Spanish' } });
+    fireEvent.click(screen.getByText('Pick Deadline'));
+    fireEvent.click(screen.getByRole('button', { name: 'Build My Plan' }));
+    await clickPathfinderButton(/Continue with this plan/i);
+    await clickPathfinderButton(/Continue to Review/i);
+    await screen.findByLabelText('Campaign Name');
+    mocks.clearCampaignBuilderDraftSnapshot.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Create Campaign' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your plan is still here');
+    expect(mocks.clearCampaignBuilderDraftSnapshot).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Campaign Name')).toHaveValue('Learn Spanish');
+    fireEvent.click(screen.getByRole('button', { name: 'Create Campaign' }));
+    await waitFor(() => expect(mocks.onCreateEpic).toHaveBeenCalledTimes(2));
+  });
+
   it("dispatches a builder closed event when Pathfinder is dismissed", () => {
     const onClosed = vi.fn();
     window.addEventListener("campaign-builder-closed", onClosed);
@@ -800,7 +841,7 @@ describe("Pathfinder", () => {
       estimated_minutes: 45,
     }));
 
-    expect(onCampaignCreated).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onCampaignCreated).toHaveBeenCalledTimes(1));
     const event = onCampaignCreated.mock.calls[0]?.[0] as CustomEvent<{
       title: string;
       habitCount: number;

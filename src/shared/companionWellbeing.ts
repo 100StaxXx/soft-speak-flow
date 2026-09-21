@@ -2,8 +2,9 @@ import { getCurrentVisualStageBoundaryLevel } from "../config/progression.ts";
 
 export const WELLBEING_CATEGORIES = ["mind", "body", "soul"] as const;
 export type WellbeingCategory = typeof WELLBEING_CATEGORIES[number];
-// v3 uses the same opaque scene as both endpoints, with 4s idle / 5s activity clips.
-export const WELLBEING_PROMPT_VERSION = 3;
+// v4 keeps the v3 endpoint/duration contract, but gives the middle of each loop
+// a clearly readable full-body action instead of almost-static micro-movements.
+export const WELLBEING_PROMPT_VERSION = 4;
 export const WELLBEING_VIDEO_SECONDS = 5;
 export const IDLE_VIDEO_SECONDS = 4;
 export const IDLE_VIDEO_CATEGORIES = ["idle_breathe", "idle_look", "idle_rest", "idle_greet"] as const;
@@ -38,19 +39,19 @@ export const WELLBEING_OPTIONS = {
 
 // These are motion directions, not instructions for a user to perform daily.
 const ACTIONS: Record<number, Record<WellbeingCategory, string>> = {
-  1: { mind: "Notice a tiny reflection on the ground, tilt the head with curiosity, then return the gaze to the viewer.", body: "Make one tiny playful step in place, then return to the starting stance.", soul: "Settle comfortably, take one gentle visible breath, and slowly blink." },
-  5: { mind: "Follow a moving reflection with an attentive gaze and turn toward it on the right.", body: "Perform one comfortable full-body stretch, then settle into a ready stance.", soul: "Face the viewer, blink slowly, and lean forward slightly in quiet companionship." },
-  13: { mind: "Tilt the head in curiosity, pause in recognition, then make a small decisive turn.", body: "Make one small anatomy-appropriate sideways leap or swimming burst and come to a controlled stop.", soul: "Turn into a soft breeze, close the eyes, and relax." },
-  21: { mind: "Examine the path ahead, deliberately turn toward it, then face the viewer again.", body: "Shift weight confidently into one measured step and return to the starting stance.", soul: "Offer a soft, reassuring gaze and a small friendly head tilt." },
-  36: { mind: "Hold a focused gaze, then make one precise, purposeful head turn and return.", body: "Make one controlled shoulder or body stretch in place and settle back.", soul: "Let an alert posture soften with one unhurried breath, then return to the starting posture." },
-  56: { mind: "Slowly lift the gaze toward the horizon and return with calm awareness.", body: "Shift naturally in one fluid, sweeping motion in place and settle back. Do not invent flight or new limbs.", soul: "Relax into one slow, visible breath and return to the starting posture." },
-  81: { mind: "Observe the scene with steady attention, then make one precise head turn and return.", body: "Make an assured, economical stretch in place, then return to the starting stance.", soul: "Give one slow, gentle blink while resting peacefully in the landscape." },
+  1: { mind: "Curiously toddle two steps toward a detail on the ground, lower the whole body to inspect it, then turn and toddle back.", body: "Crouch and spring into one joyful low hop, land with natural limb movement, then step back to the starting mark.", soul: "Take a friendly step toward the viewer, lower into a welcoming bow with a broad head tilt, then rise and step back." },
+  5: { mind: "Walk a short curious arc toward a reflection, turn the whole body to examine it, then retrace the arc.", body: "Lower the front of the body into a pronounced natural stretch, extend through the shoulders and back, then rise with a lively step and return.", soul: "Turn side-on to enjoy the breeze, lift and open the body's posture with a contented expression, then turn back toward the viewer." },
+  13: { mind: "Pivot into profile and take two investigating steps, lower to inspect the path, then pivot and walk back.", body: "Make one energetic sideways bound, land in a visible crouch, then turn and bound back to the starting mark.", soul: "Step toward the viewer in a friendly approach, dip the whole body in greeting, then rise and return with a relaxed turn." },
+  21: { mind: "Pace a short scouting arc, plant the feet and turn the torso toward the horizon, then confidently retrace the route.", body: "Perform a confident crouch-and-spring hop with a controlled landing, followed by a deliberate turn back to the starting stance.", soul: "Turn through a broad, relaxed half-circle to take in the landscape, then return along the arc and face the viewer warmly." },
+  36: { mind: "Take two purposeful scouting strides, lower the body to study the ground, then turn decisively and stride back.", body: "Perform a broad full-body stretch from a lowered stance to full height, then take a strong lateral step and recover naturally.", soul: "Lower the whole body into a comfortable resting posture, pause with a contented expression, then visibly rise and settle back into the starting stance." },
+  56: { mind: "Walk a sweeping but compact surveying arc with the torso visibly turning, lift the head at its apex, then return along the arc.", body: "Gather into a deep natural crouch, extend through the whole body into a powerful stretch, then make a sweeping turn and return. Do not invent flight or new limbs.", soul: "Take a measured step toward the viewer, give a graceful full-body bow, then rise, turn and return to the original mark." },
+  81: { mind: "Make a regal quarter-turn and two assured scouting strides, survey the landscape in profile, then turn and stride back.", body: "Perform one powerful controlled lateral bound with a clear weight shift and landing, then walk back into the original stance.", soul: "Turn into profile, lower into a serene resting posture, then rise in one fluid full-body motion and face the viewer again." },
 };
 const IDLE_ACTIONS: Record<IdleVideoCategory, string> = {
-  idle_breathe: "Take one very subtle natural breath and blink once. Animate anatomy, never scale or warp the whole image.",
-  idle_look: "Notice something nearby with a small curious head turn, then calmly look back at the viewer.",
-  idle_rest: "Let the eyelids soften for a quiet resting moment, then gently reopen them without changing the stance.",
-  idle_greet: "Give a tiny friendly head tilt and a soft blink, then return to the original neutral expression.",
+  idle_breathe: "Perform one clearly visible waking stretch: lower through the limbs, lengthen the back naturally, lift the chest, then recover the starting stance. Animate the joints, never scale or warp the whole image.",
+  idle_look: "Turn the whole body into profile, take two curious steps along a short arc, then pivot and walk back to the original mark.",
+  idle_rest: "Lower the whole body into an anatomy-appropriate seated or resting posture, pause briefly, then push up through the limbs to the original stance.",
+  idle_greet: "Make one cheerful low hop with a visible crouch, lift and soft landing, then take a settling step back to the original mark and expression.",
 };
 const ELEMENT_DETAILS: Record<string, string> = {
   fire: "Soft warm reflections and subtle heat haze; no flames touching the creature.",
@@ -70,8 +71,10 @@ export function buildWellbeingVideoPrompt(level: number, category: CompanionVide
     `Exactly ${seconds} seconds, silent, one continuous shot. Use the supplied image as the exact first frame and exact last frame.`,
     "Preserve this unique companion's identity, species, markings, colors, proportions, existing limbs and current evolution form. Preserve its elemental background and framing.",
     `Keep the supplied landscape, ground, horizon and scenery visible throughout all ${seconds} seconds. Never replace the habitat with a solid color, glow, studio backdrop or empty background.`,
-    `Current visual stage: ${stage}. ${stage < 13 ? "Small, gentle youthful movement." : stage < 56 ? "Calm, confident mature movement." : "Unhurried, dignified movement."}`,
+    `Current visual stage: ${stage}. ${stage < 13 ? "Bouncy, curious youthful energy with clearly visible body movement." : stage < 56 ? "Expressive, confident mature movement with a clear full-body action." : "Expansive, dignified movement with a clearly readable change in posture and position."}`,
     action,
+    `Motion timing: begin the action within the first 0.3 seconds; use the middle of the clip for a clearly visible full-body excursion and natural recovery. Only the endpoints match: do not hold the reference pose throughout. A blink, breathing, head tilt or moving background alone is not enough. Keep motion readable at phone size, using a displacement up to half a body length when space allows. Finish the return by ${seconds - 0.5} seconds.`,
+    "Adapt the action to the visible anatomy: land animals step or hop, swimming creatures make a curved swimming pass, and limbless creatures bend and glide. Only visibly winged creatures may use their existing wings. Keep normal anatomy and ground contact; never simulate movement by stretching the still image.",
     "Use anatomy-appropriate movement only. Remain fully in frame. Complete the action before the final half-second, returning naturally to exactly the original resting pose, position, scale, gaze and expression. Hold that starting pose for the final half-second. No exit, teleport, reverse playback, elastic deformation or morphing.",
     ELEMENT_DETAILS[element.toLowerCase()] ?? "Keep the existing background calm and unchanged.",
     "Locked camera. No cuts, zoom, transformation, evolution, additional creatures, text, interface, large particle effects, religious imagery, prayer poses, or religious symbols.",
