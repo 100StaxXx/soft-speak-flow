@@ -53,9 +53,14 @@ supabase functions serve --no-verify-jwt --env-file "$tmp_env" >"$tmp_log" 2>&1 
 serve_pid="$!"
 
 health_status="000"
-for _ in $(seq 1 30); do
+# Cold CI runners may need to download the Edge Runtime image first. Keep
+# readiness bounded, and fail immediately if the serving process has exited.
+for _ in $(seq 1 120); do
+  if ! kill -0 "$serve_pid" 2>/dev/null; then
+    break
+  fi
   health_status="$(
-    curl -sS -o /dev/null -w "%{http_code}" \
+    curl --connect-timeout 2 --max-time 3 -sS -o /dev/null -w "%{http_code}" \
       -X POST "${SUPABASE_FUNCTIONS_URL}/verify-admin-access" \
       -H "Content-Type: application/json" \
       -d '{}' || true
