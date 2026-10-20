@@ -222,9 +222,6 @@ verify_jwt = false
 [functions.generate-daily-missions]
 verify_jwt = true
 
-[functions.generate-daily-quotes]
-verify_jwt = false
-
 [functions.dispatch-daily-quote-pushes]
 verify_jwt = false
 
@@ -442,9 +439,6 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.generate-memorial-image]
-verify_jwt = false
-
-[functions.generate-companion-scar]
 verify_jwt = false
 
 [functions.transcribe-audio]
