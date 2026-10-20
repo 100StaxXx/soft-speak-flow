@@ -13,6 +13,7 @@ describe("Adventure companion reactions", () => {
     render(<AdventureCompanion companion={companion} celebrate />);
     const video = screen.getByLabelText("Your companion celebrates");
     expect(video).toHaveAttribute("src", "/graceward-motion/v1/lion/light/reaction-celebrate.mp4");
+    expect(video).toHaveAttribute("poster", "/my-lion.webp");
     fireEvent.ended(video);
     expect(screen.getByAltText("Leo")).toHaveAttribute("src", "/my-lion.webp");
   });

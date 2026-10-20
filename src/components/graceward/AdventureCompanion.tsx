@@ -29,7 +29,7 @@ export function AdventureCompanion({ companion, celebrate = false }: { companion
   return <motion.div className={`gw-companion ${celebrate ? "gw-companion-celebrating" : ""}`}
     animate={celebrate && !reducedMotion ? { scale: [1, 1.07, 1], rotate: [0, -3, 3, 0] } : { scale: 1, rotate: 0 }}
     transition={{ duration: 0.7 }}>
-    {showVideo ? <video ref={video} src={url!} muted playsInline preload="metadata" aria-label="Your companion celebrates"
+    {showVideo ? <video ref={video} src={url!} poster={companion?.current_image_url || undefined} muted playsInline preload="metadata" aria-label="Your companion celebrates"
       onEnded={() => setVideoFinished(true)} onError={() => setVideoFinished(true)} />
       : companion?.current_image_url && !imageFailed ? <img src={companion.current_image_url} alt={companion.companion_name || "Your faith companion"} onError={() => setImageFailed(true)} />
       : <div className="gw-companion-placeholder"><Sparkles size={48} /><span>Your adventure awaits</span></div>}
