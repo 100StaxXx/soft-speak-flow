@@ -67,6 +67,7 @@ import { MentorGuidanceCard } from "@/components/MentorGuidanceCard";
 import { MentorSpotlightGuard } from "@/components/tutorial/MentorSpotlightGuard";
 import { OnboardingExperienceGate } from "@/components/OnboardingExperienceGate";
 import { PRODUCT } from "@/config/product";
+import { GRACEWARD_ADVENTURE_ENABLED } from "@/config/gracewardAdventure";
 
 // Lazy load pages for code splitting
 const Auth = lazy(() => import("./pages/Auth"));
@@ -90,6 +91,8 @@ const MentorSelection = lazy(() => import("./pages/MentorSelection"));
 const MentorChat = lazy(() => import("./pages/MentorChat"));
 const PepTalkDetail = lazy(() => import("./pages/PepTalkDetail"));
 const EncouragementHistory = lazy(() => import("./pages/EncouragementHistory"));
+const GracewardAdventure = lazy(() => import("./pages/GracewardAdventure"));
+const GracewardBibleQuest = lazy(() => import("./pages/GracewardBibleQuest"));
 const AccessibilityPreview = import.meta.env.DEV
   ? lazy(() => import("./pages/AccessibilityPreview"))
   : null;
@@ -166,7 +169,7 @@ const RootRoute = memo(() => {
     return <Welcome />;
   }
 
-  return <Navigate to={PRODUCT.mode === "cosmiq" ? "/journeys" : "/companion"} replace />;
+  return <Navigate to={PRODUCT.mode === "cosmiq" ? "/journeys" : GRACEWARD_ADVENTURE_ENABLED ? "/adventure" : "/companion"} replace />;
 });
 
 RootRoute.displayName = "RootRoute";
@@ -441,6 +444,11 @@ const AppContent = memo(() => {
                   <Route path="/creator/dashboard" element={<Navigate to="/welcome" replace />} />
                   <Route path="/onboarding" element={<Onboarding />} />
                   <Route path="/" element={<RootRoute />} />
+                  {GRACEWARD_ADVENTURE_ENABLED && <>
+                    <Route path="/adventure" element={<ProtectedRoute><GracewardAdventure /></ProtectedRoute>} />
+                    <Route path="/play" element={<ProtectedRoute><GracewardAdventure /></ProtectedRoute>} />
+                    <Route path="/play/bible-quest/:nodeId" element={<ProtectedRoute><GracewardBibleQuest /></ProtectedRoute>} />
+                  </>}
                   <Route path="/today" element={<Navigate to="/mentor" replace />} />
                   <Route path="/plan" element={<Navigate to="/mentor" replace />} />
                   <Route path="/grow" element={<Navigate to="/companion" replace />} />
