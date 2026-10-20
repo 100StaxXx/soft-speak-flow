@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
 
+vi.mock("@/config/gracewardAdventure", () => ({ GRACEWARD_ADVENTURE_ENABLED: false }));
+
 const mocks = vi.hoisted(() => ({ hapticsLight: vi.fn() }));
 vi.mock("@/utils/haptics", () => ({
   haptics: { light: (...args: unknown[]) => mocks.hapticsLight(...args) },
