@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 
 SUPPORT_FILE="$ROOT_DIR/supabase/tests/security/_support/helpers.sql"
 TEST_FILES=(
+  "$ROOT_DIR/supabase/tests/security/18_graceward_adventure.sql"
   "$ROOT_DIR/supabase/tests/security/01_rls_and_storage.sql"
   "$ROOT_DIR/supabase/tests/security/02_entitlements_and_rpc.sql"
   "$ROOT_DIR/supabase/tests/security/04_companion_claim_validation.sql"
