@@ -1,14 +1,19 @@
 import { memo, useEffect, useRef } from "react";
-import { Compass, MessageCircle, PawPrint, Sunrise } from "lucide-react";
+import { BookOpen, Compass, Gamepad2, MessageCircle, PawPrint, Sunrise } from "lucide-react";
 
 import { NavLink } from "@/components/NavLink";
 import { CompanionNavPresence } from "@/components/companion/CompanionNavPresence";
 import { haptics } from "@/utils/haptics";
 import { PRODUCT } from "@/config/product";
+import { GRACEWARD_ADVENTURE_ENABLED } from "@/config/gracewardAdventure";
 const navItems = PRODUCT.mode === "cosmiq" ? [
   { to: "/mentor", label: "Guide", icon: Sunrise, primary: false },
   { to: "/journeys", label: "Plan", icon: Compass, primary: true },
   { to: "/companion", label: "Companion", icon: PawPrint, primary: false },
+] as const : GRACEWARD_ADVENTURE_ENABLED ? [
+  { to: "/play", label: "Play", icon: Gamepad2, primary: false },
+  { to: "/companion", label: "Companion", icon: PawPrint, primary: true },
+  { to: "/mentor", label: "Sanctuary", icon: BookOpen, primary: false },
 ] as const : [
   { to: "/mentor", label: "Today", icon: Sunrise, primary: false },
   { to: "/companion", label: "Companion", icon: PawPrint, primary: true },
@@ -43,7 +48,7 @@ export const BottomNav = memo(() => {
   return (
     <nav
       ref={navRef}
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-border/55 bg-background/[0.88] shadow-[0_-12px_40px_rgba(20,30,20,0.08)] backdrop-blur-2xl"
+      className={`fixed inset-x-0 bottom-0 z-50 border-t border-border/55 bg-background/[0.88] shadow-[0_-12px_40px_rgba(20,30,20,0.08)] backdrop-blur-2xl ${GRACEWARD_ADVENTURE_ENABLED ? "gw-adventure-nav" : ""}`}
       role="navigation"
       aria-label="Main navigation"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
@@ -65,7 +70,7 @@ export const BottomNav = memo(() => {
                 <>
                   <span
                     className={item.primary
-                      ? `grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_5px_16px_hsl(var(--primary)/0.28)] ${isActive ? "ring-4 ring-primary/20" : ""}`
+                      ? `grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_5px_16px_hsl(var(--primary)/0.28)] ${GRACEWARD_ADVENTURE_ENABLED ? "gw-primary-nav" : ""} ${isActive ? "ring-4 ring-primary/20" : ""}`
                       : "relative isolate grid h-8 w-8 place-items-center"}
                   >
                     {item.to === "/companion" ? <CompanionNavPresence isActive={isActive} /> : null}

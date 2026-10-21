@@ -16,7 +16,7 @@ const APP_TARGET = "App";
 const WIDGET_TARGET = "CosmiqWidgetExtension";
 const PRODUCTS = {
   graceward: {
-    buildVersion: "38",
+    buildVersion: "53",
     appGroup: "group.com.darrylgraham.graceward",
     appBundleId: "com.darrylgraham.graceward",
     widgetBundleId: "com.darrylgraham.graceward.GracewardWidget",
@@ -26,7 +26,7 @@ const PRODUCTS = {
     appIcon: "AppIconGraceward",
     displayName: "Graceward",
     launchStoryboard: "LaunchScreenGraceward",
-    marketingVersion: "1.0",
+    marketingVersion: "1.0.3",
     urlScheme: "graceward",
     swiftCondition: "GRACEWARD_PRODUCT",
     debugConfiguration: "GracewardDebug",

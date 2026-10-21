@@ -49,6 +49,7 @@ import {
 } from "@/hooks/useCompanionLayoutMode";
 import { deriveCompanionDisplayState } from "@/lib/companionDisplayState";
 import { cn } from "@/lib/utils";
+import { GRACEWARD_ADVENTURE_ENABLED } from "@/config/gracewardAdventure";
 import { PRODUCT } from "@/config/product";
 
 type CompanionTab = "overview" | "focus" | "stories" | "collection";
@@ -77,7 +78,7 @@ const COMPANION_GOLD_THEME_VARS: CSSProperties = {
 } as CSSProperties;
 
 const isCompanionTab = (tab: string): tab is CompanionTab =>
-  COMPANION_TAB_KEYS.includes(tab as CompanionTab);
+  COMPANION_TAB_KEYS.includes(tab as CompanionTab) && !(GRACEWARD_ADVENTURE_ENABLED && tab === "focus");
 
 // Memoized tab content to prevent unnecessary re-renders
 const OverviewTab = memo(({
@@ -216,8 +217,8 @@ const CompanionTabBar = ({
             ? "border-primary/15 bg-card/[0.78] text-muted-foreground backdrop-blur-md shadow-sm"
             : "border-stardust-gold/[0.16] bg-[linear-gradient(180deg,rgba(34,28,15,0.56),rgba(20,16,8,0.6))] text-stardust-gold/[0.78] backdrop-blur-md shadow-[0_16px_34px_rgba(0,0,0,0.16)]",
           isDesktop
-            ? "inline-grid h-auto w-auto min-w-[460px] grid-cols-4 justify-start p-1.5"
-            : "grid w-full grid-cols-4",
+            ? `inline-grid h-auto w-auto min-w-[460px] ${GRACEWARD_ADVENTURE_ENABLED ? "grid-cols-3" : "grid-cols-4"} justify-start p-1.5`
+            : `grid w-full ${GRACEWARD_ADVENTURE_ENABLED ? "grid-cols-3" : "grid-cols-4"}`,
       )}
     >
       <TabsTrigger
@@ -227,13 +228,14 @@ const CompanionTabBar = ({
         <TrendingUp className="h-4 w-4" />
         <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>{isGraceward ? "Formation" : "Overview"}</span>
       </TabsTrigger>
+      {!GRACEWARD_ADVENTURE_ENABLED && (
       <TabsTrigger
         value="focus"
         className={triggerClassName}
       >
         <Timer className="h-4 w-4" />
         <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Focus</span>
-      </TabsTrigger>
+      </TabsTrigger>)}
       <TabsTrigger
         value="stories"
         className={triggerClassName}
@@ -470,6 +472,7 @@ const Companion = () => {
             )}
           </TabsContent>
 
+          {!GRACEWARD_ADVENTURE_ENABLED && (
           <TabsContent
             value="focus"
             forceMount
@@ -481,7 +484,7 @@ const Companion = () => {
                 enableCosmiqCinema={displayCompanion?.product_mode === "cosmiq"}
               />
             )}
-          </TabsContent>
+          </TabsContent>)}
 
           <TabsContent
             value="stories"

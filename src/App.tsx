@@ -67,6 +67,7 @@ import { MentorGuidanceCard } from "@/components/MentorGuidanceCard";
 import { MentorSpotlightGuard } from "@/components/tutorial/MentorSpotlightGuard";
 import { OnboardingExperienceGate } from "@/components/OnboardingExperienceGate";
 import { PRODUCT } from "@/config/product";
+import { GRACEWARD_ADVENTURE_ENABLED } from "@/config/gracewardAdventure";
 
 // Lazy load pages for code splitting
 const Auth = lazy(() => import("./pages/Auth"));
@@ -90,6 +91,10 @@ const MentorSelection = lazy(() => import("./pages/MentorSelection"));
 const MentorChat = lazy(() => import("./pages/MentorChat"));
 const PepTalkDetail = lazy(() => import("./pages/PepTalkDetail"));
 const EncouragementHistory = lazy(() => import("./pages/EncouragementHistory"));
+const GracewardAdventure = lazy(() => import("./pages/GracewardAdventure"));
+const GracewardMiniGame = lazy(() => import("./pages/GracewardMiniGame"));
+const GracewardSanctuaryActivity = lazy(() => import("./pages/GracewardSanctuaryActivity"));
+const GracewardBibleQuest = lazy(() => import("./pages/GracewardBibleQuest"));
 const AccessibilityPreview = import.meta.env.DEV
   ? lazy(() => import("./pages/AccessibilityPreview"))
   : null;
@@ -166,7 +171,7 @@ const RootRoute = memo(() => {
     return <Welcome />;
   }
 
-  return <Navigate to={PRODUCT.mode === "cosmiq" ? "/journeys" : "/companion"} replace />;
+  return <Navigate to={PRODUCT.mode === "cosmiq" ? "/journeys" : GRACEWARD_ADVENTURE_ENABLED ? "/play" : "/companion"} replace />;
 });
 
 RootRoute.displayName = "RootRoute";
@@ -384,7 +389,8 @@ const AppContent = memo(() => {
   }, [hideNativeSplashOnce, profileLoading, session?.user, splashHidden, status]);
 
   const activeMainTabPath = isMainTabPath(location.pathname) ? location.pathname : null;
-  const showBottomNav = shouldShowBottomNav(location.pathname, Boolean(session?.user));
+  const showBottomNav = shouldShowBottomNav(location.pathname, Boolean(session?.user)) &&
+    !(GRACEWARD_ADVENTURE_ENABLED && location.pathname.startsWith("/play/"));
 
   useEffect(() => {
     const rootStyle = document.documentElement.style;
@@ -441,6 +447,13 @@ const AppContent = memo(() => {
                   <Route path="/creator/dashboard" element={<Navigate to="/welcome" replace />} />
                   <Route path="/onboarding" element={<Onboarding />} />
                   <Route path="/" element={<RootRoute />} />
+                  {GRACEWARD_ADVENTURE_ENABLED && <>
+                    <Route path="/adventure" element={<Navigate to="/play" replace />} />
+                    <Route path="/play" element={<ProtectedRoute><GracewardAdventure /></ProtectedRoute>} />
+                    <Route path="/play/:gameId" element={<ProtectedRoute><GracewardMiniGame /></ProtectedRoute>} />
+                    <Route path="/mentor/:activityId" element={<ProtectedRoute><GracewardSanctuaryActivity /></ProtectedRoute>} />
+                    <Route path="/play/bible-quest/:nodeId" element={<ProtectedRoute><GracewardBibleQuest /></ProtectedRoute>} />
+                  </>}
                   <Route path="/today" element={<Navigate to="/mentor" replace />} />
                   <Route path="/plan" element={<Navigate to="/mentor" replace />} />
                   <Route path="/grow" element={<Navigate to="/companion" replace />} />

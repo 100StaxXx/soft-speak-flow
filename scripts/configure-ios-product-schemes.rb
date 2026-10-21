@@ -8,8 +8,8 @@ project = Xcodeproj::Project.open(project_path)
 
 products = {
   'Graceward' => {
-    build_version: '38',
-    marketing_version: '1.0',
+    build_version: '53',
+    marketing_version: '1.0.3',
     bundle_id: 'com.darrylgraham.graceward',
     widget_bundle_id: 'com.darrylgraham.graceward.GracewardWidget',
     display_name: 'Graceward',
