@@ -769,7 +769,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 44;
+				CURRENT_PROJECT_VERSION = 51;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = App/Info.plist;
@@ -780,7 +780,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.3;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BRAND = graceward;
 				PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.graceward;
@@ -803,7 +803,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 44;
+				CURRENT_PROJECT_VERSION = 51;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = App/Info.plist;
@@ -814,7 +814,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.3;
 				PRODUCT_BRAND = graceward;
 				PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.graceward;
 				PRODUCT_DISPLAY_NAME = Graceward;
@@ -958,7 +958,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 44;
+				CURRENT_PROJECT_VERSION = 51;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
@@ -970,7 +970,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.3;
 				PRODUCT_BRAND = graceward;
 				PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.graceward.GracewardWidget;
 				PRODUCT_DISPLAY_NAME = Graceward;
@@ -990,7 +990,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 44;
+				CURRENT_PROJECT_VERSION = 51;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
@@ -1002,7 +1002,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.3;
 				PRODUCT_BRAND = graceward;
 				PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.graceward.GracewardWidget;
 				PRODUCT_DISPLAY_NAME = Graceward;
