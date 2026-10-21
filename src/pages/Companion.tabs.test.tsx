@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MainTabVisibilityProvider } from "@/contexts/MainTabVisibilityContext";
 
 const mocks = vi.hoisted(() => ({
+  adventureEnabled: false,
+  productMode: "christian" as "christian" | "cosmiq",
   companion: {
     id: "companion-1",
     current_xp: 120,
@@ -37,6 +39,11 @@ const mocks = vi.hoisted(() => ({
   progressToNext: 60,
   canEvolve: false,
 }));
+
+vi.mock("@/config/product", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/config/product")>();
+  return {...actual, PRODUCT: {...actual.PRODUCT, get mode() { return mocks.productMode; }}};
+});
 
 vi.mock("@/config/gracewardAdventure", () => ({ get GRACEWARD_ADVENTURE_ENABLED() { return mocks.adventureEnabled && mocks.productMode === "christian"; } }));
 
@@ -389,6 +396,7 @@ describe("Companion tabs performance behavior", () => {
     expect(screen.getByRole("tab", { name: /Focus/ })).toBeInTheDocument();
   });
   beforeEach(() => {
+    mocks.productMode = "christian";
     mocks.adventureEnabled = false;
     mocks.companion = {
       id: "companion-1",
