@@ -389,7 +389,8 @@ const AppContent = memo(() => {
   }, [hideNativeSplashOnce, profileLoading, session?.user, splashHidden, status]);
 
   const activeMainTabPath = isMainTabPath(location.pathname) ? location.pathname : null;
-  const showBottomNav = shouldShowBottomNav(location.pathname, Boolean(session?.user));
+  const showBottomNav = shouldShowBottomNav(location.pathname, Boolean(session?.user)) &&
+    !(GRACEWARD_ADVENTURE_ENABLED && location.pathname.startsWith("/play/"));
 
   useEffect(() => {
     const rootStyle = document.documentElement.style;

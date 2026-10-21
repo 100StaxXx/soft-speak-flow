@@ -1,14 +1,12 @@
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
 import { GracewardPairs, GracewardVerseBuilder } from "@/components/graceward/GracewardGames";
-import "@/styles/gracewardAdventure.css";
+import { useGracewardAdventure } from "@/hooks/useGracewardAdventure";
+import "@/styles/gracewardGames.css";
 
 export default function GracewardMiniGame() {
   const { gameId } = useParams();
-  const title = gameId === "noahs-pairs" ? "Noah’s Pairs" : gameId === "scripture-builder" ? "Scripture Builder" : "Choose a game";
-  return <main className="gw-adventure gw-activity-page pt-safe pb-nav-safe"><div className="gw-shell gw-game-shell">
-    <header className="gw-game-header"><Link to="/play" className="gw-icon-button" aria-label="Back to Play"><ArrowLeft /></Link><div><p className="gw-eyebrow">PLAY</p><h1>{title}</h1></div></header>
-    <div className="gw-activity-card">{gameId === "noahs-pairs" ? <GracewardPairs /> : gameId === "scripture-builder" ? <GracewardVerseBuilder /> : <Link className="gw-button" to="/play">Back to Play</Link>}</div>
-    <p className="gw-game-note">Play at your own pace. You can start a fresh round any time.</p>
-  </div></main>;
+  const { userId } = useGracewardAdventure();
+  if (gameId === "noahs-pairs") return <GracewardPairs key={`${userId}:${gameId}`} playerId={userId}/>;
+  if (gameId === "scripture-builder") return <GracewardVerseBuilder key={`${userId}:${gameId}`} playerId={userId}/>;
+  return <main className="gg-stage"><div className="gg-shell"><h1>Choose your next adventure</h1><Link className="gg-cta" to="/play">Back to Play</Link></div></main>;
 }

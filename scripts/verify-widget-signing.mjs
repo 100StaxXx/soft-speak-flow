@@ -16,7 +16,7 @@ const APP_TARGET = "App";
 const WIDGET_TARGET = "CosmiqWidgetExtension";
 const PRODUCTS = {
   graceward: {
-    buildVersion: "52",
+    buildVersion: "53",
     appGroup: "group.com.darrylgraham.graceward",
     appBundleId: "com.darrylgraham.graceward",
     widgetBundleId: "com.darrylgraham.graceward.GracewardWidget",

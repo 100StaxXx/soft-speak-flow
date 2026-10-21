@@ -39,3 +39,11 @@ Implement Word of Faith and Scripture Match, expand to the planned 30-node world
 ## Three-tab organization
 
 Play contains Bible Quest, Noah’s Pairs, and Scripture Builder; game back buttons return to Play. Companion keeps care, growth, memories, and keepsakes. Sanctuary contains daily reflection, Quiet pause, and Focus time. Older `/adventure` links redirect to Play. This navigation is gated to Graceward Adventure; Cosmiq remains unchanged.
+
+## Full game rounds (1.0.3 build 53)
+
+All three games have full-screen introductions, optional synthesized sound, pause/resume/restart controls, and animated finale scenes with points and stars. Noah’s Pairs has 6- and 8-pair modes, automatic mismatch flips, match streaks, and a time bonus. Scripture Builder is a three-passage round with Guided and Challenge modes, word-by-word feedback, and scored hints. Bible Quest keeps its existing server-validated reward and saved-answer flow while adding trail introductions, discovery streak scoring, and a new finale. No database migration or change to XP policy is required.
+
+The Play trophy shelf tracks personal bests by game/mode plus the 30 most recent completed rounds. Records are local to the device and account; they do not sync across devices or claim to be a global leaderboard. Reloading a Bible Quest finale does not count the same round twice. Storage failure is reported rather than presented as a successful save. Timers pause when the page is hidden; sound defaults off, and reduced-motion preferences disable animation.
+
+Original artwork: `public/graceward-games/v1/story-island.png`, generated with the built-in image tool for Graceward. Runtime scenes and card transitions use scoped CSS/SVG. Game routes hide the app’s bottom tabs only when Graceward Adventure is enabled; Cosmiq retains its existing navigation.

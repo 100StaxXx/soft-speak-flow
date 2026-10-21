@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, cleanup } from "@testing-library/re
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { BIBLE_TRAILS, parseQuestDraft } from "@/data/gracewardBibleQuest";
+import { readGameRecords } from "@/lib/gracewardGameScores";
 import GracewardBibleQuest from "./GracewardBibleQuest";
 
 const mocks = vi.hoisted(() => ({ complete: vi.fn(), completions: [] as { node_id: number; score: number; xp_awarded: number; coins_awarded: number }[] }));
@@ -18,9 +19,11 @@ afterEach(cleanup);
 describe("Bible Quest recovery and reward flow", () => {
   it("restores an answered question and its explanation after leaving the game", () => {
     const view = renderRound();
+    fireEvent.click(screen.getByRole("button", {name: "Begin the trail"}));
     fireEvent.click(screen.getByRole("button", { name: "Light" }));
     expect(screen.getByText("Genesis 1:3–5")).toBeInTheDocument();
     view.unmount(); renderRound();
+    fireEvent.click(screen.getByRole("button", {name: "Resume trail"}));
     expect(screen.getByRole("button", { name: "Next discovery" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Light/ })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Next discovery" }));
@@ -59,6 +62,18 @@ describe("Bible Quest recovery and reward flow", () => {
     renderRound();
     expect(screen.queryByRole("button", { name: "Collect my reward" })).not.toBeInTheDocument();
     expect(mocks.complete).not.toHaveBeenCalled();
+  });
+  it("plays the full trail, records its finale once, and restores that same result", () => {
+    const view = renderRound();
+    fireEvent.click(screen.getByRole("button", { name: "Begin the trail" }));
+    for (const [index, question] of BIBLE_TRAILS[0].questions.entries()) {
+      fireEvent.click(screen.getByRole("button", { name: question.choices[question.answer] }));
+      fireEvent.click(screen.getByRole("button", { name: index === 4 ? "See my discoveries" : "Next discovery" }));
+    }
+    expect(screen.getByRole("heading", { name: "A trail of bright discoveries." })).toBeInTheDocument();
+    expect(readGameRecords("test-user").bests["bible-quest:trail-1"].score).toBe(1500);
+    view.unmount(); renderRound();
+    expect(readGameRecords("test-user").rounds).toBe(1);
   });
   it("discards corrupt or cross-level saved answers", () => {
     for (const raw of ["{", '{"version":1,"nodeId":2,"answers":[],"revealed":false}', '{"version":1,"nodeId":1,"answers":[99],"revealed":true}']) {
