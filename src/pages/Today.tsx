@@ -1,3 +1,5 @@
+import { GracewardSanctuaryTools } from "@/components/graceward/GracewardSanctuaryTools";
+import { GRACEWARD_ADVENTURE_ENABLED } from "@/config/gracewardAdventure";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import {
@@ -182,7 +184,7 @@ export default function Today() {
                 {PRODUCT.name}
               </p>
               <h1 className="mt-1.5 text-3xl font-semibold tracking-tight sm:text-4xl">
-                {getGreeting(now)}
+                {GRACEWARD_ADVENTURE_ENABLED ? "Sanctuary" : getGreeting(now)}
               </h1>
               <p className="mt-1 text-sm text-foreground/75">
                 {format(now, "EEEE, MMMM d")} · One day, already prepared.
@@ -200,6 +202,7 @@ export default function Today() {
           </header>
 
           <main className="mt-5 space-y-4 sm:mt-6">
+            {GRACEWARD_ADVENTURE_ENABLED && <GracewardSanctuaryTools />}
             <Card
               data-tour="morning-checkin"
               className="daily-way-scripture-card overflow-hidden border-primary/20 bg-card/[0.86] p-4 shadow-lg backdrop-blur-xl sm:p-5"

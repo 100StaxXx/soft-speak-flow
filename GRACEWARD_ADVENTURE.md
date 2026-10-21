@@ -4,7 +4,7 @@ This branch adds the first complete game-to-companion flow to the existing Grace
 
 ## Included
 
-- An illustrated-color Adventure home and Play entry, plus four-tab Graceward navigation. Existing companion, Sanctuary and guide screens remain accessible.
+- An illustrated-color Adventure home and Play entry, plus three-tab Graceward navigation: Play, Companion, and Sanctuary. Existing companion, Sanctuary and guide screens remain accessible.
 - Three five-question Bible Quest trails with original explanatory summaries and passage references. These 15 items need final editorial review before launch.
 - Per-account, per-trail unfinished-answer storage. Closing and reopening a trail restores both the answer and its explanation. Storage failure is visible to the player.
 - An additive database migration with authenticated, product-scoped completion, ordered unlocks, server scoring, atomic XP and first-completion coin awards, retry-safe receipts and read-only user progress access.
@@ -16,7 +16,7 @@ This branch adds the first complete game-to-companion flow to the existing Grace
 1. Confirm the target Graceward project and current migrations; apply `supabase/migrations/20261020180000_graceward_bible_quest.sql` through the normal migration process.
 2. Supply the existing Graceward `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` and `VITE_EXPECTED_SUPABASE_PROJECT_REF` through the normal private environment configuration. Do not substitute Cosmiq credentials.
 3. Set `VITE_GRACEWARD_ADVENTURE=true` in the test build. It only activates when the product mode is Christian. It is off by default and compiled into the build.
-4. Build with `npm run build:graceward`. Visit `/adventure`, finish a round, collect its reward and verify saved progress after restarting. Repeat with an existing high-level companion and an existing subscription.
+4. Build with `npm run build:graceward`. Visit `/play`, finish a round, collect its reward and verify saved progress after restarting. Repeat with an existing high-level companion and an existing subscription.
 5. Run a physical iPhone/TestFlight check for navigation, animation, audio preferences and all existing account/companion flows before enabling in a release build.
 
 Disabling the flag and rebuilding restores the old navigation and root landing without removing progress. The new database table is additive; no destructive rollback is required. This is a build-time switch, not a remote rollback control for a shipped binary.
@@ -35,3 +35,7 @@ In this environment, Vite compilation completed. The production build verifier c
 ## Next milestones
 
 Implement Word of Faith and Scripture Match, expand to the planned 30-node world and reviewed content inventory, add usable cosmetic rewards, then run beta pacing and cost measurements. The broader transformation is not complete in this first-playable branch.
+
+## Three-tab organization
+
+Play contains Bible Quest, Noah’s Pairs, and Scripture Builder; game back buttons return to Play. Companion keeps care, growth, memories, and keepsakes. Sanctuary contains daily reflection, Quiet pause, and Focus time. Older `/adventure` links redirect to Play. This navigation is gated to Graceward Adventure; Cosmiq remains unchanged.

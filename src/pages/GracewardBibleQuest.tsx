@@ -48,10 +48,10 @@ function QuestRound({ trail, adventure, companion }: {
   const restart = () => { setDraft({ version: 1, nodeId: trail.id, answers: [], revealed: false }); setReceipt(null); setError(""); };
 
   return <main className="gw-adventure gw-game-page pt-safe pb-nav-safe"><div className="gw-shell gw-game-shell">
-    <header className="gw-game-header"><Link to="/adventure" className="gw-icon-button" aria-label="Save and return to adventure"><ArrowLeft /></Link><div><p className="gw-eyebrow">BIBLE QUEST</p><strong>{trail.subtitle}</strong></div><span className="gw-progress-pill">{Math.min(index + 1, 5)} / 5</span></header>
+    <header className="gw-game-header"><Link to="/play" className="gw-icon-button" aria-label="Save and return to Play"><ArrowLeft /></Link><div><p className="gw-eyebrow">BIBLE QUEST</p><strong>{trail.subtitle}</strong></div><span className="gw-progress-pill">{Math.min(index + 1, 5)} / 5</span></header>
     {!draftSaved && <p className="gw-error" role="status">This device cannot save unfinished answers. Finish and collect your reward before leaving.</p>}
     {adventure.isLoading ? <p role="status">Loading your trail…</p> : adventure.isError ? <div className="gw-error" role="alert">Your progress couldn't load.<button className="gw-button" onClick={() => void adventure.refetch()}>Try again</button></div>
-    : !unlocked || !companion || companion.current_stage < 1 ? <section className="gw-question-card"><h1>One step at a time</h1><p>Hatch your companion and complete the preceding trail to play here.</p><Link className="gw-button" to="/adventure">Back to your adventure</Link></section>
+    : !unlocked || !companion || companion.current_stage < 1 ? <section className="gw-question-card"><h1>One step at a time</h1><p>Hatch your companion and complete the preceding trail to play here.</p><Link className="gw-button" to="/play">Back to Play</Link></section>
     : finished ? <section className="gw-question-card gw-results" aria-labelledby="gw-result-title">
       <span className="gw-result-icon"><Star fill="currentColor" /></span><p className="gw-eyebrow">A NEW DISCOVERY</p><h1 id="gw-result-title">Look how far you’ve come!</h1><p>You answered {score} of 5 correctly and explored every explanation.</p>
       <AdventureCompanion companion={companion} celebrate={Boolean(receipt)} />
@@ -59,7 +59,7 @@ function QuestRound({ trail, adventure, companion }: {
       : previousCompletion ? <p className="gw-muted">You’ve already earned this trail’s reward. Thanks for exploring it again!</p>
       : <><p className="gw-muted">Save this discovery to grow your companion and unlock the next trail.</p><button className="gw-button gw-button-gold" disabled={saving} onClick={() => void save()}>{saving ? "Saving your adventure…" : "Collect my reward"}<Sparkles size={19} /></button></>}
       {error && <p className="gw-error" role="alert">{error}</p>}
-      {(receipt || previousCompletion) && (nextTrail ? <Link className="gw-button" to={`/play/bible-quest/${nextTrail.id}`}>Next adventure <ArrowRight size={19} /></Link> : <Link className="gw-button" to="/adventure">Chapter complete! Visit your world <ArrowRight size={19} /></Link>)}
+      {(receipt || previousCompletion) && (nextTrail ? <Link className="gw-button" to={`/play/bible-quest/${nextTrail.id}`}>Next adventure <ArrowRight size={19} /></Link> : <Link className="gw-button" to="/play">Chapter complete! Back to Play <ArrowRight size={19} /></Link>)}
       <button className="gw-text-link" disabled={saving} onClick={restart}><RotateCcw size={16} /> Play this trail again</button>
     </section> : question && <>
       <div className="gw-question-progress" aria-label={`Question ${index + 1} of 5`}>{trail.questions.map((_, position) => <span key={position} className={position <= index ? "gw-progress-active" : ""} />)}</div>

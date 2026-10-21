@@ -38,6 +38,8 @@ const mocks = vi.hoisted(() => ({
   canEvolve: false,
 }));
 
+vi.mock("@/config/gracewardAdventure", () => ({ get GRACEWARD_ADVENTURE_ENABLED() { return mocks.adventureEnabled && mocks.productMode === "christian"; } }));
+
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({
     prefetchQuery: mocks.prefetchQuery,
@@ -373,7 +375,21 @@ const renderCompanion = (isTabActive = true) =>
   );
 
 describe("Companion tabs performance behavior", () => {
+  it("keeps enabled Graceward Companion focused on care, with games and focus elsewhere", () => {
+    mocks.adventureEnabled = true;
+    renderCompanion();
+    expect(screen.getByRole("tab", { name: /Formation/ })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /Activities|Focus/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Noah’s Pairs")).not.toBeInTheDocument();
+  });
+  it("preserves Cosmiq Focus when Graceward Adventure is enabled", () => {
+    mocks.adventureEnabled = true;
+    mocks.productMode = "cosmiq";
+    renderCompanion();
+    expect(screen.getByRole("tab", { name: /Focus/ })).toBeInTheDocument();
+  });
   beforeEach(() => {
+    mocks.adventureEnabled = false;
     mocks.companion = {
       id: "companion-1",
       current_xp: 120,

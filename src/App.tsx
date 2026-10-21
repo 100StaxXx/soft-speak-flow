@@ -92,6 +92,8 @@ const MentorChat = lazy(() => import("./pages/MentorChat"));
 const PepTalkDetail = lazy(() => import("./pages/PepTalkDetail"));
 const EncouragementHistory = lazy(() => import("./pages/EncouragementHistory"));
 const GracewardAdventure = lazy(() => import("./pages/GracewardAdventure"));
+const GracewardMiniGame = lazy(() => import("./pages/GracewardMiniGame"));
+const GracewardSanctuaryActivity = lazy(() => import("./pages/GracewardSanctuaryActivity"));
 const GracewardBibleQuest = lazy(() => import("./pages/GracewardBibleQuest"));
 const AccessibilityPreview = import.meta.env.DEV
   ? lazy(() => import("./pages/AccessibilityPreview"))
@@ -169,7 +171,7 @@ const RootRoute = memo(() => {
     return <Welcome />;
   }
 
-  return <Navigate to={PRODUCT.mode === "cosmiq" ? "/journeys" : GRACEWARD_ADVENTURE_ENABLED ? "/adventure" : "/companion"} replace />;
+  return <Navigate to={PRODUCT.mode === "cosmiq" ? "/journeys" : GRACEWARD_ADVENTURE_ENABLED ? "/play" : "/companion"} replace />;
 });
 
 RootRoute.displayName = "RootRoute";
@@ -445,8 +447,10 @@ const AppContent = memo(() => {
                   <Route path="/onboarding" element={<Onboarding />} />
                   <Route path="/" element={<RootRoute />} />
                   {GRACEWARD_ADVENTURE_ENABLED && <>
-                    <Route path="/adventure" element={<ProtectedRoute><GracewardAdventure /></ProtectedRoute>} />
+                    <Route path="/adventure" element={<Navigate to="/play" replace />} />
                     <Route path="/play" element={<ProtectedRoute><GracewardAdventure /></ProtectedRoute>} />
+                    <Route path="/play/:gameId" element={<ProtectedRoute><GracewardMiniGame /></ProtectedRoute>} />
+                    <Route path="/mentor/:activityId" element={<ProtectedRoute><GracewardSanctuaryActivity /></ProtectedRoute>} />
                     <Route path="/play/bible-quest/:nodeId" element={<ProtectedRoute><GracewardBibleQuest /></ProtectedRoute>} />
                   </>}
                   <Route path="/today" element={<Navigate to="/mentor" replace />} />

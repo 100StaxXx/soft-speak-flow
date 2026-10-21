@@ -11,15 +11,17 @@ import {
 } from "react";
 import { MainTabVisibilityProvider } from "@/contexts/MainTabVisibilityContext";
 import { logger } from "@/utils/logger";
+import { GRACEWARD_ADVENTURE_ENABLED } from "@/config/gracewardAdventure";
 import { PRODUCT } from "@/config/product";
 
-type MainTabPath = "/companion" | "/mentor" | "/guide" | "/journeys";
+type MainTabPath = "/play" | "/companion" | "/mentor" | "/guide" | "/journeys";
 
 const TAB_ORDER: MainTabPath[] = PRODUCT.mode === "cosmiq"
   ? ["/mentor", "/journeys", "/companion"]
-  : ["/companion", "/mentor", "/guide"];
+  : GRACEWARD_ADVENTURE_ENABLED ? ["/play", "/companion", "/mentor", "/guide"] : ["/companion", "/mentor", "/guide"];
 
 const TAB_COMPONENTS: Record<MainTabPath, LazyExoticComponent<ComponentType>> = {
+  "/play": lazy(() => import("@/pages/GracewardAdventure")),
   "/companion": lazy(() => import("@/pages/Companion")),
   "/mentor": PRODUCT.mode === "cosmiq"
     ? lazy(() => import("@/pages/Mentor"))
@@ -32,6 +34,7 @@ export const isMainTabPath = (pathname: string): pathname is MainTabPath =>
   TAB_ORDER.includes(pathname as MainTabPath);
 
 const initialScrollPositions: Record<MainTabPath, number> = {
+  "/play": 0,
   "/companion": 0,
   "/mentor": 0,
   "/guide": 0,

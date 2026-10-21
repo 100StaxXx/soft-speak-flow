@@ -11,9 +11,8 @@ const navItems = PRODUCT.mode === "cosmiq" ? [
   { to: "/journeys", label: "Plan", icon: Compass, primary: true },
   { to: "/companion", label: "Companion", icon: PawPrint, primary: false },
 ] as const : GRACEWARD_ADVENTURE_ENABLED ? [
-  { to: "/adventure", label: "Adventure", icon: Compass, primary: false },
-  { to: "/play", label: "Play", icon: Gamepad2, primary: true },
-  { to: "/companion", label: "Companion", icon: PawPrint, primary: false },
+  { to: "/play", label: "Play", icon: Gamepad2, primary: false },
+  { to: "/companion", label: "Companion", icon: PawPrint, primary: true },
   { to: "/mentor", label: "Sanctuary", icon: BookOpen, primary: false },
 ] as const : [
   { to: "/mentor", label: "Today", icon: Sunrise, primary: false },
@@ -54,7 +53,7 @@ export const BottomNav = memo(() => {
       aria-label="Main navigation"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
-      <div className={`mx-auto grid max-w-lg ${GRACEWARD_ADVENTURE_ENABLED ? "grid-cols-4" : "grid-cols-3"} items-end px-3 py-2`}>
+      <div className="mx-auto grid max-w-lg grid-cols-3 items-end px-3 py-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           return (
