@@ -42,9 +42,12 @@ jobs:
       - name: Prepare isolated worker runtime
         run: |
           mkdir -p ops/companion-media/scripts
-          cp scripts/companion-media-worker.mjs scripts/companion-animation-worker.mjs scripts/companion-animation-processing.mjs scripts/verify-companion-temporal.mjs scripts/finish-companion-foreground.mjs scripts/pack-companion-actions.mjs scripts/verify-companion-action-pack.mjs scripts/companion-animation-review-sheet.mjs scripts/extract-companion-video-foreground.swift scripts/encode-companion-alpha.swift scripts/inspect-companion-alpha.swift ops/companion-media/scripts/
+          cp scripts/companion-native-codec-smoke.mjs scripts/companion-media-worker.mjs scripts/companion-animation-worker.mjs scripts/companion-animation-processing.mjs scripts/verify-companion-temporal.mjs scripts/finish-companion-foreground.mjs scripts/pack-companion-actions.mjs scripts/verify-companion-action-pack.mjs scripts/companion-animation-review-sheet.mjs scripts/extract-companion-video-foreground.swift scripts/encode-companion-alpha.swift scripts/inspect-companion-alpha.swift ops/companion-media/scripts/
           npm ci --prefix ops/companion-media
           command -v ffmpeg || brew install ffmpeg
+      - name: Check native transparency codecs
+        working-directory: ops/companion-media
+        run: node scripts/companion-native-codec-smoke.mjs
       - name: Review existing media and finish one queued pack
         working-directory: ops/companion-media
         run: node run.mjs
