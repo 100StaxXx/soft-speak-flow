@@ -1,6 +1,11 @@
 name: Companion Media Quality
 on:
   workflow_dispatch:
+    inputs:
+      validate_runtime:
+        description: Run native codec checks even when the queue is empty
+        type: boolean
+        default: false
   schedule:
     - cron: '3,8,13,18,23,28,33,38,43,48,53,58 * * * *'
 permissions:
@@ -29,7 +34,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
   review:
     needs: queue
-    if: needs.queue.outputs.work == 'true'
+    if: needs.queue.outputs.work == 'true' || inputs.validate_runtime == true
     runs-on: macos-15
     timeout-minutes: 60
     steps:
