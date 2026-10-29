@@ -86,6 +86,7 @@ export async function reviewOnce(db,origin,key) {
   const {error:ledger}=await db.from('user_storage_assets').upsert({user_id:job.user_id,bucket_id:'companion-cinema-private',storage_path:storagePath,source_kind:'companion_media_review',source_record_table:'companion_media_reviews',source_record_id:job.id},{onConflict:'bucket_id,storage_path'});
   if(ledger)throw Error('asset_registration_failed');
   const {error:upload}=await db.storage.from('companion-cinema-private').upload(storagePath,sheet,{contentType:'image/jpeg',upsert:false});if(upload&&String(upload.statusCode)!=='409')throw Error('asset_upload_failed');
+  const stored=await db.from('companion_media_reviews').update({report}).eq('id',job.id).eq('lease_token',job.lease_token).eq('status','processing').gt('lease_until',new Date().toISOString()).select('id').maybeSingle();if(stored.error||!stored.data)throw Error('worker_lease_lost');
   const response=await fetch(`${origin}/functions/v1/companion-media-review`,{method:'POST',headers:{authorization:`Bearer ${key}`,apikey:key,'content-type':'application/json'},signal:AbortSignal.any([controller.signal,AbortSignal.timeout(90000)]),body:JSON.stringify({action:'visual',id:job.id,lease:job.lease_token,sha256:report.sha256})});
   if(!response.ok){const failed=await response.json().catch(()=>({}));throw Error(typeof failed.code==='string'&&/^[a-z_]+$/.test(failed.code)?`quality_${failed.code}`:'quality_visual_review_unavailable');}
   const {assessment}=await response.json();
