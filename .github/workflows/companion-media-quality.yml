@@ -1,0 +1,53 @@
+name: Companion Media Quality
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '3,8,13,18,23,28,33,38,43,48,53,58 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: cosmiq-companion-media
+  cancel-in-progress: false
+jobs:
+  queue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      work: ${{ steps.probe.outputs.work }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci --prefix ops/companion-media --ignore-scripts
+      - id: probe
+        working-directory: ops/companion-media
+        run: node run.mjs --probe
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  review:
+    needs: queue
+    if: needs.queue.outputs.work == 'true'
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Prepare isolated worker runtime
+        run: |
+          mkdir -p ops/companion-media/scripts
+          cp scripts/companion-media-worker.mjs scripts/companion-animation-worker.mjs scripts/companion-animation-processing.mjs scripts/verify-companion-temporal.mjs scripts/finish-companion-foreground.mjs scripts/pack-companion-actions.mjs scripts/verify-companion-action-pack.mjs scripts/companion-animation-review-sheet.mjs scripts/extract-companion-video-foreground.swift scripts/encode-companion-alpha.swift scripts/inspect-companion-alpha.swift ops/companion-media/scripts/
+          npm ci --prefix ops/companion-media
+          command -v ffmpeg || brew install ffmpeg
+      - name: Review existing media and finish one queued pack
+        working-directory: ops/companion-media
+        run: node run.mjs
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # User media is kept in private app storage, never public workflow artifacts.

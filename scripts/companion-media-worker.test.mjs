@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import {execFileSync} from 'node:child_process';
+import {publicMediaURL,validateProbe,inspectMedia} from './companion-media-worker.mjs';
+const origin='https://project.supabase.co';
+test('video download is restricted to the owning app storage path',()=>{const base=origin+'/storage/v1/object/public/companion-animation-videos/user/clip.mp4';assert.equal(publicMediaURL({user_id:'user',video_url:base},origin),base);for(const url of [base+'?token=bad',base.replace('/user/','/another/'),base.replace('project.supabase.co','evil.example'),base.replace('https:','http:')])assert.throws(()=>publicMediaURL({user_id:'user',video_url:url},origin));});
+test('probe rejects unbounded or wrong-duration inputs',()=>{const p={streams:[{width:640,height:640,avg_frame_rate:'24/1'}],format:{duration:'4.04'}};assert.equal(validateProbe(p,4).fps,24);assert.throws(()=>validateProbe(p,12));assert.throws(()=>validateProbe({...p,format:{duration:'Infinity'}},null));assert.throws(()=>validateProbe({...p,streams:[{...p.streams[0],width:8192}]},null));});
+test('real decoder builds endpoint-inclusive sheet and rejects an inserted flash',async()=>{const dir=await fs.mkdtemp(path.join(os.tmpdir(),'cosmiq-quality-test-'));try{const clip=path.join(dir,'clip.mp4');execFileSync('ffmpeg',['-v','error','-f','lavfi','-i','color=c=0x345678:s=128x128:r=24:d=2','-c:v','libx264','-pix_fmt','yuv420p',clip]);const result=await inspectMedia(clip,dir,{expected:2,loop:true});assert.equal(result.report.passed,true);assert.equal(result.report.temporal.frameCount,48);assert.ok(result.sheet.length>1000);const bad=path.join(dir,'flash.mp4');execFileSync('ffmpeg',['-v','error','-i',clip,'-vf',"drawbox=c=white:t=fill:enable=eq(n\\,24)",'-c:v','libx264','-pix_fmt','yuv420p',bad]);const failed=await inspectMedia(bad,dir,{expected:2});assert.equal(failed.report.passed,false);assert.equal(failed.sheet,undefined);}finally{await fs.rm(dir,{recursive:true,force:true});}});

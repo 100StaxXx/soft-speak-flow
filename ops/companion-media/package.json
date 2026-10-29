@@ -1,0 +1,1 @@
+{"name":"cosmiq-companion-media-worker","private":true,"type":"module","dependencies":{"@supabase/supabase-js":"2.81.1","sharp":"0.35.5"}}
