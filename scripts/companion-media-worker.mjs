@@ -78,7 +78,7 @@ export async function reviewOnce(db,origin,key) {
   const bytes=await boundedDownload(await fetch(url,{redirect:'error',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(60000)])}),controller.signal);
   const file=path.join(dir,'source.mp4');await fs.writeFile(file,bytes,{flag:'wx'});
   let sampleIndices=null;
-  if(job.source_kind==='package'&&!job.audit_only){const {data:pack,error}=await db.from('companion_animation_packages').select('manifest').eq('id',job.source_id).single();if(error||pack.manifest?.assets?.webm?.sha256!==digest(bytes))throw Error('quality_pack_bytes_changed');sampleIndices=pack.manifest.actions.flatMap(a=>[a.startFrame,Math.floor((a.startFrame+a.endFrame)/2),a.endFrame]);}
+  if(job.source_kind==='package'){const {data:pack,error}=await db.from('companion_animation_packages').select('manifest').eq('id',job.source_id).maybeSingle();if(error||(!pack&&!job.audit_only))throw Error('quality_pack_unavailable');if(pack){if(pack.manifest?.assets?.webm?.sha256!==digest(bytes))throw Error('quality_pack_bytes_changed');sampleIndices=pack.manifest.actions.flatMap(a=>[a.startFrame,Math.floor((a.startFrame+a.endFrame)/2),a.endFrame]);}}
   const {report,sheet}=await inspectMedia(file,dir,{expected:job.expected_seconds,loop:job.loop_required,alpha:job.source_kind==='package',motion:true,sampleIndices,signal:controller.signal});
   completedReport=report;
   if(!report.passed){await finish(report,'quality_temporal_continuity');console.log('Media held for temporal review.');return true;}
