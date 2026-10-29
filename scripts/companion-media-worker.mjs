@@ -26,16 +26,18 @@ export function validateProbe(probe,expected) {
  if(!Number.isFinite(fps)||fps<10||fps>60)throw Error('quality_media_framerate');
  return {duration,width:stream.width,height:stream.height,fps};
 }
-export async function inspectMedia(file,dir,{expected=null,loop=false,alpha=false,signal=AbortSignal.timeout(120000)}={}) {
+export async function inspectMedia(file,dir,{expected=null,loop=false,alpha=false,motion=false,sampleIndices=null,signal=AbortSignal.timeout(120000)}={}) {
  const run=(command,args)=>exec(command,args,{signal,timeout:120000,maxBuffer:1024*1024});
  const probe=JSON.parse((await run('ffprobe',['-v','error','-select_streams','v:0','-show_entries','stream=width,height,avg_frame_rate:format=duration','-of','json',file])).stdout);
  const metadata=validateProbe(probe,expected);
  const bytes=await fs.readFile(file),sha256=digest(bytes);
  const temporal=await verifyTemporal(file,{loop,alpha,signal});
+ if(motion&&temporal.maxFrameChange<0.05){temporal.passed=false;temporal.issues.push({frame:0,reason:'no_visible_motion'});}
  const report={passed:temporal.passed,sha256,metadata,temporal};
  if(!report.passed)return {report};
  // Include the first and final decoded frames, rather than timestamps after EOF.
- const indices=Array.from({length:12},(_,i)=>Math.round(i*(temporal.frameCount-1)/11));
+ const indices=sampleIndices ? [...new Set([0,...sampleIndices,temporal.frameCount-1])].sort((a,b)=>a-b) : Array.from({length:12},(_,i)=>Math.round(i*(temporal.frameCount-1)/11));
+ if(indices.length>32||indices.some(n=>!Number.isInteger(n)||n<0||n>=temporal.frameCount))throw Error('quality_invalid_sample_indices');
  const selection=[...new Set(indices)].map(n=>`eq(n\\,${n})`).join('+');
  await run('ffmpeg',['-v','error','-n',...(alpha?['-c:v','libvpx-vp9']:[]),'-i',file,'-vf',`select=${selection},scale=384:256:force_original_aspect_ratio=decrease,pad=384:256:(ow-iw)/2:(oh-ih)/2:color=0x18202c`,'-fps_mode','vfr',path.join(dir,'sample-%02d.png')]);
  const names=(await fs.readdir(dir)).filter(n=>/^sample-\d+\.png$/.test(n)).sort();
@@ -75,7 +77,9 @@ export async function reviewOnce(db,origin,key) {
   }else url=publicMediaURL(job,origin);
   const bytes=await boundedDownload(await fetch(url,{redirect:'error',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(60000)])}),controller.signal);
   const file=path.join(dir,'source.mp4');await fs.writeFile(file,bytes,{flag:'wx'});
-  const {report,sheet}=await inspectMedia(file,dir,{expected:job.expected_seconds,loop:job.loop_required,alpha:job.source_kind==='package',signal:controller.signal});
+  let sampleIndices=null;
+  if(job.source_kind==='package'&&!job.audit_only){const {data:pack,error}=await db.from('companion_animation_packages').select('manifest').eq('id',job.source_id).single();if(error||pack.manifest?.assets?.webm?.sha256!==digest(bytes))throw Error('quality_pack_bytes_changed');sampleIndices=pack.manifest.actions.flatMap(a=>[a.startFrame,Math.floor((a.startFrame+a.endFrame)/2),a.endFrame]);}
+  const {report,sheet}=await inspectMedia(file,dir,{expected:job.expected_seconds,loop:job.loop_required,alpha:job.source_kind==='package',motion:true,sampleIndices,signal:controller.signal});
   completedReport=report;
   if(!report.passed){await finish(report,'quality_temporal_continuity');console.log('Media held for temporal review.');return true;}
   const storagePath=`${job.user_id}/quality/${job.id}/${report.sha256}.jpg`;
