@@ -38,12 +38,46 @@ async function download(url, output, signal) {
   for await (const chunk of response.body) { size += chunk.length; if (size > limit) throw new Error('source_too_large'); chunks.push(chunk); }
   await fs.writeFile(output, Buffer.concat(chunks), { flag: 'wx' });
 }
+// Only fixed stage names and allowlisted failure categories enter hosted logs.
+// Child-process errors can contain private media paths and environment details.
+export function processingFailureCode(error, stage) {
+  const safeStage = /^[a-z_]+$/.test(stage) ? stage : 'processing';
+  const stderr = typeof error?.stderr === 'string' ? error.stderr : '';
+  let reason = 'failed';
+  if (error?.name === 'AbortError') reason = 'aborted';
+  else if (error?.killed) reason = 'timeout';
+  else if (/No foreground in frame/.test(stderr)) reason = 'no_foreground';
+  else if (/No space left on device|ENOSPC/.test(stderr)) reason = 'disk_full';
+  else if (/Cannot decode video|Incomplete decode/.test(stderr)) reason = 'decode_failed';
+  else if (/Decoder did not return requested frame/.test(stderr)) reason = 'frame_mismatch';
+  else if (/HEVC alpha encoder unavailable/.test(stderr)) reason = 'codec_unavailable';
+  else if (/Encoder stalled/.test(stderr)) reason = 'encoder_stalled';
+  return `worker_${safeStage}_${reason}`;
+}
 async function run(command, args, signal, timeout = 15 * 60_000) {
-  return exec(command, args, { cwd: root, signal, timeout, maxBuffer: 4 * 1024 * 1024 });
+  const stages = {
+    'extract-companion-video-foreground.swift': 'extract_foreground',
+    'pack-companion-actions.mjs': 'pack_actions',
+    'encode-companion-alpha.swift': 'encode_hevc',
+    'inspect-companion-alpha.swift': 'decode_hevc',
+    'verify-companion-action-pack.mjs': 'verify_action_pack',
+    'companion-animation-review-sheet.mjs': 'review_sheet',
+  };
+  const stage = stages[path.basename(args[0])] ?? (command === 'ffprobe' ? 'probe_source' : command === 'ffmpeg' ? 'ffmpeg' : 'processing');
+  console.log(`Starting ${stage}`);
+  try {
+    const result = await exec(command, args, { cwd: root, signal, timeout, maxBuffer: 4 * 1024 * 1024 });
+    console.log(`Completed ${stage}`);
+    return result;
+  } catch (error) {
+    throw new Error(processingFailureCode(error, stage));
+  }
 }
 
 export async function processLocalSet(actions, output, signal = AbortSignal.timeout(45 * 60_000)) {
+  console.log('Starting finish_frames');
   const finished = await finishAnimationSet(actions, path.join(output, 'finished'));
+  console.log('Completed finish_frames');
   const recipe = path.join(output, 'recipe.json');
   await fs.writeFile(recipe, JSON.stringify(finished.recipe), { flag: 'wx' });
   const packed = path.join(output, 'packed');
@@ -121,6 +155,7 @@ async function main() {
     const inputs = validateInputs(job,origin), actions=[];
     for (const input of inputs) {
       if(controller.signal.aborted) throw new Error('worker_lease_lost');
+      console.log(`Preparing action ${input.category}`);
       const clip=path.join(dir,`${input.category}.mp4`), masks=path.join(dir,`masks-${input.category}`);
       await download(input.video_url,clip,controller.signal);
       const probe=JSON.parse((await run('ffprobe',['-v','error','-select_streams','v:0','-show_entries','stream=width,height,r_frame_rate,nb_frames','-of','json',clip],controller.signal)).stdout).streams[0];
