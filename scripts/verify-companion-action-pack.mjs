@@ -18,7 +18,7 @@ for (let p = 0; p < image.length; p += 4) {
   assert.equal(image[p + 3], decodedAnchor[p + 3]);
   if (image[p + 3]) for (let c = 0; c < 3; c++) assert.equal(image[p + c], decodedAnchor[p + c]);
 }
-function compare(a, b) {
+function compare(a, b, label) {
   const sums = [0, 0, 0]; let pixels = 0, alpha = 0;
   for (let p = 0; p < a.length; p += 4) {
     alpha += Math.abs(a[p + 3] - b[p + 3]);
@@ -26,7 +26,7 @@ function compare(a, b) {
       pixels++; for (let c = 0; c < 3; c++) sums[c] += Math.abs(a[p + c] - b[p + c]);
     }
   }
-  assert.ok(pixels > 20_000, 'Opaque character missing');
+  assert.ok(pixels > 20_000, `${label}: Opaque character missing`);
   return { rgb: sums.map(s => s / pixels), alpha: alpha / (a.length / 4) };
 }
 const results = [];
@@ -34,7 +34,7 @@ for (const segment of manifest.segments) {
   for (const n of [segment.startFrame, segment.endFrame, segment.guardEndFrame]) {
     assert.ok(masterAnchor.equals(await read(file(masters, n))), `${segment.id}: master pose changed`);
     const frame = await read(file(decoded, n));
-    const match = compare(decodedAnchor, frame);
+    const match = compare(decodedAnchor, frame, `${segment.id} seam ${n}`);
     assert.ok(match.rgb.every(n => n < 3), `${segment.id}: seam color mismatch ${JSON.stringify(match)}`);
     assert.ok(match.alpha < 1, `${segment.id}: alpha drift`);
     for (const p of [20 * 640 + 20, 620 * 640 + 620]) assert.equal(frame[p * 4 + 3], 0);
@@ -42,7 +42,7 @@ for (const segment of manifest.segments) {
   }
   const mid = Math.floor((segment.startFrame + segment.endFrame) / 2);
   const frame = await read(file(decoded, mid));
-  const match = compare(await read(file(masters, mid)), frame);
+  const match = compare(await read(file(masters, mid)), frame, `${segment.id} midpoint ${mid}`);
   assert.ok(match.rgb.every(n => n < 4), `${segment.id}: decoded action color mismatch`);
   assert.ok(match.alpha < 1, `${segment.id}: decoded action alpha mismatch`);
 }
