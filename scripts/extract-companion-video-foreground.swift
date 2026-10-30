@@ -4,6 +4,7 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 import Vision
+import CoreML
 
 // Offline prototype: original frames and timing are preserved. No motion is synthesized.
 let args = CommandLine.arguments
@@ -23,13 +24,22 @@ let trackOutput = AVAssetReaderTrackOutput(track: track, outputSettings: [
 reader.add(trackOutput)
 guard reader.startReading() else { fatalError("Cannot decode video") }
 let context = CIContext()
+// Explicit device selection replaces usesCPUOnly, which is deprecated and does
+// not keep this GPU/Neural-Engine-only model off the Neural Engine. That path
+// can stall while loading on unattended workers. Select only supported devices
+// and reuse the request across frames; mask content and quality gates are unchanged.
+let request = VNGenerateForegroundInstanceMaskRequest()
+for (stage, devices) in try request.supportedComputeStageDevices {
+  let gpu = devices.first(where: { if case .gpu = $0 { return true }; return false })
+  let cpu = devices.first(where: { if case .cpu = $0 { return true }; return false })
+  guard let device = gpu ?? cpu else { fatalError("Foreground compute device unavailable") }
+  request.setComputeDevice(device, for: stage)
+}
 var index = 0
 while let sample = trackOutput.copyNextSampleBuffer() {
   try autoreleasepool {
     guard let buffer = CMSampleBufferGetImageBuffer(sample) else { fatalError("Missing frame") }
     let handler = VNImageRequestHandler(cvPixelBuffer: buffer, options: [:])
-    let request = VNGenerateForegroundInstanceMaskRequest()
-    request.usesCPUOnly = true
     try handler.perform([request])
     guard let observation = request.results?.first, !observation.allInstances.isEmpty else {
       fatalError("No foreground in frame \(index)")
