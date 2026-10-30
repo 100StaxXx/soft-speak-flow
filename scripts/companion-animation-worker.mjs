@@ -46,6 +46,7 @@ export function processingFailureCode(error, stage) {
   let reason = 'failed';
   if (error?.name === 'AbortError') reason = 'aborted';
   else if (error?.killed) reason = 'timeout';
+  else if (/Foreground compute device unavailable/.test(stderr)) reason = 'compute_unavailable';
   else if (/No foreground in frame/.test(stderr)) reason = 'no_foreground';
   else if (/No space left on device|ENOSPC/.test(stderr)) reason = 'disk_full';
   else if (/Cannot decode video|Incomplete decode/.test(stderr)) reason = 'decode_failed';
