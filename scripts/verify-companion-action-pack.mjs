@@ -1,3 +1,4 @@
+import { compareActionFrame as compare } from './companion-action-frame-quality.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -18,17 +19,7 @@ for (let p = 0; p < image.length; p += 4) {
   assert.equal(image[p + 3], decodedAnchor[p + 3]);
   if (image[p + 3]) for (let c = 0; c < 3; c++) assert.equal(image[p + c], decodedAnchor[p + c]);
 }
-function compare(a, b, label) {
-  const sums = [0, 0, 0]; let pixels = 0, alpha = 0;
-  for (let p = 0; p < a.length; p += 4) {
-    alpha += Math.abs(a[p + 3] - b[p + 3]);
-    if (a[p + 3] > 250 && b[p + 3] > 250) {
-      pixels++; for (let c = 0; c < 3; c++) sums[c] += Math.abs(a[p + c] - b[p + c]);
-    }
-  }
-  assert.ok(pixels > 20_000, `${label}: Opaque character missing`);
-  return { rgb: sums.map(s => s / pixels), alpha: alpha / (a.length / 4) };
-}
+
 const results = [];
 for (const segment of manifest.segments) {
   for (const n of [segment.startFrame, segment.endFrame, segment.guardEndFrame]) {
