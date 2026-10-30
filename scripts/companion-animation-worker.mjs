@@ -43,6 +43,7 @@ async function download(url, output, signal) {
 export function processingFailureCode(error, stage) {
   const safeStage = /^[a-z_]+$/.test(stage) ? stage : 'processing';
   const stderr = typeof error?.stderr === 'string' ? error.stderr : '';
+  if (/Opaque character missing/.test(stderr)) return 'quality_character_visibility';
   let reason = 'failed';
   if (error?.name === 'AbortError') reason = 'aborted';
   else if (error?.killed) reason = 'timeout';
