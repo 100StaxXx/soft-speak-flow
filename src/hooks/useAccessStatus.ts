@@ -53,11 +53,11 @@ interface AccessStatus {
 }
 
 export function useAccessStatus(): AccessStatus {
-  const { profile, loading: profileLoading } = useProfile();
+  const { profile, loading: profileLoading, error: profileError } = useProfile();
   const { accessState, isLoading: accessLoading } = useAccessState();
   const isSubscribed = accessState.subscribed;
 
-  const loading = profileLoading || accessLoading;
+  const loading = accessLoading || (profileLoading && !profileError);
 
   // If still loading, return safe defaults (grant access during load to avoid flash)
   if (loading) {
