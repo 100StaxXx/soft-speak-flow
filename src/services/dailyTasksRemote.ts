@@ -10,7 +10,14 @@ export interface DailySubtask {
 }
 
 export interface DailyTask {
+  session_series_anchor?: string | null;
   id: string;
+  schedule_timezone?: string | null;
+  schedule_end_time?: string | null;
+  schedule_source_date?: string | null;
+  schedule_source_time?: string | null;
+  recurrence_override?: boolean;
+  manual_series_id?: string | null;
   user_id: string;
   task_text: string;
   difficulty: string | null;

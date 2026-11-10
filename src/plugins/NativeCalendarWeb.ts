@@ -10,6 +10,10 @@ export class NativeCalendarWeb extends WebPlugin implements NativeCalendarPlugin
     return { granted: false };
   }
 
+  async listEvents(): Promise<never> {
+    throw new Error("Apple Calendar is only available on iOS.");
+  }
+
   async listCalendars(): Promise<{ calendars: NativeCalendarDescriptor[] }> {
     return { calendars: [] };
   }

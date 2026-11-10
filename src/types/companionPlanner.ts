@@ -249,6 +249,7 @@ export interface PlannerPriorityScore {
 }
 
 export interface CompanionPlannerLaunchIntent {
+  selectedDate?: string | null;
   id: string;
   message: string;
   starterIntent: CompanionPlannerStarterIntent;

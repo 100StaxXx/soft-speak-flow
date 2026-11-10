@@ -73,12 +73,47 @@ type StoreMode = IDBTransactionMode;
 
 const ACTIVE_QUEUE_STATUSES: QueueActionStatus[] = ["queued", "syncing", "failed"];
 
+const OFFLINE_DB_OPEN_RETRY_DELAY_MS = 30_000;
+const OFFLINE_DB_OPEN_LOG_COOLDOWN_MS = 60_000;
+
 let db: IDBDatabase | null = null;
 let openPromise: Promise<IDBDatabase> | null = null;
+let offlineDBOpenRetryAfter = 0;
+let lastOfflineDBOpenError: unknown = null;
+let lastOfflineDBOpenErrorLogAt = 0;
 
 const nowMs = () => Date.now();
 
 const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+
+export function isOfflineDBTemporarilyUnavailable(error?: unknown): boolean {
+  if (offlineDBOpenRetryAfter <= nowMs()) {
+    return false;
+  }
+
+  return error === undefined || error === lastOfflineDBOpenError;
+}
+
+const logOfflineDBOpenFailure = (error: unknown) => {
+  const timestamp = nowMs();
+  if (timestamp - lastOfflineDBOpenErrorLogAt < OFFLINE_DB_OPEN_LOG_COOLDOWN_MS) {
+    return;
+  }
+
+  lastOfflineDBOpenErrorLogAt = timestamp;
+  console.error("Failed to open offline database:", error);
+};
+
+const recordOfflineDBOpenFailure = (error: unknown) => {
+  lastOfflineDBOpenError = error;
+  offlineDBOpenRetryAfter = nowMs() + OFFLINE_DB_OPEN_RETRY_DELAY_MS;
+  logOfflineDBOpenFailure(error);
+};
+
+const recordOfflineDBOpenSuccess = () => {
+  lastOfflineDBOpenError = null;
+  offlineDBOpenRetryAfter = 0;
+};
 
 const requestToPromise = <T>(request: IDBRequest<T>) =>
   new Promise<T>((resolve, reject) => {
@@ -304,18 +339,38 @@ const getQueuedActionRowsForUser = async (
 export async function initOfflineDB(): Promise<IDBDatabase> {
   if (db) return db;
 
+  if (isOfflineDBTemporarilyUnavailable()) {
+    return Promise.reject(lastOfflineDBOpenError ?? new Error("Offline database is temporarily unavailable"));
+  }
+
+  if (typeof indexedDB === "undefined") {
+    const error = new Error("IndexedDB is not available");
+    recordOfflineDBOpenFailure(error);
+    return Promise.reject(error);
+  }
+
   if (!openPromise) {
     const pendingOpen = new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      let request: IDBOpenDBRequest;
+      try {
+        request = indexedDB.open(DB_NAME, DB_VERSION);
+      } catch (error) {
+        recordOfflineDBOpenFailure(error);
+        resetOfflineDB();
+        reject(error);
+        return;
+      }
 
       request.onerror = () => {
-        console.error("Failed to open offline database:", request.error);
+        const error = request.error ?? new Error("IndexedDB open request failed");
+        recordOfflineDBOpenFailure(error);
         resetOfflineDB();
-        reject(request.error);
+        reject(error);
       };
 
       request.onsuccess = () => {
         const database = request.result;
+        recordOfflineDBOpenSuccess();
         bindIndexedDbLifecycle(database, resetOfflineDB);
         db = database;
         resolve(database);
@@ -555,6 +610,10 @@ export async function getQueuedActions(userId: string): Promise<QueuedAction[]> 
       return actions;
     });
   } catch (error) {
+    if (isOfflineDBTemporarilyUnavailable(error)) {
+      return [];
+    }
+
     console.error("Failed to get queued actions:", error);
     return [];
   }
@@ -585,6 +644,10 @@ export async function getQueuedActionCount(
       return normalized.filter((action) => statuses.includes(action.status)).length;
     });
   } catch (error) {
+    if (isOfflineDBTemporarilyUnavailable(error)) {
+      return 0;
+    }
+
     console.error("Failed to get queued action count:", error);
     return 0;
   }
@@ -820,5 +883,8 @@ export function __resetOfflineDBForTests(): void {
   if (db) {
     db.close();
   }
+  lastOfflineDBOpenError = null;
+  offlineDBOpenRetryAfter = 0;
+  lastOfflineDBOpenErrorLogAt = 0;
   resetOfflineDB();
 }

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-04T01:05:38Z",
+  "generatedAt": "2026-11-10T20:32:27Z",
   "frontendInvoked": [
     "adjust-epic-plan",
     "analyze-user-patterns",
@@ -7,6 +7,7 @@
     "apply-epic-adjustments",
     "auth-gateway",
     "backfill-companion-image-focal",
+    "calendar-read-events",
     "check-apple-subscription",
     "claim-referral-code",
     "classify-task-intent",
@@ -14,6 +15,7 @@
     "companion-agent-action",
     "companion-chat",
     "companion-planner-chat",
+    "cosmiq-quest-planner",
     "create-influencer-code",
     "decompose-task",
     "delete-quest-attachment",
@@ -113,6 +115,7 @@
     "apply-epic-adjustments",
     "auth-gateway",
     "backfill-companion-image-focal",
+    "calendar-read-events",
     "check-apple-subscription",
     "check-contact-reminders",
     "check-habit-reminders",
@@ -123,6 +126,7 @@
     "companion-agent-action",
     "companion-chat",
     "companion-planner-chat",
+    "cosmiq-quest-planner",
     "cost-guardrail-monitor",
     "create-influencer-code",
     "decompose-task",

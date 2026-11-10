@@ -17,7 +17,28 @@ export interface NativeCalendarEventOptions {
   isAllDay?: boolean;
 }
 
+export interface NativeCalendarEventDescriptor {
+  notes?: string | null;
+  isRecurring?: boolean;
+  modifiedAt?: string | null;
+  id: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  isAllDay: boolean;
+  location?: string | null;
+  calendarId: string;
+  calendarName: string;
+  htmlLink?: string | null;
+}
+
 export interface NativeCalendarPlugin {
+  listEvents(options: {
+    calendarId: string;
+    startDate: string;
+    endDate: string;
+  }): Promise<{ events: NativeCalendarEventDescriptor[] }>;
+
   isAvailable(): Promise<{ available: boolean }>;
   requestPermissions(): Promise<{ granted: boolean }>;
   listCalendars(): Promise<{ calendars: NativeCalendarDescriptor[] }>;

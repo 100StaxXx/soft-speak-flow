@@ -10,12 +10,94 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "isAvailable", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestPermissions", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "listEvents", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "listCalendars", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "createOrUpdateEvent", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "deleteEvent", returnType: CAPPluginReturnPromise)
     ]
 
     private let eventStore = EKEventStore()
+
+    private func eventIdentity(_ event: EKEvent) -> String {
+        let base = event.eventIdentifier ?? event.calendarItemIdentifier
+        return event.hasRecurrenceRules ? "\(base)::cosmiq-occurrence::\(Int64(event.startDate.timeIntervalSince1970 * 1000))" : base
+    }
+
+    private func parseIsoDate(_ value: String) -> Date? {
+        let fractionalFormatter = ISO8601DateFormatter()
+        fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractionalFormatter.date(from: value) {
+            return date
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: value)
+    }
+
+    @objc public func listEvents(_ call: CAPPluginCall) {
+        guard hasCalendarAccess() else {
+            call.reject("Calendar access not granted")
+            return
+        }
+
+        guard let calendarId = call.getString("calendarId"),
+              let startDateString = call.getString("startDate"),
+              let endDateString = call.getString("endDate") else {
+            call.reject("calendarId, startDate, and endDate are required")
+            return
+        }
+
+        guard let calendar = eventStore.calendar(withIdentifier: calendarId) else {
+            call.reject("Calendar not found")
+            return
+        }
+
+        guard let startDate = parseIsoDate(startDateString),
+              let endDate = parseIsoDate(endDateString),
+              endDate > startDate else {
+            call.reject("Invalid calendar event range")
+            return
+        }
+
+        let predicate = eventStore.predicateForEvents(
+            withStart: startDate,
+            end: endDate,
+            calendars: [calendar]
+        )
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        let events = eventStore.events(matching: predicate).map { event in
+            let dayFormatter = DateFormatter()
+            dayFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dayFormatter.calendar = Calendar(identifier: .gregorian)
+            dayFormatter.timeZone = event.timeZone ?? TimeZone.current
+            dayFormatter.dateFormat = "yyyy-MM-dd"
+            var payload = [
+                "id": eventIdentity(event),
+                "title": event.title ?? "Busy",
+                "startDate": event.isAllDay ? dayFormatter.string(from: event.startDate) : formatter.string(from: event.startDate),
+                "endDate": event.isAllDay ? dayFormatter.string(from: event.endDate) : formatter.string(from: event.endDate),
+                "isAllDay": event.isAllDay,
+                "calendarId": calendar.calendarIdentifier,
+                "calendarName": calendar.title,
+                "isRecurring": event.hasRecurrenceRules,
+                "notes": event.notes ?? ""
+            ] as [String : Any]
+
+            if let location = event.location {
+                payload["location"] = location
+            }
+            if let htmlLink = event.url?.absoluteString {
+                payload["htmlLink"] = htmlLink
+            }
+
+            return payload
+        }
+
+        call.resolve(["events": events])
+    }
 
     // MARK: - Helpers
     private func hasCalendarAccess() -> Bool {
@@ -33,12 +115,22 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc public override func requestPermissions(_ call: CAPPluginCall) {
-        eventStore.requestAccess(to: .event) { granted, error in
-            if let error = error {
-                call.reject("Calendar permission request failed", nil, error)
-                return
+        if #available(iOS 17.0, *) {
+            eventStore.requestFullAccessToEvents { granted, error in
+                if let error = error {
+                    call.reject("Calendar permission request failed", nil, error)
+                    return
+                }
+                call.resolve(["granted": granted])
             }
-            call.resolve(["granted": granted])
+        } else {
+            eventStore.requestAccess(to: .event) { granted, error in
+                if let error = error {
+                    call.reject("Calendar permission request failed", nil, error)
+                    return
+                }
+                call.resolve(["granted": granted])
+            }
         }
     }
 
@@ -48,11 +140,13 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        let defaultId = eventStore.defaultCalendarForNewEvents?.calendarIdentifier
         let calendars = eventStore.calendars(for: .event).map { calendar in
             return [
                 "id": calendar.calendarIdentifier,
                 "title": calendar.title,
-                "isPrimary": (calendar.source.sourceType == .calDAV) && calendar.allowsContentModifications
+                "readOnly": !calendar.allowsContentModifications,
+                "isPrimary": calendar.calendarIdentifier == defaultId
             ] as [String : Any]
         }
 

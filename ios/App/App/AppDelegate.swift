@@ -144,6 +144,7 @@ class AppBridgeViewController: CAPBridgeViewController {
         // Local plugins are not auto-registered from capacitor.config.json packageClassList.
         bridge?.registerPluginInstance(WidgetDataPlugin())
         bridge?.registerPluginInstance(NativeCalendarPlugin())
+        bridge?.registerPluginInstance(NativeVoiceInputPlugin())
         bridge?.registerPluginInstance(StoreKitPlugin())
         bridge?.registerPluginInstance(WinWinKitPlugin())
     }

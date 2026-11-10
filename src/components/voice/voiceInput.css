@@ -1,0 +1,10 @@
+.voice-input-feedback { flex-shrink:0; margin:8px 14px; color:#f5e9d1; min-width:0; }
+.voice-input-controls { display:flex; align-items:center; gap:6px; padding:5px; border:1px solid #ffffff26; border-radius:999px; background:#202027; box-shadow:0 4px 18px #0003; }
+.voice-input-controls button { width:44px; height:44px; min-width:44px; border-radius:50%; background:#ffffff12; }
+.voice-input-controls .voice-input-send { background:#7041cf; color:white; }
+.voice-input-feedback-header { display:flex; justify-content:space-between; gap:12px; padding:6px 10px 0; font-size:11px; color:#bccbd6; }
+.voice-input-time { font-variant-numeric:tabular-nums; }
+.voice-input-wave { height:38px; display:flex; flex:1; min-width:0; overflow:hidden; align-items:center; justify-content:center; gap:3px; }
+.voice-input-wave span { flex:1; max-width:4px; min-width:1px; border-radius:3px; background:#e5e2ed; transition:height 70ms linear; }
+.voice-input-transcript { margin:6px 10px; font-size:15px; line-height:1.45; max-height:5.8em; overflow-y:auto; overflow-wrap:anywhere; white-space:pre-wrap; }
+@media(prefers-reduced-motion:reduce) { .voice-input-wave span { transition:none; } }

@@ -1808,6 +1808,7 @@ const Journeys = () => {
         </QuestsErrorBoundary>
 
         <JourneysCompanionPlannerModal
+          selectedDate={selectedDate}
           open={showCompanionPlanner}
           onOpenChange={setIsCompanionPlannerPinned}
           presentation={isDesktopLayout || isMacHostedIOSApp ? "dialog" : "drawer"}

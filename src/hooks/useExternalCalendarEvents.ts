@@ -9,6 +9,80 @@ import type {
 } from "@/types/companionPlanner";
 import { supabase } from "@/integrations/supabase/client";
 
+import { NativeCalendar } from "@/plugins/NativeCalendarPlugin";
+import {
+  dedupeExternalCalendarEvents,
+  normalizeExternalCalendarEvent,
+  type ExternalCalendarEvent,
+  type RawExternalCalendarEvent,
+} from "@/types/externalCalendar";
+import { calendarProviderDisplayName } from "@/utils/calendarDestinationOptions";
+import { parseFunctionInvokeError, toUserFacingFunctionError } from "@/utils/supabaseFunctionErrors";
+
+import type { ConnectedCalendar } from "@/hooks/useCalendarIntegrations";
+
+const getConnectionCalendarName = (connection: ConnectedCalendar): string =>
+  connection.primary_calendar_name
+  || connection.calendar_email
+  || `${calendarProviderDisplayName(connection.provider)} Calendar`;
+
+export async function loadConnectionEvents(
+  connection: ConnectedCalendar,
+  range: { startDate: string; endDate: string },
+): Promise<ExternalCalendarEvent[]> {
+  const fallbackCalendarName = getConnectionCalendarName(connection);
+  let rawEvents: RawExternalCalendarEvent[] = [];
+
+  if (connection.provider === "apple") {
+    if (!connection.primary_calendar_id) {
+      throw new Error("Choose an Apple calendar in Preferences before syncing Agenda.");
+    }
+
+    const available = await NativeCalendar.isAvailable();
+    if (!available.available) {
+      throw new Error("Apple Calendar is unavailable in this app build.");
+    }
+
+    const result = await NativeCalendar.listEvents({
+      calendarId: connection.primary_calendar_id,
+      startDate: range.startDate,
+      endDate: range.endDate,
+    });
+    rawEvents = result.events;
+  } else {
+    const { data, error } = await supabase.functions.invoke(
+      "calendar-read-events",
+      {
+        body: {
+          action: "listEvents",
+          provider: connection.provider,
+          startDate: range.startDate,
+          endDate: range.endDate,
+          calendarId: connection.primary_calendar_id ?? undefined,
+        },
+      },
+    );
+
+    if (error) {
+      const parsed = await parseFunctionInvokeError(error);
+      if (parsed.status === 409) {
+        throw new Error(`Reconnect ${calendarProviderDisplayName(connection.provider)} in Preferences, then retry calendar sync.`);
+      }
+      throw new Error(toUserFacingFunctionError(parsed, { action: `sync ${fallbackCalendarName}` }));
+    }
+
+    rawEvents = Array.isArray(data?.events) ? data.events : [];
+  }
+
+  return rawEvents
+    .map((event) => normalizeExternalCalendarEvent(
+      { ...event, connectionId: connection.id },
+      connection.provider,
+      fallbackCalendarName,
+    ))
+    .filter((event): event is ExternalCalendarEvent => event !== null);
+}
+
 interface UseExternalCalendarEventsOptions {
   enabled?: boolean;
 }

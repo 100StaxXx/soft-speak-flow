@@ -2765,6 +2765,11 @@ export type Database = {
           reminder_offsets_minutes: number[]
           reminder_sent: boolean | null
           reminder_sent_offsets_minutes: number[]
+          schedule_timezone: string | null
+          schedule_end_time: string | null
+          session_series_anchor: string | null
+          manual_series_id: string | null
+          recurrence_override: boolean
           scheduled_time: string | null
           sort_order: number | null
           source: string | null
@@ -2815,6 +2820,11 @@ export type Database = {
           reminder_offsets_minutes?: number[]
           reminder_sent?: boolean | null
           reminder_sent_offsets_minutes?: number[]
+          schedule_timezone?: string | null
+          schedule_end_time?: string | null
+          session_series_anchor?: string | null
+          manual_series_id?: string | null
+          recurrence_override?: boolean
           scheduled_time?: string | null
           sort_order?: number | null
           source?: string | null
@@ -2865,6 +2875,11 @@ export type Database = {
           reminder_offsets_minutes?: number[]
           reminder_sent?: boolean | null
           reminder_sent_offsets_minutes?: number[]
+          schedule_timezone?: string | null
+          schedule_end_time?: string | null
+          session_series_anchor?: string | null
+          manual_series_id?: string | null
+          recurrence_override?: boolean
           scheduled_time?: string | null
           sort_order?: number | null
           source?: string | null

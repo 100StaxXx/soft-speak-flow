@@ -743,6 +743,13 @@ describe("useTaskMutations attachment handling", () => {
     );
   });
 
+  it("persists a fixed recurring class as a zoned ordinary quest", async () => {
+    setOnline(true);
+    const { result } = renderHook(() => useTaskMutations("2026-10-27"), { wrapper: createWrapper() });
+    await act(async () => { await result.current.addTask({ taskText:"Biology",difficulty:"easy",taskDate:"2026-10-27",scheduledTime:"08:00",estimatedDuration:180,keepTimeFixed:true,recurrencePattern:"custom",recurrenceDays:[0,2,4] }); });
+    expect(mocks.dailyTasksInsertMock).toHaveBeenCalledWith(expect.objectContaining({flexibility:"fixed",must_calendar_block:true,schedule_timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,recurrence_days:[0,2,4],estimated_duration:180}));
+  });
+
   it("preserves an explicit voice source through local and remote quest creation", async () => {
     setOnline(true);
 
@@ -1909,4 +1916,15 @@ describe("useTaskMutations attachment handling", () => {
     }));
     expect(mocks.toastMock).not.toHaveBeenCalledWith(expect.objectContaining({ title: "Time removed" }));
   });
+});
+
+it('allows a corrected quest after an early recurring-time validation error', async () => {
+ const {result}=renderHook(()=>useTaskMutations('2026-02-20'),{wrapper:createWrapper()});
+ await act(async()=>{
+  await expect(result.current.addTask({taskText:'Work',difficulty:'medium',taskDate:'2026-02-20',recurrencePattern:'daily'})).rejects.toThrow();
+ });
+ await act(async()=>{
+  await expect(result.current.addTask({taskText:'Work',difficulty:'medium',taskDate:'2026-02-20',scheduledTime:'09:00',recurrencePattern:'daily'})).resolves.toBeTruthy();
+ });
+ expect(result.current.isAdding).toBe(false);
 });

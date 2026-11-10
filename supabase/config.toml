@@ -396,3 +396,9 @@ verify_jwt = false
 
 [functions.cost-guardrail-monitor]
 verify_jwt = false
+
+[functions.cosmiq-quest-planner]
+verify_jwt = false
+
+[functions.calendar-read-events]
+verify_jwt = false

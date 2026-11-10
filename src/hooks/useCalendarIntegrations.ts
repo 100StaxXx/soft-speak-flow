@@ -24,6 +24,7 @@ export interface ConnectedCalendar {
 }
 
 interface CalendarUserSettings {
+  visible_calendars?: Partial<Record<CalendarProvider, string[]>>;
   user_id: string;
   integration_visible: boolean;
   nudge_dismissed_at: string | null;
@@ -94,12 +95,12 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
 
       const { data, error } = await supabase
         .from('calendar_user_settings')
-        .select('user_id, integration_visible, nudge_dismissed_at, default_provider')
+        .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
 
       if (error) throw error;
-      return data as CalendarUserSettings | null;
+      return data as unknown as CalendarUserSettings | null;
     },
   });
 
@@ -467,7 +468,17 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
     onSuccess: invalidate,
   });
 
+  // Return fresh query results directly: awaiting invalidation alone leaves a
+  // caller's current render holding the old error/connection snapshot.
+  const reloadScheduleSources = async () => {
+    const [freshSettings, freshConnections] = await Promise.all([settingsQuery.refetch(), connectionsQuery.refetch()]);
+    return { connections: freshConnections.data ?? [], visibleCalendars: freshSettings.data?.visible_calendars,
+      calendarsLoading: freshSettings.isError || freshConnections.isError };
+  };
+
   return {
+    reloadScheduleSources,
+    hasLoadError: !!settingsQuery.error || !!connectionsQuery.error,
     settings,
     connections,
     connectedByProvider,

@@ -1,3 +1,4 @@
+import { canonicalScheduleChange } from '@/utils/zonedQuest';
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -89,6 +90,8 @@ function detectCategory(taskText: string, providedCategory?: string): TaskCatego
 }
 
 export interface AddTaskParams {
+  creationId?: string;
+  epicId?: string | null;
   taskText: string;
   difficulty: 'easy' | 'medium' | 'hard';
   source?: QuestCreationSource | string | null;
@@ -96,6 +99,7 @@ export interface AddTaskParams {
   isMainQuest?: boolean;
   scheduledTime?: string | null;
   estimatedDuration?: number | null;
+  keepTimeFixed?: boolean;
   recurrencePattern?: string | null;
   recurrenceDays?: number[] | null;
   recurrenceMonthDays?: number[] | null;
@@ -201,6 +205,8 @@ const TOGGLE_TASK_REMOTE_STATE_SELECT = `
 `;
 
 interface TaskUpdateInput {
+  schedule_timezone?: string | null;
+  flexibility?: "fixed" | "preferred" | "flexible";
   task_text?: string;
   task_date?: string | null;
   difficulty?: string;
@@ -866,7 +872,7 @@ export const useTaskMutations = (taskDate: string) => {
     mutationFn: async (params: AddTaskParams) => withTaskSyncLock(async () => {
       if (addInProgress.current) throw new Error('Please wait...');
       addInProgress.current = true;
-
+      try {
       const normalizedScheduling = normalizeTaskSchedulingState({
         task_date: params.taskDate !== undefined ? params.taskDate : taskDate,
         scheduled_time: params.scheduledTime || null,
@@ -906,12 +912,9 @@ export const useTaskMutations = (taskDate: string) => {
         .map((title) => title.trim())
         .filter((title) => title.length > 0);
 
-      const localExistingTasks = normalizedScheduling.task_date === null
-        ? []
-        : await getLocalTasksByDate<DailyTask>(user.id, normalizedScheduling.task_date);
-      const questPosition = (localExistingTasks?.length || 0) + 1;
-      const xpReward = getEffectiveQuestXP(params.difficulty, questPosition);
-      const localTaskId = normalizeUuidLikeId(createOfflinePlannerId("task"));
+      // Store the base reward. The server applies completion order and daily limits.
+      const xpReward = getEffectiveQuestXP(params.difficulty, 1);
+      const localTaskId = normalizeUuidLikeId(params.creationId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(params.creationId) ? params.creationId : createOfflinePlannerId("task"));
 
       const localTaskRow: DailyTask = {
         id: localTaskId,
@@ -930,6 +933,9 @@ export const useTaskMutations = (taskDate: string) => {
         recurrence_month_days: (recurrenceWrite.fields.recurrence_month_days as number[] | null | undefined) ?? null,
         recurrence_custom_period: (recurrenceWrite.fields.recurrence_custom_period as "week" | "month" | null | undefined) ?? null,
         recurrence_end_date: (recurrenceWrite.fields.recurrence_end_date as string | null | undefined) ?? null,
+        schedule_timezone: params.keepTimeFixed ? Intl.DateTimeFormat().resolvedOptions().timeZone : null,
+        flexibility: params.keepTimeFixed ? "fixed" : "preferred",
+        must_calendar_block: params.keepTimeFixed === true,
         is_recurring: recurrenceWrite.hasRecurrence,
         reminder_enabled: reminderEnabled,
         reminder_minutes_before: reminderMinutesBefore,
@@ -947,7 +953,7 @@ export const useTaskMutations = (taskDate: string) => {
         context_id: null,
         source: resolveQuestSource(params.source, normalizedScheduling),
         habit_source_id: null,
-        epic_id: null,
+        epic_id: params.epicId || null,
         sort_order: 0,
         contact_id: params.contactId || null,
         auto_log_interaction: params.autoLogInteraction ?? true,
@@ -974,12 +980,16 @@ export const useTaskMutations = (taskDate: string) => {
       const queuedCreatePayload = {
         id: localTaskId,
         task_text: params.taskText,
+          epic_id: params.epicId || null,
         difficulty: params.difficulty,
         xp_reward: xpReward,
         task_date: normalizedScheduling.task_date,
         is_main_quest: params.isMainQuest ?? false,
         scheduled_time: normalizedScheduling.scheduled_time,
         estimated_duration: params.estimatedDuration || null,
+        schedule_timezone: params.keepTimeFixed ? Intl.DateTimeFormat().resolvedOptions().timeZone : null,
+        flexibility: params.keepTimeFixed ? "fixed" : "preferred",
+        must_calendar_block: params.keepTimeFixed === true,
         ...recurrenceWrite.fields,
         is_recurring: recurrenceWrite.hasRecurrence,
         reminder_enabled: reminderEnabled,
@@ -1068,12 +1078,16 @@ export const useTaskMutations = (taskDate: string) => {
           id: getRemoteTaskId(localTaskId),
           user_id: user.id,
           task_text: params.taskText,
+          epic_id: params.epicId || null,
           difficulty: params.difficulty,
           xp_reward: xpReward,
           task_date: normalizedScheduling.task_date,
           is_main_quest: params.isMainQuest ?? false,
           scheduled_time: normalizedScheduling.scheduled_time,
           estimated_duration: params.estimatedDuration || null,
+          schedule_timezone: params.keepTimeFixed ? Intl.DateTimeFormat().resolvedOptions().timeZone : null,
+        flexibility: params.keepTimeFixed ? "fixed" : "preferred",
+          must_calendar_block: params.keepTimeFixed === true,
           ...recurrenceWrite.fields,
           is_recurring: recurrenceWrite.hasRecurrence,
           reminder_enabled: reminderEnabled,
@@ -1237,7 +1251,9 @@ export const useTaskMutations = (taskDate: string) => {
           existenceCheckMs,
         });
         throw error;
+      }
       } finally {
+        // Includes validation and local reads, not only the remote insert.
         addInProgress.current = false;
       }
     }),
@@ -1339,6 +1355,7 @@ export const useTaskMutations = (taskDate: string) => {
       // Refetch to sync with server
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['manual-campaign-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['inbox-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['inbox-count'] });
     },
@@ -2104,6 +2121,7 @@ export const useTaskMutations = (taskDate: string) => {
       if (!user?.id) throw new Error('User not authenticated');
       const remoteTaskId = getRemoteTaskId(taskId);
       const localTask = await getLocalTaskRecord(taskId);
+      updates = canonicalScheduleChange(localTask, updates);
       let normalizedToInbox = false;
       let strippedScheduledTime = false;
       let movedFromInboxToScheduled = false;
@@ -2120,6 +2138,8 @@ export const useTaskMutations = (taskDate: string) => {
 
       // Build update object with only provided fields
       const updateData: Record<string, unknown> = {};
+      if (updates.schedule_timezone !== undefined) updateData.schedule_timezone = updates.schedule_timezone;
+      if (updates.flexibility !== undefined) {updateData.flexibility=updates.flexibility; updateData.must_calendar_block=updates.flexibility === "fixed";}
       
       if (updates.task_text !== undefined) {
         updateData.task_text = updates.task_text;
@@ -2352,6 +2372,7 @@ export const useTaskMutations = (taskDate: string) => {
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['manual-campaign-tasks'] });
 
       if (data?.queued) {
         toast({
