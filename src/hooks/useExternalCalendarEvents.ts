@@ -55,7 +55,7 @@ const getRange = (selectedDate: Date) => {
   };
 };
 
-async function loadConnectionEvents(
+export async function loadConnectionEvents(
   connection: ConnectedCalendar,
   range: { startDate: string; endDate: string },
 ): Promise<ExternalCalendarEvent[]> {

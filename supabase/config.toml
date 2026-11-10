@@ -417,3 +417,7 @@ static_files = ["./functions/companion-wellbeing-video/habitats/*.webp"]
 # Preserve live gateway behavior: this worker validates its internal secret itself.
 [functions.process-companion-cinema-event]
 verify_jwt = false
+
+# The planner authenticates users with requireProtectedRequest.
+[functions.cosmiq-quest-planner]
+verify_jwt = false

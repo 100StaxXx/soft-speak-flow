@@ -1,1312 +1,357 @@
-import type { HTMLAttributes, ReactNode } from "react";
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CompanionStructuredResponse } from "@/shared/companionStructuredOutput";
-import type { CompanionAgentFollowUp } from "@/types/companionAgent";
-import type { CompanionAssistantMessage } from "@/hooks/useCompanionAssistant";
-
-const mocks = vi.hoisted(() => ({
-  visual: {
-    companionLabel: "Nova",
-    imageUrl: "/placeholder-companion.svg" as string | null,
-    focalX: null as number | null,
-    focalY: null as number | null,
-    element: "fire" as string | null,
-    usesPortraitShell: false,
-    favoriteColor: "#9b6bff" as string | null,
-  },
-  assistant: {
-    setDraftInput: vi.fn(),
-    submitTypedMessage: vi.fn(),
-    toggleRecording: vi.fn(),
-    requestMicrophonePermission: vi.fn(),
-    setShowPermissionDialog: vi.fn(),
-    confirmPendingAction: vi.fn(),
-    cancelPendingAction: vi.fn(),
-    confirmAllPendingActions: vi.fn(),
-    stopSpeaking: vi.fn(),
-    submitMessage: vi.fn().mockResolvedValue(true),
-    startNewChat: vi.fn().mockResolvedValue(undefined),
-    startTemplateThread: vi.fn().mockReturnValue("fresh-template-session"),
-    archiveCurrentThread: vi.fn().mockResolvedValue(undefined),
-    resumeThread: vi.fn().mockResolvedValue(undefined),
-  },
-  drawerRootProps: [] as Array<Record<string, unknown>>,
-  assistantOptions: [] as Array<Record<string, unknown>>,
-  toastError: vi.fn(),
-  state: {
-    messages: [
-      {
-        id: "m1",
-        role: "assistant" as const,
-        content:
-          "I can help you shape that into something concrete when you're ready.",
-        createdAt: "2026-04-18T08:01:00.000Z",
-        source: "agent" as const,
-      },
-    ] as CompanionAssistantMessage[],
-    draftInput: "Plan tomorrow for me",
-    pendingAction: {
-      id: "action-1",
-      status: "pending" as const,
-      intent: "plan_week" as const,
-      actionType: "campaign_update" as const,
-      proposalId: null,
-      summary: "Adjust Launch prep.",
-      confirmationMessage:
-        "Want me to adjust Launch prep?",
-      normalizedPayload: {},
-      affectedEntities: null,
-      expiresAt: "2026-04-19T20:00:00.000Z",
-      createdAt: "2026-04-18T08:02:00.000Z",
-    },
-    activeThread: {
-      sessionId: "journeys-session-1",
-      companionId: "companion-1",
-      surface: "journeys" as const,
-      title: "Current thread",
-      previewText:
-        "I can help you shape that into something concrete when you're ready.",
-      createdAt: "2026-04-18T08:00:00.000Z",
-      lastMessageAt: "2026-04-18T08:01:00.000Z",
-      archivedAt: null,
-      messageCount: 2,
-    },
-    historyThreads: [
-      {
-        sessionId: "archived-session-1",
-        companionId: "companion-1",
-        surface: "journeys" as const,
-        title: "Earlier thread",
-        previewText: "Let's pick up yesterday's plan.",
-        createdAt: "2026-04-17T08:00:00.000Z",
-        lastMessageAt: "2026-04-17T08:05:00.000Z",
-        archivedAt: "2026-04-17T09:00:00.000Z",
-        messageCount: 4,
-      },
-    ],
-    structuredResponse: {
-      intent: {
-        intentType: "conversation" as const,
-        timeHorizon: "today" as const,
-        isRecurring: false,
-        shouldCreateQuest: false,
-        shouldPromptCampaign: false,
-      },
-      planDay: {
-        message: "Today is best as a balanced push with one clear focus block.",
-        dayAssessment: "balanced" as const,
-        suggestedQuests: [
-          {
-            suggestionId: "plan-1",
-            proposalId: "proposal-plan-1",
-            title: "Outline the launch checklist",
-            type: "must" as const,
-            estimatedDuration: "45 min",
-            estimatedDurationMinutes: 45,
-            source: "campaign" as const,
-            reason:
-              "It keeps the launch campaign moving without crowding the afternoon.",
-          },
-        ],
-      },
-    } as CompanionStructuredResponse | null,
-    activeFollowUp: null as CompanionAgentFollowUp | null,
-    understandingState: null as null | string,
-  },
-}));
-
-vi.mock("@/hooks/useJourneysCompanionVisual", () => ({
-  useJourneysCompanionVisual: () => mocks.visual,
-}));
-
-vi.mock("@/hooks/useCompanionAssistant", () => ({
-  useCompanionAssistant: (options: Record<string, unknown>) => {
-    mocks.assistantOptions.push(options);
-    return {
-      todayLabel: "Saturday, April 18",
-      placeholder: "chat",
-      messages: mocks.state.messages,
-      structuredResponse: mocks.state.structuredResponse,
-      activeFollowUp: mocks.state.activeFollowUp,
-      understandingState: mocks.state.understandingState,
-      pendingAction: mocks.state.pendingAction,
-      pendingActionCount: 3,
-      readyPendingActionCount: 3,
-      draftInput: mocks.state.draftInput,
-      setDraftInput: mocks.assistant.setDraftInput,
-      interimText: "",
-      isSubmitting: false,
-      isResolvingAction: false,
-      submitMessage: mocks.assistant.submitMessage,
-      submitTypedMessage: mocks.assistant.submitTypedMessage,
-      confirmPendingAction: mocks.assistant.confirmPendingAction,
-      cancelPendingAction: mocks.assistant.cancelPendingAction,
-      confirmAllPendingActions: mocks.assistant.confirmAllPendingActions,
-      isRecording: false,
-      isAutoStopping: false,
-      isVoiceSupported: true,
-      permissionStatus: "granted" as const,
-      showPermissionDialog: false,
-      setShowPermissionDialog: mocks.assistant.setShowPermissionDialog,
-      isRequestingPermission: false,
-      toggleRecording: mocks.assistant.toggleRecording,
-      requestMicrophonePermission: mocks.assistant.requestMicrophonePermission,
-      isSpeaking: false,
-      speechProvider: "none" as const,
-      stopSpeaking: mocks.assistant.stopSpeaking,
-      activeThread: mocks.state.activeThread,
-      historyThreads: mocks.state.historyThreads,
-      isLoadingThreads: false,
-      canOpenThreadPicker: true,
-      threadHistoryEmptyStateMessage:
-        "Past chats will show up here after at least one real exchange.",
-      hasPersistedActiveThread: true,
-      canStartNewChat: true,
-      newChatDisabledReason: null,
-      canArchiveThread: true,
-      archiveDisabledReason: null,
-      startNewChat: mocks.assistant.startNewChat,
-      startTemplateThread: mocks.assistant.startTemplateThread,
-      archiveCurrentThread: mocks.assistant.archiveCurrentThread,
-      resumeThread: mocks.assistant.resumeThread,
-    };
-  },
-}));
-
-vi.mock("@/components/ui/dialog", () => ({
-  Dialog: ({ open, children }: { open: boolean; children: ReactNode }) =>
-    open ? <div>{children}</div> : null,
-  DialogContent: ({
-    children,
-    className,
-  }: {
-    children: ReactNode;
-    className?: string;
-  }) => <div className={className}>{children}</div>,
-  DialogHeader: ({
-    children,
-    className,
-  }: {
-    children: ReactNode;
-    className?: string;
-  }) => <div className={className}>{children}</div>,
-  DialogTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  DialogDescription: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-}));
-
-vi.mock("@/components/ui/drawer", () => ({
-  Drawer: ({
-    open,
-    children,
-    ...props
-  }: {
-    open: boolean;
-    children: ReactNode;
-  } & Record<string, unknown>) => {
-    mocks.drawerRootProps.push({ open, ...props });
-    return open ? <div>{children}</div> : null;
-  },
-  DrawerContent: ({
-    children,
-    className,
-    ...props
-  }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }) => (
-    <div className={className} {...props}>
-      {children}
-    </div>
-  ),
-  DrawerHeader: ({
-    children,
-    className,
-  }: {
-    children: ReactNode;
-    className?: string;
-  }) => <div className={className}>{children}</div>,
-  DrawerTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  DrawerDescription: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-}));
-
-vi.mock("@/components/ui/tooltip", () => ({
-  TooltipProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
-  Tooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
-  TooltipTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
-  TooltipContent: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-}));
-
-vi.mock("@/components/ui/sonner", () => ({
-  toast: {
-    error: mocks.toastError,
-  },
-}));
-
-import { JourneysCompanionPlannerModal } from "./JourneysCompanionPlannerModal";
-
-const createBaseAssistantMessage = () => ({
-  id: "m1",
-  role: "assistant" as const,
-  content:
-    "I can help you shape that into something concrete when you're ready.",
-  createdAt: "2026-04-18T08:01:00.000Z",
-  source: "agent" as const,
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { JourneysCompanionPlannerModal } from './JourneysCompanionPlannerModal';
+const mocks = vi.hoisted(() => ({ record: vi.fn(), remember: vi.fn(), remove: vi.fn(), reload: vi.fn(), invoke: vi.fn(), availability: vi.fn(), add: vi.fn(), update: vi.fn(), check: vi.fn() }));
+vi.mock('@/utils/plannerSync', () => ({ PLANNER_SYNC_EVENT: 'planner-sync-finished' }));
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'planning-user' } }) }));
+vi.mock('@/hooks/useCalendarIntegrations', () => ({ useCalendarIntegrations: () => ({ reloadScheduleSources: mocks.reload, connections: [], settings: null, isLoading: false, hasLoadError: false }) }));
+vi.mock('@/hooks/useTaskMutations', () => ({ useTaskMutations: () => ({ addTask: mocks.add, updateTask: mocks.update, deleteTask: mocks.remove }) }));
+vi.mock('@/hooks/useQuestScheduleGuard', () => ({ useQuestScheduleGuard: () => ({ checkSchedule: mocks.check, conflictDialog: null }) }));
+vi.mock('@/services/questScheduleAvailability', () => ({ loadQuestScheduleAvailability: mocks.availability }));
+vi.mock('@/integrations/supabase/client', () => ({ supabase: { functions: { invoke: mocks.invoke } } }));
+vi.mock('@/features/quest-planner/usePlannerPreferences',()=>({usePlannerPreferences:()=>({preferences:{explicit_preferences:[],learning_enabled:true},record:mocks.record,save:mocks.remember})}));
+const introduction = { phase: 'commitments', reply: 'I have your work hours. Is anything else already booked tomorrow?', choices: ['Nothing else booked'], engagements: [], quests: [] };
+const quest = { id: 'proposal-1', task_id: null, title: 'Read a chapter', goal: 'Learn astronomy', epic_id: 'campaign-1', time: '18:00', duration: 20, category: 'mind' };
+function open() { return render(<JourneysCompanionPlannerModal open onOpenChange={vi.fn()} presentation="dialog" launchIntent={{ id: 'launch', target: 'planner', starterIntent: 'briefing_followup', selectedDate: '2026-10-27', message: 'Prepare me for tomorrow' }}/>); }
+beforeEach(() => {
+  localStorage.clear(); vi.clearAllMocks(); mocks.record.mockResolvedValue(undefined); mocks.remember.mockResolvedValue(undefined); mocks.remove.mockResolvedValue(undefined); mocks.reload.mockResolvedValue({ connections: [], visibleCalendars: undefined, calendarsLoading: false }); mocks.availability.mockResolvedValue({ tasks: [], events: [], commitments: [], incomplete: false });
+  mocks.invoke.mockResolvedValue({ data: introduction, error: null }); mocks.add.mockResolvedValue({ id: 'saved' }); mocks.update.mockResolvedValue({ id: 'existing' }); mocks.check.mockImplementation(async value => value);
+});
+describe('the single-flow adventure planner', () => {
+  it('asks about engagements through the new endpoint without old category menus', async () => {
+    open(); await screen.findByText(introduction.reply);
+    expect(mocks.invoke.mock.calls.map(call => call[0])).toEqual(['cosmiq-quest-planner']);
+    expect(screen.queryByRole('button', { name: 'Logistics' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Priorities' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Planning date')).toHaveValue('2026-10-27');
+    fireEvent.click(screen.getByRole('button', { name: 'Nothing else booked' }));
+    await waitFor(() => expect(mocks.invoke).toHaveBeenCalledTimes(2));
+    expect(mocks.invoke.mock.calls[1][0]).toBe('cosmiq-quest-planner');
+    expect(mocks.invoke.mock.calls[1][1].body.message).toBe('Nothing else booked');
+  });
+  it('lets the user edit time and duration, confirms before saving, and keeps the campaign link', async () => {
+    mocks.invoke.mockResolvedValue({ data: { ...introduction, phase: 'review', choices: [], quests: [quest] } });
+    open(); await screen.findByText('Learn astronomy');
+    expect(mocks.add).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Start time for Read a chapter'), { target: { value: '19:00' } });
+    fireEvent.change(screen.getByLabelText('Duration for Read a chapter'), { target: { value: '30' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add quest to Agenda' }));
+    await waitFor(() => expect(mocks.add).toHaveBeenCalledOnce());
+    expect(mocks.add.mock.calls[0][0]).toMatchObject({ taskDate: '2026-10-27', scheduledTime: '19:00', estimatedDuration: 30, epicId: 'campaign-1' });
+    await screen.findByText('Added to Agenda');
+    expect(screen.queryByRole('button', { name: 'Add quest to Agenda' })).not.toBeInTheDocument();
+  });
+  it('stops before saving when the user cancels a schedule conflict', async () => {
+    mocks.invoke.mockResolvedValue({ data: { ...introduction, phase: 'review', quests: [quest] } }); mocks.check.mockResolvedValue(null);
+    open(); await screen.findByText('Learn astronomy'); fireEvent.click(screen.getByRole('button', { name: 'Add quest to Agenda' }));
+    await waitFor(() => expect(mocks.check).toHaveBeenCalled()); expect(mocks.add).not.toHaveBeenCalled();
+  });
+  it('reuses existing task identity rather than adding a duplicate', async () => {
+    mocks.invoke.mockResolvedValue({ data: { ...introduction, phase: 'review', quests: [{ ...quest, task_id: 'existing' }] } });
+    open(); await screen.findByText('Learn astronomy'); fireEvent.click(screen.getByRole('button', { name: 'Add quest to Agenda' }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledOnce()); expect(mocks.add).not.toHaveBeenCalled();
+    expect(mocks.update.mock.calls[0][0].taskId).toBe('existing');
+  });
+  it('does not invent free time when a calendar read is incomplete', async () => {
+    mocks.availability.mockResolvedValue({ tasks: [], events: [], commitments: [], incomplete: true });
+    open(); await screen.findByRole('alert'); expect(mocks.invoke).not.toHaveBeenCalled();
+  });
+  it('keeps a failed second save retryable without duplicating the first quest', async () => {
+    mocks.invoke.mockResolvedValue({ data: { ...introduction, phase: 'review', quests: [quest, { ...quest, id: 'second', title: 'Sketch a constellation', time: '20:00' }] } });
+    mocks.add.mockResolvedValueOnce({ id: 'first' }).mockRejectedValueOnce(new Error('Temporarily offline')).mockResolvedValueOnce({ id: 'second' });
+    open(); await screen.findByText('Add 2 quests to Agenda'); fireEvent.click(screen.getByRole('button', { name: 'Add 2 quests to Agenda' }));
+    await screen.findByText('Temporarily offline'); fireEvent.click(screen.getByRole('button', { name: 'Add quest to Agenda' }));
+    await waitFor(() => expect(mocks.add).toHaveBeenCalledTimes(3));
+    expect(mocks.add.mock.calls.map(call => call[0].taskText)).toEqual(['Read a chapter','Sketch a constellation','Sketch a constellation']);
+  });
 });
 
-const createBasePendingAction = () => ({
-  id: "action-1",
-  status: "pending" as const,
-  intent: "plan_week" as const,
-  actionType: "campaign_update" as const,
-  proposalId: null,
-  summary: "Adjust Launch prep.",
-  confirmationMessage: "Want me to adjust Launch prep?",
-  normalizedPayload: {},
-  affectedEntities: null,
-  expiresAt: "2026-04-19T20:00:00.000Z",
-  createdAt: "2026-04-18T08:02:00.000Z",
+
+it('automatically reloads transient calendar failures before asking the user to retry', async () => {
+  mocks.availability.mockResolvedValueOnce({ tasks: [], events: [], incomplete: true, issues: ['calendar-settings'] });
+  open();
+  await screen.findByText(introduction.reply);
+  expect(mocks.reload).toHaveBeenCalledOnce();
+  expect(mocks.availability.mock.calls[1][1].calendarsLoading).toBe(false);
+});
+it('requires explicit input-based planning after a partial read and still checks before saving', async () => {
+  mocks.availability.mockResolvedValue({ tasks: [], events: [], commitments: [], incomplete: true, issues: ['local-sync'] });
+  mocks.invoke.mockResolvedValue({ data: { ...introduction, phase: 'review', quests: [quest] } });
+  open(); await screen.findByText(/Some schedule changes are still syncing/);
+  expect(mocks.invoke).not.toHaveBeenCalled();
+  expect(screen.queryByText('Checking your time and goals…')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Plan with my input' }));
+  await screen.findByText('Learn astronomy');
+  expect(mocks.invoke.mock.calls[0][1].body.message).toContain('Ask me to confirm my prior engagements');
+  expect(screen.getByText(/Times still need your review/)).toBeInTheDocument();
+  expect(mocks.add).not.toHaveBeenCalled();
+  mocks.check.mockResolvedValue(null);
+  fireEvent.click(screen.getByRole('button', { name: 'Add quest to Agenda' }));
+  await waitFor(() => expect(mocks.check).toHaveBeenCalled());
+  expect(mocks.add).not.toHaveBeenCalled();
 });
 
-const createBaseActiveThread = () => ({
-  sessionId: "journeys-session-1",
-  companionId: "companion-1",
-  surface: "journeys" as const,
-  title: "Current thread",
-  previewText:
-    "I can help you shape that into something concrete when you're ready.",
-  createdAt: "2026-04-18T08:00:00.000Z",
-  lastMessageAt: "2026-04-18T08:01:00.000Z",
-  archivedAt: null,
-  messageCount: 2,
+
+it('omits a scheduled quest returned again by the model', async () => {
+  mocks.availability.mockResolvedValue({ tasks: [{ id: 'existing', task_text: 'Read a chapter', task_date: '2026-10-27', scheduled_time: '18:00', estimated_duration: 20 }], events: [], incomplete: false });
+  mocks.invoke.mockResolvedValue({ data: { ...introduction, phase: 'review', quests: [quest] } });
+  open(); await screen.findByText(/Already in Agenda: Read a chapter/);
+  expect(screen.queryByRole('button', { name: 'Add quest to Agenda' })).not.toBeInTheDocument();
+});
+it('rechecks a restored draft before making its old proposal actionable', async () => {
+  localStorage.setItem('cosmiq:quest-planner:planning-user:2026-10-27', JSON.stringify({ history: [], plan: { ...introduction, phase: 'review', quests: [quest] }, saved: [], queued: [] }));
+  mocks.availability.mockResolvedValue({ tasks: [{ id: 'existing', task_text: 'Read a chapter', task_date: '2026-10-27', scheduled_time: '18:00', estimated_duration: 20 }], events: [], incomplete: false });
+  open(); expect(screen.queryByRole('button', { name: 'Add quest to Agenda' })).not.toBeInTheDocument();
+  await screen.findByText(/Already in Agenda: Read a chapter/);
+  expect(mocks.invoke).not.toHaveBeenCalled();
+});
+it('prevents saving a proposal that was added to Agenda after generation', async () => {
+  mocks.invoke.mockResolvedValue({ data: { ...introduction, phase: 'review', quests: [quest] } });
+  open(); await screen.findByRole('button', { name: 'Add quest to Agenda' });
+  mocks.availability.mockResolvedValue({ tasks: [{ id: 'added-elsewhere', task_text: 'Read a chapter', task_date: '2026-10-27', scheduled_time: '18:00', estimated_duration: 20 }], events: [], incomplete: false });
+  fireEvent.click(screen.getByRole('button', { name: 'Add quest to Agenda' }));
+  await screen.findByText(/Already in Agenda: Read a chapter/);
+  expect(mocks.add).not.toHaveBeenCalled(); expect(mocks.update).not.toHaveBeenCalled();
+});
+it('accepts a plain request, labels the suggested duration, and waits for Add', async () => {
+  open(); await screen.findByText(introduction.reply);
+  mocks.invoke.mockResolvedValue({ data: { phase: 'review', reply: 'Walk Dog at 7 PM. I suggested 20 minutes; you can change it.', choices: [], engagements: [], quests: [{ ...quest, title: 'Walk Dog', time: '19:00', goal: 'Care for your dog', epic_id: null, duration_suggested: true }] } });
+  fireEvent.change(screen.getByRole('textbox', { name: 'Your answer' }), { target: { value: 'I want to walk my dog at 7pm' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send answer' }));
+  await screen.findByDisplayValue('Walk Dog');
+  expect(screen.getByLabelText('Start time for Walk Dog')).toHaveValue('19:00');
+  expect(screen.getByText('Suggested · editable')).toBeInTheDocument();
+  expect(mocks.add).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Add quest to Agenda' }));
+  await waitFor(() => expect(mocks.add).toHaveBeenCalledWith(expect.objectContaining({ taskText: 'Walk Dog', scheduledTime: '19:00', estimatedDuration: 20, epicId: null })));
 });
 
-const createBaseStructuredResponse = (): CompanionStructuredResponse => ({
-  intent: {
-    intentType: "conversation",
-    timeHorizon: "today",
-    isRecurring: false,
-    shouldCreateQuest: false,
-    shouldPromptCampaign: false,
-  },
-  planDay: {
-    message: "Today is best as a balanced push with one clear focus block.",
-    dayAssessment: "balanced",
-    suggestedQuests: [
-      {
-        suggestionId: "plan-1",
-        proposalId: "proposal-plan-1",
-        title: "Outline the launch checklist",
-        type: "must",
-        estimatedDuration: "45 min",
-        estimatedDurationMinutes: 45,
-        source: "campaign",
-        reason:
-          "It keeps the launch campaign moving without crowding the afternoon.",
-      },
-    ],
-  },
+it('records accepted edits against the original proposal',async()=>{
+ mocks.invoke.mockResolvedValue({data:{...introduction,phase:'review',quests:[quest]}});open();await screen.findByDisplayValue('Read a chapter');
+ fireEvent.change(screen.getByLabelText('Duration for Read a chapter'),{target:{value:'15'}});
+ fireEvent.click(screen.getByRole('button',{name:'Add quest to Agenda'}));
+ await waitFor(()=>expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({kind:'accepted',before_duration:20,after_duration:15})));
+});
+it('removes a declined proposal and offers optional reason feedback',async()=>{
+ mocks.invoke.mockResolvedValue({data:{...introduction,phase:'review',quests:[quest]}});open();await screen.findByDisplayValue('Read a chapter');
+ fireEvent.click(screen.getByRole('button',{name:'Remove Read a chapter'}));
+ expect(screen.queryByRole('button',{name:'Add quest to Agenda'})).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Too long'}));
+ await waitFor(()=>expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({reason:'too_long'})));
+});
+it('saves a lasting preference only after Remember this',async()=>{
+ mocks.invoke.mockResolvedValue({data:{...introduction,memory_suggestion:'I prefer evening walks'}});open();await screen.findByText('Remember: I prefer evening walks');
+ expect(mocks.remember).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'Remember this'}));
+ await waitFor(()=>expect(mocks.remember).toHaveBeenCalledWith({explicit_preferences:['I prefer evening walks']}));
+});
+it('allows an explicit additional occurrence and does not re-save the same proposal ID',async()=>{
+ const repeat={...quest,id:'existing-repeat',title:'Walk Dog',repeat_requested:true};
+ mocks.availability.mockResolvedValue({tasks:[{id:'morning',task_text:'Walk the Beast',task_date:'2026-10-27',scheduled_time:'07:00'}],events:[],incomplete:false});
+ mocks.invoke.mockResolvedValue({data:{...introduction,phase:'review',quests:[repeat]}});open();await screen.findByDisplayValue('Walk Dog');
+ mocks.availability.mockResolvedValue({tasks:[{id:'existing-repeat',task_text:'Walk Dog',task_date:'2026-10-27',scheduled_time:'18:00'}],events:[],incomplete:false});
+ fireEvent.click(screen.getByRole('button',{name:'Add quest to Agenda'}));await screen.findByText('Added to Agenda');expect(mocks.add).not.toHaveBeenCalled();
+});
+it('undoes only newly added quests that have not changed',async()=>{
+ mocks.invoke.mockResolvedValue({data:{...introduction,phase:'review',quests:[quest]}});open();await screen.findByDisplayValue('Read a chapter');
+ fireEvent.click(screen.getByRole('button',{name:'Add quest to Agenda'}));await screen.findByText('Added to Agenda');
+ mocks.availability.mockResolvedValue({tasks:[{id:'saved',task_text:quest.title,task_date:'2026-10-27',scheduled_time:'18:00',estimated_duration:20}],events:[],incomplete:false});
+ fireEvent.click(screen.getByRole('button',{name:'Undo quests just added'}));await waitFor(()=>expect(mocks.remove).toHaveBeenCalledWith('saved'));
+});
+it('does not undo a quest edited after it was added',async()=>{
+ mocks.invoke.mockResolvedValue({data:{...introduction,phase:'review',quests:[quest]}});open();await screen.findByDisplayValue('Read a chapter');
+ fireEvent.click(screen.getByRole('button',{name:'Add quest to Agenda'}));await screen.findByText('Added to Agenda');
+ mocks.availability.mockResolvedValue({tasks:[{id:'saved',task_text:quest.title,task_date:'2026-10-27',scheduled_time:'20:00',estimated_duration:20}],events:[],incomplete:false});
+ fireEvent.click(screen.getByRole('button',{name:'Undo quests just added'}));await screen.findByText(/A quest changed since you added it/);expect(mocks.remove).not.toHaveBeenCalled();
 });
 
-const createComingUpStructuredResponse = (): CompanionStructuredResponse => ({
-  intent: {
-    intentType: "conversation",
-    timeHorizon: "today",
-    isRecurring: false,
-    shouldCreateQuest: false,
-    shouldPromptCampaign: false,
-  },
-  comingUp: {
-    message: "You have one useful move before your next event.",
-    nextEvent: {
-      id: "event-1",
-      title: "Client call",
-      label: "2:00 PM",
-      startsAt: "2026-04-25T21:00:00.000Z",
-      endsAt: "2026-04-25T21:30:00.000Z",
-      isAllDay: false,
-      source: "calendar",
-    },
-    nextBestAction: {
-      suggestionId: "coming-up-1",
-      proposalId: "proposal-coming-up-1",
-      title: "Adjust Course launch",
-      type: "must",
-      estimatedDuration: "30 min",
-      estimatedDurationMinutes: 30,
-      source: "campaign",
-      reason: "This fits before the call and reduces the most pressure.",
-    },
-    remainingToday: [],
-    tomorrowSummary: "light",
-    missedItems: [],
-  },
+it('adds a second quest without replacing the first and Back does not undo or duplicate it', async () => {
+  open(); await screen.findByText(introduction.reply);
+  mocks.invoke.mockResolvedValue({ data: { ...introduction, phase: 'review', choices: [], reply: 'Review your reading quest.', quests: [quest] } });
+  fireEvent.click(screen.getByRole('button', { name: 'Nothing else booked' }));
+  await screen.findByDisplayValue(quest.title);
+  expect(screen.queryByRole('button', { name: 'Try something different' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Add quest to Agenda' }));
+  await screen.findByText('Added to Agenda');
+  const saved = { id: 'saved', task_text: quest.title, task_date: '2026-10-27', scheduled_time: '18:00', estimated_duration: 20 };
+  mocks.availability.mockResolvedValue({ tasks: [saved], events: [], incomplete: false });
+  const second = { ...quest, id: 'second', title: 'Sketch a constellation', time: '20:00' };
+  mocks.invoke.mockResolvedValue({ data: { ...introduction, phase: 'review', choices: [], reply: 'Try a sketch this evening.', quests: [second] } });
+  fireEvent.click(screen.getByRole('button', { name: 'Suggest another quest' }));
+  await screen.findByText('What goal would you like this next quest to support?');
+  const body = mocks.invoke.mock.calls.at(-1)![1].body;
+  expect(body.message).toContain('Keep all saved quests');
+  expect(body.history).toEqual([]); expect(body.draft).toBeNull();
+  expect(screen.queryByRole('button',{name:'Add quest to Agenda'})).not.toBeInTheDocument();
+  expect(body.busy).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'saved', title: quest.title })]));
+  fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+  await screen.findByDisplayValue(quest.title);
+  expect(screen.getByLabelText('Start time for Read a chapter')).toBeDisabled();
+  expect(mocks.remove).not.toHaveBeenCalled(); expect(mocks.add).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole('button', { name: 'Suggest another quest' }));
+  await screen.findByText('What goal would you like this next quest to support?');
+  fireEvent.click(screen.getByRole('button',{name:'Build my mind'}));
+  await screen.findByText('Which activity would you like to do for that goal?');
+  expect(screen.queryByRole('button',{name:'Add quest to Agenda'})).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:second.title}));
+  await screen.findByText('How much time would you like to spend on this quest?');
+  fireEvent.click(screen.getByRole('button',{name:'30 minutes'}));
+  await screen.findByText('When would you like to begin?');
+  expect(screen.queryByRole('button',{name:'Add quest to Agenda'})).not.toBeInTheDocument();
+  fireEvent.change(screen.getByRole('textbox',{name:'Your answer'}),{target:{value:'8 PM'}});
+  fireEvent.click(screen.getByRole('button',{name:'Send answer'}));
+  await screen.findByDisplayValue(second.title);
+  expect(screen.getByRole('article',{name:'Earlier quest: Read a chapter'})).toHaveTextContent('Added to Agenda');
+  expect(screen.queryByText('Conversation so far')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Add quest to Agenda' }));
+  await waitFor(() => expect(mocks.add).toHaveBeenCalledTimes(2));
+  expect(mocks.add.mock.calls.map(call => call[0].taskText)).toEqual([quest.title, second.title]);
+});
+it('clears a restored sync warning when background sync finishes, without generating a new plan', async () => {
+  localStorage.setItem('cosmiq:quest-planner:planning-user:2026-10-27', JSON.stringify({ history: [], plan: { ...introduction, phase: 'review', quests: [quest] }, saved: [quest.id], queued: [quest.id] }));
+  mocks.availability.mockResolvedValue({ tasks: [], events: [], incomplete: true, issues: ['local-sync'] });
+  open(); await screen.findByText(/Some schedule changes are still syncing/);
+  mocks.availability.mockResolvedValue({ tasks: [{id: quest.id,task_text:quest.title,task_date:'2026-10-27',scheduled_time:'18:00'}], events: [], incomplete: false });
+  act(() => { window.dispatchEvent(new Event('planner-sync-finished')); });
+  await waitFor(() => expect(screen.queryByText(/Some schedule changes are still syncing/)).not.toBeInTheDocument());
+  expect(mocks.invoke).not.toHaveBeenCalled();
+  expect(JSON.parse(localStorage.getItem('cosmiq:quest-planner:planning-user:2026-10-27')!).queued).toEqual([]);
 });
 
-const getTranscriptViewport = () => {
-  const transcript = screen.getByTestId(
-    "journeys-companion-planner-transcript",
-  );
-  const viewport = transcript.closest<HTMLElement>(
-    "[data-radix-scroll-area-viewport]",
-  );
-  if (!viewport) {
-    throw new Error("Expected the planner transcript to render in a viewport.");
-  }
-  return viewport;
-};
-
-const setTranscriptViewportMetrics = (
-  viewport: HTMLElement,
-  metrics: {
-    scrollHeight: number;
-    clientHeight: number;
-    scrollTop: number;
-  },
-) => {
-  Object.defineProperty(viewport, "scrollHeight", {
-    configurable: true,
-    value: metrics.scrollHeight,
-  });
-  Object.defineProperty(viewport, "clientHeight", {
-    configurable: true,
-    value: metrics.clientHeight,
-  });
-  Object.defineProperty(viewport, "scrollTop", {
-    configurable: true,
-    writable: true,
-    value: metrics.scrollTop,
-  });
-};
-
-const installTranscriptScrollTo = (viewport: HTMLElement) => {
-  const scrollTo = vi.fn((options?: ScrollToOptions | number, y?: number) => {
-    if (typeof options === "number") {
-      viewport.scrollLeft = options;
-      viewport.scrollTop = typeof y === "number" ? y : viewport.scrollTop;
-      return;
-    }
-
-    if (typeof options?.top === "number") {
-      viewport.scrollTop = options.top;
-    }
-    if (typeof options?.left === "number") {
-      viewport.scrollLeft = options.left;
-    }
-  });
-
-  Object.defineProperty(viewport, "scrollTo", {
-    configurable: true,
-    value: scrollTo,
-  });
-
-  return scrollTo;
-};
-
-describe("JourneysCompanionPlannerModal", () => {
-  const originalMatchMedia = window.matchMedia;
-  const originalVisualViewport = window.visualViewport;
-  const originalInnerHeight = window.innerHeight;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.assistant.submitMessage.mockResolvedValue(true);
-    mocks.drawerRootProps.length = 0;
-    mocks.assistantOptions.length = 0;
-    mocks.state.messages = [createBaseAssistantMessage()];
-    mocks.state.pendingAction = createBasePendingAction();
-    mocks.state.activeThread = createBaseActiveThread();
-    mocks.state.structuredResponse = createBaseStructuredResponse();
-    mocks.state.draftInput = "Plan tomorrow for me";
-    mocks.state.activeFollowUp = null;
-    mocks.state.understandingState = null;
-    mocks.visual = {
-      companionLabel: "Nova",
-      imageUrl: "/placeholder-companion.svg",
-      focalX: null,
-      focalY: null,
-      element: "fire",
-      usesPortraitShell: false,
-      favoriteColor: "#9b6bff",
-    };
-
-    Object.defineProperty(window, "matchMedia", {
-      writable: true,
-      value: vi.fn().mockImplementation(() => ({
-        matches: false,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      })),
-    });
-
-    Object.defineProperty(window, "innerHeight", {
-      configurable: true,
-      writable: true,
-      value: 700,
-    });
-
-    Object.defineProperty(window, "visualViewport", {
-      configurable: true,
-      value: {
-        height: 700,
-        offsetTop: 0,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      },
-    });
-  });
-
-  afterEach(() => {
-    Object.defineProperty(window, "matchMedia", {
-      writable: true,
-      value: originalMatchMedia,
-    });
-    Object.defineProperty(window, "visualViewport", {
-      configurable: true,
-      value: originalVisualViewport,
-    });
-    Object.defineProperty(window, "innerHeight", {
-      configurable: true,
-      writable: true,
-      value: originalInnerHeight,
-    });
-  });
-
-  it("renders the unified transcript and inline pending confirmation card", () => {
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-
-    expect(
-      screen.getByText(
-        "I can help you shape that into something concrete when you're ready.",
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("structured-plan-day")).toBeInTheDocument();
-    expect(
-      screen.getByText("Outline the launch checklist"),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /saved|save|draft/i }))
-      .toBeNull();
-    expect(
-      screen.getByText("Adjust Launch prep."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Confirm All (3)" }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Confirm" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
-    expect(
-      screen.getByTestId("journeys-companion-planner-text-input"),
-    ).toHaveAttribute("data-tour", "companion-plan-day-chat-input");
-    expect(
-      screen.getByTestId("journeys-companion-planner-send-button"),
-    ).toHaveAttribute("data-tour", "companion-plan-day-chat-send");
-  });
-
-  it("previews the exact day blocks before confirmation", () => {
-    mocks.state.pendingAction = {
-      ...createBasePendingAction(),
-      intent: "plan_day",
-      actionType: "day_plan_apply",
-      summary: "Plan 2026-04-18 with 2 focused blocks.",
-      normalizedPayload: {
-        plan_date: "2026-04-18",
-        send_to_calendar: true,
-        calendar_provider: "google",
-        blocks: [
-          { title: "Launch notes", start_time: "09:30", duration_minutes: 45 },
-          { title: "Walk", start_time: "14:00", duration_minutes: 20 },
-        ],
-      },
-    } as any;
-
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-
-    expect(screen.getByText("09:30")).toBeInTheDocument();
-    expect(screen.getByText("Launch notes")).toBeInTheDocument();
-    expect(screen.getByText("45m")).toBeInTheDocument();
-    expect(screen.getByText("Also send to google")).toBeInTheDocument();
-  });
-
-  it("fills generated scene avatars in the circular header frame", () => {
-    mocks.visual.imageUrl = "https://assets.example.com/generated-companion-scene.png";
-    mocks.visual.focalX = 0.42;
-    mocks.visual.focalY = 0.58;
-    mocks.visual.usesPortraitShell = false;
-
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-
-    expect(screen.getByRole("img", { name: "Nova" })).toHaveAttribute(
-      "data-companion-image-fit",
-      "cover",
-    );
-  });
-
-  it("keeps text entry local until the user sends", () => {
-    mocks.state.pendingAction = null;
-
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-
-    fireEvent.change(
-      screen.getByTestId("journeys-companion-planner-text-input"),
-      {
-        target: { value: "Ok start creating tasks" },
-      },
-    );
-
-    expect(mocks.assistant.setDraftInput).toHaveBeenCalledWith(
-      "Ok start creating tasks",
-    );
-    expect(mocks.assistant.submitTypedMessage).not.toHaveBeenCalled();
-    expect(mocks.assistant.submitMessage).not.toHaveBeenCalled();
-  });
-
-  it("shows rich planner cards as the single assistant response", () => {
-    const previousMessages = mocks.state.messages;
-    const previousPendingAction = mocks.state.pendingAction;
-    const previousStructuredResponse = mocks.state.structuredResponse;
-    const structuredResponse = createBaseStructuredResponse();
-    const assistantReply = structuredResponse.planDay?.message ?? "";
-
-    mocks.state.pendingAction = null;
-    mocks.state.structuredResponse = structuredResponse;
-    mocks.state.messages = [
-      {
-        id: "m-rich-card",
-        role: "assistant",
-        content: assistantReply,
-        createdAt: "2026-04-18T08:03:00.000Z",
-        source: "agent",
-        structuredResponse,
-      },
-    ];
-
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-
-    const planDayCard = screen.getByTestId("structured-plan-day");
-    const renderedCopies = screen.getAllByText(assistantReply);
-    expect(renderedCopies).toHaveLength(1);
-    expect(planDayCard).toContainElement(renderedCopies[0]!);
-    expect(screen.queryByRole("button", { name: /saved|save|draft/i }))
-      .toBeNull();
-
-    mocks.state.messages = previousMessages;
-    mocks.state.pendingAction = previousPendingAction;
-    mocks.state.structuredResponse = previousStructuredResponse;
-  });
-
-  it("hides the rich card origin bubble even when its text is unique", () => {
-    const previousMessages = mocks.state.messages;
-    const previousPendingAction = mocks.state.pendingAction;
-    const previousStructuredResponse = mocks.state.structuredResponse;
-    const structuredResponse = createBaseStructuredResponse();
-    const uniqueAssistantReply =
-      "I tightened the afternoon block before showing the plan.";
-    const cardMessage = structuredResponse.planDay?.message ?? "";
-
-    mocks.state.pendingAction = null;
-    mocks.state.structuredResponse = structuredResponse;
-    mocks.state.messages = [
-      {
-        id: "m-rich-card-unique-reply",
-        role: "assistant",
-        content: uniqueAssistantReply,
-        createdAt: "2026-04-18T08:04:00.000Z",
-        source: "agent",
-        structuredResponse,
-      },
-    ];
-
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-
-    const planDayCard = screen.getByTestId("structured-plan-day");
-    expect(screen.queryByText(uniqueAssistantReply)).toBeNull();
-    expect(planDayCard).toContainElement(screen.getByText(cardMessage));
-    expect(screen.queryByRole("button", { name: /saved|save|draft/i }))
-      .toBeNull();
-
-    mocks.state.messages = previousMessages;
-    mocks.state.pendingAction = previousPendingAction;
-    mocks.state.structuredResponse = previousStructuredResponse;
-  });
-
-  it("keeps action receipt bubbles visible after rich card actions resolve", () => {
-    const previousMessages = mocks.state.messages;
-    const previousPendingAction = mocks.state.pendingAction;
-    const previousStructuredResponse = mocks.state.structuredResponse;
-    const structuredResponse = createBaseStructuredResponse();
-    const cardOriginReply = "Here is the plan I can save for you.";
-    const receiptReply = "Saved Outline the launch checklist.";
-
-    mocks.state.pendingAction = null;
-    mocks.state.structuredResponse = structuredResponse;
-    mocks.state.messages = [
-      {
-        id: "m-rich-card-origin",
-        role: "assistant",
-        content: cardOriginReply,
-        createdAt: "2026-04-18T08:05:00.000Z",
-        source: "agent",
-        structuredResponse,
-      },
-      {
-        id: "m-user-confirm",
-        role: "user",
-        content: "Confirm",
-        createdAt: "2026-04-18T08:06:00.000Z",
-        source: "agent",
-      },
-      {
-        id: "m-action-receipt",
-        role: "assistant",
-        content: receiptReply,
-        createdAt: "2026-04-18T08:06:01.000Z",
-        source: "agent",
-        structuredResponse,
-        receipt: {
-          actionId: "action-1",
-          status: "executed",
-          proposalId: "proposal-plan-1",
-          message: receiptReply,
-          summary: "Saved the planned quest.",
-          createdAt: "2026-04-18T08:06:01.000Z",
-          executionResult: null,
-          executionError: null,
-        },
-      },
-    ];
-
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-
-    expect(screen.queryByText(cardOriginReply)).toBeNull();
-    expect(screen.getByText("Confirm")).toBeInTheDocument();
-    expect(screen.getByText(receiptReply)).toBeInTheDocument();
-    expect(screen.getByTestId("structured-plan-day")).toHaveTextContent(
-      "Outline the launch checklist",
-    );
-
-    mocks.state.messages = previousMessages;
-    mocks.state.pendingAction = previousPendingAction;
-    mocks.state.structuredResponse = previousStructuredResponse;
-  });
-
-  it("passes the selected Journeys date into the assistant hook", async () => {
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-        selectedDate={new Date("2026-02-13T00:00:00")}
-      />,
-    );
-
-    expect(
-      await screen.findByText(
-        "I can help you shape that into something concrete when you're ready.",
-      ),
-    ).toBeInTheDocument();
-    expect(mocks.assistantOptions.at(-1)?.defaultSelectedDate).toBe(
-      "2026-02-13",
-    );
-  });
-
-  it("renders planner briefing context for plan-day launch intents", async () => {
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-        launchIntent={{
-          id: "plan-launch-1",
-          message: "Plan my day",
-          starterIntent: "plan_day",
-          target: "planner",
-          selectedDate: "2026-04-18",
-          briefingContext: {
-            content:
-              "Saturday, April 18 looks steady: 3 open quests, 1 timed and 2 anytime, with about 2h planned.",
-            focus: "Keep this day realistic.",
-            actionPrompt: "Preserve timed quests and avoid overload.",
-            dataSnapshot: {
-              openQuestCount: 3,
-              scheduledQuestCount: 1,
-              anytimeQuestCount: 2,
-              ritualQuestCount: 1,
-              activeCampaignCount: 1,
-              estimatedLoadLabel: "2h",
-              loadSignal: "steady",
-              plannerInsightStatement:
-                "The day is workable. Choose the next important quest, then keep the rest in a simple order.",
-            },
-          },
-        }}
-      />,
-    );
-
-    const briefing = await screen.findByTestId(
-      "journeys-companion-planner-briefing",
-    );
-
-    expect(briefing).toHaveTextContent("Saturday, April 18 looks steady");
-    expect(within(briefing).getByText("Planning with")).toBeInTheDocument();
-    expect(within(briefing).getByText("Open")).toBeInTheDocument();
-    expect(within(briefing).getByText("3")).toBeInTheDocument();
-    expect(briefing).toHaveTextContent(
-      '"The day is workable. Choose the next important quest, then keep the rest in a simple order."',
-    );
-    expect(briefing).toHaveTextContent("- Nova");
-    expect(briefing).not.toHaveTextContent("Preserve timed quests");
-  });
-
-  it("keeps the transcript in place when messages arrive after the user scrolls up", () => {
-    const { rerender } = render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        onOpenCampaignBuilder={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-    const viewport = getTranscriptViewport();
-    const scrollTo = installTranscriptScrollTo(viewport);
-
-    setTranscriptViewportMetrics(viewport, {
-      scrollHeight: 900,
-      clientHeight: 300,
-      scrollTop: 120,
-    });
-    fireEvent.scroll(viewport);
-    scrollTo.mockClear();
-
-    mocks.state.messages = [
-      ...mocks.state.messages,
-      {
-        id: "m2",
-        role: "assistant" as const,
-        content: "I added more detail while you were reading above.",
-        createdAt: "2026-04-18T08:03:00.000Z",
-        source: "agent" as const,
-      },
-    ];
-    setTranscriptViewportMetrics(viewport, {
-      scrollHeight: 1200,
-      clientHeight: 300,
-      scrollTop: 120,
-    });
-
-    rerender(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        onOpenCampaignBuilder={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-
-    expect(
-      screen.getByText("I added more detail while you were reading above."),
-    ).toBeInTheDocument();
-    expect(scrollTo).not.toHaveBeenCalled();
-    expect(viewport.scrollTop).toBe(120);
-  });
-
-  it("follows new messages when the transcript is already pinned to the bottom", () => {
-    const { rerender } = render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        onOpenCampaignBuilder={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-    const viewport = getTranscriptViewport();
-    const scrollTo = installTranscriptScrollTo(viewport);
-
-    setTranscriptViewportMetrics(viewport, {
-      scrollHeight: 900,
-      clientHeight: 300,
-      scrollTop: 600,
-    });
-    fireEvent.scroll(viewport);
-    scrollTo.mockClear();
-
-    mocks.state.messages = [
-      ...mocks.state.messages,
-      {
-        id: "m2",
-        role: "assistant" as const,
-        content: "Here is the next thing at the bottom.",
-        createdAt: "2026-04-18T08:03:00.000Z",
-        source: "agent" as const,
-      },
-    ];
-    setTranscriptViewportMetrics(viewport, {
-      scrollHeight: 1200,
-      clientHeight: 300,
-      scrollTop: 600,
-    });
-
-    rerender(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        onOpenCampaignBuilder={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-
-    expect(scrollTo).toHaveBeenCalledWith({
-      top: 900,
-      behavior: "smooth",
-    });
-    expect(viewport.scrollTop).toBe(900);
-  });
-
-  it("keeps the transcript in place when a coming-up card arrives", () => {
-    const { rerender } = render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        onOpenCampaignBuilder={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-    const viewport = getTranscriptViewport();
-    const scrollTo = installTranscriptScrollTo(viewport);
-
-    setTranscriptViewportMetrics(viewport, {
-      scrollHeight: 900,
-      clientHeight: 300,
-      scrollTop: 600,
-    });
-    fireEvent.scroll(viewport);
-    scrollTo.mockClear();
-
-    const structuredResponse = createComingUpStructuredResponse();
-    mocks.state.pendingAction = null;
-    mocks.state.structuredResponse = structuredResponse;
-    mocks.state.messages = [
-      ...mocks.state.messages,
-      {
-        id: "m2",
-        role: "user" as const,
-        content: "What do I have coming up?",
-        createdAt: "2026-04-18T08:02:00.000Z",
-        source: "agent" as const,
-      },
-      {
-        id: "m3",
-        role: "assistant" as const,
-        content: structuredResponse.comingUp?.message ?? "",
-        createdAt: "2026-04-18T08:03:00.000Z",
-        source: "agent" as const,
-        structuredResponse,
-      },
-    ];
-    setTranscriptViewportMetrics(viewport, {
-      scrollHeight: 1200,
-      clientHeight: 300,
-      scrollTop: 600,
-    });
-
-    rerender(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        onOpenCampaignBuilder={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-
-    expect(screen.getByTestId("structured-coming-up")).toBeInTheDocument();
-    expect(scrollTo).not.toHaveBeenCalled();
-    expect(viewport.scrollTop).toBe(600);
-  });
-
-  it("does not scroll the transcript when the composer receives focus", () => {
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-    const viewport = getTranscriptViewport();
-    const scrollTo = installTranscriptScrollTo(viewport);
-
-    setTranscriptViewportMetrics(viewport, {
-      scrollHeight: 900,
-      clientHeight: 300,
-      scrollTop: 120,
-    });
-    fireEvent.scroll(viewport);
-    scrollTo.mockClear();
-
-    fireEvent.focus(
-      screen.getByTestId("journeys-companion-planner-text-input"),
-    );
-
-    expect(scrollTo).not.toHaveBeenCalled();
-    expect(viewport.scrollTop).toBe(120);
-  });
-
-  it("opens thread history from the thread-history launch intent and resumes a selected thread", async () => {
-    const onLaunchIntentConsumed = vi.fn();
-
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-        launchIntent={{
-          id: "launch-1",
-          message: "",
-          starterIntent: "thread_history",
-        }}
-        onLaunchIntentConsumed={onLaunchIntentConsumed}
-      />,
-    );
-
-    expect(onLaunchIntentConsumed).toHaveBeenCalledWith("launch-1");
-
-    await waitFor(() => {
-      expect(
-        screen.getByTestId("journeys-companion-thread-picker"),
-      ).toBeInTheDocument();
-    });
-
-    fireEvent.click(
-      screen.getByTestId("journeys-companion-thread-resume-archived-session-1"),
-    );
-
-    await waitFor(() => {
-      expect(mocks.assistant.resumeThread).toHaveBeenCalledWith(
-        "archived-session-1",
-      );
-    });
-  });
-
-  it("keeps mobile planner typing out of Vaul drawer gestures", () => {
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="drawer"
-      />,
-    );
-
-    expect(
-      mocks.drawerRootProps.find((props) => props.open === true),
-    ).toMatchObject({ repositionInputs: false, handleOnly: true });
-    expect(
-      screen
-        .getByTestId("journeys-companion-planner-text-input")
-        .closest("[data-vaul-no-drag]"),
-    ).not.toBeNull();
-  });
-
-  it("allows normal mobile drawer close requests away from the composer", () => {
-    const onOpenChange = vi.fn();
-    mocks.state.draftInput = "";
-
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={onOpenChange}
-        presentation="drawer"
-      />,
-    );
-
-    const drawerProps = mocks.drawerRootProps.find(
-      (props) => props.open === true,
-    );
-    (drawerProps?.onOpenChange as (open: boolean) => void)(false);
-
-    expect(onOpenChange).toHaveBeenCalledWith(false);
-  });
-
-  it("keeps the mobile planner drawer flush when no keyboard inset is present", () => {
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="drawer"
-      />,
-    );
-
-    expect(
-      screen.getByTestId("journeys-companion-planner-drawer-content"),
-    ).toHaveStyle({ bottom: "88px" });
-  });
-
-  it.each([
-    ["390x844", 844, 574],
-    ["393x852", 852, 579],
-    ["430x932", 932, 620],
-    ["375x667", 667, 454],
-  ])(
-    "keeps the self-sized mobile planner drawer within a %s viewport",
-    (_label, viewportHeight, expectedShellHeight) => {
-      Object.defineProperty(window, "innerHeight", {
-        configurable: true,
-        writable: true,
-        value: viewportHeight,
-      });
-      Object.defineProperty(window, "visualViewport", {
-        configurable: true,
-        value: {
-          height: viewportHeight,
-          offsetTop: 0,
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-        },
-      });
-
-      render(
-        <JourneysCompanionPlannerModal
-          open
-          onOpenChange={vi.fn()}
-          presentation="drawer"
-        />,
-      );
-
-      expect(
-        screen.getByTestId("journeys-companion-planner-shell"),
-      ).toHaveStyle({ height: `${expectedShellHeight}px` });
-      expect(
-        screen.getByTestId("journeys-companion-planner-drawer-content"),
-      ).toHaveClass("max-h-none");
-    },
-  );
-
-  it("adds bottom safe-area padding to the mobile planner composer", () => {
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="drawer"
-      />,
-    );
-
-    expect(screen.getByTestId("journeys-companion-planner-footer")).toHaveClass(
-      "pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]",
-      "sm:pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]",
-    );
-  });
-
-  it("sizes the mobile planner shell to the visible viewport when the keyboard opens", () => {
-    Object.defineProperty(window, "innerHeight", {
-      configurable: true,
-      writable: true,
-      value: 852,
-    });
-    Object.defineProperty(window, "visualViewport", {
-      configurable: true,
-      value: {
-        height: 500,
-        offsetTop: 0,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      },
-    });
-
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="drawer"
-      />,
-    );
-
-    expect(screen.getByTestId("journeys-companion-planner-shell")).toHaveStyle({
-      height: "454px",
-    });
-    expect(
-      screen.getByTestId("journeys-companion-planner-drawer-content"),
-    ).toHaveStyle({ bottom: "352px" });
-    expect(
-      mocks.drawerRootProps.find((props) => props.open === true),
-    ).toMatchObject({ repositionInputs: false });
-  });
-
-  it("keeps the pinned transcript anchored when the drawer layout changes", async () => {
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="drawer"
-      />,
-    );
-    const viewport = getTranscriptViewport();
-    const scrollTo = installTranscriptScrollTo(viewport);
-
-    setTranscriptViewportMetrics(viewport, {
-      scrollHeight: 900,
-      clientHeight: 300,
-      scrollTop: 600,
-    });
-    fireEvent.scroll(viewport);
-    scrollTo.mockClear();
-
-    await act(async () => {
-      Object.defineProperty(window, "innerHeight", {
-        configurable: true,
-        writable: true,
-        value: 852,
-      });
-      Object.defineProperty(window, "visualViewport", {
-        configurable: true,
-        value: {
-          height: 500,
-          offsetTop: 0,
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-        },
-      });
-      window.dispatchEvent(new Event("resize"));
-    });
-
-    await waitFor(() => {
-      expect(
-        screen.getByTestId("journeys-companion-planner-shell"),
-      ).toHaveStyle({ height: "454px" });
-    });
-    expect(scrollTo).toHaveBeenCalledWith({
-      top: 600,
-      behavior: "smooth",
-    });
-  });
-
-  it("wires inline confirm and cancel actions to the unified assistant hook", () => {
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Confirm All (3)" }));
-    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-
-    expect(
-      screen.getByRole("button", { name: "Confirm All (3)" }),
-    ).toHaveAttribute("data-tour", "companion-plan-day-pending-confirm-all");
-    expect(screen.getByRole("button", { name: "Confirm" })).toHaveAttribute(
-      "data-tour",
-      "companion-plan-day-pending-confirm",
-    );
-    expect(mocks.assistant.confirmAllPendingActions).toHaveBeenCalledTimes(1);
-    expect(mocks.assistant.confirmPendingAction).toHaveBeenCalledTimes(1);
-    expect(mocks.assistant.cancelPendingAction).toHaveBeenCalledTimes(1);
-  });
-
-  it("renders model follow-up options as direct replies", async () => {
-    const previousPendingAction = mocks.state.pendingAction;
-    mocks.state.pendingAction = null;
-    mocks.state.activeFollowUp = {
-      question: "Do you want today to lean progress or recovery?",
-      reason: "Your calendar has room for either shape.",
-      expectedAnswerType: "choice",
-      options: ["Progress", "Recovery"],
-    };
-
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-
-    expect(
-      screen.getByTestId("journeys-companion-follow-up"),
-    ).toHaveTextContent("Do you want today to lean progress or recovery?");
-    expect(
-      screen.getByText("Your calendar has room for either shape."),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Progress" })).toHaveAttribute(
-      "data-tour",
-      "companion-plan-day-follow-up-option",
-    );
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Progress" }));
-    });
-
-    expect(mocks.assistant.submitMessage).toHaveBeenCalledWith(
-      "Progress",
-      "text",
-      {
-        turnOrigin: "follow_up_option",
-      },
-    );
-
-    mocks.state.pendingAction = previousPendingAction;
-    mocks.state.activeFollowUp = null;
-  });
-
-  it("renders structured guidance without save buttons", () => {
-    render(
-      <JourneysCompanionPlannerModal
-        open
-        onOpenChange={vi.fn()}
-        presentation="dialog"
-      />,
-    );
-
-    expect(screen.queryByRole("button", { name: /save|draft/i })).toBeNull();
-  });
+it('keeps follow-ups focused with choices and text, and defers another quest until review is complete', async () => {
+  mocks.invoke.mockResolvedValue({ data: { ...introduction, phase: 'details', choices: ['Find an open time for me', 'After 6 PM'], reply: 'What time would you like for the reading session?' } });
+  open(); await screen.findByText('What time would you like for the reading session?');
+  expect(screen.queryByRole('button', { name: /Suggest (another |a )quest/ })).not.toBeInTheDocument();
+  expect(screen.getByRole('textbox', { name: 'Your answer' })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: 'After 6 PM' }));
+  await waitFor(() => expect(mocks.invoke).toHaveBeenCalledTimes(2));
+  expect(mocks.invoke.mock.calls[1][1].body.message).toBe('After 6 PM');
+});
+it('provides a safe way forward for older saved questions without choices', async () => {
+  localStorage.setItem('cosmiq:quest-planner:planning-user:2026-10-27', JSON.stringify({ history: [], plan: { ...introduction, phase: 'details', choices: [], reply: 'What time for reading?' }, saved: ['old'], queued: [] }));
+  open(); await screen.findByRole('button', { name: 'Help me choose' });
+  fireEvent.click(screen.getByRole('button', { name: 'Type my answer' }));
+  expect(screen.getByRole('textbox', { name: 'Your answer' })).toHaveFocus();
+  expect(mocks.invoke).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Help me choose' }));
+  await waitFor(() => expect(mocks.invoke).toHaveBeenCalledOnce());
+  expect(mocks.invoke.mock.calls[0][1].body.message).toContain('do not switch to a different activity');
+});
+
+
+it('keeps the original appointment through a date switch, AM/PM clarification and save', async () => {
+  open(); await screen.findByText(introduction.reply);
+  const request='I have an appointment at 360 e 2nd dtla on 2026-11-05 at 10 with Cynthia Fuentes. I need to be reminded an hour earlier';
+  const clarify={...introduction,phase:'details',reply:'10 AM or 10 PM?',choices:['10 AM','10 PM']};
+  mocks.invoke.mockResolvedValue({data:clarify});
+  fireEvent.change(screen.getByRole('textbox',{name:'Your answer'}),{target:{value:request}});
+  fireEvent.click(screen.getByRole('button',{name:'Send answer'}));
+  await screen.findByText('10 AM or 10 PM?');
+  expect(screen.getByLabelText('Planning date')).toHaveValue('2026-11-05');
+  const appointment={...quest,title:'Appointment with Cynthia Fuentes',epic_id:null,goal:'Attend your appointment',time:'10:00',duration:30,duration_suggested:true,location:'360 E 2nd DTLA',notes:'With Cynthia Fuentes',reminder_offsets_minutes:[60],time_fixed:true};
+  mocks.invoke.mockResolvedValue({data:{...introduction,phase:'review',reply:'Review your appointment.',choices:[],quests:[appointment]}});
+  fireEvent.click(screen.getByRole('button',{name:'10 AM'}));
+  await screen.findByDisplayValue(appointment.title);
+  const body=mocks.invoke.mock.calls.at(-1)![1].body;
+  expect(body.history).toContainEqual({role:'user',content:request});
+  expect(body.date).toBe('2026-11-05');
+  expect(screen.getByLabelText(`Location for ${appointment.title}`)).toHaveValue(appointment.location);
+  expect(screen.getByText('Reminder: 1 hour before')).toBeInTheDocument();
+  expect(screen.queryByRole('button',{name:'Swap'})).not.toBeInTheDocument();
+  expect(mocks.add).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button',{name:'Add quest to Agenda'}));
+  await waitFor(()=>expect(mocks.add).toHaveBeenCalledWith(expect.objectContaining({taskText:appointment.title,taskDate:'2026-11-05',scheduledTime:'10:00',estimatedDuration:30,location:appointment.location,notes:appointment.notes,reminderEnabled:true,reminderMinutesBefore:60,reminderOffsetsMinutes:[60],keepTimeFixed:true})));
+});
+it('keeps edited location and reminder metadata when an appointment save is queued offline',async()=>{
+ const appointment={...quest,location:'360 E 2nd DTLA',notes:'Bring the form',reminder_offsets_minutes:[60],time_fixed:true};
+ mocks.invoke.mockResolvedValue({data:{...introduction,phase:'review',quests:[appointment]}});
+ mocks.add.mockResolvedValue({id:'saved',queued:true});open();await screen.findByDisplayValue(quest.title);
+ fireEvent.change(screen.getByLabelText(`Location for ${quest.title}`),{target:{value:'360 E 2nd, Suite 2'}});
+ fireEvent.click(screen.getByRole('button',{name:'Add quest to Agenda'}));
+ await screen.findByText(/Added to Agenda on this device/);
+ expect(mocks.add).toHaveBeenCalledWith(expect.objectContaining({location:'360 E 2nd, Suite 2',reminderOffsetsMinutes:[60],notes:'Bring the form'}));
+});
+it('does not clear an existing appointment address or reminder when only its time changes',async()=>{
+ mocks.invoke.mockResolvedValue({data:{...introduction,phase:'review',quests:[{...quest,task_id:'existing'}]}});open();await screen.findByDisplayValue(quest.title);
+ fireEvent.click(screen.getByRole('button',{name:'Add quest to Agenda'}));await waitFor(()=>expect(mocks.update).toHaveBeenCalledOnce());
+ expect(mocks.update.mock.calls[0][0].updates).not.toHaveProperty('location');
+ expect(mocks.update.mock.calls[0][0].updates).not.toHaveProperty('reminder_enabled');
+});
+
+it('keeps the unsaved appointment and conversation when moving its draft to another date',async()=>{
+ const draft={...introduction,phase:'review',choices:[],quests:[{...quest,title:'Appointment with Cynthia',location:'360 E 2nd DTLA',reminder_offsets_minutes:[60],time_fixed:true}]};
+ mocks.invoke.mockResolvedValueOnce({data:draft}).mockResolvedValueOnce({data:{...draft,quests:[{...draft.quests[0],date:'2026-11-05'}]}});
+ open();await screen.findByDisplayValue('Appointment with Cynthia');
+ fireEvent.change(screen.getByLabelText('Your answer'),{target:{value:'Move it to 2026-11-05'}});
+ fireEvent.click(screen.getByRole('button',{name:'Send answer'}));
+ await waitFor(()=>expect(mocks.invoke).toHaveBeenCalledTimes(2));
+ const body=mocks.invoke.mock.calls[1][1].body;
+ expect(body.date).toBe('2026-11-05');expect(body.history.length).toBeGreaterThan(0);
+ expect(body.draft.quests[0]).toMatchObject({title:'Appointment with Cynthia',location:'360 E 2nd DTLA',reminder_offsets_minutes:[60]});
+ expect(mocks.add).not.toHaveBeenCalled();
+});
+it('saves the entire ten-hour work quest without shortening its duration',async()=>{
+ mocks.invoke.mockResolvedValue({data:{...introduction,phase:'review',choices:[],quests:[{...quest,title:'Work',time:'08:00',duration:600,time_fixed:true}]}});
+ open();await screen.findByDisplayValue('Work');fireEvent.click(screen.getByRole('button',{name:'Add quest to Agenda'}));
+ await waitFor(()=>expect(mocks.add).toHaveBeenCalledOnce());expect(mocks.add.mock.calls[0][0]).toMatchObject({estimatedDuration:600,keepTimeFixed:true});
+});
+
+it('explains a rate limit and keeps the typed request available to retry',async()=>{
+ open();await screen.findByText(introduction.reply);
+ mocks.invoke.mockResolvedValueOnce({data:null,error:{context:new Response(JSON.stringify({retryAfterSeconds:120}),{status:429})}});
+ fireEvent.change(screen.getByLabelText('Your answer'),{target:{value:'Remove the reminder please'}});fireEvent.click(screen.getByRole('button',{name:'Send answer'}));
+ await screen.findByText(/request limit.*2 minutes/);
+ expect(screen.getByLabelText('Your answer')).toHaveValue('Remove the reminder please');expect(mocks.add).not.toHaveBeenCalled();
+});
+
+describe('contextual composer and fresh conversations',()=>{
+ it('updates the input hint with the question, and restores it on Back',async()=>{
+  mocks.invoke.mockResolvedValueOnce({data:{...introduction,input_hint:'Tell me what is already booked…'}}).mockResolvedValueOnce({data:{...introduction,phase:'details',reply:'How long would you like to read?',choices:['15 minutes','30 minutes'],input_hint:'Enter a duration, such as 20 minutes…'}});
+  open();await screen.findByPlaceholderText('Tell me what is already booked…');
+  fireEvent.click(screen.getByRole('button',{name:'Nothing else booked'}));
+  await screen.findByPlaceholderText('Enter a duration, such as 20 minutes…');
+  fireEvent.click(screen.getByRole('button',{name:'Back'}));
+  await screen.findByPlaceholderText('Tell me what is already booked…');
+ });
+ it('uses a neutral fallback for old saved responses rather than an unrelated activity example',async()=>{
+  open();await screen.findByText(introduction.reply);
+  expect(screen.getByLabelText('Your answer')).toHaveAttribute('placeholder','Type your answer to the question above…');
+ });
+ it('cancelling reset keeps the typed answer and does not restart',async()=>{
+  open();await screen.findByText(introduction.reply);
+  fireEvent.change(screen.getByLabelText('Your answer'),{target:{value:'I finish work at 6'}});
+  fireEvent.click(screen.getByRole('button',{name:'Start over'}));fireEvent.click(screen.getByRole('button',{name:'Keep planning'}));
+  expect(screen.getByLabelText('Your answer')).toHaveValue('I finish work at 6');expect(mocks.invoke).toHaveBeenCalledTimes(1);
+ });
+ it('resets only this conversation and rechecks saved bookings without deleting quests',async()=>{
+  mocks.invoke.mockResolvedValueOnce({data:{...introduction,phase:'review',choices:[],quests:[quest],engagements:[{title:'Unsaved meeting',start:'2026-10-27T09:00:00Z',end:'2026-10-27T10:00:00Z'}]}}).mockResolvedValueOnce({data:{...introduction,reply:'Fresh plan. Anything else booked?',input_hint:'Tell me about your day…'}});
+  localStorage.setItem('cosmiq:quest-planner:planning-user:2026-10-29','other day draft');
+  open();await screen.findByText('Learn astronomy');
+  fireEvent.click(screen.getByRole('button',{name:'Add quest to Agenda'}));await screen.findByText('Added to Agenda');
+  fireEvent.click(screen.getByRole('button',{name:'Start over'}));fireEvent.click(screen.getByRole('button',{name:'Reset conversation'}));
+  await screen.findByText('Fresh plan. Anything else booked?');
+  const body=mocks.invoke.mock.calls[1][1].body;
+  expect(body.date).toBe('2026-10-27');expect(body.history).toEqual([]);expect(body.draft).toBeNull();
+  expect(mocks.availability.mock.calls.at(-1)[1].extraCommitments).toEqual([]);
+  expect(mocks.remove).not.toHaveBeenCalled();expect(mocks.update).not.toHaveBeenCalled();expect(mocks.add).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole('button',{name:'Back'})).not.toBeInTheDocument();
+  expect(localStorage.getItem('cosmiq:quest-planner:planning-user:2026-10-29')).toBe('other day draft');
+  const saved=JSON.parse(localStorage.getItem('cosmiq:quest-planner:planning-user:2026-10-27')!);
+  expect(saved.history).toHaveLength(2);expect(saved.plan.quests).toEqual([]);
+ });
+});
+
+it('reviews and saves multiple recurring class periods with their repeat rules and reminders intact',async()=>{
+ const recurrence={pattern:'weekly',days:[0,2],month_days:[],end_date:'2026-12-18'};
+ const first={...quest,title:'Class',date:'2026-10-28',time:'08:00',duration:180,recurrence,reminder_offsets_minutes:[60]};
+ const second={...first,id:'afternoon',time:'14:00',duration:120};
+ mocks.invoke.mockResolvedValue({data:{...introduction,phase:'review',choices:[],quests:[first,second]}});
+ mocks.add.mockImplementation(async value=>{mocks.availability.mockResolvedValue({tasks:[{id:'saved',task_text:'Class',task_date:'2026-10-28',scheduled_time:'08:00',estimated_duration:180,is_recurring:true,recurrence_pattern:'weekly',recurrence_days:[0,2]}],events:[],incomplete:false});return {id:value.creationId==='afternoon'?'saved2':'saved'};});
+ open();await screen.findByText('Add 2 quests to Agenda');
+ expect(screen.getAllByText(/Every Mon, Wed/)).toHaveLength(2);
+ fireEvent.click(screen.getByRole('button',{name:'Add 2 quests to Agenda'}));
+ await waitFor(()=>expect(mocks.add).toHaveBeenCalledTimes(2));
+ expect(mocks.add.mock.calls[0][0]).toMatchObject({taskDate:'2026-10-28',recurrencePattern:'weekly',recurrenceDays:[0,2],recurrenceEndDate:'2026-12-18',reminderOffsetsMinutes:[60]});
+ expect(mocks.add.mock.calls[1][0]).toMatchObject({scheduledTime:'14:00',estimatedDuration:120});
+ expect(mocks.check.mock.calls[0][0]).toMatchObject({recurrence_pattern:'weekly',is_recurring:true,task_date:'2026-10-28'});
+ expect(screen.queryByRole('button',{name:'Undo quests just added'})).not.toBeInTheDocument();
 });

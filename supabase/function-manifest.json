@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-20T07:40:46Z",
+  "generatedAt": "2026-11-10T20:10:26Z",
   "frontendInvoked": [
     "adjust-epic-plan",
     "analyze-user-patterns",
@@ -16,6 +16,7 @@
     "companion-chat",
     "companion-planner-chat",
     "companion-wellbeing-video",
+    "cosmiq-quest-planner",
     "create-influencer-code",
     "decompose-task",
     "delete-quest-attachment",
@@ -134,6 +135,7 @@
     "companion-chat",
     "companion-planner-chat",
     "companion-wellbeing-video",
+    "cosmiq-quest-planner",
     "cost-guardrail-monitor",
     "create-influencer-code",
     "decompose-task",

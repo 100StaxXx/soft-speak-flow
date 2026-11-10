@@ -443,7 +443,16 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
     onSuccess: refreshCalendarIntegrations,
   });
 
+  // Return fresh query results directly: awaiting invalidation alone leaves a
+  // caller's current render holding the old error/connection snapshot.
+  const reloadScheduleSources = async () => {
+    const [freshSettings, freshConnections] = await Promise.all([settingsQuery.refetch(), connectionsQuery.refetch()]);
+    return { connections: freshConnections.data ?? [], visibleCalendars: freshSettings.data?.visible_calendars,
+      calendarsLoading: freshSettings.isError || freshConnections.isError };
+  };
+
   return {
+    reloadScheduleSources,
     settings,
     connections,
     connectedByProvider,
@@ -453,6 +462,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
     canConnectAppleNative,
     appleNativeUnavailableReason,
     isLoading: settingsQuery.isLoading || connectionsQuery.isLoading,
+    hasLoadError: !!settingsQuery.error || !!connectionsQuery.error,
     refreshCalendarIntegrations,
 
     upsertSettings,

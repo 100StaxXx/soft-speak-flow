@@ -29,6 +29,7 @@
 		AS1000001000000000000001 /* AuthSessionStoragePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AS2000001000000000000001 /* AuthSessionStoragePlugin.swift */; };
 		NC1000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */; };
 		NP1000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = NP2000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift */; };
+		B71000001000000000000001 /* Plugins/NativeVoiceInput/NativeVoiceInputPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B72000001000000000000001 /* Plugins/NativeVoiceInput/NativeVoiceInputPlugin.swift */; };
 		NP1000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = NP2000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m */; };
 		SC1000001000000000000001 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = SC2000001000000000000001 /* SceneDelegate.swift */; };
 		WD1000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */; };
@@ -93,6 +94,7 @@
 		AS2000001000000000000001 /* AuthSessionStoragePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/AuthSessionStorage/AuthSessionStoragePlugin.swift; sourceTree = "<group>"; };
 		NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/NativeCalendar/NativeCalendarPlugin.m; sourceTree = "<group>"; };
 		NP2000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift; sourceTree = "<group>"; };
+		B72000001000000000000001 /* Plugins/NativeVoiceInput/NativeVoiceInputPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/NativeVoiceInput/NativeVoiceInputPlugin.swift; sourceTree = "<group>"; };
 		NP2000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m; sourceTree = "<group>"; };
 		SC2000001000000000000001 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/WidgetData/WidgetDataPlugin.swift; sourceTree = "<group>"; };
@@ -161,6 +163,7 @@
 				AS2000001000000000000001 /* AuthSessionStoragePlugin.swift */,
 				NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */,
 				NP2000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift */,
+				B72000001000000000000001 /* Plugins/NativeVoiceInput/NativeVoiceInputPlugin.swift */,
 				NP2000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m */,
 				EV2000001000000000000001 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.swift */,
 				EV2000001000000000000002 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m */,
@@ -451,6 +454,7 @@
 				AS1000001000000000000001 /* AuthSessionStoragePlugin.swift in Sources */,
 				NC1000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m in Sources */,
 				NP1000001000000000000001 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.swift in Sources */,
+				B71000001000000000000001 /* Plugins/NativeVoiceInput/NativeVoiceInputPlugin.swift in Sources */,
 				NP1000001000000000000002 /* Plugins/NativePlacesAutocomplete/NativePlacesAutocompletePlugin.m in Sources */,
 				EV1000001000000000000001 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.swift in Sources */,
 					EV1000001000000000000002 /* Plugins/EvolutionShareVideo/EvolutionShareVideoPlugin.m in Sources */,
